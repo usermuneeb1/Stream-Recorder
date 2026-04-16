@@ -107,10 +107,6 @@ jobs:
           echo "jq version: $(jq --version)"
           echo "──────────────────────────────────────"
 
-      # ─── 3. SETUP CLOUDFLARE WARP ────────────────────────────────────────
-      - name: "🌐 Setup Cloudflare WARP"
-        continue-on-error: true
-        run: bash scripts/setup-warp.sh
 
       # ─── 4. CHECK DISK SPACE ─────────────────────────────────────────────
       - name: "💾 Check Disk Space"
@@ -189,7 +185,13 @@ jobs:
           source scripts/discord-notify.sh
           notify_live_detected
 
-      # ─── 8. RECORD THE STREAM ────────────────────────────────────────────
+      # ─── 8. SETUP CLOUDFLARE WARP (Pre-recording) ────────────────────────
+      - name: "🌐 Setup Cloudflare WARP"
+        if: steps.detect.outputs.is_live == 'true'
+        continue-on-error: true
+        run: bash scripts/setup-warp.sh
+
+      # ─── 9. RECORD THE STREAM ────────────────────────────────────────────
       - name: "🎬 Record Stream"
         id: record
         if: steps.detect.outputs.is_live == 'true'
