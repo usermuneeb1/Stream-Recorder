@@ -86,21 +86,30 @@ check_cookie_health() {
         set_env "COOKIE_STATUS" "expired"
         set_output "cookie_status" "expired"
         
-        # Send Discord warning
-        source "$SCRIPT_DIR/discord-notify.sh"
+        local last_warning_time
+        last_warning_time=$(github_api_read_content "cookie_warning_sent.txt" 2>/dev/null) || last_warning_time=0
+        local current_time=$(now_epoch)
         
-        # Calculate cookie age
-        local cookie_age="unknown"
-        local last_valid
-        last_valid=$(github_api_read_content "cookie_timestamp.txt" 2>/dev/null) || last_valid=""
-        if [[ -n "$last_valid" ]]; then
-            local now_ts
-            now_ts=$(now_epoch)
-            local age_sec=$(( now_ts - last_valid ))
-            cookie_age=$(( age_sec / 86400 ))
+        if (( current_time - last_warning_time > 86400 )); then
+            # Send Discord warning
+            source "$SCRIPT_DIR/discord-notify.sh"
+            
+            # Calculate cookie age
+            local cookie_age="unknown"
+            local last_valid
+            last_valid=$(github_api_read_content "cookie_timestamp.txt" 2>/dev/null) || last_valid=""
+            if [[ -n "$last_valid" ]]; then
+                local now_ts
+                now_ts=$(now_epoch)
+                local age_sec=$(( now_ts - last_valid ))
+                cookie_age=$(( age_sec / 86400 ))
+            fi
+            
+            notify_cookie_warning "expired" "$cookie_age"
+            github_api_write "cookie_warning_sent.txt" "$current_time" "Lock: Cookie warning sent" >/dev/null 2>&1 || true
+        else
+            log_warn "Cookie warn limited (already sent within 24h)"
         fi
-        
-        notify_cookie_warning "expired" "$cookie_age"
         
         log_warn "⚠️ Recording will continue with cookieless methods (lower quality)"
         log_warn "⚠️ To fix: re-export cookies from your browser and update the YOUTUBE_COOKIES secret"

@@ -77,10 +77,12 @@ detect_method_1_redirect() {
     user_agent=$(rotate_user_agent)
     
     # Follow redirects and capture the final URL
+    local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
     local final_url
     final_url=$(curl -sL -o /dev/null -w '%{url_effective}' \
         --max-time 15 \
         -H "User-Agent: ${user_agent}" \
+        -H "Cookie: ${bypass_cookie}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         -H "Accept: text/html,application/xhtml+xml" \
         "$live_url" 2>/dev/null) || {
@@ -236,9 +238,11 @@ detect_method_3_streams_tab() {
     user_agent=$(rotate_user_agent)
     
     # Fetch the streams tab
+    local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
     local page_content
     page_content=$(curl -s --max-time 20 \
         -H "User-Agent: ${user_agent}" \
+        -H "Cookie: ${bypass_cookie}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         -H "Accept: text/html,application/xhtml+xml" \
         "$streams_url" 2>/dev/null) || {
@@ -255,10 +259,10 @@ detect_method_3_streams_tab() {
     # YouTube marks live streams with specific badges in the HTML
     local video_ids=()
     
-    # Extract video IDs that have live badges
+    # Extract video IDs specifically from the streams tab video renderer objects
     while IFS= read -r vid; do
         [[ -n "$vid" ]] && video_ids+=("$vid")
-    done < <(echo "$page_content" | grep -oP '"videoId"\s*:\s*"\K[a-zA-Z0-9_-]{11}' | sort -u | head -5)
+    done < <(grep -oP '"gridVideoRenderer":\{"videoId":"\K[a-zA-Z0-9_-]{11}' <<< "$page_content" | head -10)
     
     if [[ ${#video_ids[@]} -eq 0 ]]; then
         log_info "Method 3: No videos found on /streams tab"
@@ -274,6 +278,7 @@ detect_method_3_streams_tab() {
         local video_page
         video_page=$(curl -s --max-time 15 \
             -H "User-Agent: ${user_agent}" \
+            -H "Cookie: ${bypass_cookie}" \
             "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || continue
         
         if grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"; then
