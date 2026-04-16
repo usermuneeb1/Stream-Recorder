@@ -1,0 +1,54 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  📡 STREAM RECORDER — WEEKLY SUMMARY WORKFLOW                              ║
+# ║  Runs every Monday at 10:00 UTC (3:00 PM PKT) to send weekly analytics.   ║
+# ║  Reads stats.json + links.txt and sends a premium Discord embed.          ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "📊 Weekly Summary"
+
+on:
+  schedule:
+    # Every Monday at 10:00 UTC = 3:00 PM PKT
+    - cron: "0 10 * * 1"
+  
+  workflow_dispatch:
+
+env:
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  GH_PAT: ${{ secrets.GH_PAT }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  summary:
+    name: "📊 Generate Weekly Report"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install Dependencies"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq bc curl python3
+          chmod +x scripts/*.sh
+
+      - name: "📊 Generate & Send Weekly Report"
+        run: bash scripts/weekly-report.sh
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          source scripts/utils.sh
+          
+          echo "## 📊 Weekly Summary Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Generated | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📹 This Week | ${WEEKLY_TOTAL_STREAMS:-0} streams |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏱️ Hours | ${WEEKLY_TOTAL_HOURS:-0}h |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💾 Size | ${WEEKLY_TOTAL_GB:-0} GB |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📏 Lifetime | ${LIFETIME_TOTAL_STREAMS:-0} streams |" >> $GITHUB_STEP_SUMMARY

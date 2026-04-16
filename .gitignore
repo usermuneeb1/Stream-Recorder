@@ -1,0 +1,38 @@
+# ═══════════════════════════════════════════════════════════
+#  📡 Stream Recorder — .gitignore
+# ═══════════════════════════════════════════════════════════
+
+# Media files (never commit recordings)
+*.mp4
+*.webm
+*.mkv
+*.ts
+*.m4a
+*.flv
+*.part
+*.ytdl
+
+# Cookie files (contains sensitive data)
+cookies.txt
+cookies_encoded.txt
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python cache
+__pycache__/
+*.pyc

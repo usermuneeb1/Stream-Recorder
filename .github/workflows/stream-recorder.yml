@@ -1,0 +1,306 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  📡 AUTOMATED STREAM RECORDER — MAIN WORKFLOW                              ║
+# ║  Runs every 5 minutes (Thu-Sun) to check for live streams and record them. ║
+# ║  Full lifecycle: Detect → Record → Process → Upload → Notify → Archive    ║
+# ║                                                                            ║
+# ║  Author : Muneeb Ahmad                                                    ║
+# ║  Version: 2.0.0                                                           ║
+# ║  Repo   : Public (unlimited GitHub Actions minutes)                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "📡 Stream Recorder"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  TRIGGERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+on:
+  # Scheduled: Every 5 minutes, Thursday through Sunday
+  schedule:
+    - cron: "*/5 * * * 4"    # Thursday
+    - cron: "*/5 * * * 5"    # Friday
+    - cron: "*/5 * * * 6"    # Saturday
+    - cron: "*/5 * * * 0"    # Sunday
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      force_record:
+        description: "Force recording even if not live (for testing)"
+        required: false
+        default: "false"
+        type: boolean
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CONCURRENCY — Only one recording at a time, never cancel running jobs
+# ═══════════════════════════════════════════════════════════════════════════════
+
+concurrency:
+  group: stream-recorder
+  cancel-in-progress: false
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ENVIRONMENT VARIABLES (from secrets)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+env:
+  # Main webhook (fallback if specific channels not set)
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  # Channel-specific webhooks (optional — falls back to main if not set)
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_LINKS: ${{ secrets.DISCORD_WEBHOOK_LINKS }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  # YouTube & Cloud
+  YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+  YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
+  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  GH_PAT: ${{ secrets.GH_PAT }}
+  WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  RECORD_DIR: /tmp/stream-recorder
+  COOKIES_FILE: cookies.txt
+  TZ: Asia/Karachi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  JOBS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+jobs:
+  record:
+    name: "🎬 Detect & Record"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360   # 6 hours max
+
+    steps:
+      # ─── 1. CHECKOUT REPOSITORY ──────────────────────────────────────────
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
+      - name: "📦 Install Dependencies"
+        run: |
+          echo "📦 Installing required tools..."
+          
+          # Update package list
+          sudo apt-get update -qq
+          
+          # Install core tools
+          sudo apt-get install -y -qq ffmpeg jq bc curl python3
+          
+          # Install yt-dlp (latest nightly for best YouTube compatibility)
+          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+          sudo chmod a+rx /usr/local/bin/yt-dlp
+          
+          # Install streamlink
+          pip3 install --quiet streamlink
+          
+          # Make scripts executable
+          chmod +x scripts/*.sh
+          
+          # Verify installations
+          echo "──────────────────────────────────────"
+          echo "yt-dlp version: $(yt-dlp --version)"
+          echo "ffmpeg version: $(ffmpeg -version 2>&1 | head -1)"
+          echo "streamlink version: $(streamlink --version 2>/dev/null || echo 'N/A')"
+          echo "jq version: $(jq --version)"
+          echo "──────────────────────────────────────"
+
+      # ─── 3. SETUP CLOUDFLARE WARP ────────────────────────────────────────
+      - name: "🌐 Setup Cloudflare WARP"
+        continue-on-error: true
+        run: bash scripts/setup-warp.sh
+
+      # ─── 4. CHECK DISK SPACE ─────────────────────────────────────────────
+      - name: "💾 Check Disk Space"
+        id: disk_check
+        run: |
+          source scripts/utils.sh
+          
+          log_header "💾 DISK SPACE CHECK"
+          
+          available=$(get_disk_space_gb)
+          total=$(get_total_disk_gb)
+          used=$(get_disk_used_percent)
+          
+          echo "disk_space=${available}" >> $GITHUB_OUTPUT
+          echo "DISK_SPACE_GB=${available}" >> $GITHUB_ENV
+          
+          log_info "Available: ${available} GB / ${total} GB (${used}% used)"
+          
+          if ! check_disk_space 3; then
+            log_error "Insufficient disk space — aborting"
+            echo "disk_ok=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "disk_ok=true" >> $GITHUB_OUTPUT
+
+      # ─── 5. PREPARE COOKIES ──────────────────────────────────────────────
+      - name: "🍪 Prepare Cookies"
+        if: steps.disk_check.outputs.disk_ok == 'true'
+        run: |
+          source scripts/utils.sh
+          
+          log_header "🍪 COOKIE PREPARATION"
+          
+          if [[ -n "${YOUTUBE_COOKIES:-}" ]]; then
+            echo "$YOUTUBE_COOKIES" | base64 -d > cookies.txt 2>/dev/null || {
+              log_warn "Failed to decode cookies — recording without authentication"
+              rm -f cookies.txt
+            }
+            
+            if [[ -f cookies.txt ]] && [[ -s cookies.txt ]]; then
+              line_count=$(wc -l < cookies.txt)
+              log_ok "Cookies prepared: ${line_count} lines"
+              
+              # Validate cookie format
+              if head -1 cookies.txt | grep -qi "netscape\|mozilla\|#"; then
+                log_ok "Cookie format validated (Netscape/Mozilla)"
+              else
+                log_warn "Cookie format may be invalid — proceeding anyway"
+              fi
+            else
+              log_warn "Cookie file is empty after decode"
+              rm -f cookies.txt
+            fi
+          else
+            log_info "No YOUTUBE_COOKIES secret set — will use cookieless methods"
+          fi
+
+      # ─── 5b. CHECK COOKIE HEALTH ──────────────────────────────────────────
+      - name: "🍪 Check Cookie Health"
+        if: steps.disk_check.outputs.disk_ok == 'true'
+        continue-on-error: true
+        run: bash scripts/check-cookies.sh
+
+      # ─── 6. DETECT LIVE STREAM ───────────────────────────────────────────
+      - name: "🔍 Detect Live Stream"
+        id: detect
+        if: steps.disk_check.outputs.disk_ok == 'true'
+        run: bash scripts/detect-stream.sh
+
+      # ─── 7. SEND LIVE DETECTED NOTIFICATION ──────────────────────────────
+      - name: "🔴 Notify — Live Detected"
+        if: steps.detect.outputs.is_live == 'true'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_live_detected
+
+      # ─── 8. RECORD THE STREAM ────────────────────────────────────────────
+      - name: "🎬 Record Stream"
+        id: record
+        if: steps.detect.outputs.is_live == 'true'
+        timeout-minutes: 300  # 5 hours max for recording
+        run: bash scripts/record-stream.sh
+
+      # ─── 9. POST-PROCESS ─────────────────────────────────────────────────
+      - name: "⚙️ Post-Process"
+        id: process
+        if: steps.record.outputs.recording_success == 'true'
+        run: bash scripts/post-process.sh
+
+      # ─── 10. UPLOAD TO CLOUDS ────────────────────────────────────────────
+      - name: "☁️ Upload to Clouds"
+        id: upload
+        if: steps.process.outputs.parts_count != ''
+        continue-on-error: true
+        run: bash scripts/upload-clouds.sh
+
+      # ─── 11. SEND COMPLETE NOTIFICATION ──────────────────────────────────
+      - name: "✅ Notify — Recording Complete"
+        if: steps.record.outputs.recording_success == 'true'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_recording_complete
+
+      # ─── 12. UPDATE STATISTICS ───────────────────────────────────────────
+      - name: "📊 Update Statistics"
+        if: steps.record.outputs.recording_success == 'true'
+        continue-on-error: true
+        run: bash scripts/update-stats.sh
+
+      # ─── 13. ARCHIVE LINKS ───────────────────────────────────────────────
+      - name: "🔗 Archive Links"
+        if: steps.record.outputs.recording_success == 'true'
+        continue-on-error: true
+        run: bash scripts/update-links.sh
+
+      # ─── 14. SEND FAILED NOTIFICATION (if recording failed) ──────────────
+      - name: "❌ Notify — Recording Failed"
+        if: steps.detect.outputs.is_live == 'true' && steps.record.outputs.recording_success != 'true'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_recording_failed "All recording methods failed" "Auto-retry triggered in 2 minutes"
+
+      # ─── 15. AUTO-RETRY ON FAILURE ────────────────────────────────────────
+      - name: "🔄 Auto-Retry on Failure"
+        if: steps.detect.outputs.is_live == 'true' && steps.record.outputs.recording_success != 'true'
+        continue-on-error: true
+        run: |
+          source scripts/utils.sh
+          
+          log_header "🔄 AUTO-RETRY"
+          log_info "Waiting 2 minutes before retrying..."
+          sleep 120
+          
+          log_info "Triggering workflow retry..."
+          curl -s -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${GH_PAT}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/dispatches" \
+            -d '{"ref":"main"}' || {
+            log_warn "Failed to trigger retry — will retry on next scheduled run"
+          }
+
+      # ─── 16. CLEANUP (ALWAYS RUNS) ───────────────────────────────────────
+      - name: "🧹 Cleanup"
+        if: always()
+        run: |
+          source scripts/utils.sh
+          
+          log_header "🧹 CLEANUP"
+          
+          # Remove all media files
+          rm -f *.mp4 *.webm *.mkv *.ts *.m4a *.flv *.part 2>/dev/null
+          rm -f cookies.txt 2>/dev/null
+          rm -rf /tmp/stream-recorder 2>/dev/null
+          rm -rf /tmp/yt-dlp-* 2>/dev/null
+          
+          # Report final disk space
+          log_info "Final disk space: $(get_disk_space_gb) GB free"
+          log_ok "Cleanup complete"
+
+      # ─── 17. RUN SUMMARY ─────────────────────────────────────────────────
+      - name: "📋 Run Summary"
+        if: always()
+        run: |
+          source scripts/utils.sh
+          
+          log_header "📋 RUN SUMMARY"
+          log_info "Completed at  : $(now_pkt)"
+          log_info "Stream live   : ${STREAM_IS_LIVE:-false}"
+          log_info "Recorded      : ${RECORDING_SUCCESS:-false}"
+          log_info "Duration      : ${RECORD_DURATION_FMT:-N/A}"
+          log_info "File size     : ${RECORD_SIZE_HUMAN:-N/A}"
+          log_info "Parts         : ${RECORD_PARTS:-N/A}"
+          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3}"
+          log_info "WARP          : ${WARP_CONNECTED:-false}"
+          log_info "Disk space    : $(get_disk_space_gb 2>/dev/null || echo 'N/A') GB"
+          
+          # Write to Job Summary
+          echo "## 📡 Stream Recorder — Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Time | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📺 Stream Live | ${STREAM_IS_LIVE:-false} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎬 Recorded | ${RECORDING_SUCCESS:-false} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏱️ Duration | ${RECORD_DURATION_FMT:-N/A} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💾 Size | ${RECORD_SIZE_HUMAN:-N/A} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 WARP | ${WARP_CONNECTED:-false} |" >> $GITHUB_STEP_SUMMARY

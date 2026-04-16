@@ -1,0 +1,73 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  📡 STREAM RECORDER — CLOUD LINK REFRESH WORKFLOW                          ║
+# ║  Runs every 3 days to keep Gofile/Pixeldrain links alive.                  ║
+# ║  Pings each link to reset the 60-day inactivity timer.                    ║
+# ║  Dead links are reported and can be restored from Archive.org.            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🔄 Cloud Link Refresh"
+
+on:
+  schedule:
+    # Every 3 days at 06:00 UTC (11:00 AM PKT)
+    - cron: "0 6 */3 * *"
+  
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (check only, no refresh)"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: cloud-refresh
+  cancel-in-progress: false
+
+env:
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  GH_PAT: ${{ secrets.GH_PAT }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  refresh:
+    name: "🔗 Refresh Cloud Links"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install Dependencies"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq bc curl python3
+          chmod +x scripts/*.sh
+
+      - name: "🔄 Refresh Links"
+        run: bash scripts/refresh-links.sh
+
+      - name: "📢 Send Discord Notification"
+        if: always()
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_links_refreshed
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          source scripts/utils.sh
+          
+          echo "## 🔄 Cloud Link Refresh Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Time | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔗 Checked | ${REFRESH_TOTAL_CHECKED:-0} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Alive | ${REFRESH_TOTAL_ALIVE:-0} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔄 Refreshed | ${REFRESH_TOTAL_REFRESHED:-0} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💀 Dead | ${REFRESH_TOTAL_DEAD:-0} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏛️ Restored | ${REFRESH_TOTAL_RESTORED:-0} |" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,14 @@
+{
+    "total_streams": 0,
+    "total_hours": 0,
+    "total_gb": 0,
+    "avg_duration_hours": 0,
+    "last_stream": {
+        "title": "",
+        "channel": "",
+        "date": "",
+        "duration": "00:00:00",
+        "size_gb": 0
+    },
+    "updated_at": ""
+}
