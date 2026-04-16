@@ -259,10 +259,10 @@ detect_method_3_streams_tab() {
     # YouTube marks live streams with specific badges in the HTML
     local video_ids=()
     
-    # Extract video IDs specifically from the streams tab video renderer objects
+    # Extract video IDs specifically from the streams tab 
     while IFS= read -r vid; do
         [[ -n "$vid" ]] && video_ids+=("$vid")
-    done < <(grep -oP '"gridVideoRenderer":\{"videoId":"\K[a-zA-Z0-9_-]{11}' <<< "$page_content" | head -10)
+    done < <(grep -oP '"videoId"\s*:\s*"\K[a-zA-Z0-9_-]{11}' <<< "$page_content" | sort -u | head -10)
     
     if [[ ${#video_ids[@]} -eq 0 ]]; then
         log_info "Method 3: No videos found on /streams tab"
