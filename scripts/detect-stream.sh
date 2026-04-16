@@ -108,8 +108,8 @@ detect_method_1_redirect() {
         return 1
     }
     
-    # Check for live indicators
-    if ! grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true|isLiveBroadcast' <<< "$page_content"; then
+    # Check for live indicators (strictly isLiveNow to avoid VOD false positives)
+    if ! grep -qE '"isLiveNow"\s*:\s*true' <<< "$page_content"; then
         log_info "Method 1: Video found but NOT currently live"
         return 1
     fi
@@ -266,7 +266,7 @@ detect_method_3_streams_tab() {
             -H "User-Agent: ${user_agent}" \
             "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || continue
         
-        if grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true' <<< "$video_page"; then
+        if grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"; then
             log_info "Method 3: Video ${video_id} is LIVE!"
             
             # Extract metadata
@@ -403,7 +403,7 @@ is_stream_still_live() {
         -H "User-Agent: ${user_agent}" \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || return 1
     
-    grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true' <<< "$page_content"
+    grep -qE '"isLiveNow"\s*:\s*true' <<< "$page_content"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
