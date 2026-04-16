@@ -14,15 +14,15 @@
 #  Consistent, timestamped, color-coded logging with emoji prefixes.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-readonly LOG_RESET='\033[0m'
-readonly LOG_RED='\033[0;31m'
-readonly LOG_GREEN='\033[0;32m'
-readonly LOG_YELLOW='\033[0;33m'
-readonly LOG_BLUE='\033[0;34m'
-readonly LOG_PURPLE='\033[0;35m'
-readonly LOG_CYAN='\033[0;36m'
-readonly LOG_GRAY='\033[0;90m'
-readonly LOG_BOLD='\033[1m'
+LOG_RESET="\033[0m"
+LOG_RED="\033[1;31m"
+LOG_GREEN="\033[1;32m"
+LOG_YELLOW="\033[1;33m"
+LOG_BLUE="\033[1;34m"
+LOG_PURPLE="\033[1;35m"
+LOG_CYAN="\033[1;36m"
+LOG_GRAY="\033[0;37m"
+LOG_BOLD="\033[1m"
 
 _log_timestamp() {
     date '+%Y-%m-%d %H:%M:%S'

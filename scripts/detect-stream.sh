@@ -77,19 +77,19 @@ detect_method_1_redirect() {
     }
     
     # Check for live indicators
-    if ! echo "$page_content" | grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true|isLiveBroadcast'; then
+    if ! grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true|isLiveBroadcast' <<< "$page_content"; then
         log_info "Method 1: Video found but NOT currently live"
         return 1
     fi
     
     # Extract metadata from page
     local title=""
-    title=$(echo "$page_content" | grep -oP '"title"\s*:\s*"\K[^"]+' | head -1 || echo "")
-    [[ -z "$title" ]] && title=$(echo "$page_content" | grep -oP '<title>\K[^<]+' | head -1 | sed 's/ - YouTube$//' || echo "")
+    title=$(grep -oP '"title"\s*:\s*"\K[^"]+' <<< "$page_content" | head -1 || echo "")
+    [[ -z "$title" ]] && title=$(grep -oP '<title>\K[^<]+' <<< "$page_content" | head -1 | sed 's/ - YouTube$//' || echo "")
     
     local channel=""
-    channel=$(echo "$page_content" | grep -oP '"ownerChannelName"\s*:\s*"\K[^"]+' | head -1 || echo "")
-    [[ -z "$channel" ]] && channel=$(echo "$page_content" | grep -oP '"author"\s*:\s*"\K[^"]+' | head -1 || echo "")
+    channel=$(grep -oP '"ownerChannelName"\s*:\s*"\K[^"]+' <<< "$page_content" | head -1 || echo "")
+    [[ -z "$channel" ]] && channel=$(grep -oP '"author"\s*:\s*"\K[^"]+' <<< "$page_content" | head -1 || echo "")
     
     local thumbnail="https://i.ytimg.com/vi/${video_id}/maxresdefault_live.jpg"
     
@@ -234,13 +234,13 @@ detect_method_3_streams_tab() {
             -H "User-Agent: ${user_agent}" \
             "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || continue
         
-        if echo "$video_page" | grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true'; then
+        if grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true' <<< "$video_page"; then
             log_info "Method 3: Video ${video_id} is LIVE!"
             
             # Extract metadata
             local title channel
-            title=$(echo "$video_page" | grep -oP '"title"\s*:\s*"\K[^"]+' | head -1 || echo "Live Stream")
-            channel=$(echo "$video_page" | grep -oP '"ownerChannelName"\s*:\s*"\K[^"]+' | head -1 || echo "Unknown")
+            title=$(grep -oP '"title"\s*:\s*"\K[^"]+' <<< "$video_page" | head -1 || echo "Live Stream")
+            channel=$(grep -oP '"ownerChannelName"\s*:\s*"\K[^"]+' <<< "$video_page" | head -1 || echo "Unknown")
             
             DETECTED_VIDEO_ID="$video_id"
             DETECTED_TITLE="${title:-Live Stream}"
@@ -301,7 +301,7 @@ detect_live_stream() {
     set_output "is_live" "false"
     set_env "STREAM_IS_LIVE" "false"
     
-    return 1
+    return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -317,7 +317,7 @@ _export_detection_results() {
             log_warn "Duplicate Detection: Stream ${DETECTED_VIDEO_ID} already recorded. Skipping."
             set_output "is_live" "false"
             set_env "STREAM_IS_LIVE" "false"
-            return 1
+            return 0
         fi
     fi
     
@@ -371,7 +371,7 @@ is_stream_still_live() {
         -H "User-Agent: ${user_agent}" \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || return 1
     
-    echo "$page_content" | grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true'
+    grep -qE '"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true' <<< "$page_content"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

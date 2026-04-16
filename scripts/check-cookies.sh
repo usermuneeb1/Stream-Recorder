@@ -58,17 +58,17 @@ check_cookie_health() {
     local logged_in=false
     
     # Method 1: Check for subscription feed content (only visible when logged in)
-    if echo "$response" | grep -q '"subscriptionButton"'; then
+    if grep -q '"subscriptionButton"' <<< "$response"; then
         logged_in=true
     fi
     
     # Method 2: Check for user avatar/account indicators
-    if echo "$response" | grep -qE '"LOGGED_IN"|"accountName"|"avatarUrl"'; then
+    if grep -qE '"LOGGED_IN"|"accountName"|"avatarUrl"' <<< "$response"; then
         logged_in=true
     fi
     
     # Method 3: Check if we were redirected to login page (means NOT logged in)
-    if echo "$response" | grep -qE 'accounts\.google\.com|"LOGIN_REQUIRED"'; then
+    if grep -qE 'accounts\.google\.com|"LOGIN_REQUIRED"' <<< "$response"; then
         logged_in=false
     fi
     
