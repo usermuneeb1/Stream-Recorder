@@ -22,6 +22,38 @@ DETECTED_METHOD=""
 DETECTED_URL=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  URL SANITIZER
+#  Handles whether the user entered a raw handle or a full YouTube URL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+get_live_url() {
+    local channel_input="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
+    local channel_handle
+    
+    # If the user pasted a full URL, extract the part after youtube.com
+    if [[ "$channel_input" =~ youtube\.com/([^/]+) ]]; then
+        channel_handle="${BASH_REMATCH[1]}"
+    else
+        channel_handle="$channel_input"
+    fi
+    
+    echo "https://www.youtube.com/${channel_handle}/live"
+}
+
+get_streams_url() {
+    local channel_input="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
+    local channel_handle
+    
+    if [[ "$channel_input" =~ youtube\.com/([^/]+) ]]; then
+        channel_handle="${BASH_REMATCH[1]}"
+    else
+        channel_handle="$channel_input"
+    fi
+    
+    echo "https://www.youtube.com/${channel_handle}/streams"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  METHOD 1: /live Redirect Check (Fastest — 1-2 seconds)
 #  Checks if youtube.com/@channel/live redirects to a video page
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -29,8 +61,8 @@ DETECTED_URL=""
 detect_method_1_redirect() {
     log_step "Method 1: Checking /live redirect..."
     
-    local channel_handle="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
-    local live_url="https://www.youtube.com/${channel_handle}/live"
+    local live_url
+    live_url=$(get_live_url)
     local user_agent
     user_agent=$(rotate_user_agent)
     
@@ -113,8 +145,8 @@ detect_method_1_redirect() {
 detect_method_2_ytdlp() {
     log_step "Method 2: yt-dlp JSON dump..."
     
-    local channel_handle="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
-    local live_url="https://www.youtube.com/${channel_handle}/live"
+    local live_url
+    live_url=$(get_live_url)
     local cookies_arg=""
     
     # Use cookies if available
@@ -188,8 +220,8 @@ detect_method_2_ytdlp() {
 detect_method_3_streams_tab() {
     log_step "Method 3: Scanning /streams tab..."
     
-    local channel_handle="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
-    local streams_url="https://www.youtube.com/${channel_handle}/streams"
+    local streams_url
+    streams_url=$(get_streams_url)
     local user_agent
     user_agent=$(rotate_user_agent)
     
