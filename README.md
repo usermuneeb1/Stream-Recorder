@@ -2,5 +2,5 @@
 
 Automated YouTube Stream Recorder
 
-**Author:** SAVA_GAMING143  
+**Author:** Muneeb Ahmad 
 **License:** MIT
