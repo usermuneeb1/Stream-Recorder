@@ -161,8 +161,8 @@ detect_method_2_ytdlp() {
     live_url=$(get_live_url)
     local cookies_arg=""
     
-    # Use cookies if available
-    if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]]; then
+    # Use cookies if available and not explicitly expired
+    if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]] && [[ "$COOKIE_STATUS" != "expired" ]]; then
         cookies_arg="--cookies cookies.txt"
     fi
     
