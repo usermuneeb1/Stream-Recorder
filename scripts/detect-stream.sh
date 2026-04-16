@@ -275,12 +275,33 @@ detect_method_3_streams_tab() {
     
     local video_id="$live_video_id"
     log_info "Method 3: Video ${video_id} is LIVE!"
-            
-    # Extract metadata from the streams tab
-    local title channel
-    # Safely extract title and channel from the streams page content
-    title="Live Stream"
-    channel="Unknown Channel"
+    
+    # Extract title from the video block in the HTML
+    local title
+    title=$(echo "$page_content" | awk -F'"videoId":"'"$video_id"'"' '{
+        split($2, a, "\"text\":\"");
+        if (length(a) > 1) {
+            split(a[2], b, "\"");
+            print b[1];
+        }
+    }' | head -1)
+    [[ -z "$title" ]] && title=$(echo "$page_content" | grep -oP '"title":\{"runs":\[\{"text":"\K[^"]+' | head -1 || true)
+    [[ -z "$title" ]] && title="Live Stream"
+    
+    # Extract channel name from the page
+    local channel
+    channel=$(echo "$page_content" | grep -oP '"channelName":"\K[^"]+' | head -1 || true)
+    [[ -z "$channel" ]] && channel=$(echo "$page_content" | grep -oP '"ownerChannelName":"\K[^"]+' | head -1 || true)
+    [[ -z "$channel" ]] && channel=$(echo "$page_content" | grep -oP '"c4TabbedHeaderRenderer".*?"title":"\K[^"]+' | head -1 || true)
+    # Fallback: extract from page metadata
+    [[ -z "$channel" ]] && channel=$(echo "$page_content" | grep -oP '<link itemprop="name" content="\K[^"]+' | head -1 || true)
+    [[ -z "$channel" ]] && channel=$(echo "$page_content" | grep -oP '"author":"\K[^"]+' | head -1 || true)
+    [[ -z "$channel" ]] && {
+        # Last resort: extract from the URL handle
+        local handle
+        handle=$(echo "${YOUTUBE_CHANNEL_ID:-}" | grep -oP '@\K[^/]+' || true)
+        channel="${handle:-Unknown Channel}"
+    }
     
     DETECTED_VIDEO_ID="$video_id"
     DETECTED_TITLE="$title"
@@ -289,7 +310,7 @@ detect_method_3_streams_tab() {
     DETECTED_METHOD="Streams Tab Scan"
     DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
     
-    log_ok "Method 3: ✅ LIVE DETECTED — ${DETECTED_URL}"
+    log_ok "Method 3: ✅ LIVE DETECTED — ${DETECTED_TITLE} by ${DETECTED_CHANNEL}"
     return 0
 }
 
@@ -400,13 +421,41 @@ is_stream_still_live() {
     
     local user_agent
     user_agent=$(rotate_user_agent)
+    local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
     
-    local page_content
-    page_content=$(curl -s --max-time 10 \
+    # Method A: Check the streams tab for LIVE badge (most reliable, avoids per-video blocks)
+    local streams_url
+    streams_url=$(get_streams_url 2>/dev/null || echo "")
+    if [[ -n "$streams_url" ]]; then
+        local page_content
+        page_content=$(curl -s --max-time 15 \
+            -H "User-Agent: ${user_agent}" \
+            -H "Cookie: ${bypass_cookie}" \
+            -H "Accept-Language: en-US,en;q=0.9" \
+            "$streams_url" 2>/dev/null) || true
+        
+        if [[ -n "$page_content" ]]; then
+            # Check if this specific video ID still has LIVE badge
+            local is_live
+            is_live=$(echo "$page_content" | awk -F'"videoId":"'"$video_id"'"' '{
+                if ($2 ~ /"style":"LIVE"/) print "yes";
+            }')
+            [[ "$is_live" == "yes" ]] && return 0
+            
+            # Also check if ANY video is live (stream may have restarted with new ID)
+            echo "$page_content" | grep -q '"style":"LIVE"' && return 0
+        fi
+    fi
+    
+    # Method B: Direct video page check with bypass cookies
+    local video_page
+    video_page=$(curl -s --max-time 10 \
         -H "User-Agent: ${user_agent}" \
+        -H "Cookie: ${bypass_cookie}" \
+        -H "Accept-Language: en-US,en;q=0.9" \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || return 1
     
-    grep -qE '"isLiveNow"\s*:\s*true' <<< "$page_content"
+    grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

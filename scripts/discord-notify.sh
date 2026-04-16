@@ -106,10 +106,9 @@ notify_live_detected() {
     local method="${STREAM_DETECTION_METHOD:-Unknown}"
     local detect_time="${STREAM_DETECTION_TIME:-$(now_pkt)}"
     local avatar="${AVATAR_URL:-}"
-    local warp_status="${WARP_CONNECTED:-false}"
+    local cookie_status="${COOKIE_STATUS:-unknown}"
     local disk_space
     disk_space=$(get_disk_space_gb 2>/dev/null || echo "N/A")
-    local warp_ip="${WARP_IP:-${ORIGINAL_IP:-N/A}}"
     local timestamp
     timestamp=$(now_utc_iso)
     
@@ -118,8 +117,11 @@ notify_live_detected() {
     esc_channel=$(json_escape "$channel")
     esc_method=$(json_escape "$method")
     
-    local warp_indicator="🔴 Off"
-    [[ "$warp_status" == "true" ]] && warp_indicator="🟢 Connected"
+    # Cookie status indicator
+    local cookie_indicator="✅ Valid"
+    [[ "$cookie_status" == "expired" ]] && cookie_indicator="⚠️ Expired"
+    [[ "$cookie_status" == "no_cookies" ]] && cookie_indicator="❌ None"
+    [[ "$cookie_status" == "check_failed" ]] && cookie_indicator="❓ Unknown"
     
     local payload
     payload=$(cat <<PAYLOAD
@@ -129,64 +131,55 @@ notify_live_detected() {
     "embeds": [
         {
             "title": "🔴  LIVE STREAM DETECTED",
-            "description": "A live broadcast has been detected. **Recording has been initiated automatically.**\\n\\nThe system is now capturing the stream using the bulletproof multi-method recording engine.",
+            "description": "> **${esc_title}**\\n\\n🎥 Recording has been **initiated automatically**. The system is capturing the stream using the multi-method recording engine.",
             "color": ${COLOR_LIVE_DETECTED:-15736129},
             "thumbnail": {
                 "url": "${thumbnail}"
             },
             "fields": [
                 {
-                    "name": "📺  Stream Title",
-                    "value": "[${esc_title}](${video_url})",
-                    "inline": false
-                },
-                {
-                    "name": "👤  Channel",
-                    "value": "${esc_channel}",
+                    "name": "📺  Channel",
+                    "value": "**${esc_channel}**",
                     "inline": true
                 },
                 {
-                    "name": "🕐  Detected At",
+                    "name": "🔍  Method",
+                    "value": "\`${esc_method}\`",
+                    "inline": true
+                },
+                {
+                    "name": "🕐  Detected",
                     "value": "\`${detect_time}\`",
                     "inline": true
                 },
                 {
-                    "name": "🔍  Detection Method",
-                    "value": "${esc_method}",
-                    "inline": true
-                },
-                {
-                    "name": "▶️  Watch Live",
-                    "value": "**[🔗 Open in YouTube](${video_url})**",
-                    "inline": false
-                },
-                {
                     "name": "\\u200B",
-                    "value": "\\u200B",
+                    "value": "**[▶️ Watch Live on YouTube](${video_url})**",
                     "inline": false
                 },
                 {
-                    "name": "🌐  WARP Status",
-                    "value": "${warp_indicator}",
+                    "name": "🍪  Cookies",
+                    "value": "${cookie_indicator}",
                     "inline": true
                 },
                 {
-                    "name": "💾  Disk Space",
+                    "name": "💾  Disk",
                     "value": "\`${disk_space} GB\` free",
                     "inline": true
                 },
                 {
-                    "name": "🔒  IP Address",
-                    "value": "\`${warp_ip}\`",
+                    "name": "🛡️  Status",
+                    "value": "🟢 Recording...",
                     "inline": true
                 }
             ],
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • Stream Recorder",
+                "name": "${esc_channel} is LIVE",
+                "url": "${video_url}",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Automated Stream Recorder v${RECORDER_VERSION:-2.0.0} • © ${RECORDER_NAME:-Muneeb Ahmad} • Recording in Progress...",
+                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • Recording in progress...",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"

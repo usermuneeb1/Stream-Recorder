@@ -89,7 +89,8 @@ jobs:
           # Install core tools
           sudo apt-get install -y -qq ffmpeg jq bc curl python3
           
-          # Install yt-dlp (latest nightly for best YouTube compatibility)
+          # Install yt-dlp (nightly build for latest YouTube anti-bot patches)
+          sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp 2>/dev/null || \
           sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
           sudo chmod a+rx /usr/local/bin/yt-dlp
           

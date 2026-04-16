@@ -32,7 +32,13 @@ record_method_a() {
     local user_agent
     user_agent=$(rotate_user_agent)
     
-    log_info "  Method A: Cookies + web_creator player"
+    log_info "  Method A: Cookies + web player"
+    
+    # Skip if cookies are expired or missing
+    if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
+        log_warn "  Method A: Cookies expired — skipping"
+        return 1
+    fi
     
     if [[ ! -f "$COOKIES_FILE" ]] || [[ ! -s "$COOKIES_FILE" ]]; then
         log_warn "  Method A: No cookies file — skipping"
@@ -41,10 +47,11 @@ record_method_a() {
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
-        --extractor-args "youtube:player_client=web_creator" \
+        --extractor-args "youtube:player_client=web" \
         --user-agent "$user_agent" \
         --no-part \
         --no-continue \
+        --no-check-certificates \
         --live-from-start \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
@@ -66,7 +73,13 @@ record_method_b() {
     local user_agent
     user_agent=$(rotate_user_agent)
     
-    log_info "  Method B: Cookies + tv player"
+    log_info "  Method B: Cookies + web_creator player"
+    
+    # Skip if cookies are expired or missing
+    if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
+        log_warn "  Method B: Cookies expired — skipping"
+        return 1
+    fi
     
     if [[ ! -f "$COOKIES_FILE" ]] || [[ ! -s "$COOKIES_FILE" ]]; then
         log_warn "  Method B: No cookies file — skipping"
@@ -75,10 +88,11 @@ record_method_b() {
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
-        --extractor-args "youtube:player_client=tv" \
+        --extractor-args "youtube:player_client=web_creator" \
         --user-agent "$user_agent" \
         --no-part \
         --no-continue \
+        --no-check-certificates \
         --live-from-start \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
@@ -98,12 +112,13 @@ record_method_c() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method C: iOS player (no cookies)"
+    log_info "  Method C: Web player (no cookies, anonymous)"
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        --extractor-args "youtube:player_client=ios" \
+        --extractor-args "youtube:player_client=web" \
         --no-part \
         --no-continue \
+        --no-check-certificates \
         --live-from-start \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
@@ -123,12 +138,12 @@ record_method_d() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method D: Android player (no cookies)"
+    log_info "  Method D: Default player (auto-detect best client)"
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        --extractor-args "youtube:player_client=android" \
         --no-part \
         --no-continue \
+        --no-check-certificates \
         --live-from-start \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
@@ -149,13 +164,14 @@ record_method_e() {
     local output_file="$2"
     local mobile_ua="Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36"
     
-    log_info "  Method E: Mobile web player (no cookies)"
+    log_info "  Method E: Mobile web player (mweb)"
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --extractor-args "youtube:player_client=mweb" \
         --user-agent "$mobile_ua" \
         --no-part \
         --no-continue \
+        --no-check-certificates \
         --live-from-start \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
@@ -289,10 +305,10 @@ attempt_recording() {
         "record_method_f"
     )
     local method_names=(
-        "A: Cookies+web_creator"
-        "B: Cookies+tv"
-        "C: iOS"
-        "D: Android"
+        "A: Cookies+web"
+        "B: Cookies+web_creator"
+        "C: Web (anonymous)"
+        "D: Default (auto)"
         "E: Mobile Web"
         "F: Streamlink"
     )
