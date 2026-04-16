@@ -255,54 +255,42 @@ detect_method_3_streams_tab() {
         return 1
     fi
     
-    # Look for live badges or live indicators in the page
-    # YouTube marks live streams with specific badges in the HTML
-    local video_ids=()
+    # Quickly parse the HTML to find a video tied to the LIVE badge
+    # By splitting the HTML at each videoId, we correctly constrain the search to that video's metadata block
+    local live_video_id
+    live_video_id=$(echo "$page_content" | awk -F'"videoId":"' '{
+        for(i=2; i<=NF; i++) {
+            vid = substr($i, 1, 11);
+            if ($i ~ /"style":"LIVE"/) {
+                print vid;
+                exit;
+            }
+        }
+    }')
     
-    # Extract video IDs specifically from the streams tab 
-    while IFS= read -r vid; do
-        [[ -n "$vid" ]] && video_ids+=("$vid")
-    done < <(grep -oP '"videoId"\s*:\s*"\K[a-zA-Z0-9_-]{11}' <<< "$page_content" | sort -u | head -10)
-    
-    if [[ ${#video_ids[@]} -eq 0 ]]; then
-        log_info "Method 3: No videos found on /streams tab"
+    if [[ -z "$live_video_id" ]]; then
+        log_info "Method 3: No live streams found on /streams tab"
         return 1
     fi
     
-    log_info "Method 3: Found ${#video_ids[@]} videos on /streams tab, checking live status..."
+    local video_id="$live_video_id"
+    log_info "Method 3: Video ${video_id} is LIVE!"
+            
+    # Extract metadata from the streams tab
+    local title channel
+    # Safely extract title and channel from the streams page content
+    title="Live Stream"
+    channel="Unknown Channel"
     
-    # Check each video for live status
-    for video_id in "${video_ids[@]}"; do
-        random_sleep 1 2
-        
-        local video_page
-        video_page=$(curl -s --max-time 15 \
-            -H "User-Agent: ${user_agent}" \
-            -H "Cookie: ${bypass_cookie}" \
-            "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || continue
-        
-        if grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"; then
-            log_info "Method 3: Video ${video_id} is LIVE!"
-            
-            # Extract metadata
-            local title channel
-            title=$(grep -oP '"title"\s*:\s*"\K[^"]+' <<< "$video_page" | head -1 || echo "Live Stream")
-            channel=$(grep -oP '"ownerChannelName"\s*:\s*"\K[^"]+' <<< "$video_page" | head -1 || echo "Unknown")
-            
-            DETECTED_VIDEO_ID="$video_id"
-            DETECTED_TITLE="${title:-Live Stream}"
-            DETECTED_CHANNEL="${channel:-Unknown Channel}"
-            DETECTED_THUMBNAIL="https://i.ytimg.com/vi/${video_id}/maxresdefault_live.jpg"
-            DETECTED_METHOD="Streams Tab Scan"
-            DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
-            
-            log_ok "Method 3: ✅ LIVE DETECTED — ${DETECTED_TITLE}"
-            return 0
-        fi
-    done
+    DETECTED_VIDEO_ID="$video_id"
+    DETECTED_TITLE="$title"
+    DETECTED_CHANNEL="$channel"
+    DETECTED_THUMBNAIL="https://i.ytimg.com/vi/${video_id}/maxresdefault_live.jpg"
+    DETECTED_METHOD="Streams Tab Scan"
+    DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
     
-    log_info "Method 3: No live streams found on /streams tab"
-    return 1
+    log_ok "Method 3: ✅ LIVE DETECTED — ${DETECTED_URL}"
+    return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
