@@ -27,27 +27,37 @@ DETECTED_URL=""
 # ═══════════════════════════════════════════════════════════════════════════════
 
 get_live_url() {
-    local channel_input="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
+    local channel_input
+    channel_input=$(echo "${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}" | tr -d '[:space:]')
     local channel_handle
     
-    # If the user pasted a full URL, extract the part after youtube.com
-    if [[ "$channel_input" =~ youtube\.com/([^/]+) ]]; then
+    if [[ "$channel_input" =~ youtube\.com/([^/\?]+) ]]; then
         channel_handle="${BASH_REMATCH[1]}"
     else
         channel_handle="$channel_input"
+    fi
+    
+    # Ensure it has @ if not a channel/ format
+    if [[ "$channel_handle" != "@"* ]] && [[ "$channel_handle" != "channel/"* ]] && [[ "$channel_handle" != "c/"* ]]; then
+        channel_handle="@${channel_handle}"
     fi
     
     echo "https://www.youtube.com/${channel_handle}/live"
 }
 
 get_streams_url() {
-    local channel_input="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
+    local channel_input
+    channel_input=$(echo "${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}" | tr -d '[:space:]')
     local channel_handle
     
-    if [[ "$channel_input" =~ youtube\.com/([^/]+) ]]; then
+    if [[ "$channel_input" =~ youtube\.com/([^/\?]+) ]]; then
         channel_handle="${BASH_REMATCH[1]}"
     else
         channel_handle="$channel_input"
+    fi
+    
+    if [[ "$channel_handle" != "@"* ]] && [[ "$channel_handle" != "channel/"* ]] && [[ "$channel_handle" != "c/"* ]]; then
+        channel_handle="@${channel_handle}"
     fi
     
     echo "https://www.youtube.com/${channel_handle}/streams"
@@ -412,4 +422,5 @@ is_stream_still_live() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     detect_live_stream
+    exit 0
 fi
