@@ -28,14 +28,17 @@ source "$SCRIPT_DIR/utils.sh"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 get_webhook_url() {
-    local type="$1"  # "alerts", "links", or "reports"
+    local type="$1"  # alerts, recordings, refresh, reports
     
     case "$type" in
         alerts)
             echo "${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
             ;;
-        links)
-            echo "${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}"
+        recordings)
+            echo "${DISCORD_WEBHOOK_RECORDINGS:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}"
+            ;;
+        refresh)
+            echo "${DISCORD_WEBHOOK_REFRESH:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}"
             ;;
         reports)
             echo "${DISCORD_WEBHOOK_REPORTS:-${DISCORD_WEBHOOK_URL:-}}"
@@ -412,7 +415,7 @@ notify_recording_complete() {
 PAYLOAD
 )
     
-    send_discord_webhook "$payload" "links"
+    send_discord_webhook "$payload" "recordings"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -780,7 +783,7 @@ notify_links_refreshed() {
 PAYLOAD
 )
     
-    send_discord_webhook "$payload" "reports"
+    send_discord_webhook "$payload" "refresh"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
