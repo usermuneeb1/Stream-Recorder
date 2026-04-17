@@ -161,16 +161,16 @@ update_recordings_json() {
     local month_folder
     month_folder=$(TZ='Asia/Karachi' date '+%Y-%m')
     
-    # Build download links
+    # Build download links (env vars are semicolon-delimited: "PartName|url;PartName|url")
     local gofile_link="" pixeldrain_link="" archive_link=""
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
-        gofile_link=$(echo "$GOFILE_LINKS" | head -1 | cut -d'|' -f2)
+        gofile_link=$(echo "$GOFILE_LINKS" | cut -d';' -f1 | cut -d'|' -f2)
     fi
     if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
-        pixeldrain_link=$(echo "$PIXELDRAIN_LINKS" | head -1 | cut -d'|' -f2)
+        pixeldrain_link=$(echo "$PIXELDRAIN_LINKS" | cut -d';' -f1 | cut -d'|' -f2)
     fi
     if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
-        archive_link=$(echo "$ARCHIVE_LINKS" | head -1 | cut -d'|' -f2)
+        archive_link=$(echo "$ARCHIVE_LINKS" | cut -d';' -f1 | cut -d'|' -f2)
     fi
     
     # If no thumbnail from stream, use YouTube default

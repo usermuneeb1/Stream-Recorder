@@ -435,9 +435,13 @@ is_stream_still_live() {
         return 0
     fi
     
-    # Method B: yt-dlp json check (Definitive but slower)
+    # Method B: yt-dlp json check (Definitive but slower — only if Method A inconclusive)
     local is_live
-    is_live=$(yt-dlp --dump-json --no-download --extractor-args "youtube:player_client=mweb" "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null | jq -r '.is_live // false' 2>/dev/null)
+    is_live=$(timeout 20 yt-dlp --dump-json --no-download \
+        --extractor-args "youtube:player_client=mweb" \
+        --socket-timeout 5 \
+        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null \
+        | jq -r '.is_live // false' 2>/dev/null)
     if [[ "$is_live" == "true" ]]; then
         return 0
     fi

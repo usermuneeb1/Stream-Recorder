@@ -371,13 +371,13 @@ upload_to_clouds() {
     # Build links strings for env
     local gofile_links_str="" pixeldrain_links_str="" archive_links_str=""
     
-    for entry in "${GOFILE_LINKS[@]:-}"; do
+    for entry in "${GOFILE_LINKS[@]+${GOFILE_LINKS[@]}}"; do
         [[ -n "$entry" ]] && gofile_links_str+="${entry};"
     done
-    for entry in "${PIXELDRAIN_LINKS[@]:-}"; do
+    for entry in "${PIXELDRAIN_LINKS[@]+${PIXELDRAIN_LINKS[@]}}"; do
         [[ -n "$entry" ]] && pixeldrain_links_str+="${entry};"
     done
-    for entry in "${ARCHIVE_LINKS[@]:-}"; do
+    for entry in "${ARCHIVE_LINKS[@]+${ARCHIVE_LINKS[@]}}"; do
         [[ -n "$entry" ]] && archive_links_str+="${entry};"
     done
     

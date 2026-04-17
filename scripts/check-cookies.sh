@@ -112,7 +112,8 @@ check_cookie_health() {
         
         local last_warning_time
         last_warning_time=$(github_api_read_content "cookie_warning_sent.txt" 2>/dev/null) || last_warning_time=0
-        local current_time=$(now_epoch)
+        local current_time
+        current_time=$(now_epoch)
         
         if (( current_time - last_warning_time > 86400 )); then
             # Send Discord warning

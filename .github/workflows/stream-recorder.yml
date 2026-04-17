@@ -231,7 +231,7 @@ jobs:
       # ─── 10. UPLOAD TO CLOUDS ────────────────────────────────────────────
       - name: "☁️ Upload to Clouds"
         id: upload
-        if: steps.process.outputs.parts_count != ''
+        if: steps.record.outputs.recording_success == 'true'
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
 
@@ -271,17 +271,18 @@ jobs:
           source scripts/utils.sh
           
           log_header "🔄 AUTO-RETRY"
-          log_info "Waiting 2 minutes before retrying..."
-          sleep 120
+          log_info "Stream was live but recording failed — dispatching new workflow run..."
+          log_info "(Current run will finish cleanup, then new run will start)"
           
-          log_info "Triggering workflow retry..."
+          # Fire-and-forget dispatch — new run queued by concurrency group after this one ends
           curl -s -X POST \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token ${GH_PAT}" \
+            -H "Content-Type: application/json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/dispatches" \
-            -d '{"ref":"main"}' || {
-            log_warn "Failed to trigger retry — will retry on next scheduled run"
-          }
+            -d '{"ref":"main"}' && \
+            log_ok "Retry dispatched — will start after this run finishes" || \
+            log_warn "Failed to dispatch retry — next scheduled run (in 5 min) will retry"
 
       # ─── 16. CLEANUP (ALWAYS RUNS) ───────────────────────────────────────
       - name: "🧹 Cleanup"

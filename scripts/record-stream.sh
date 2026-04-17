@@ -292,7 +292,7 @@ attempt_recording() {
     local attempt_num="$2"
     local output_base="${SEGMENTS_DIR}/segment_$(printf '%03d' "$attempt_num").mp4"
     
-    log_step "Recording attempt ${attempt_num}/${MAX_RECORD_ATTEMPTS:-5}"
+    log_step "Recording attempt ${attempt_num}/${MAX_RECORD_ATTEMPTS:-3}"
     log_info "  URL: ${video_url}"
     log_info "  Output: ${output_base}"
     
@@ -445,7 +445,7 @@ record_stream() {
     log_info "Stream    : ${stream_title}"
     log_info "Video ID  : ${video_id}"
     log_info "URL       : ${video_url}"
-    log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-5} attempts × 6 methods = $((${MAX_RECORD_ATTEMPTS:-5} * 6)) chances"
+    log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-3} attempts × 6 methods = $((${MAX_RECORD_ATTEMPTS:-3} * 6)) chances"
     log_info "Started   : $(now_pkt)"
     
     # ── Prepare directories ──────────────────────────────────────────────────
