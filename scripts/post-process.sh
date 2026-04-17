@@ -291,18 +291,19 @@ post_process() {
         return 1
     fi
     
-    # ── Stage 4: Download Thumbnail ──────────────────────────────────────────
+    # ── Stage 4: Download Thumbnail (for Discord embed only — NOT uploaded to cloud) ──
     if [[ "${SAVE_THUMBNAIL:-true}" == "true" ]] && [[ -n "${STREAM_THUMBNAIL:-}" ]]; then
         log_separator
-        log_step "Downloading Thumbnail..."
+        log_step "Downloading Thumbnail (for Discord only)..."
         local thumb_ext="jpg"
         [[ "$STREAM_THUMBNAIL" == *".webp"* ]] && thumb_ext="webp"
         local thumb_file="${RECORD_DIR}/${base_name}_thumbnail.${thumb_ext}"
         
         if curl -sL --max-time 15 -o "$thumb_file" "$STREAM_THUMBNAIL"; then
             if [[ -s "$thumb_file" ]]; then
-                log_ok "Thumbnail downloaded successfully"
-                PROCESSED_FILES+=("$thumb_file")
+                log_ok "Thumbnail saved (Discord embed only — will NOT be uploaded to cloud)"
+                # NOTE: NOT adding to PROCESSED_FILES — thumbnail stays local for Discord
+                set_env "LOCAL_THUMBNAIL_PATH" "$thumb_file"
             else
                 log_warn "Downloaded thumbnail is empty"
                 rm -f "$thumb_file"

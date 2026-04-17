@@ -70,7 +70,7 @@ generate_weekly_report() {
                 local entry_ymd
                 entry_ymd=$(echo "$entry_date" | grep -oP '\d{4}-\d{2}-\d{2}' | head -1)
                 
-                if [[ -n "$entry_ymd" ]] && [[ "$entry_ymd" >= "$week_start" ]] && [[ "$entry_ymd" <= "$today" ]]; then
+                if [[ -n "$entry_ymd" ]] && [[ ! "$entry_ymd" < "$week_start" ]] && [[ ! "$entry_ymd" > "$today" ]]; then
                     (( weekly_streams++ ))
                     
                     # Parse duration to hours

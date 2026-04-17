@@ -8,7 +8,7 @@
 # ║  Repo   : Public (unlimited GitHub Actions minutes)                       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "📡 Stream Recorder"
+name: "☪️ The Muslim Lantern — Stream Recorder"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  TRIGGERS
@@ -73,7 +73,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360   # 6 hours max
 
+    permissions:
+      contents: write
+      actions: write
+
     steps:
+      # ─── 0. AUTO-CLEANUP OLD RUNS ────────────────────────────────────────
+      - name: "🧹 Cleanup Old Workflow Runs"
+        continue-on-error: true
+        run: |
+          # Delete old completed runs to keep Actions tab clean (keep latest 5)
+          echo "🧹 Cleaning up old workflow runs..."
+          RUNS=$(curl -s -H "Authorization: token ${GH_PAT}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=50&status=completed" \
+            | jq -r '.workflow_runs[5:] | .[].id' 2>/dev/null) || true
+          
+          deleted=0
+          for run_id in $RUNS; do
+            curl -s -X DELETE -H "Authorization: token ${GH_PAT}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" 2>/dev/null && ((deleted++)) || true
+          done
+          echo "✅ Deleted ${deleted} old runs"
+
       # ─── 1. CHECKOUT REPOSITORY ──────────────────────────────────────────
       - name: "📥 Checkout Repository"
         uses: actions/checkout@v4
@@ -296,7 +317,7 @@ jobs:
           log_info "Disk space    : $(get_disk_space_gb 2>/dev/null || echo 'N/A') GB"
           
           # Write to Job Summary
-          echo "## 📡 Stream Recorder — Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## ☪️ The Muslim Lantern — Run Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY

@@ -78,12 +78,23 @@ refresh_links() {
     local archive_urls=()
     
     while IFS= read -r line; do
-        if [[ "$line" =~ \[gofile:.+\]\ (https://gofile\.io/d/[^ ]+) ]]; then
+        # Match format: [gofile:Part 1] https://gofile.io/d/XXXXX
+        if [[ "$line" =~ \[gofile:[^\]]+\]\ *(https://gofile\.io/d/[^ ]+) ]]; then
             gofile_urls+=("${BASH_REMATCH[1]}")
-        elif [[ "$line" =~ \[pixeldrain:.+\]\ (https://pixeldrain\.com/u/[^ ]+) ]]; then
+        elif [[ "$line" =~ gofile\.io/d/([a-zA-Z0-9]+) ]]; then
+            gofile_urls+=("https://gofile.io/d/${BASH_REMATCH[1]}")
+        fi
+        # Match format: [pixeldrain:Part 1] https://pixeldrain.com/u/XXXXX
+        if [[ "$line" =~ \[pixeldrain:[^\]]+\]\ *(https://pixeldrain\.com/u/[^ ]+) ]]; then
             pixeldrain_urls+=("${BASH_REMATCH[1]}")
-        elif [[ "$line" =~ \[archive:.+\]\ (https://archive\.org/details/[^ ]+) ]]; then
+        elif [[ "$line" =~ pixeldrain\.com/u/([a-zA-Z0-9_-]+) ]]; then
+            pixeldrain_urls+=("https://pixeldrain.com/u/${BASH_REMATCH[1]}")
+        fi
+        # Match format: [archive:Part 1] https://archive.org/details/XXXXX
+        if [[ "$line" =~ \[archive:[^\]]+\]\ *(https://archive\.org/details/[^ ]+) ]]; then
             archive_urls+=("${BASH_REMATCH[1]}")
+        elif [[ "$line" =~ archive\.org/details/([a-zA-Z0-9_-]+) ]]; then
+            archive_urls+=("https://archive.org/details/${BASH_REMATCH[1]}")
         fi
     done <<< "$links_content"
     

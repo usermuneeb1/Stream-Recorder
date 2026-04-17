@@ -126,7 +126,7 @@ notify_live_detected() {
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
@@ -179,7 +179,7 @@ notify_live_detected() {
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • Recording in progress...",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Recording in progress...",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -300,7 +300,7 @@ notify_recording_complete() {
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
@@ -375,7 +375,7 @@ notify_recording_complete() {
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • ${upload_emoji} ${upload_count}/${upload_total} uploads",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • ${upload_emoji} ${upload_count}/${upload_total} uploads",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -458,7 +458,7 @@ notify_recording_failed() {
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
@@ -470,13 +470,23 @@ notify_recording_failed() {
             },
             "fields": [
                 {
-                    "name": "🔍  Diagnosis",
+                    "name": "\\u200B",
+                    "value": "━━━━━ **Diagnosis** ━━━━━",
+                    "inline": false
+                },
+                {
+                    "name": "🔍  Root Cause",
                     "value": "${diagnosis}",
                     "inline": false
                 },
                 {
-                    "name": "📋  Error",
+                    "name": "📋  Error Details",
                     "value": "\`\`\`\\n${esc_error}\\n\`\`\`",
+                    "inline": false
+                },
+                {
+                    "name": "\\u200B",
+                    "value": "━━━━━ **Status** ━━━━━",
                     "inline": false
                 },
                 {
@@ -496,7 +506,22 @@ notify_recording_failed() {
                 },
                 {
                     "name": "\\u200B",
-                    "value": "━━━━━ **Troubleshooting** ━━━━━\\n1️⃣ Re-export fresh cookies from Firefox\\n2️⃣ Update \`YOUTUBE_COOKIES\` GitHub secret\\n3️⃣ Trigger a fresh workflow run\\n\\n**[▶️ Check if still live](${video_url})**",
+                    "value": "━━━━━ **Troubleshooting** ━━━━━",
+                    "inline": false
+                },
+                {
+                    "name": "1️⃣  Refresh Cookies",
+                    "value": "Re-export fresh cookies from Firefox",
+                    "inline": false
+                },
+                {
+                    "name": "2️⃣  Update Secret",
+                    "value": "Update \`YOUTUBE_COOKIES\` in GitHub secrets",
+                    "inline": false
+                },
+                {
+                    "name": "3️⃣  Manual Run",
+                    "value": "**[▶️ Check if still live](${video_url})** — Then trigger a fresh workflow",
                     "inline": false
                 }
             ],
@@ -505,7 +530,7 @@ notify_recording_failed() {
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • Auto-retry active",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Auto-retry active",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -530,7 +555,6 @@ notify_weekly_summary() {
     local timestamp
     timestamp=$(now_utc_iso)
     
-    # These should be set by the weekly-report.sh script
     local total_streams="${WEEKLY_TOTAL_STREAMS:-0}"
     local total_hours="${WEEKLY_TOTAL_HOURS:-0}"
     local total_gb="${WEEKLY_TOTAL_GB:-0}"
@@ -547,64 +571,99 @@ notify_weekly_summary() {
     local esc_list
     esc_list=$(json_escape "$streams_list")
     
+    # Performance indicator
+    local perf_emoji="⭐" perf_text="Great Week!"
+    if (( total_streams == 0 )); then
+        perf_emoji="😴" perf_text="No Activity"
+    elif (( total_streams >= 5 )); then
+        perf_emoji="🔥" perf_text="Outstanding!"
+    elif (( total_streams >= 3 )); then
+        perf_emoji="💪" perf_text="Solid Week!"
+    fi
+    
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
-            "title": "📊  WEEKLY SUMMARY",
-            "description": "Performance report for the week of **${week_start} — ${week_end}**\\n\\nHere's what your automated recording system accomplished this week:",
+            "title": "📊  WEEKLY PERFORMANCE REPORT",
+            "description": "**${week_start} — ${week_end}**\\n\\n${perf_emoji} ${perf_text} — Here's your automated recording system's weekly performance breakdown.",
             "color": ${COLOR_WEEKLY:-3447003},
             "fields": [
                 {
-                    "name": "📹  Streams Recorded",
-                    "value": "\`${total_streams}\`",
+                    "name": "\\u200B",
+                    "value": "━━━━━ **This Week** ━━━━━",
+                    "inline": false
+                },
+                {
+                    "name": "📹  Streams",
+                    "value": "**${total_streams}** recorded",
                     "inline": true
                 },
                 {
-                    "name": "⏱️  Total Hours",
-                    "value": "\`${total_hours}h\`",
+                    "name": "⏱️  Hours",
+                    "value": "**${total_hours}h** captured",
                     "inline": true
                 },
                 {
-                    "name": "💾  Total Size",
-                    "value": "\`${total_gb} GB\`",
+                    "name": "💾  Storage",
+                    "value": "**${total_gb} GB** saved",
                     "inline": true
                 },
                 {
                     "name": "📏  Avg Duration",
-                    "value": "\`${avg_duration}\`",
+                    "value": "\`${avg_duration}\` per stream",
                     "inline": true
                 },
                 {
-                    "name": "☁️  Cloud Status",
+                    "name": "☁️  Uploads",
                     "value": "All links active ✅",
                     "inline": true
                 },
                 {
-                    "name": "🟢  System Status",
-                    "value": "Operational",
+                    "name": "🛡️  System",
+                    "value": "🟢 Operational",
                     "inline": true
                 },
                 {
                     "name": "\\u200B",
-                    "value": "\\u200B",
+                    "value": "━━━━━ **Recordings** ━━━━━",
                     "inline": false
                 },
                 {
-                    "name": "📋  This Week's Recordings",
+                    "name": "📝  This Week's Streams",
                     "value": "${esc_list}",
                     "inline": false
+                },
+                {
+                    "name": "\\u200B",
+                    "value": "━━━━━ **All-Time Stats** ━━━━━",
+                    "inline": false
+                },
+                {
+                    "name": "🏆  Total Streams",
+                    "value": "**${lifetime_streams}**",
+                    "inline": true
+                },
+                {
+                    "name": "⏰  Total Hours",
+                    "value": "**${lifetime_hours}h**",
+                    "inline": true
+                },
+                {
+                    "name": "📦  Total Storage",
+                    "value": "**${lifetime_gb} GB**",
+                    "inline": true
                 }
             ],
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • Weekly Report",
+                "name": "${RECORDER_NAME:-The Muslim Lantern} • Weekly Report",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.0.0} • Lifetime: ${lifetime_streams} streams | ${lifetime_hours}h | ${lifetime_gb} GB",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Automated Recording System",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -636,50 +695,63 @@ notify_links_refreshed() {
     local total_restored="${REFRESH_TOTAL_RESTORED:-0}"
     local refresh_time="${REFRESH_TIME_FMT:-N/A}"
     
-    local status_emoji="✅"
-    local status_text="All links healthy"
+    local status_emoji="✅" status_text="All links healthy"
+    local embed_color=${COLOR_REFRESH:-5763757}
     if (( total_dead > 0 )) && (( total_restored > 0 )); then
-        status_emoji="🔧"
-        status_text="${total_restored} restored from Archive.org"
+        status_emoji="🔧" status_text="${total_restored} links restored from Archive.org"
+        embed_color=${COLOR_COMPLETE_PARTIAL:-16761095}
     elif (( total_dead > 0 )); then
-        status_emoji="⚠️"
-        status_text="${total_dead} dead links found"
+        status_emoji="⚠️" status_text="${total_dead} dead links detected"
+        embed_color=${COLOR_FAILED:-15158332}
+    elif (( total_checked == 0 )); then
+        status_emoji="💭" status_text="No links to check yet"
     fi
+    
+    # Health bar
+    local health_pct=100
+    if (( total_checked > 0 )); then
+        health_pct=$(( (total_alive * 100) / total_checked ))
+    fi
+    local health_bar=""
+    local filled=$(( health_pct / 10 ))
+    local empty=$(( 10 - filled ))
+    for ((i=0; i<filled; i++)); do health_bar+="🟢"; done
+    for ((i=0; i<empty; i++)); do health_bar+="⚪"; done
     
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
-            "title": "🔄  CLOUD LINKS REFRESHED",
-            "description": "The automated link preservation system has completed its maintenance cycle.\\nAll download links have been checked and refreshed to prevent expiration.",
-            "color": ${COLOR_REFRESH:-5763757},
+            "title": "🔄  CLOUD LINK PRESERVATION",
+            "description": "The automated link maintenance cycle has completed. All download links have been checked, pinged, and refreshed to **prevent expiration**.\\n\\n${health_bar} **${health_pct}%** Health",
+            "color": ${embed_color},
             "fields": [
                 {
-                    "name": "🔗  Links Checked",
-                    "value": "\`${total_checked}\`",
+                    "name": "🔍  Checked",
+                    "value": "**${total_checked}** links",
                     "inline": true
                 },
                 {
-                    "name": "✅  Links Alive",
-                    "value": "\`${total_alive}\`",
+                    "name": "✅  Alive",
+                    "value": "**${total_alive}** healthy",
                     "inline": true
                 },
                 {
-                    "name": "🔄  Links Refreshed",
-                    "value": "\`${total_refreshed}\`",
+                    "name": "🔄  Refreshed",
+                    "value": "**${total_refreshed}** reset",
                     "inline": true
                 },
                 {
-                    "name": "💀  Dead Links",
-                    "value": "\`${total_dead}\`",
+                    "name": "💀  Dead",
+                    "value": "**${total_dead}** expired",
                     "inline": true
                 },
                 {
-                    "name": "🏛️  Restored from Archive",
-                    "value": "\`${total_restored}\`",
+                    "name": "🏛️  Restored",
+                    "value": "**${total_restored}** from Archive",
                     "inline": true
                 },
                 {
@@ -688,17 +760,17 @@ notify_links_refreshed() {
                     "inline": true
                 },
                 {
-                    "name": "📋  Status",
-                    "value": "${status_emoji} ${status_text}",
+                    "name": "\\u200B",
+                    "value": "${status_emoji} **Status:** ${status_text}",
                     "inline": false
                 }
             ],
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • Link Manager",
+                "name": "${RECORDER_NAME:-The Muslim Lantern} • Link Manager",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.0.0} • © ${RECORDER_NAME:-Muneeb Ahmad} • Next refresh in 3 days",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Next refresh in 3 days",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -712,7 +784,7 @@ PAYLOAD
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 6: 🟢 SYSTEM HEALTH (Bonus)
+#  NOTIFICATION 6: 🛡️ SYSTEM HEALTH
 #  General system health check notification
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -734,37 +806,62 @@ notify_system_health() {
     local ffmpeg_ver
     ffmpeg_ver=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}' || echo "N/A")
     local warp_status="${WARP_CONNECTED:-false}"
-    local current_ip
-    current_ip=$(get_public_ip 2>/dev/null || echo "N/A")
+    local cookie_status="${COOKIE_STATUS:-unknown}"
     
     local warp_text="🔴 Disconnected"
     [[ "$warp_status" == "true" ]] && warp_text="🟢 Connected"
     
+    local cookie_text="❓ Unknown"
+    [[ "$cookie_status" == "valid" ]] && cookie_text="✅ Valid"
+    [[ "$cookie_status" == "expired" ]] && cookie_text="⚠️ Expired"
+    [[ "$cookie_status" == "no_cookies" ]] && cookie_text="❌ None"
+    
+    # System health indicator
+    local health_status="🟢 ALL SYSTEMS OPERATIONAL"
+    local health_color=${COLOR_HEALTH:-10181046}
+    if [[ "$cookie_status" == "expired" ]]; then
+        health_status="🟡 DEGRADED — Cookies expired"
+        health_color=${COLOR_COOKIE_WARN:-16744448}
+    elif [[ "$warp_status" != "true" ]]; then
+        health_status="🟡 DEGRADED — WARP disconnected"
+        health_color=${COLOR_COOKIE_WARN:-16744448}
+    fi
+    
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
-            "title": "🟢  SYSTEM HEALTH CHECK",
-            "description": "All systems operational. The automated stream recorder is running correctly.",
-            "color": ${COLOR_HEALTH:-10181046},
+            "title": "🛡️  SYSTEM HEALTH CHECK",
+            "description": "${health_status}\\n\\nAll components have been verified and the automated recording system is ready to capture streams.",
+            "color": ${health_color},
             "fields": [
                 {
+                    "name": "\\u200B",
+                    "value": "━━━━━ **Infrastructure** ━━━━━",
+                    "inline": false
+                },
+                {
                     "name": "💾  Disk Space",
-                    "value": "\`${disk_space}/${disk_total} GB\` (${disk_used}% used)",
+                    "value": "\`${disk_space}/${disk_total} GB\`\\n(${disk_used}% used)",
                     "inline": true
                 },
                 {
-                    "name": "🌐  WARP",
+                    "name": "🌐  WARP VPN",
                     "value": "${warp_text}",
                     "inline": true
                 },
                 {
-                    "name": "🔒  IP Address",
-                    "value": "\`${current_ip}\`",
+                    "name": "🍪  Cookies",
+                    "value": "${cookie_text}",
                     "inline": true
+                },
+                {
+                    "name": "\\u200B",
+                    "value": "━━━━━ **Software** ━━━━━",
+                    "inline": false
                 },
                 {
                     "name": "📦  yt-dlp",
@@ -777,17 +874,17 @@ notify_system_health() {
                     "inline": true
                 },
                 {
-                    "name": "⏰  Checked At",
+                    "name": "⏰  Checked",
                     "value": "\`$(now_pkt)\`",
                     "inline": true
                 }
             ],
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • System Monitor",
+                "name": "${RECORDER_NAME:-The Muslim Lantern} • System Monitor",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.0.0} • © ${RECORDER_NAME:-Muneeb Ahmad} • ALL SYSTEMS GO",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Automated Health Check",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -811,56 +908,73 @@ notify_cookie_warning() {
     local avatar="${AVATAR_URL:-}"
     local timestamp
     timestamp=$(now_utc_iso)
-    local status="${1:-expired}"  # "expired" or "expiring_soon"
+    local status="${1:-expired}"
     local days_old="${2:-unknown}"
     
-    local title description
+    local title description embed_color
     if [[ "$status" == "expired" ]]; then
-        title="🍪  COOKIES EXPIRED — ACTION REQUIRED"
-        description="Your YouTube cookies have **expired or stopped working**. The recorder will keep trying with cookieless methods, but **recording quality may be lower** and some streams may fail.\n\n**You need to update your cookies to fix this.**"
+        title="🚨  COOKIES EXPIRED — ACTION REQUIRED"
+        description="Your YouTube cookies have **expired or stopped working**. Recording will continue with cookieless methods but **quality and reliability may be reduced**.\\n\\n⚠️ **Update your cookies immediately to restore full functionality.**"
+        embed_color=${COLOR_FAILED:-15158332}
     else
         title="🍪  COOKIES EXPIRING SOON"
-        description="Your YouTube cookies are **${days_old} days old** and may expire soon. Consider updating them to prevent recording issues."
+        description="Your YouTube cookies are **${days_old} days old** and approaching expiration. Update them soon to prevent recording issues."
+        embed_color=${COLOR_COOKIE_WARN:-16744448}
     fi
     
     local payload
     payload=$(cat <<PAYLOAD
 {
-    "username": "${BOT_USERNAME:-📡 Stream Recorder}",
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
     "avatar_url": "${avatar}",
     "embeds": [
         {
             "title": "${title}",
             "description": "${description}",
-            "color": ${COLOR_COOKIE_WARN:-16744448},
+            "color": ${embed_color},
             "fields": [
                 {
                     "name": "🍪  Cookie Age",
-                    "value": "\`${days_old} days\`",
+                    "value": "**${days_old} days**",
                     "inline": true
                 },
                 {
-                    "name": "📋  Status",
-                    "value": "${status}",
+                    "name": "📊  Status",
+                    "value": "\`${status}\`",
                     "inline": true
                 },
                 {
-                    "name": "⏰  Checked At",
+                    "name": "⏰  Checked",
                     "value": "\`$(now_pkt)\`",
                     "inline": true
                 },
                 {
-                    "name": "🔧  How to Fix",
-                    "value": "1. Open your browser → go to YouTube\n2. Make sure you're logged in\n3. Use cookies.txt extension to export\n4. Encode with: \`base64 -w 0 cookies.txt\`\n5. Update the \`YOUTUBE_COOKIES\` secret in GitHub",
+                    "name": "\\u200B",
+                    "value": "━━━━━ **How to Fix** ━━━━━",
+                    "inline": false
+                },
+                {
+                    "name": "1️⃣  Export Cookies",
+                    "value": "Open Firefox → Go to YouTube → Make sure you're logged in → Use **cookies.txt** extension to export",
+                    "inline": false
+                },
+                {
+                    "name": "2️⃣  Encode to Base64",
+                    "value": "Run: \`base64 -w 0 cookies.txt | clip\`",
+                    "inline": false
+                },
+                {
+                    "name": "3️⃣  Update GitHub Secret",
+                    "value": "Go to **Settings → Secrets → Actions** → Edit \`YOUTUBE_COOKIES\` → Paste the base64 string",
                     "inline": false
                 }
             ],
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • Cookie Monitor",
+                "name": "${RECORDER_NAME:-The Muslim Lantern} • Cookie Monitor",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • © ${RECORDER_NAME:-Muneeb Ahmad} • UPDATE YOUR COOKIES",
+                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • UPDATE COOKIES TO RESTORE",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -892,3 +1006,4 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             ;;
     esac
 fi
+

@@ -401,7 +401,17 @@ github_api_write() {
         log_ok "File written to GitHub: $filepath (commit: ${commit_sha:0:7})"
         return 0
     else
+        local err_msg
+        err_msg=$(echo "$response" | jq -r '.message // empty' 2>/dev/null)
         log_error "Failed to write file to GitHub: $filepath"
+        if [[ -n "$err_msg" ]]; then
+            log_error "  GitHub API error: $err_msg"
+            if [[ "$err_msg" == *"not accessible"* ]] || [[ "$err_msg" == *"Resource not accessible"* ]]; then
+                log_error "  FIX: Your GH_PAT needs 'Contents: Read and write' permission"
+                log_error "  Go to: GitHub → Settings → Developer settings → Personal access tokens"
+                log_error "  Create a new token with 'repo' scope (classic) or 'Contents: Read and write' (fine-grained)"
+            fi
+        fi
         log_debug "Response: $response"
         return 1
     fi

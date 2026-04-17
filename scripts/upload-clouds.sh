@@ -104,29 +104,39 @@ upload_to_pixeldrain() {
     local max_retries="${PIXELDRAIN_MAX_RETRIES:-3}"
     local attempt=1
     
-    # Build auth arg
-    local auth_arg=""
-    if [[ -n "$api_key" ]]; then
-        auth_arg="-u :${api_key}"
-    fi
-    
     while (( attempt <= max_retries )); do
         local upload_start
         upload_start=$(now_epoch)
         
+        # URL-encode the filename (spaces, emojis, special chars break the URL)
         local filename
         filename=$(basename "$file")
+        local encoded_filename
+        encoded_filename=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$filename" 2>/dev/null || echo "$filename" | sed 's/ /%20/g; s/&/%26/g')
         
         local upload_response
-        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
-            -T "$file" \
-            $auth_arg \
-            "https://pixeldrain.com/api/file/${filename}" 2>/dev/null) || {
-            log_warn "  Pixeldrain: Upload request failed (attempt $attempt)"
-            (( attempt++ ))
-            sleep 5
-            continue
-        }
+        if [[ -n "$api_key" ]]; then
+            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+                -T "$file" \
+                -u ":${api_key}" \
+                "https://pixeldrain.com/api/file/${encoded_filename}" 2>&1) || {
+                log_warn "  Pixeldrain: Upload request failed (attempt $attempt)"
+                log_debug "  Response: $upload_response"
+                (( attempt++ ))
+                sleep 5
+                continue
+            }
+        else
+            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+                -T "$file" \
+                "https://pixeldrain.com/api/file/${encoded_filename}" 2>&1) || {
+                log_warn "  Pixeldrain: Upload request failed (attempt $attempt)"
+                log_debug "  Response: $upload_response"
+                (( attempt++ ))
+                sleep 5
+                continue
+            }
+        fi
         
         local upload_elapsed=$(( $(now_epoch) - upload_start ))
         
