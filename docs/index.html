@@ -371,10 +371,13 @@
             transition: all .2s; flex-shrink: 0; margin-left: 16px;
         }
         .modal-x:hover { background: var(--red); color: #fff; border-color: var(--red); }
-        .modal-img {
+        .modal-player {
             width: calc(100% - 56px); margin: 0 28px; aspect-ratio: 16/9;
-            object-fit: cover; border-radius: var(--radius-md);
-            box-shadow: 0 4px 20px rgba(0,0,0,.2);
+            background: #000; border-radius: var(--radius-md); overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,.2); position: relative;
+        }
+        .modal-player iframe, .modal-player img {
+            width: 100%; height: 100%; object-fit: cover; border: none;
         }
         .modal-body { padding: 24px 28px 32px; }
         .modal-grid {
@@ -539,7 +542,7 @@
             </div>
             <button class="modal-x" onclick="cm()">✕</button>
         </div>
-        <img class="modal-img" id="mi" src="" alt="">
+        <div class="modal-player" id="mp"></div>
         <div class="modal-body">
             <div class="modal-grid" id="ms"></div>
             <div class="modal-dls" id="md"></div>
@@ -679,7 +682,16 @@ function om(i){
     const r=f[i];if(!r)return;
     document.getElementById('mc').textContent=r.channel||'Stream';
     document.getElementById('mt').textContent=r.title||'Untitled';
-    document.getElementById('mi').src=r.thumbnail||`https://i.ytimg.com/vi/${r.video_id||'x'}/maxresdefault.jpg`;
+    
+    // Setup video player or fallback to thumbnail
+    const p=document.getElementById('mp');
+    if(r.video_id) {
+        p.innerHTML = `<iframe src="https://www.youtube.com/embed/${r.video_id}?autoplay=1&rel=0&modestbranding=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    } else {
+        const th=r.thumbnail||'https://placehold.co/640x360/1a1a2e/C41E3A?text=The+Muslim+Lantern';
+        p.innerHTML = `<img src="${th}" alt="Thumbnail">`;
+    }
+    
     const d=r.date?new Date(r.date):new Date();
     document.getElementById('ms').innerHTML=`
         <div class="mstat"><div class="l">Duration</div><div class="v">${r.duration_fmt||fmtD(r.duration_sec||0)}</div></div>
@@ -700,6 +712,7 @@ function cm(e){
     if(e&&e.target!==document.getElementById('mb')&&!e.target.closest('.modal-x'))return;
     document.getElementById('mb').classList.remove('open');
     document.body.style.overflow='';
+    document.getElementById('mp').innerHTML=''; // Stop video playing
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')cm();});
 
