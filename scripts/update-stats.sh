@@ -138,6 +138,94 @@ read_stats() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  UPLOAD CHAT FILE TO GITHUB PAGES
+#  Saves chat.json to data/chats/{video_id}.json so the dashboard can load it
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_chat_to_github() {
+    local chat_file="${RECORD_CHAT_FILE:-}"
+    local video_id="${STREAM_VIDEO_ID:-}"
+    
+    if [[ -z "$chat_file" ]] || [[ ! -f "$chat_file" ]] || [[ ! -s "$chat_file" ]]; then
+        log_info "No chat file to upload (chat_file=${chat_file:-none})"
+        return 0
+    fi
+    
+    if [[ -z "$video_id" ]]; then
+        log_warn "No video ID — cannot upload chat file"
+        return 0
+    fi
+    
+    log_step "Uploading chat file to GitHub Pages..."
+    
+    # Validate it's real JSON (chat-downloader sometimes writes partial lines)
+    local line_count
+    line_count=$(wc -l < "$chat_file" | tr -d ' ')
+    log_info "Chat file: ${line_count} lines (${chat_file})"
+    
+    if (( line_count == 0 )); then
+        log_warn "Chat file is empty — no chat was captured"
+        return 0
+    fi
+    
+    # If it's NDJSON (one JSON object per line), wrap it into a valid JSON array
+    # so it works consistently whether chat-downloader wrote array or lines
+    local chat_content
+    local first_char
+    first_char=$(head -c 1 "$chat_file")
+    
+    if [[ "$first_char" == "[" ]]; then
+        # Already a JSON array
+        chat_content=$(cat "$chat_file")
+    else
+        # NDJSON — wrap into array
+        chat_content="["
+        local first=true
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            # Basic JSON object check
+            [[ "$line" == "{"* ]] || continue
+            if [[ "$first" == "true" ]]; then
+                chat_content+="${line}"
+                first=false
+            else
+                chat_content+=",${line}"
+            fi
+        done < "$chat_file"
+        chat_content+="]"
+    fi
+    
+    # Validate the resulting JSON before uploading
+    if ! echo "$chat_content" | jq -e 'type == "array"' > /dev/null 2>&1; then
+        log_warn "Chat content is not valid JSON array — skipping upload"
+        return 0
+    fi
+    
+    local msg_count
+    msg_count=$(echo "$chat_content" | jq 'length' 2>/dev/null || echo "0")
+    log_info "Chat messages to upload: ${msg_count}"
+    
+    # Upload to data/chats/{video_id}.json in the repo
+    local chat_path="data/chats/${video_id}.json"
+    
+    if github_api_write "$chat_path" "$chat_content" "💬 Chat log: ${video_id} (${msg_count} messages)"; then
+        # Build the GitHub Pages public URL
+        local repo="${GITHUB_REPOSITORY:-}"
+        local owner="${repo%%/*}"
+        local repo_name="${repo##*/}"
+        local chat_url="https://${owner}.github.io/${repo_name}/${chat_path}"
+        
+        set_env "RECORD_CHAT_URL" "$chat_url"
+        log_ok "Chat uploaded — URL: ${chat_url}"
+        log_ok "Chat will sync with player in the dashboard ✅"
+    else
+        log_warn "Failed to upload chat file — dashboard will show no chat for this recording"
+    fi
+    
+    return 0
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  UPDATE RECORDINGS.JSON (for web dashboard)
 #  Appends the current recording to the recordings array
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -246,5 +334,6 @@ update_recordings_json() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     update_stats
+    upload_chat_to_github || true
     update_recordings_json || true
 fi
