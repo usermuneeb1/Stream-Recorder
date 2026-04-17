@@ -305,50 +305,30 @@ notify_recording_complete() {
     "embeds": [
         {
             "title": "✅  RECORDING COMPLETE",
-            "description": "The live stream has been **successfully recorded**, processed, and uploaded to cloud storage.\\n\\n> **${esc_title}**",
+            "description": "> 📺 **${esc_title}**\\n> 👤 **${esc_channel}**\\n\\nThe live stream has been **successfully recorded**, processed, and uploaded to **${upload_count}/${upload_total}** cloud services.",
             "color": ${embed_color},
             "thumbnail": {
                 "url": "${thumbnail}"
             },
             "fields": [
                 {
-                    "name": "👤  Channel",
-                    "value": "${esc_channel}",
-                    "inline": true
-                },
-                {
                     "name": "⏱️  Duration",
                     "value": "\`${duration_fmt}\`",
                     "inline": true
                 },
                 {
-                    "name": "💾  File Size",
+                    "name": "💾  Size",
                     "value": "\`${size_human}\`",
                     "inline": true
                 },
                 {
-                    "name": "📐  Resolution",
+                    "name": "📐  Quality",
                     "value": "\`${resolution}\`",
                     "inline": true
                 },
                 {
-                    "name": "📦  Parts",
+                    "name": "📦  Segments",
                     "value": "\`${parts}\` part(s)",
-                    "inline": true
-                },
-                {
-                    "name": "☁️  Uploads",
-                    "value": "${upload_emoji} \`${upload_count}/${upload_total}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🕐  Start Time",
-                    "value": "\`${start_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🕐  End Time",
-                    "value": "\`${end_time}\`",
                     "inline": true
                 },
                 {
@@ -357,44 +337,72 @@ notify_recording_complete() {
                     "inline": true
                 },
                 {
-                    "name": "🔗  YouTube",
-                    "value": "**[▶️ Watch Original](${video_url})**",
+                    "name": "☁️  Uploads",
+                    "value": "${upload_emoji} \`${upload_count}/${upload_total}\`",
+                    "inline": true
+                },
+                {
+                    "name": "\\u200B",
+                    "value": "━━━━━━━ **Timeline** ━━━━━━━",
+                    "inline": false
+                },
+                {
+                    "name": "🟢  Started",
+                    "value": "\`${start_time}\`",
+                    "inline": true
+                },
+                {
+                    "name": "🔴  Ended",
+                    "value": "\`${end_time}\`",
+                    "inline": true
+                },
+                {
+                    "name": "📤  Upload Time",
+                    "value": "\`${upload_time}\`",
+                    "inline": true
+                },
+                {
+                    "name": "\\u200B",
+                    "value": "**[▶️ Watch Original on YouTube](${video_url})**",
                     "inline": false
                 }
             ],
+            "image": {
+                "url": "${thumbnail}"
+            },
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • Stream Recorder",
+                "name": "${esc_channel} • Recording Complete",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.0.0} • © ${RECORDER_NAME:-Muneeb Ahmad} • Upload: ${upload_count}/${upload_total}",
+                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • ${upload_emoji} ${upload_count}/${upload_total} uploads",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
         },
         {
             "title": "📥  Download Links",
-            "description": "Click any link below to download the recording. Multiple mirrors provided for reliability.",
+            "description": "Click below to download the recording. **${upload_count} mirror(s)** available for redundancy.",
             "color": ${embed_color},
             "fields": [
                 {
-                    "name": "🟢  Gofile — Fast Download",
+                    "name": "🟢  Gofile — High Speed",
                     "value": "${gofile_section}",
                     "inline": false
                 },
                 {
-                    "name": "🔵  Pixeldrain — Reliable Mirror",
+                    "name": "🔵  Pixeldrain — Reliable",
                     "value": "${pixeldrain_section}",
                     "inline": false
                 },
                 {
-                    "name": "🏛️  Archive.org — Permanent Storage",
+                    "name": "🏛️  Archive.org — Forever",
                     "value": "${archive_section}",
                     "inline": false
                 }
             ],
             "footer": {
-                "text": "⏱️ Upload took ${upload_time} • 📡 Stream Recorder v${RECORDER_VERSION:-2.0.0}",
+                "text": "⏱️ Upload took ${upload_time} • 💾 ${size_human} total",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
@@ -422,6 +430,7 @@ notify_recording_failed() {
     local avatar="${AVATAR_URL:-}"
     local error_msg="${1:-All recording methods exhausted}"
     local retry_info="${2:-Auto-retry triggered in 2 minutes}"
+    local cookie_status="${COOKIE_STATUS:-unknown}"
     local timestamp
     timestamp=$(now_utc_iso)
     local current_time
@@ -432,6 +441,20 @@ notify_recording_failed() {
     esc_channel=$(json_escape "$channel")
     esc_error=$(json_escape "$error_msg")
     
+    # Diagnose the issue
+    local diagnosis="Unknown"
+    if echo "$error_msg" | grep -qi "technical difficulties"; then
+        diagnosis="YouTube is blocking the IP. WARP may not be connected or the IP has been flagged."
+    elif echo "$error_msg" | grep -qi "bot\|captcha\|sign in"; then
+        diagnosis="YouTube detected automated access. Cookies may need refreshing."
+    elif echo "$error_msg" | grep -qi "PO Token\|po_token"; then
+        diagnosis="YouTube requires a PO Token for this video. This is an industry-wide limitation."
+    elif echo "$error_msg" | grep -qi "not live\|no longer live"; then
+        diagnosis="Stream ended before recording could start."
+    else
+        diagnosis="All 6 recording methods (web, web_creator, default, mweb, streamlink) failed."
+    fi
+    
     local payload
     payload=$(cat <<PAYLOAD
 {
@@ -440,49 +463,49 @@ notify_recording_failed() {
     "embeds": [
         {
             "title": "❌  RECORDING FAILED",
-            "description": "The recording engine has **exhausted all available methods**. The system will automatically retry.\\n\\n> ⚠️ ${esc_error}",
+            "description": "> 📺 **${esc_title}**\\n> 👤 **${esc_channel}**\\n\\nThe recording engine exhausted **all available methods** (6 methods × 5 attempts = 30 tries).",
             "color": ${COLOR_FAILED:-15158332},
             "thumbnail": {
                 "url": "${thumbnail}"
             },
             "fields": [
                 {
-                    "name": "📺  Stream",
-                    "value": "[${esc_title}](${video_url})",
+                    "name": "🔍  Diagnosis",
+                    "value": "${diagnosis}",
                     "inline": false
                 },
                 {
-                    "name": "👤  Channel",
-                    "value": "${esc_channel}",
-                    "inline": true
-                },
-                {
-                    "name": "🕐  Failed At",
-                    "value": "\`${current_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🔄  Auto-Retry",
-                    "value": "${retry_info}",
-                    "inline": true
-                },
-                {
-                    "name": "📋  Error Details",
+                    "name": "📋  Error",
                     "value": "\`\`\`\\n${esc_error}\\n\`\`\`",
                     "inline": false
                 },
                 {
-                    "name": "ℹ️  What Happens Next?",
-                    "value": "The system will **automatically retry** the recording workflow in 2 minutes. If the stream is still live, it will attempt all 6 recording methods again (5 attempts × 6 methods = 30 chances).",
+                    "name": "🕐  Time",
+                    "value": "\`${current_time}\`",
+                    "inline": true
+                },
+                {
+                    "name": "🍪  Cookies",
+                    "value": "\`${cookie_status}\`",
+                    "inline": true
+                },
+                {
+                    "name": "🔄  Retry",
+                    "value": "${retry_info}",
+                    "inline": true
+                },
+                {
+                    "name": "\\u200B",
+                    "value": "━━━━━ **Troubleshooting** ━━━━━\\n1️⃣ Re-export fresh cookies from Firefox\\n2️⃣ Update \`YOUTUBE_COOKIES\` GitHub secret\\n3️⃣ Trigger a fresh workflow run\\n\\n**[▶️ Check if still live](${video_url})**",
                     "inline": false
                 }
             ],
             "author": {
-                "name": "${RECORDER_NAME:-Muneeb Ahmad} • Stream Recorder",
+                "name": "${esc_channel} • Recording Failed",
                 "icon_url": "${avatar}"
             },
             "footer": {
-                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.0.0} • © ${RECORDER_NAME:-Muneeb Ahmad} • AUTO-RETRY TRIGGERED",
+                "text": "📡 Stream Recorder v${RECORDER_VERSION:-2.1.0} • Auto-retry active",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"

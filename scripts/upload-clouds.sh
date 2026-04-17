@@ -39,46 +39,18 @@ upload_to_gofile() {
     local attempt=1
     
     while (( attempt <= max_retries )); do
-        # Step 1: Get available upload server
-        log_debug "  Gofile: Getting upload server (attempt $attempt)..."
-        
-        local server_response server
-        server_response=$(curl -s --max-time 15 "https://api.gofile.io/servers" 2>/dev/null) || {
-            log_warn "  Gofile: Server request failed"
-            (( attempt++ ))
-            sleep 3
-            continue
-        }
-        
-        server=$(echo "$server_response" | jq -r '.data.servers[0].name // empty' 2>/dev/null)
-        [[ -z "$server" ]] && server=$(echo "$server_response" | jq -r '.data.server // empty' 2>/dev/null)
-        
-        if [[ -z "$server" ]]; then
-            log_warn "  Gofile: Could not determine upload server"
-            (( attempt++ ))
-            sleep 3
-            continue
-        fi
-        
-        log_debug "  Gofile: Using server: ${server}"
-        
-        # Step 2: Upload file
         local upload_start
         upload_start=$(now_epoch)
         
+        # Upload directly to Gofile's global endpoint (auto-routes to closest region)
         local upload_response
-        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-1800}" \
+        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
             -F "file=@${file}" \
-            "https://${server}.gofile.io/contents/uploadfile" 2>/dev/null) || {
-            # Try alternate endpoint
-            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-1800}" \
-                -F "file=@${file}" \
-                "https://${server}.gofile.io/uploadFile" 2>/dev/null) || {
-                log_warn "  Gofile: Upload request failed (attempt $attempt)"
-                (( attempt++ ))
-                sleep 5
-                continue
-            }
+            "https://upload.gofile.io/uploadfile" 2>/dev/null) || {
+            log_warn "  Gofile: Upload request failed (attempt $attempt)"
+            (( attempt++ ))
+            sleep 5
+            continue
         }
         
         local upload_elapsed=$(( $(now_epoch) - upload_start ))
@@ -146,7 +118,7 @@ upload_to_pixeldrain() {
         filename=$(basename "$file")
         
         local upload_response
-        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-1800}" \
+        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
             -T "$file" \
             $auth_arg \
             "https://pixeldrain.com/api/file/${filename}" 2>/dev/null) || {

@@ -228,7 +228,7 @@ validate_recorded_file() {
         if (( size >= min_bytes )); then
             found_file="$output_base"
         else
-            log_warn "  File too small ($(format_size "$size")): $output_base"
+            log_warn "  File too small ($(format_size "$size")): $output_base" >&2
             rm -f "$output_base"
         fi
     fi
@@ -246,7 +246,7 @@ validate_recorded_file() {
                     found_file="$check_file"
                     break
                 else
-                    log_warn "  File too small ($(format_size "$size")): $check_file"
+                    log_warn "  File too small ($(format_size "$size")): $check_file" >&2
                     rm -f "$check_file"
                 fi
             fi
@@ -275,7 +275,7 @@ validate_recorded_file() {
     if [[ -n "$found_file" ]]; then
         local final_size
         final_size=$(get_file_size "$found_file")
-        log_ok "  Valid recording found: $(basename "$found_file") ($(format_size "$final_size"))"
+        log_ok "  Valid recording found: $(basename "$found_file") ($(format_size "$final_size"))" >&2
         echo "$found_file"
         return 0
     fi
