@@ -9,6 +9,8 @@
     <link rel="icon" href="https://yt3.googleusercontent.com/hCG9GTPq_hnBEI7G0ciYrmgW8QWPDOVO6i6jFlw_7d5oS-E93dTVwDSFzKOvMVtjnoZvagpZlw=s800-c-k-c0x00ffffff-no-rj" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
     <style>
         :root {
             --font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -371,14 +373,60 @@
             transition: all .2s; flex-shrink: 0; margin-left: 16px;
         }
         .modal-x:hover { background: var(--red); color: #fff; border-color: var(--red); }
+        .modal-media-wrapper {
+            display: flex; height: 50vh; min-height: 400px;
+            margin: 0 28px; background: #000; border-radius: var(--radius-md);
+            overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.2);
+        }
         .modal-player {
-            width: calc(100% - 56px); margin: 0 28px; aspect-ratio: 16/9;
-            background: #000; border-radius: var(--radius-md); overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,.2); position: relative;
+            flex: 1; position: relative; background: #000; min-width: 0;
         }
-        .modal-player iframe, .modal-player img {
-            width: 100%; height: 100%; object-fit: cover; border: none;
+        .modal-player iframe, .modal-player video {
+            width: 100%; height: 100%; border: none; outline: none;
         }
+        .modal-chat {
+            width: 320px; background: #0f0f0f; border-left: 1px solid #272727;
+            display: flex; flex-direction: column; overflow: hidden;
+            font-family: 'Roboto', -apple-system, sans-serif;
+            transition: width 0.3s;
+        }
+        .modal-chat-header {
+            padding: 12px 16px; border-bottom: 1px solid #272727;
+            font-size: 15px; font-weight: 500; color: #fff;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-chat-messages {
+            flex: 1; overflow-y: auto; padding: 12px 16px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .modal-chat-messages::-webkit-scrollbar { width: 8px; }
+        .modal-chat-messages::-webkit-scrollbar-thumb { background: #717171; border-radius: 4px; }
+        .chat-msg {
+            font-size: 13px; line-height: 1.4; word-wrap: break-word; color: #fff;
+            display: flex; gap: 10px; align-items: flex-start;
+            animation: fadeIn 0.15s ease-out;
+        }
+        .chat-author {
+            color: #aaa; font-weight: 500; flex-shrink: 0;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .chat-author-img {
+            width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
+            background: #333;
+        }
+        .chat-text { color: #f1f1f1; }
+        
+        .source-switcher {
+            display: flex; gap: 8px; margin: 16px 28px 0; justify-content: center; flex-wrap: wrap;
+        }
+        .ss-btn {
+            padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border);
+            background: var(--bg3); color: var(--text2); font-size: 12px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .ss-btn.active { background: var(--red); color: #fff; border-color: var(--red); }
+        .ss-btn:hover:not(.active) { border-color: var(--text3); color: var(--text); }
+        .plyr { width: 100%; height: 100%; }
         .modal-body { padding: 24px 28px 32px; }
         .modal-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -542,7 +590,18 @@
             </div>
             <button class="modal-x" onclick="cm()">✕</button>
         </div>
-        <div class="modal-player" id="mp"></div>
+        <div class="modal-media-wrapper">
+            <div class="modal-player" id="mp"></div>
+            <div class="modal-chat" id="mChat">
+                <div class="modal-chat-header">
+                    <span>Live Chat Replay</span>
+                </div>
+                <div class="modal-chat-messages" id="chatMsgs">
+                    <div style="color: #888; font-size: 13px; text-align: center; margin-top: 20px;">Chat logs will appear here if available.</div>
+                </div>
+            </div>
+        </div>
+        <div class="source-switcher" id="mSource"></div>
         <div class="modal-body">
             <div class="modal-grid" id="ms"></div>
             <div class="modal-dls" id="md"></div>
@@ -676,6 +735,60 @@ function render(){
     }).join('');
 }
 
+let plyrInstance = null;
+let chatData = [];
+let chatCurrentIndex = 0;
+
+async function loadChatEngine(chatUrl) {
+    const cMsgs = document.getElementById('chatMsgs');
+    cMsgs.innerHTML = '<div style="color:#888;font-size:13px;text-align:center;margin-top:20px;">Downloading synchronized chat archive...</div>';
+    try {
+        const res = await fetch(chatUrl);
+        if(!res.ok) throw new Error('Fetch failed');
+        const text = await res.text();
+        
+        if(text.trim().startsWith('[')) chatData = JSON.parse(text);
+        else chatData = text.trim().split('\n').filter(l=>l).map(l=>JSON.parse(l));
+        
+        chatData.sort((a,b)=>(a.time_in_seconds||0) - (b.time_in_seconds||0));
+        chatCurrentIndex = 0;
+        cMsgs.innerHTML = '<div style="color:#10b981;font-size:12px;text-align:center;margin:10px 0;font-weight:600;">✅ Chat sync ready!</div>';
+    } catch(err) {
+        cMsgs.innerHTML = '<div style="color:#ef4444;font-size:13px;text-align:center;margin-top:20px;">Failed to load live chat file.</div>';
+        chatData = [];
+    }
+}
+
+function renderChatChunk(currentTime) {
+    if(!chatData.length) return;
+    const cMsgs = document.getElementById('chatMsgs');
+    let added = false;
+    
+    while(chatCurrentIndex < chatData.length && chatData[chatCurrentIndex].time_in_seconds <= currentTime) {
+        let msg = chatData[chatCurrentIndex];
+        let author = msg.author?.name || 'User';
+        let text = msg.message || msg.text || '';
+        let img = msg.author?.images?.[0]?.url || 'https://placehold.co/24x24/333/fff?text='+author.charAt(0).toUpperCase();
+        
+        let div = document.createElement('div');
+        div.className = 'chat-msg';
+        div.innerHTML = `
+            <img src="${img}" class="chat-author-img" onerror="this.src='https://placehold.co/24x24/333/fff?text=U'">
+            <div>
+                <span class="chat-author">${esc(author)}</span>
+                <span class="chat-text">${esc(text)}</span>
+            </div>
+        `;
+        cMsgs.appendChild(div);
+        chatCurrentIndex++;
+        added = true;
+    }
+    
+    if(added) {
+        cMsgs.scrollTop = cMsgs.scrollHeight;
+    }
+}
+
 // Modal
 function om(i){
     const f=R.sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -683,14 +796,52 @@ function om(i){
     document.getElementById('mc').textContent=r.channel||'Stream';
     document.getElementById('mt').textContent=r.title||'Untitled';
     
-    // Setup video player or fallback to thumbnail
+    document.getElementById('chatMsgs').innerHTML = '<div style="color:#888;font-size:13px;text-align:center;margin-top:20px;">Standby for chat link...</div>';
+    chatData = []; chatCurrentIndex = 0;
+    
     const p=document.getElementById('mp');
-    if(r.video_id) {
-        p.innerHTML = `<iframe src="https://www.youtube.com/embed/${r.video_id}?autoplay=1&rel=0&modestbranding=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    const sSwitcher = document.getElementById('mSource');
+    sSwitcher.innerHTML = '';
+    if(plyrInstance) { plyrInstance.destroy(); plyrInstance = null; }
+    
+    let sources = [];
+    if(r.pixeldrain_link) sources.push({id:'pd', name:'🔵 Pixeldrain (HD Stream)', url: r.pixeldrain_link.replace('/u/', '/api/file/')});
+    if(r.video_id) sources.push({id:'yt', name:'🔴 YouTube', url: `https://www.youtube.com/embed/${r.video_id}?autoplay=1&rel=0`});
+    if(r.gofile_link) sources.push({id:'gf', name:'🟢 Gofile', url: r.gofile_link});
+    
+    window.setSrc = function(id) {
+        if(plyrInstance) { plyrInstance.destroy(); plyrInstance = null; }
+        document.querySelectorAll('.ss-btn').forEach(b=>b.classList.remove('active'));
+        const activeBtn = document.getElementById('sb-'+id);
+        if(activeBtn) activeBtn.classList.add('active');
+        
+        let src = sources.find(s=>s.id===id);
+        if(!src) return;
+        
+        if(id === 'pd') {
+            p.innerHTML = `<video id="plyrPlayer" controls playsinline crossorigin><source src="${src.url}" type="video/mp4"></video>`;
+            plyrInstance = new Plyr('#plyrPlayer', { autoplay: true });
+            plyrInstance.on('timeupdate', e => renderChatChunk(plyrInstance.currentTime));
+            plyrInstance.on('seeked', e => {
+                document.getElementById('chatMsgs').innerHTML = '';
+                chatCurrentIndex = 0;
+                renderChatChunk(plyrInstance.currentTime);
+            });
+        } else {
+            p.innerHTML = `<iframe src="${src.url}" allowfullscreen allow="autoplay"></iframe>`;
+        }
+    };
+    
+    if(sources.length > 0) {
+        sSwitcher.innerHTML = sources.map(s=>`<button id="sb-${s.id}" class="ss-btn" onclick="setSrc('${s.id}')">${s.name}</button>`).join('');
+        setSrc(sources[0].id);
     } else {
-        const th=r.thumbnail||'https://placehold.co/640x360/1a1a2e/C41E3A?text=The+Muslim+Lantern';
+        const th=r.thumbnail||'https://placehold.co/640x360/1a1a2e/C41E3A?text=No+Video';
         p.innerHTML = `<img src="${th}" alt="Thumbnail">`;
     }
+    
+    if(r.chat_url) loadChatEngine(r.chat_url);
+    else document.getElementById('chatMsgs').innerHTML = '<div style="color: #666; font-size: 13px; text-align: center; margin-top: 20px;">No chat archive saved for this stream.</div>';
     
     const d=r.date?new Date(r.date):new Date();
     document.getElementById('ms').innerHTML=`
@@ -708,11 +859,13 @@ function om(i){
     document.getElementById('mb').classList.add('open');
     document.body.style.overflow='hidden';
 }
+
 function cm(e){
     if(e&&e.target!==document.getElementById('mb')&&!e.target.closest('.modal-x'))return;
     document.getElementById('mb').classList.remove('open');
     document.body.style.overflow='';
-    document.getElementById('mp').innerHTML=''; // Stop video playing
+    if(plyrInstance) { plyrInstance.destroy(); plyrInstance = null; }
+    document.getElementById('mp').innerHTML='';
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')cm();});
 

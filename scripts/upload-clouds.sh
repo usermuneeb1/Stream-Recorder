@@ -250,6 +250,21 @@ upload_to_archive() {
             log_ok "  Archive.org: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
             log_info "  Archive.org: Link → ${link} (PERMANENT)"
             ARCHIVE_LINKS+=("${part_name}|${link}|${identifier}")
+            
+            # --- Upload chat.json if exists ---
+            local chat_file="/tmp/stream-recorder/chat.json"
+            if [[ -f "$chat_file" ]]; then
+                log_info "  🏛️  Archive.org: Uploading chat.json to same identifier..."
+                curl -s -o /dev/null \
+                    --max-time 300 \
+                    --location \
+                    --header "authorization: LOW ${access_key}:${secret_key}" \
+                    --upload-file "$chat_file" \
+                    "https://s3.us.archive.org/${identifier}/chat.json" 2>/dev/null || true
+                log_ok "  Archive.org: Chat log uploaded."
+                set_env "RECORD_CHAT_URL" "https://archive.org/download/${identifier}/chat.json"
+            fi
+            
             return 0
         fi
         

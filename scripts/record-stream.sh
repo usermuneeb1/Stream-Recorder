@@ -460,6 +460,19 @@ record_stream() {
     set_env "RECORD_OUTPUT_TITLE" "$safe_title"
     set_env "RECORD_RAW_FILE" "$raw_output"
     
+    # ── Live Chat Extractor ──────────────────────────────────────────────────
+    local chat_output="${RECORD_DIR}/chat.json"
+    local chat_pid=""
+    
+    log_info "Spawning chat-downloader in background..."
+    if command -v chat_downloader &>/dev/null; then
+        chat_downloader "$video_url" --output "$chat_output" >/dev/null 2>&1 &
+        chat_pid=$!
+        log_info "Chat downloader started (PID: $chat_pid)"
+    else
+        log_warn "chat_downloader not found, skipping chat extraction"
+    fi
+    
     # ── Recording Loop ───────────────────────────────────────────────────────
     local max_attempts="${MAX_RECORD_ATTEMPTS:-5}"
     local attempt=1
@@ -495,6 +508,14 @@ record_stream() {
     
     # ── Check Results ────────────────────────────────────────────────────────
     log_separator
+    
+    # Stop chat downloader gracefully
+    if [[ -n "${chat_pid:-}" ]]; then
+        log_info "Stopping chat downloader..."
+        kill -2 "$chat_pid" 2>/dev/null || kill -9 "$chat_pid" 2>/dev/null
+        wait "$chat_pid" 2>/dev/null || true
+        set_env "RECORD_CHAT_FILE" "$chat_output"
+    fi
     
     if [[ ${#RECORDED_FILES[@]} -eq 0 ]]; then
         log_error "═══ RECORDING FAILED ═══"
