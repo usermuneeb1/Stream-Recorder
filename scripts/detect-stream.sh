@@ -423,39 +423,26 @@ is_stream_still_live() {
     user_agent=$(rotate_user_agent)
     local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
     
-    # Method A: Check the streams tab for LIVE badge (most reliable, avoids per-video blocks)
-    local streams_url
-    streams_url=$(get_streams_url 2>/dev/null || echo "")
-    if [[ -n "$streams_url" ]]; then
-        local page_content
-        page_content=$(curl -s --max-time 15 \
-            -H "User-Agent: ${user_agent}" \
-            -H "Cookie: ${bypass_cookie}" \
-            -H "Accept-Language: en-US,en;q=0.9" \
-            "$streams_url" 2>/dev/null) || true
-        
-        if [[ -n "$page_content" ]]; then
-            # Check if this specific video ID still has LIVE badge
-            local is_live
-            is_live=$(echo "$page_content" | awk -F'"videoId":"'"$video_id"'"' '{
-                if ($2 ~ /"style":"LIVE"/) print "yes";
-            }')
-            [[ "$is_live" == "yes" ]] && return 0
-            
-            # Also check if ANY video is live (stream may have restarted with new ID)
-            echo "$page_content" | grep -q '"style":"LIVE"' && return 0
-        fi
-    fi
-    
-    # Method B: Direct video page check with bypass cookies
+    # Method A: Direct video page check with bypass cookies (Fastest & most accurate)
     local video_page
     video_page=$(curl -s --max-time 10 \
         -H "User-Agent: ${user_agent}" \
         -H "Cookie: ${bypass_cookie}" \
         -H "Accept-Language: en-US,en;q=0.9" \
-        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || return 1
+        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || true
     
-    grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"
+    if grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"; then
+        return 0
+    fi
+    
+    # Method B: yt-dlp json check (Definitive but slower)
+    local is_live
+    is_live=$(yt-dlp --dump-json --no-download --extractor-args "youtube:player_client=mweb" "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null | jq -r '.is_live // false' 2>/dev/null)
+    if [[ "$is_live" == "true" ]]; then
+        return 0
+    fi
+    
+    return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
