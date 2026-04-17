@@ -54,6 +54,7 @@ jobs:
 
       - name: "📢 Send Discord Notification"
         if: always()
+        continue-on-error: true
         run: |
           source scripts/utils.sh
           source scripts/discord-notify.sh

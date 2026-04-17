@@ -57,8 +57,8 @@ send_discord_webhook() {
     webhook_url=$(get_webhook_url "$channel_type")
     
     if [[ -z "$webhook_url" ]]; then
-        log_error "No Discord webhook URL set for '${channel_type}' — cannot send notification"
-        return 1
+        log_warn "No Discord webhook URL set for '${channel_type}' — skipping notification (set DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_${channel_type^^} secret)"
+        return 0
     fi
     
     log_debug "Sending to ${channel_type} channel..."
