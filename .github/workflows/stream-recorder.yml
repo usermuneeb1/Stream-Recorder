@@ -49,6 +49,8 @@ env:
   # Channel-specific webhooks (optional — falls back to main if not set)
   DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
   DISCORD_WEBHOOK_LINKS: ${{ secrets.DISCORD_WEBHOOK_LINKS }}
+  DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
+  DISCORD_WEBHOOK_REFRESH: ${{ secrets.DISCORD_WEBHOOK_REFRESH }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   # YouTube & Cloud
   YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
