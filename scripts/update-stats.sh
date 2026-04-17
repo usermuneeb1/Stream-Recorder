@@ -138,9 +138,111 @@ read_stats() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  UPDATE RECORDINGS.JSON (for web dashboard)
+#  Appends the current recording to the recordings array
+# ═══════════════════════════════════════════════════════════════════════════════
+
+update_recordings_json() {
+    log_step "Updating recordings.json for web dashboard..."
+    
+    local video_id="${STREAM_VIDEO_ID:-}"
+    local title="${STREAM_TITLE:-Unknown Stream}"
+    local channel="${STREAM_CHANNEL:-Unknown Channel}"
+    local video_url="${STREAM_URL:-}"
+    local thumbnail="${STREAM_THUMBNAIL:-}"
+    local duration_sec="${RECORD_DURATION_SEC:-0}"
+    local duration_fmt="${RECORD_DURATION_FMT:-00:00:00}"
+    local size_bytes="${RECORD_SIZE_BYTES:-0}"
+    local size_human="${RECORD_SIZE_HUMAN:-0 B}"
+    local size_gb="${RECORD_SIZE_GB:-0.00}"
+    local resolution="${RECORD_RESOLUTION:-N/A}"
+    local record_date
+    record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
+    local month_folder
+    month_folder=$(TZ='Asia/Karachi' date '+%Y-%m')
+    
+    # Build download links
+    local gofile_link="" pixeldrain_link="" archive_link=""
+    if [[ -n "${GOFILE_LINKS:-}" ]]; then
+        gofile_link=$(echo "$GOFILE_LINKS" | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
+        pixeldrain_link=$(echo "$PIXELDRAIN_LINKS" | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
+        archive_link=$(echo "$ARCHIVE_LINKS" | head -1 | cut -d'|' -f2)
+    fi
+    
+    # If no thumbnail from stream, use YouTube default
+    if [[ -z "$thumbnail" ]] && [[ -n "$video_id" ]]; then
+        thumbnail="https://i.ytimg.com/vi/${video_id}/maxresdefault.jpg"
+    fi
+    
+    # Build new recording entry
+    local new_entry
+    new_entry=$(jq -n \
+        --arg video_id "$video_id" \
+        --arg title "$title" \
+        --arg channel "$channel" \
+        --arg video_url "$video_url" \
+        --arg thumbnail "$thumbnail" \
+        --argjson duration_sec "$duration_sec" \
+        --arg duration_fmt "$duration_fmt" \
+        --argjson size_bytes "$size_bytes" \
+        --arg size_human "$size_human" \
+        --arg size_gb "$size_gb" \
+        --arg resolution "$resolution" \
+        --arg date "$record_date" \
+        --arg month "$month_folder" \
+        --arg gofile_link "$gofile_link" \
+        --arg pixeldrain_link "$pixeldrain_link" \
+        --arg archive_link "$archive_link" \
+        --arg recorded_at "$(now_utc_iso)" \
+        '{
+            video_id: $video_id,
+            title: $title,
+            channel: $channel,
+            video_url: $video_url,
+            thumbnail: $thumbnail,
+            duration_sec: $duration_sec,
+            duration_fmt: $duration_fmt,
+            size_bytes: $size_bytes,
+            size_human: $size_human,
+            size_gb: ($size_gb | tonumber),
+            resolution: $resolution,
+            date: $date,
+            month: $month,
+            gofile_link: $gofile_link,
+            pixeldrain_link: $pixeldrain_link,
+            archive_link: $archive_link,
+            recorded_at: $recorded_at
+        }')
+    
+    # Read existing recordings
+    local existing
+    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing="[]"
+    
+    # Ensure it's valid JSON array
+    if ! echo "$existing" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        existing="[]"
+    fi
+    
+    # Prepend new entry (newest first)
+    local updated
+    updated=$(echo "$existing" | jq --argjson entry "$new_entry" '[$entry] + .')
+    
+    if github_api_write "data/recordings.json" "$updated" "📹 Add recording: ${title}"; then
+        log_ok "recordings.json updated — dashboard will show this recording"
+    else
+        log_warn "Failed to update recordings.json — dashboard won't show this recording"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     update_stats
+    update_recordings_json || true
 fi
