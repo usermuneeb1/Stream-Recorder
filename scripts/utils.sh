@@ -390,6 +390,7 @@ github_api_write() {
     response=$(curl -s -X PUT \
         -H "Authorization: token $token" \
         -H "Accept: application/vnd.github.v3+json" \
+        -H "Content-Type: application/json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${repo}/contents/${filepath}" \
         -d "$payload" 2>/dev/null)

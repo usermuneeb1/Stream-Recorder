@@ -474,8 +474,9 @@ record_stream() {
     fi
     
     # ── Recording Loop ───────────────────────────────────────────────────────
-    local max_attempts="${MAX_RECORD_ATTEMPTS:-5}"
+    local max_attempts="${MAX_RECORD_ATTEMPTS:-3}"
     local attempt=1
+    local consecutive_failures=0
     
     while (( attempt <= max_attempts )); do
         log_separator
@@ -483,15 +484,28 @@ record_stream() {
         # Try to record
         if attempt_recording "$video_url" "$attempt"; then
             RECORDING_SUCCESS=true
+            consecutive_failures=0
             log_ok "Attempt ${attempt} produced a valid recording"
         else
-            log_warn "Attempt ${attempt} failed to produce a recording"
+            (( consecutive_failures++ ))
+            log_warn "Attempt ${attempt} failed to produce a recording (${consecutive_failures} consecutive failure(s))"
+            # If we've had 2+ consecutive failures on non-first attempt, stream is likely over
+            if (( attempt > 1 && consecutive_failures >= 2 )); then
+                log_info "Multiple consecutive failures after a successful segment — stream has ended"
+                break
+            fi
         fi
         
         # Check if stream is still live (only if we haven't reached max attempts)
         if (( attempt < max_attempts )); then
             log_info "Checking if stream is still live..."
-            random_sleep 3 8
+            # Wait 30s after a successful segment (YouTube CDN cache takes time to update)
+            if [[ "$RECORDING_SUCCESS" == "true" ]]; then
+                log_info "Cooling down 30s after successful segment..."
+                sleep 30
+            else
+                random_sleep 3 8
+            fi
             
             if is_stream_still_live "$video_id"; then
                 log_info "Stream is still live — recording next segment"

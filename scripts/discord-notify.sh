@@ -109,11 +109,73 @@ notify_live_detected() {
     local method="${STREAM_DETECTION_METHOD:-Unknown}"
     local detect_time="${STREAM_DETECTION_TIME:-$(now_pkt)}"
     local avatar="${AVATAR_URL:-}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local cookie_status="${COOKIE_STATUS:-unknown}"
-    local disk_space
-    disk_space=$(get_disk_space_gb 2>/dev/null || echo "N/A")
     local timestamp
     timestamp=$(now_utc_iso)
+    
+    local cookie_icon="🟢"
+    [[ "$cookie_status" == "expired" ]] && cookie_icon="🟡"
+    [[ "$cookie_status" == "no_cookies" ]] && cookie_icon="🔴"
+    
+    local esc_title esc_channel esc_method
+    esc_title=$(json_escape "$title")
+    esc_channel=$(json_escape "$channel")
+    esc_method=$(json_escape "$method")
+    
+    local payload
+    payload=$(cat <<PAYLOAD
+{
+    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
+    "avatar_url": "${avatar}",
+    "embeds": [
+        {
+            "author": {
+                "name": "🔴  GOING LIVE NOW",
+                "icon_url": "${avatar}"
+            },
+            "title": "${esc_title}",
+            "url": "${video_url}",
+            "description": "**${esc_channel}** has started streaming. The automated recorder has been activated and is capturing the stream right now.",
+            "color": 15736129,
+            "image": {
+                "url": "${thumbnail}"
+            },
+            "fields": [
+                {
+                    "name": "🕐  Detected At",
+                    "value": "`${detect_time}`",
+                    "inline": true
+                },
+                {
+                    "name": "🔍  Method",
+                    "value": "`${esc_method}`",
+                    "inline": true
+                },
+                {
+                    "name": "🍪  Cookies",
+                    "value": "${cookie_icon} `${cookie_status}`",
+                    "inline": true
+                },
+                {
+                    "name": "🔗  Links",
+                    "value": "[▶️ Watch Live](${video_url})  •  [📊 Dashboard](${dashboard_url})",
+                    "inline": false
+                }
+            ],
+            "footer": {
+                "text": "☪️ The Muslim Lantern Archive  •  Recording in progress...",
+                "icon_url": "${avatar}"
+            },
+            "timestamp": "${timestamp}"
+        }
+    ]
+}
+PAYLOAD
+)
+    
+    send_discord_webhook "$payload" "alerts"
+}
     
     local esc_title esc_channel esc_method
     esc_title=$(json_escape "$title")
@@ -209,91 +271,52 @@ notify_recording_complete() {
     local video_url="${STREAM_URL:-}"
     local thumbnail="${STREAM_THUMBNAIL:-}"
     local avatar="${AVATAR_URL:-}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
     
-    # Recording details
     local duration_fmt="${RECORD_DURATION_FMT:-00:00:00}"
-    local duration_sec="${RECORD_DURATION_SEC:-0}"
     local size_human="${RECORD_SIZE_HUMAN:-0 B}"
-    local size_gb="${RECORD_SIZE_GB:-0.00}"
     local resolution="${RECORD_RESOLUTION:-N/A}"
-    local parts="${RECORD_PARTS:-1}"
-    local process_time="${PROCESSING_TIME_FMT:-N/A}"
-    local upload_time="${UPLOAD_TIME_FMT:-N/A}"
-    
-    # Upload results
     local upload_count="${UPLOAD_SUCCESS_COUNT:-0}"
     local upload_total="${UPLOAD_TOTAL_SERVICES:-3}"
-    
-    # Times
     local start_time="${STREAM_DETECTION_TIME:-N/A}"
     local end_time="${STREAM_END_TIME:-$(now_pkt)}"
     
-    # Determine color based on upload status
-    local embed_color
-    if (( upload_count == upload_total )); then
-        embed_color=${COLOR_COMPLETE_SUCCESS:-5763757}
-    elif (( upload_count > 0 )); then
-        embed_color=${COLOR_COMPLETE_PARTIAL:-16761095}
-    else
-        embed_color=${COLOR_COMPLETE_FAILED:-15158332}
-    fi
-    
-    # Upload status emoji
-    local upload_emoji
-    if (( upload_count == upload_total )); then
-        upload_emoji="✅"
-    elif (( upload_count > 0 )); then
-        upload_emoji="⚠️"
-    else
-        upload_emoji="❌"
-    fi
-    
-    # Build Gofile links section
-    local gofile_section="*No links available*"
+    # Build download links value string
+    local links_value=""
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
-        gofile_section=""
         IFS=';' read -ra g_entries <<< "$GOFILE_LINKS"
         for entry in "${g_entries[@]}"; do
-            local g_part g_link
-            g_part=$(echo "$entry" | cut -d'|' -f1)
-            g_link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ -n "$g_link" ]]; then
-                gofile_section+="[📥 Download ${g_part}](${g_link})\\n"
-            fi
+            local g_link; g_link=$(echo "$entry" | cut -d'|' -f2)
+            [[ -n "$g_link" ]] && links_value+="[🟢 Gofile](${g_link})  "
         done
     fi
-    
-    # Build Pixeldrain links section
-    local pixeldrain_section="*No links available*"
     if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
-        pixeldrain_section=""
         IFS=';' read -ra p_entries <<< "$PIXELDRAIN_LINKS"
         for entry in "${p_entries[@]}"; do
-            local p_part p_link
-            p_part=$(echo "$entry" | cut -d'|' -f1)
-            p_link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ -n "$p_link" ]]; then
-                pixeldrain_section+="[📥 Download ${p_part}](${p_link})\\n"
-            fi
+            local p_link; p_link=$(echo "$entry" | cut -d'|' -f2)
+            [[ -n "$p_link" ]] && links_value+="[🔵 Pixeldrain](${p_link})  "
         done
     fi
-    
-    # Build Archive.org links section
-    local archive_section="*No links available*"
     if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
-        archive_section=""
         IFS=';' read -ra a_entries <<< "$ARCHIVE_LINKS"
         for entry in "${a_entries[@]}"; do
-            local a_part a_link
-            a_part=$(echo "$entry" | cut -d'|' -f1)
-            a_link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ -n "$a_link" ]]; then
-                archive_section+="[📥 ${a_part} — Permanent Archive](${a_link})\\n"
-            fi
+            local a_link; a_link=$(echo "$entry" | cut -d'|' -f2)
+            [[ -n "$a_link" ]] && links_value+="[🏛️ Archive](${a_link})  "
         done
-        archive_section+="*☝️ These links never expire*"
+    fi
+    [[ -z "$links_value" ]] && links_value="*Uploading...*"
+    links_value+="\n[📊 Watch on Dashboard](${dashboard_url})"
+    
+    # Color & emoji based on upload success
+    local embed_color upload_emoji
+    if (( upload_count == upload_total )); then
+        embed_color=5763757; upload_emoji="✅"
+    elif (( upload_count > 0 )); then
+        embed_color=16761095; upload_emoji="⚠️"
+    else
+        embed_color=15158332; upload_emoji="❌"
     fi
     
     local esc_title esc_channel
@@ -307,105 +330,56 @@ notify_recording_complete() {
     "avatar_url": "${avatar}",
     "embeds": [
         {
-            "title": "✅  RECORDING COMPLETE",
-            "description": "> 📺 **${esc_title}**\\n> 👤 **${esc_channel}**\\n\\nThe live stream has been **successfully recorded**, processed, and uploaded to **${upload_count}/${upload_total}** cloud services.",
+            "author": {
+                "name": "✅  STREAM RECORDED SUCCESSFULLY",
+                "icon_url": "${avatar}"
+            },
+            "title": "${esc_title}",
+            "url": "${dashboard_url}",
+            "description": "**${esc_channel}** — The stream has ended and been fully processed. **${upload_count}/${upload_total}** cloud mirrors are ready.",
             "color": ${embed_color},
-            "thumbnail": {
+            "image": {
                 "url": "${thumbnail}"
             },
             "fields": [
                 {
                     "name": "⏱️  Duration",
-                    "value": "\`${duration_fmt}\`",
+                    "value": "`${duration_fmt}`",
                     "inline": true
                 },
                 {
                     "name": "💾  Size",
-                    "value": "\`${size_human}\`",
+                    "value": "`${size_human}`",
                     "inline": true
                 },
                 {
                     "name": "📐  Quality",
-                    "value": "\`${resolution}\`",
+                    "value": "`${resolution}`",
                     "inline": true
                 },
                 {
-                    "name": "📦  Segments",
-                    "value": "\`${parts}\` part(s)",
+                    "name": "🟢  Stream Start",
+                    "value": "`${start_time}`",
                     "inline": true
                 },
                 {
-                    "name": "⚙️  Processing",
-                    "value": "\`${process_time}\`",
+                    "name": "🔴  Stream End",
+                    "value": "`${end_time}`",
                     "inline": true
                 },
                 {
-                    "name": "☁️  Uploads",
-                    "value": "${upload_emoji} \`${upload_count}/${upload_total}\`",
+                    "name": "☁️  Mirrors",
+                    "value": "${upload_emoji} `${upload_count}/${upload_total}` uploaded",
                     "inline": true
                 },
                 {
-                    "name": "\\u200B",
-                    "value": "━━━━━━━ **Timeline** ━━━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "🟢  Started",
-                    "value": "\`${start_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🔴  Ended",
-                    "value": "\`${end_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "📤  Upload Time",
-                    "value": "\`${upload_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "**[▶️ Watch Original on YouTube](${video_url})**",
-                    "inline": false
-                }
-            ],
-            "image": {
-                "url": "${thumbnail}"
-            },
-            "author": {
-                "name": "${esc_channel} • Recording Complete",
-                "icon_url": "${avatar}"
-            },
-            "footer": {
-                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • ${upload_emoji} ${upload_count}/${upload_total} uploads",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        },
-        {
-            "title": "📥  Download Links",
-            "description": "Click below to download the recording. **${upload_count} mirror(s)** available for redundancy.",
-            "color": ${embed_color},
-            "fields": [
-                {
-                    "name": "🟢  Gofile — High Speed",
-                    "value": "${gofile_section}",
-                    "inline": false
-                },
-                {
-                    "name": "🔵  Pixeldrain — Reliable",
-                    "value": "${pixeldrain_section}",
-                    "inline": false
-                },
-                {
-                    "name": "🏛️  Archive.org — Forever",
-                    "value": "${archive_section}",
+                    "name": "📥  Download & Watch",
+                    "value": "${links_value}",
                     "inline": false
                 }
             ],
             "footer": {
-                "text": "⏱️ Upload took ${upload_time} • 💾 ${size_human} total",
+                "text": "☪️ The Muslim Lantern Archive  •  All recordings are permanent",
                 "icon_url": "${avatar}"
             },
             "timestamp": "${timestamp}"
