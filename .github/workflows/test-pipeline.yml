@@ -1,0 +1,122 @@
+name: "🧪 Test Pipeline & Features"
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: stream-recorder-test
+  cancel-in-progress: false
+
+env:
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_LINKS: ${{ secrets.DISCORD_WEBHOOK_LINKS }}
+  DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
+  YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
+  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  GH_PAT: ${{ secrets.GH_PAT }}
+  RECORD_DIR: /tmp/stream-recorder
+  TZ: Asia/Karachi
+
+jobs:
+  test-features:
+    name: "🧪 Run Feature Tests"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install Test Dependencies"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq curl bc
+          chmod +x scripts/*.sh
+
+      - name: "🧪 1. Mock Detection & Webhook Alert"
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          
+          # Mock variables
+          export STREAM_TITLE="TEST PIPELINE — MOCK LIVE STREAM"
+          export STREAM_CHANNEL="The Muslim Lantern (Test)"
+          export STREAM_URL="https://usermuneeb1.github.io/Stream-Recorder/"
+          export STREAM_THUMBNAIL="https://i.ytimg.com/vi/default/maxresdefault.jpg"
+          export BOT_USERNAME="☪️ Test Bot"
+          
+          echo "Simulating Live Detected Alert..."
+          # Fake variables for discord payload
+          local detect_time=$(now_pkt)
+          local method="auto-mock-test"
+          local cookie_icon="🍪"
+          local cookie_status="NO_COOKIES"
+          local disk_space="50.0"
+          local warp_val="🔴 Off"
+          local timestamp=$(now_utc_iso)
+          local avatar="https://yt3.ggpht.com/ytc/AIdro_k60bEq5sYj3nN2r9sXo18zB9k8-n1q5Iq19O3FkQ=s88-c-k-c0x00ffffff-no-rj"
+          local dashboard_url="https://usermuneeb1.github.io/Stream-Recorder/"
+          
+          # Send alert
+          if [[ -n "$DISCORD_WEBHOOK_ALERTS" || -n "$DISCORD_WEBHOOK_URL" ]]; then
+            notify_live_detected || true
+          fi
+
+      - name: "🧪 2. Mock Video Creation & Post Processing"
+        run: |
+          mkdir -p $RECORD_DIR
+          cd $RECORD_DIR
+          echo "Generating 5-second test video pattern..."
+          ffmpeg -f lavfi -i testsrc=duration=5:size=1280x720:rate=30 -f lavfi -i sine=frequency=1000:duration=5 -c:v libx264 -c:a aac -strict experimental "mock_test_video.mp4"
+          echo "Video generated. Size: $(du -sh mock_test_video.mp4 | cut -f1)"
+          cd -
+
+      - name: "🧪 3. Cloud Upload Algorithms (Pixeldrain Test)"
+        run: |
+          # We will just test Pixeldrain to keep it fast
+          export RECORD_DATE=$(date "+%Y-%m-%d")
+          export UPLOAD_FILE="MOCK_TEST.mp4"
+          mv $RECORD_DIR/mock_test_video.mp4 $RECORD_DIR/$UPLOAD_FILE
+          
+          if [[ -n "$PIXELDRAIN_API_KEY" ]]; then
+            echo "Testing Pixeldrain Auth Upload..."
+            # Pixeldrain specific
+            resp=$(curl -s -T "$RECORD_DIR/$UPLOAD_FILE" -u ":${PIXELDRAIN_API_KEY}" "https://pixeldrain.com/api/file/${UPLOAD_FILE}")
+            echo "Pixeldrain Response: $resp"
+            if echo "$resp" | grep -q '"success":true'; then
+              id=$(echo "$resp" | jq -r '.id')
+              export PIXELDRAIN_LINKS="Part 1|https://pixeldrain.com/u/${id}"
+              export UPLOAD_SUCCESS_COUNT=1
+            fi
+          else
+            echo "No Pixeldrain token, skipping upload."
+            export UPLOAD_SUCCESS_COUNT=0
+          fi
+          export UPLOAD_TOTAL_SERVICES=3
+
+      - name: "🧪 4. Final Data Archive & Webhook"
+        continue-on-error: true
+        run: |
+          bash scripts/update-stats.sh
+          
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          
+          # Fake metrics
+          export STREAM_TITLE="TEST PIPELINE — MOCK COMPLETE"
+          export STREAM_CHANNEL="The Muslim Lantern (Test)"
+          export RECORD_DURATION_FMT="00:00:05"
+          export RECORD_SIZE_HUMAN="1.2 MB"
+          export RECORD_RESOLUTION="1280x720"
+          
+          # Send completion webhook
+          if [[ -n "$DISCORD_WEBHOOK_RECORDINGS" || -n "$DISCORD_WEBHOOK_URL" ]]; then
+            notify_recording_complete || true
+          fi
+          
+          echo "Test Pipeline Finished!"
