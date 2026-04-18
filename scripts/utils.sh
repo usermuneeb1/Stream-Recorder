@@ -371,21 +371,34 @@ github_api_write() {
     local encoded
     encoded=$(echo -n "$content" | base64 -w 0)
     
-    # Build JSON payload
+    # Build JSON payload using jq (--arg properly JSON-escapes all values)
     local payload
     if [[ -n "$sha" ]]; then
         payload=$(jq -n \
-            --arg msg "$message" \
+            --arg msg     "$message" \
             --arg content "$encoded" \
-            --arg sha "$sha" \
+            --arg sha     "$sha" \
             '{message: $msg, content: $content, sha: $sha}')
     else
         payload=$(jq -n \
-            --arg msg "$message" \
+            --arg msg     "$message" \
             --arg content "$encoded" \
             '{message: $msg, content: $content}')
     fi
-    
+
+    # Validate payload was produced — if jq failed, payload would be empty
+    if [[ -z "$payload" ]] || ! echo "$payload" | jq -e . >/dev/null 2>&1; then
+        log_error "Failed to build JSON payload for GitHub API write ($filepath)"
+        log_debug "jq exit=$? payload_len=${#payload}"
+        return 1
+    fi
+
+    # Write to temp file — avoids ALL shell-expansion / curl -d "$var" issues
+    # that cause GitHub to return "Problems parsing JSON" for large payloads
+    local payload_file
+    payload_file=$(mktemp "/tmp/gha_payload_XXXXXX.json")
+    printf '%s' "$payload" > "$payload_file"
+
     local response
     response=$(curl -s -X PUT \
         -H "Authorization: token $token" \
@@ -393,7 +406,9 @@ github_api_write() {
         -H "Content-Type: application/json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        -d "$payload" 2>/dev/null)
+        --data-binary "@${payload_file}" 2>/dev/null)
+
+    rm -f "$payload_file"
     
     local commit_sha
     commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)

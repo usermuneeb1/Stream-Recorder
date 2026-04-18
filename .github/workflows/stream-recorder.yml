@@ -22,7 +22,7 @@ on:
     - cron: "*/5 * * * 6"    # Saturday
     - cron: "*/5 * * * 0"    # Sunday
 
-  # Manual trigger for testing
+  # Manual trigger — run manually, optionally waiting for the stream to go live
   workflow_dispatch:
     inputs:
       force_record:
@@ -30,6 +30,16 @@ on:
         required: false
         default: "false"
         type: boolean
+      wait_for_live:
+        description: "Wait for live (poll up to 5h checking every 60s)"
+        required: false
+        default: "false"
+        type: boolean
+      wait_max_hours:
+        description: "Max hours to wait (1-5, default 5)"
+        required: false
+        default: "5"
+        type: string
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CONCURRENCY — Only one recording at a time, never cancel running jobs
@@ -199,7 +209,31 @@ jobs:
       - name: "🔍 Detect Live Stream"
         id: detect
         if: steps.disk_check.outputs.disk_ok == 'true'
-        run: bash scripts/detect-stream.sh
+        timeout-minutes: 310
+        run: |
+          WAIT_MODE="${{ github.event.inputs.wait_for_live }}"
+          MAX_H="${{ github.event.inputs.wait_max_hours }}"
+          MAX_H="${MAX_H:-5}"
+          # Clamp between 1 and 5
+          [[ "$MAX_H" -lt 1 ]] 2>/dev/null && MAX_H=1
+          [[ "$MAX_H" -gt 5 ]] 2>/dev/null && MAX_H=5
+
+          if [[ "$WAIT_MODE" == "true" ]]; then
+            echo "🕐 Wait-for-live mode: polling every 60s for up to ${MAX_H}h…"
+            MAX_POLLS=$(( MAX_H * 60 ))
+            POLL=0
+            while (( POLL < MAX_POLLS )); do
+              if bash scripts/detect-stream.sh; then
+                # detect-stream.sh exits 0 only when live
+                break
+              fi
+              POLL=$(( POLL + 1 ))
+              echo "[poll $POLL/$MAX_POLLS] Not live yet — sleeping 60s…"
+              sleep 60
+            done
+          else
+            bash scripts/detect-stream.sh
+          fi
 
       # ─── 7. SEND LIVE DETECTED NOTIFICATION ──────────────────────────────
       - name: "🔴 Notify — Live Detected"

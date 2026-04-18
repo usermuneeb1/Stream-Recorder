@@ -46,7 +46,37 @@ repair_and_optimize() {
         if [[ -f "$output_file" ]] && is_valid_video "$output_file"; then
             local elapsed=$(( $(now_epoch) - remux_start ))
             log_ok "  Lossless remux succeeded in ${elapsed}s"
-            log_info "  Output: $(basename "$output_file") ($(format_size "$(get_file_size "$output_file")"))"
+
+            # ── Detect codec: VP9 in MP4 has poor browser support ─────────────
+            local vcodec
+            vcodec=$(ffprobe -v quiet -select_streams v:0 \
+                -show_entries stream=codec_name -of csv=p=0 \
+                "$output_file" 2>/dev/null)
+
+            if [[ "$vcodec" == "vp9" ]] || [[ "$vcodec" == "vp8" ]]; then
+                log_info "  ⚠️  VP9 codec detected — transcoding to H.264 for browser compatibility..."
+                local h264_tmp="${output_file%.mp4}_h264tmp.mp4"
+                local encode_start
+                encode_start=$(now_epoch)
+
+                if ffmpeg -y -i "$output_file" \
+                    -c:v libx264 -crf "${REENCODE_CRF:-20}" -preset "${REENCODE_PRESET:-fast}" \
+                    -c:a aac -b:a "${REENCODE_AUDIO_BITRATE:-192k}" \
+                    -movflags +faststart \
+                    "$h264_tmp" 2>/dev/null && is_valid_video "$h264_tmp"; then
+
+                    mv -f "$h264_tmp" "$output_file"
+                    local e2=$(( $(now_epoch) - encode_start ))
+                    log_ok "  H.264 transcode complete in ${e2}s"
+                    log_ok "  Output: $(basename "$output_file") ($(format_size "$(get_file_size "$output_file")"))"
+                else
+                    log_warn "  H.264 transcode failed — keeping VP9 (file may not play inline in Safari)"
+                    rm -f "$h264_tmp"
+                fi
+            else
+                log_info "  Codec: ${vcodec} — browser compatible ✅"
+                log_info "  Output: $(basename "$output_file") ($(format_size "$(get_file_size "$output_file")"))"
+            fi
             return 0
         else
             log_warn "  Remux output is invalid or corrupt"
@@ -56,6 +86,7 @@ repair_and_optimize() {
         log_warn "  Lossless remux failed"
         rm -f "$output_file"
     fi
+
     
     # ── Attempt 2: Re-encode with libx264 ────────────────────────────────────
     log_info "  Trying re-encode (libx264 CRF ${REENCODE_CRF:-18})..."

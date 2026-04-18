@@ -107,7 +107,6 @@ notify_live_detected() {
         --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
         --arg avatar      "$avatar" \
         --arg title       "$title" \
-        --arg url         "$video_url" \
         --arg channel     "$channel" \
         --arg thumbnail   "$thumbnail" \
         --arg dtime       "$detect_time" \
@@ -117,37 +116,35 @@ notify_live_detected() {
         --arg warp        "$warp_val" \
         --arg dash_url    "$dashboard_url" \
         --arg timestamp   "$timestamp" \
-        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
         '{
             username:   $username,
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     ("🔴  LIVE NOW  ·  " + $channel),
-                    url:      $url,
+                    name:     ("🔴  RECORDING STARTED  ─  " + $channel),
                     icon_url: $avatar
                 },
                 title:       $title,
-                url:         $url,
                 description: (
-                    "**" + $channel + "** has just started a live stream.\n" +
-                    "> 🎬 **Recording has been automatically activated.**\n\n" +
-                    "The multi-method recording engine is now capturing this stream with 6 independent methods."
+                    "A live stream from **" + $channel + "** has been detected and recording is now active.\n" +
+                    "> 🎬 **Multi-method recording engine engaged** — 6 methods × 3 retries = 18 chances to capture.\n" +
+                    "> ☁️ **Triple cloud upload** (Gofile · Pixeldrain · Archive.org) will begin once complete."
                 ),
                 color: 15212032,
                 image: { url: $thumbnail },
                 fields: [
-                    { name: "🕐  Detected At",   value: $dtime,                    inline: false },
-                    { name: "🔍  Method",         value: ("`" + $method + "`"),     inline: true  },
-                    { name: "🍪  Cookies",         value: $cookie,                   inline: true  },
-                    { name: "💾  Disk Free",       value: $disk,                     inline: true  },
-                    { name: "🌐  WARP IP Mask",    value: $warp,                     inline: true  },
-                    { name: "🎛️  Recorder",       value: "`🔴 RECORDING`",          inline: true  },
-                    { name: "🔗  Quick Links",     value: ("[▶️ Watch Live](" + $url + ")   ·   [📊 Dashboard](" + $dash_url + ")"), inline: false }
+                    { name: "🕐  Detected At",   value: $dtime,                inline: false },
+                    { name: "🔍  Method",         value: ("`" + $method + "`"), inline: true  },
+                    { name: "🍪  Cookies",         value: $cookie,              inline: true  },
+                    { name: "💾  Disk Free",       value: $disk,                inline: true  },
+                    { name: "🌐  WARP",            value: $warp,                inline: true  },
+                    { name: "🎛️  Status",         value: "`🔴 LIVE — RECORDING`", inline: true  },
+                    { name: "📊  Dashboard",       value: ("[View Archive →](" + $dash_url + ")"), inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Recording in progress…"),
+                    text:     ("☪️ " + $bot_name + "  ·  Stream Recorder v" + $bot_ver + "  ·  Recording in progress…"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -180,7 +177,9 @@ notify_recording_complete() {
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
     local upload_count="${UPLOAD_SUCCESS_COUNT:-0}"
     local upload_total="${UPLOAD_TOTAL_SERVICES:-3}"
-    local record_parts="${RECORD_PARTS:-1}"
+    local upload_elapsed="${UPLOAD_ELAPSED_HUMAN:-N/A}"
+    local process_time="${PROCESS_ELAPSED:-N/A}"
+    local warp_ip="${WARP_IP:-N/A}"
 
     # Color based on upload success
     local color=5763757         # green — all good
@@ -189,20 +188,30 @@ notify_recording_complete() {
     [[ "$upload_count" != "$upload_total" ]]          && color=16761095   # amber — partial
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
-    local gofile_url="" pixeldrain_url="" archive_url=""
+    local gofile_url="" pixeldrain_url="" archive_url="" archive_id=""
     [[ -n "${GOFILE_LINKS:-}" ]]     && gofile_url=$(echo "${GOFILE_LINKS}"     | cut -d';' -f1 | cut -d'|' -f2)
     [[ -n "${PIXELDRAIN_LINKS:-}" ]] && pixeldrain_url=$(echo "${PIXELDRAIN_LINKS}" | cut -d';' -f1 | cut -d'|' -f2)
-    [[ -n "${ARCHIVE_LINKS:-}" ]]    && archive_url=$(echo "${ARCHIVE_LINKS}"   | cut -d';' -f1 | cut -d'|' -f2)
+    if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
+        archive_url=$(echo "${ARCHIVE_LINKS}" | cut -d';' -f1 | cut -d'|' -f2)
+        archive_id=$(echo  "${ARCHIVE_LINKS}" | cut -d';' -f1 | cut -d'|' -f3)
+    fi
 
     local chat_status="❌ Not archived"
-    [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ Chat archived"
+    [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ [Chat Log Available](${RECORD_CHAT_URL})"
+
+    # Build upload status summary line
+    local upstatus=""
+    upstatus+=$(if [[ -n "$pixeldrain_url" ]]; then echo "🔵 Pixeldrain ✅"; else echo "🔵 Pixeldrain ❌"; fi)
+    upstatus+=" · "
+    upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "🟠 Gofile ✅"; else echo "🟠 Gofile ❌"; fi)
+    upstatus+=" · "
+    upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
 
     local payload
     payload=$(jq -n \
         --arg username       "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
         --arg avatar         "$avatar" \
         --arg title          "$title" \
-        --arg url            "$video_url" \
         --arg channel        "$channel" \
         --arg thumbnail      "$thumbnail" \
         --arg duration       "$duration_fmt" \
@@ -211,47 +220,57 @@ notify_recording_complete() {
         --arg date           "$record_date" \
         --arg parts          "$record_parts" \
         --arg uploads        "${upload_count}/${upload_total}" \
+        --arg upstatus       "$upstatus" \
         --arg gofile_url     "$gofile_url" \
         --arg pixeldrain_url "$pixeldrain_url" \
         --arg archive_url    "$archive_url" \
+        --arg archive_id     "$archive_id" \
         --arg chat_status    "$chat_status" \
         --arg dash_url       "$dashboard_url" \
         --arg timestamp      "$timestamp" \
-        --arg bot_ver        "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver        "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
-        --arg color          "$color" \
+        --argjson color      "$color" \
         '{
             username:   $username,
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     ("✅  RECORDED  ·  " + $channel),
-                    url:      $url,
+                    name:     ("✅  ARCHIVED  ─  " + $channel),
+                    url:      $dash_url,
                     icon_url: $avatar
                 },
                 title:       ("📼  " + $title),
-                url:         $url,
+                url:         $dash_url,
                 description: (
-                    "Recording of **" + $channel + "** is complete and ready to download.\n\n" +
-                    "**Duration:** `" + $duration + "`   **Size:** `" + $size + "`   **Resolution:** `" + $resolution + "`\n" +
-                    "**Date:** `" + $date + "`   **Parts:** `" + $parts + "`   **Uploads:** `" + $uploads + "`"
+                    "**" + $channel + "** live stream has been fully recorded, processed, and uploaded to the cloud archive.\n" +
+                    "\n" +
+                    "```\n" +
+                    "  ⏱  Duration   " + $duration + "\n" +
+                    "  💾  File Size  " + $size + "\n" +
+                    "  📐  Resolution " + $resolution + "\n" +
+                    "  📅  Date       " + $date + "\n" +
+                    "  📦  Parts      " + $parts + "\n" +
+                    "  ☁️  Uploads   " + $uploads + " services\n" +
+                    "```"
                 ),
-                color: ($color | tonumber),
+                color: $color,
                 thumbnail: { url: $thumbnail },
                 fields: (
                     [
-                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",    value: ("[Download →](" + $pixeldrain_url + ")"), inline: true  } else empty end),
-                        (if $gofile_url     != "" then { name: "🟠  Gofile",        value: ("[Download →](" + $gofile_url + ")"),     inline: true  } else empty end),
-                        (if $archive_url    != "" then { name: "🏛️  Archive.org",  value: ("[Download →](" + $archive_url + ")"),    inline: true  } else empty end),
+                        { name: "☁️  Upload Status", value: $upstatus, inline: false },
+                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",        value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: false } else empty end),
+                        (if $gofile_url     != "" then { name: "🟠  Gofile",            value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: false } else empty end),
+                        (if $archive_url    != "" then { name: "🏛️  Archive.org",     value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         (if ($pixeldrain_url == "" and $gofile_url == "" and $archive_url == "") then
-                            { name: "❌  Downloads",  value: "All cloud uploads failed — check logs", inline: false }
+                            { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
                         else empty end),
-                        { name: "💬  Live Chat",   value: $chat_status, inline: true },
-                        { name: "📊  Dashboard",   value: ("[View Archive →](" + $dash_url + ")"), inline: false }
+                        { name: "💬  Live Chat",    value: $chat_status,                                   inline: false },
+                        { name: "📊  Dashboard",    value: ("[📂 View Full Archive →](" + $dash_url + ")"),  inline: false }
                     ]
                 ),
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),
+                    text:     ("☪️ " + $bot_name + "  ·  Stream Recorder v" + $bot_ver + "  ·  Permanently Archived"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -308,15 +327,16 @@ notify_recording_failed() {
                 title:       $title,
                 url:         $url,
                 description: (
-                    "**" + $channel + "** was live but the recording failed after exhausting all 6 methods × 3 attempts.\n\n" +
-                    "> ⚠️ **" + $reason + "**"
+                    "**" + $channel + "** was live but the recording failed after exhausting all methods and retries.\n\n" +
+                    "> ⚠️ **" + $reason + "**\n\n" +
+                    "Files on disk (if any) were NOT uploaded. Check the workflow logs for full details."
                 ),
                 color: 15158332,
                 thumbnail: { url: $thumbnail },
                 fields: [
                     { name: "⏰  Failed At",    value: $fail_time,    inline: true  },
                     { name: "🔄  Retry Status", value: $retry_info,   inline: true  },
-                    { name: "🔗  Stream URL",   value: ("[▶️ YouTube](" + $url + ")   ·   [📊 Dashboard](" + $dash_url + ")"), inline: false }
+                    { name: "📊  Dashboard",    value: ("[📂 View Archive →](" + $dash_url + ")"), inline: false }
                 ],
                 footer: {
                     text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Auto-retry dispatched"),
