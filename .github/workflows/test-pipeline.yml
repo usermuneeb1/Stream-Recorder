@@ -52,15 +52,15 @@ jobs:
           
           echo "Simulating Live Detected Alert..."
           # Fake variables for discord payload
-          local detect_time=$(now_pkt)
-          local method="auto-mock-test"
-          local cookie_icon="🍪"
-          local cookie_status="NO_COOKIES"
-          local disk_space="50.0"
-          local warp_val="🔴 Off"
-          local timestamp=$(now_utc_iso)
-          local avatar="https://yt3.ggpht.com/ytc/AIdro_k60bEq5sYj3nN2r9sXo18zB9k8-n1q5Iq19O3FkQ=s88-c-k-c0x00ffffff-no-rj"
-          local dashboard_url="https://usermuneeb1.github.io/Stream-Recorder/"
+          detect_time=$(now_pkt)
+          method="auto-mock-test"
+          cookie_icon="🍪"
+          cookie_status="NO_COOKIES"
+          disk_space="50.0"
+          warp_val="🔴 Off"
+          timestamp=$(now_utc_iso)
+          avatar="https://yt3.ggpht.com/ytc/AIdro_k60bEq5sYj3nN2r9sXo18zB9k8-n1q5Iq19O3FkQ=s88-c-k-c0x00ffffff-no-rj"
+          dashboard_url="https://usermuneeb1.github.io/Stream-Recorder/"
           
           # Send alert
           if [[ -n "$DISCORD_WEBHOOK_ALERTS" || -n "$DISCORD_WEBHOOK_URL" ]]; then
