@@ -125,11 +125,11 @@ update_links() {
     if github_api_write "links.txt" "$(echo -e "$new_content")" "🔗 New recording: ${stream_title} — $(TZ='Asia/Karachi' date '+%Y-%m-%d')"; then
         log_ok "Links archive updated successfully"
     else
-        log_error "Failed to update links.txt"
-        return 1
+        log_warn "Failed to update links.txt on GitHub — will retry on next run"
+        # Don't return 1 — this is non-fatal. Log is printed above, workflow continues.
     fi
     
-    log_ok "Recording permanently archived in links.txt"
+    log_ok "Done — links.txt update attempted"
     return 0
 }
 
