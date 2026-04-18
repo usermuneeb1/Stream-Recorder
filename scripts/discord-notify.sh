@@ -173,6 +173,7 @@ notify_recording_complete() {
     local duration_fmt="${RECORD_DURATION_FMT:-N/A}"
     local size_human="${RECORD_SIZE_HUMAN:-N/A}"
     local resolution="${RECORD_RESOLUTION:-N/A}"
+    local record_parts="${RECORD_PARTS:-1}"
     local record_date
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
     local upload_count="${UPLOAD_SUCCESS_COUNT:-0}"

@@ -102,17 +102,21 @@ jobs:
       - name: "🧪 4. Final Data Archive & Webhook"
         continue-on-error: true
         run: |
+          # Fake metrics FIRST
+          export STREAM_TITLE="TEST PIPELINE — MOCK COMPLETE"
+          export STREAM_CHANNEL="The Muslim Lantern (Test)"
+          export RECORD_DURATION_FMT="00:00:05"
+          export RECORD_DURATION=5
+          export RECORD_SIZE_HUMAN="1.2 MB"
+          export RECORD_SIZE=1200000
+          export RECORD_RESOLUTION="1280x720"
+          export RECORD_FILE="MOCK_TEST.mp4"
+          export RECORD_PARTS="1"
+          
           bash scripts/update-stats.sh
           
           source scripts/utils.sh
           source scripts/discord-notify.sh
-          
-          # Fake metrics
-          export STREAM_TITLE="TEST PIPELINE — MOCK COMPLETE"
-          export STREAM_CHANNEL="The Muslim Lantern (Test)"
-          export RECORD_DURATION_FMT="00:00:05"
-          export RECORD_SIZE_HUMAN="1.2 MB"
-          export RECORD_RESOLUTION="1280x720"
           
           # Send completion webhook
           if [[ -n "$DISCORD_WEBHOOK_RECORDINGS" || -n "$DISCORD_WEBHOOK_URL" ]]; then
