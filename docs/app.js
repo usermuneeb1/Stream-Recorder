@@ -1,8 +1,8 @@
 /* ════ THE MUSLIM LANTERN — CINEMATIC ARCHIVE ════ */
 'use strict';
 
-const REC_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main/data/recordings.json';
-const STS_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main/stats.json';
+const REC_URL = '../data/recordings.json';
+const STS_URL = '../stats.json';
 
 let allRecs = [], filtered = [];
 let player = null, chatData = [], chatPtr = 0;
