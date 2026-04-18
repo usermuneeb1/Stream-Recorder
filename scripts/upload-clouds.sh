@@ -32,61 +32,76 @@ UPLOAD_START_TIME=""
 upload_to_gofile() {
     local file="$1"
     local part_name="$2"
-    
-    log_info "  🟢 Gofile: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
-    
+    local api_key="${GOFILE_API_KEY:-}"
+
+    log_info "  🟠 Gofile: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+
     local max_retries="${GOFILE_MAX_RETRIES:-3}"
     local attempt=1
-    
+
+    # Regional endpoints to try in order (first = auto, then fallbacks)
+    local -a endpoints=(
+        "https://upload.gofile.io/uploadfile"
+        "https://upload-eu-par.gofile.io/uploadfile"
+        "https://upload-na-phx.gofile.io/uploadfile"
+        "https://upload-ap-sgp.gofile.io/uploadfile"
+    )
+    local endpoint_idx=0
+
     while (( attempt <= max_retries )); do
+        local endpoint="${endpoints[$endpoint_idx]:-${endpoints[0]}}"
         local upload_start
         upload_start=$(now_epoch)
-        
-        # Upload directly to Gofile's global endpoint (auto-routes to closest region)
+
+        log_debug "  Gofile attempt ${attempt}/${max_retries} → ${endpoint}"
+
+        # Build curl args — add auth header if API key is available
         local upload_response
-        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
-            -F "file=@${file}" \
-            "https://upload.gofile.io/uploadfile" 2>/dev/null) || {
-            log_warn "  Gofile: Upload request failed (attempt $attempt)"
-            (( attempt++ ))
-            sleep 5
-            continue
-        }
-        
+        if [[ -n "$api_key" ]]; then
+            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+                -H "Authorization: Bearer ${api_key}" \
+                -F "file=@${file}" \
+                "$endpoint" 2>/dev/null) || true
+        else
+            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+                -F "file=@${file}" \
+                "$endpoint" 2>/dev/null) || true
+        fi
+
         local upload_elapsed=$(( $(now_epoch) - upload_start ))
-        
-        # Step 3: Extract download link
+
+        # Parse response
         local status download_page file_code
         status=$(echo "$upload_response" | jq -r '.status // empty' 2>/dev/null)
         download_page=$(echo "$upload_response" | jq -r '.data.downloadPage // empty' 2>/dev/null)
         file_code=$(echo "$upload_response" | jq -r '.data.code // .data.fileId // empty' 2>/dev/null)
-        
+
         if [[ "$status" == "ok" ]] && { [[ -n "$download_page" ]] || [[ -n "$file_code" ]]; }; then
             local link="${download_page:-https://gofile.io/d/${file_code}}"
-            local speed
-            local fsize
+            local speed fsize
             fsize=$(get_file_size "$file")
             if (( upload_elapsed > 0 )); then
                 speed=$(format_size $(( fsize / upload_elapsed )))
             else
                 speed="instant"
             fi
-            
             log_ok "  Gofile: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
             log_info "  Gofile: Link → ${link}"
             GOFILE_LINKS+=("${part_name}|${link}")
             return 0
         fi
-        
-        log_warn "  Gofile: Upload response invalid (attempt $attempt)"
-        log_debug "  Response: $upload_response"
+
+        log_warn "  Gofile: Upload failed on ${endpoint} (attempt ${attempt}) — response: ${upload_response:0:200}"
         (( attempt++ ))
+        # Rotate to next regional endpoint on each failure
+        endpoint_idx=$(( (endpoint_idx + 1) % ${#endpoints[@]} ))
         sleep 5
     done
-    
-    log_error "  Gofile: ❌ All ${max_retries} attempts failed"
+
+    log_error "  Gofile: ❌ All ${max_retries} attempts/endpoints failed"
     return 1
 }
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SERVICE 2: PIXELDRAIN UPLOAD

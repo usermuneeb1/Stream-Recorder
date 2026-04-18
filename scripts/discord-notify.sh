@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — PREMIUM DISCORD NOTIFICATION SYSTEM v2.1             ║
-# ║  7 notification types with rich, professional embeds:                       ║
-# ║    1. 🔴 LIVE DETECTED         → ALERTS channel                           ║
-# ║    2. ✅ RECORDING COMPLETE     → LINKS channel                            ║
-# ║    3. ❌ RECORDING FAILED       → ALERTS channel                           ║
-# ║    4. 📊 WEEKLY SUMMARY         → REPORTS channel                          ║
-# ║    5. 🔄 LINKS REFRESHED        → REPORTS channel                          ║
-# ║    6. 🟢 SYSTEM HEALTH          → REPORTS channel                          ║
-# ║    7. 🍪 COOKIE WARNING         → ALERTS channel                           ║
-# ║                                                                            ║
-# ║  MULTI-WEBHOOK: Alerts, Links, and Reports go to DIFFERENT Discord         ║
-# ║  channels. Falls back to main webhook if specific one isn't set.           ║
+# ║  📡 STREAM RECORDER — PREMIUM DISCORD NOTIFICATIONS v3.0                   ║
+# ║  7 notification types with rich professional embeds.                        ║
+# ║  Built entirely with jq — no heredoc / no backtick bash escaping issues.   ║
+# ║                                                                             ║
+# ║  All 7 types:                                                               ║
+# ║    1. 🔴 LIVE DETECTED         → ALERTS channel                            ║
+# ║    2. ✅ RECORDING COMPLETE     → RECORDINGS channel                        ║
+# ║    3. ❌ RECORDING FAILED       → ALERTS channel                            ║
+# ║    4. 📊 WEEKLY SUMMARY         → REPORTS channel                           ║
+# ║    5. 🔄 LINKS REFRESHED        → REPORTS channel                           ║
+# ║    6. 🟢 SYSTEM HEALTH          → REPORTS channel                           ║
+# ║    7. 🍪 COOKIE WARNING         → ALERTS channel                            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -19,89 +19,68 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  WEBHOOK ROUTING — Different channels for different notification types
-#
-#  DISCORD_WEBHOOK_ALERTS  → Live detected, recording failed, cookie warnings
-#  DISCORD_WEBHOOK_LINKS   → Recording complete with download links
-#  DISCORD_WEBHOOK_REPORTS → Weekly summary, link refresh, system health
-#  DISCORD_WEBHOOK_URL     → Fallback for all (if specific is not set)
+#  WEBHOOK ROUTING
 # ═══════════════════════════════════════════════════════════════════════════════
 
 get_webhook_url() {
-    local type="$1"  # alerts, recordings, refresh, reports
-    
+    local type="$1"
     case "$type" in
-        alerts)
-            echo "${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
-            ;;
-        recordings)
-            echo "${DISCORD_WEBHOOK_RECORDINGS:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}"
-            ;;
-        refresh)
-            echo "${DISCORD_WEBHOOK_REFRESH:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}"
-            ;;
-        reports)
-            echo "${DISCORD_WEBHOOK_REPORTS:-${DISCORD_WEBHOOK_URL:-}}"
-            ;;
-        *)
-            echo "${DISCORD_WEBHOOK_URL:-}"
-            ;;
+        alerts)      echo "${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}" ;;
+        recordings)  echo "${DISCORD_WEBHOOK_RECORDINGS:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}" ;;
+        refresh)     echo "${DISCORD_WEBHOOK_REFRESH:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}" ;;
+        reports)     echo "${DISCORD_WEBHOOK_REPORTS:-${DISCORD_WEBHOOK_URL:-}}" ;;
+        *)           echo "${DISCORD_WEBHOOK_URL:-}" ;;
     esac
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CORE WEBHOOK SENDER (with routing support)
+#  CORE WEBHOOK SENDER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 send_discord_webhook() {
     local payload="$1"
-    local channel_type="${2:-default}"  # alerts, links, reports, or default
+    local channel_type="${2:-default}"
     local webhook_url
     webhook_url=$(get_webhook_url "$channel_type")
-    
+
     if [[ -z "$webhook_url" ]]; then
-        log_warn "No Discord webhook URL set for '${channel_type}' — skipping notification (set DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_${channel_type^^} secret)"
+        log_warn "No Discord webhook for '${channel_type}' — skipping (set DISCORD_WEBHOOK_URL secret)"
         return 0
     fi
-    
-    log_debug "Sending to ${channel_type} channel..."
-    
+
     local http_code
     http_code=$(curl -s -o /dev/null -w '%{http_code}' \
         --max-time 30 \
         -H "Content-Type: application/json" \
         -d "$payload" \
         "$webhook_url" 2>/dev/null)
-    
+
     if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
         log_ok "Discord notification sent to [${channel_type}] (HTTP ${http_code})"
         return 0
     elif [[ "$http_code" == "429" ]]; then
-        log_warn "Discord rate limited — waiting 5s and retrying..."
+        log_warn "Discord rate limited — retrying in 5s..."
         sleep 5
         http_code=$(curl -s -o /dev/null -w '%{http_code}' \
-            --max-time 30 \
-            -H "Content-Type: application/json" \
-            -d "$payload" \
-            "$webhook_url" 2>/dev/null)
+            --max-time 30 -H "Content-Type: application/json" \
+            -d "$payload" "$webhook_url" 2>/dev/null)
         if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
             log_ok "Discord notification sent on retry (HTTP ${http_code})"
             return 0
         fi
     fi
-    
-    log_error "Discord notification failed (HTTP ${http_code})"
+
+    log_error "Discord notification FAILED (HTTP ${http_code})"
     return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NOTIFICATION 1: 🔴 LIVE STREAM DETECTED
-#  Sent immediately when a live stream is found
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_live_detected() {
     log_step "Sending LIVE DETECTED notification..."
-    
+
     local title="${STREAM_TITLE:-Live Stream}"
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
@@ -111,81 +90,80 @@ notify_live_detected() {
     local avatar="${AVATAR_URL:-}"
     local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local cookie_status="${COOKIE_STATUS:-unknown}"
+    local disk_space="${DISK_SPACE_GB:-N/A}"
     local timestamp
     timestamp=$(now_utc_iso)
-    
+
     local cookie_icon="🟢"
-    [[ "$cookie_status" == "expired" ]] && cookie_icon="🟡"
-    [[ "$cookie_status" == "no_cookies" ]] && cookie_icon="🔴"
-    
-    local esc_title esc_channel esc_method
-    esc_title=$(json_escape "$title")
-    esc_channel=$(json_escape "$channel")
-    esc_method=$(json_escape "$method")
-    
+    [[ "$cookie_status" == "expired" ]]      && cookie_icon="🔴"
+    [[ "$cookie_status" == "no_cookies" ]]   && cookie_icon="🟡"
+    [[ "$cookie_status" == "check_failed" ]] && cookie_icon="❓"
+
+    local warp_val="🔴 Off"
+    [[ "${WARP_CONNECTED:-false}" == "true" ]] && warp_val="🟢 Active"
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "author": {
-                "name": "🔴  GOING LIVE NOW",
-                "icon_url": "${avatar}"
-            },
-            "title": "${esc_title}",
-            "url": "${video_url}",
-            "description": "**${esc_channel}** has started streaming. The automated recorder has been activated and is capturing the stream right now.",
-            "color": 15736129,
-            "image": {
-                "url": "${thumbnail}"
-            },
-            "fields": [
-                {
-                    "name": "🕐  Detected At",
-                    "value": "`${detect_time}`",
-                    "inline": true
+    payload=$(jq -n \
+        --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar      "$avatar" \
+        --arg title       "$title" \
+        --arg url         "$video_url" \
+        --arg channel     "$channel" \
+        --arg thumbnail   "$thumbnail" \
+        --arg dtime       "$detect_time" \
+        --arg method      "$method" \
+        --arg cookie      "${cookie_icon} ${cookie_status}" \
+        --arg disk        "${disk_space} GB free" \
+        --arg warp        "$warp_val" \
+        --arg dash_url    "$dashboard_url" \
+        --arg timestamp   "$timestamp" \
+        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     ("🔴  LIVE NOW  ·  " + $channel),
+                    url:      $url,
+                    icon_url: $avatar
                 },
-                {
-                    "name": "🔍  Method",
-                    "value": "`${esc_method}`",
-                    "inline": true
+                title:       $title,
+                url:         $url,
+                description: (
+                    "**" + $channel + "** has just started a live stream.\n" +
+                    "> 🎬 **Recording has been automatically activated.**\n\n" +
+                    "The multi-method recording engine is now capturing this stream with 6 independent methods."
+                ),
+                color: 15212032,
+                image: { url: $thumbnail },
+                fields: [
+                    { name: "🕐  Detected At",   value: $dtime,                    inline: false },
+                    { name: "🔍  Method",         value: ("`" + $method + "`"),     inline: true  },
+                    { name: "🍪  Cookies",         value: $cookie,                   inline: true  },
+                    { name: "💾  Disk Free",       value: $disk,                     inline: true  },
+                    { name: "🌐  WARP IP Mask",    value: $warp,                     inline: true  },
+                    { name: "🎛️  Recorder",       value: "`🔴 RECORDING`",          inline: true  },
+                    { name: "🔗  Quick Links",     value: ("[▶️ Watch Live](" + $url + ")   ·   [📊 Dashboard](" + $dash_url + ")"), inline: false }
+                ],
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Recording in progress…"),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "🍪  Cookies",
-                    "value": "${cookie_icon} `${cookie_status}`",
-                    "inline": true
-                },
-                {
-                    "name": "🔗  Links",
-                    "value": "[▶️ Watch Live](${video_url})  •  [📊 Dashboard](${dashboard_url})",
-                    "inline": false
-                }
-            ],
-            "footer": {
-                "text": "☪️ The Muslim Lantern Archive  •  Recording in progress...",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "alerts"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NOTIFICATION 2: ✅ RECORDING COMPLETE
-#  Sent when recording, processing, and uploading are all done
-#  The most detailed notification — includes ALL download links
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_recording_complete() {
     log_step "Sending RECORDING COMPLETE notification..."
-    
+
     local title="${STREAM_TITLE:-Live Stream}"
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
@@ -194,698 +172,441 @@ notify_recording_complete() {
     local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
-    
-    local duration_fmt="${RECORD_DURATION_FMT:-00:00:00}"
-    local size_human="${RECORD_SIZE_HUMAN:-0 B}"
+
+    local duration_fmt="${RECORD_DURATION_FMT:-N/A}"
+    local size_human="${RECORD_SIZE_HUMAN:-N/A}"
     local resolution="${RECORD_RESOLUTION:-N/A}"
+    local record_date
+    record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
     local upload_count="${UPLOAD_SUCCESS_COUNT:-0}"
     local upload_total="${UPLOAD_TOTAL_SERVICES:-3}"
-    local start_time="${STREAM_DETECTION_TIME:-N/A}"
-    local end_time="${STREAM_END_TIME:-$(now_pkt)}"
-    
-    # Build download links value string
-    local links_value=""
-    if [[ -n "${GOFILE_LINKS:-}" ]]; then
-        IFS=';' read -ra g_entries <<< "$GOFILE_LINKS"
-        for entry in "${g_entries[@]}"; do
-            local g_link; g_link=$(echo "$entry" | cut -d'|' -f2)
-            [[ -n "$g_link" ]] && links_value+="[🟢 Gofile](${g_link})  "
-        done
-    fi
-    if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
-        IFS=';' read -ra p_entries <<< "$PIXELDRAIN_LINKS"
-        for entry in "${p_entries[@]}"; do
-            local p_link; p_link=$(echo "$entry" | cut -d'|' -f2)
-            [[ -n "$p_link" ]] && links_value+="[🔵 Pixeldrain](${p_link})  "
-        done
-    fi
-    if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
-        IFS=';' read -ra a_entries <<< "$ARCHIVE_LINKS"
-        for entry in "${a_entries[@]}"; do
-            local a_link; a_link=$(echo "$entry" | cut -d'|' -f2)
-            [[ -n "$a_link" ]] && links_value+="[🏛️ Archive](${a_link})  "
-        done
-    fi
-    [[ -z "$links_value" ]] && links_value="*Uploading...*"
-    links_value+="\n[📊 Watch on Dashboard](${dashboard_url})"
-    
-    # Color & emoji based on upload success
-    local embed_color upload_emoji
-    if (( upload_count == upload_total )); then
-        embed_color=5763757; upload_emoji="✅"
-    elif (( upload_count > 0 )); then
-        embed_color=16761095; upload_emoji="⚠️"
-    else
-        embed_color=15158332; upload_emoji="❌"
-    fi
-    
-    local esc_title esc_channel
-    esc_title=$(json_escape "$title")
-    esc_channel=$(json_escape "$channel")
-    
+    local record_parts="${RECORD_PARTS:-1}"
+
+    # Color based on upload success
+    local color=5763757         # green — all good
+    [[ "$upload_count" == "0" ]]                     && color=15158332   # red — all failed
+    [[ "$upload_count" != "0" ]] && \
+    [[ "$upload_count" != "$upload_total" ]]          && color=16761095   # amber — partial
+
+    # Extract URLs from "PartName|url" semicolon-delimited env vars
+    local gofile_url="" pixeldrain_url="" archive_url=""
+    [[ -n "${GOFILE_LINKS:-}" ]]     && gofile_url=$(echo "${GOFILE_LINKS}"     | cut -d';' -f1 | cut -d'|' -f2)
+    [[ -n "${PIXELDRAIN_LINKS:-}" ]] && pixeldrain_url=$(echo "${PIXELDRAIN_LINKS}" | cut -d';' -f1 | cut -d'|' -f2)
+    [[ -n "${ARCHIVE_LINKS:-}" ]]    && archive_url=$(echo "${ARCHIVE_LINKS}"   | cut -d';' -f1 | cut -d'|' -f2)
+
+    local chat_status="❌ Not archived"
+    [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ Chat archived"
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "author": {
-                "name": "✅  STREAM RECORDED SUCCESSFULLY",
-                "icon_url": "${avatar}"
-            },
-            "title": "${esc_title}",
-            "url": "${dashboard_url}",
-            "description": "**${esc_channel}** — The stream has ended and been fully processed. **${upload_count}/${upload_total}** cloud mirrors are ready.",
-            "color": ${embed_color},
-            "image": {
-                "url": "${thumbnail}"
-            },
-            "fields": [
-                {
-                    "name": "⏱️  Duration",
-                    "value": "`${duration_fmt}`",
-                    "inline": true
+    payload=$(jq -n \
+        --arg username       "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar         "$avatar" \
+        --arg title          "$title" \
+        --arg url            "$video_url" \
+        --arg channel        "$channel" \
+        --arg thumbnail      "$thumbnail" \
+        --arg duration       "$duration_fmt" \
+        --arg size           "$size_human" \
+        --arg resolution     "$resolution" \
+        --arg date           "$record_date" \
+        --arg parts          "$record_parts" \
+        --arg uploads        "${upload_count}/${upload_total}" \
+        --arg gofile_url     "$gofile_url" \
+        --arg pixeldrain_url "$pixeldrain_url" \
+        --arg archive_url    "$archive_url" \
+        --arg chat_status    "$chat_status" \
+        --arg dash_url       "$dashboard_url" \
+        --arg timestamp      "$timestamp" \
+        --arg bot_ver        "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
+        --arg color          "$color" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     ("✅  RECORDED  ·  " + $channel),
+                    url:      $url,
+                    icon_url: $avatar
                 },
-                {
-                    "name": "💾  Size",
-                    "value": "`${size_human}`",
-                    "inline": true
+                title:       ("📼  " + $title),
+                url:         $url,
+                description: (
+                    "Recording of **" + $channel + "** is complete and ready to download.\n\n" +
+                    "**Duration:** `" + $duration + "`   **Size:** `" + $size + "`   **Resolution:** `" + $resolution + "`\n" +
+                    "**Date:** `" + $date + "`   **Parts:** `" + $parts + "`   **Uploads:** `" + $uploads + "`"
+                ),
+                color: ($color | tonumber),
+                thumbnail: { url: $thumbnail },
+                fields: (
+                    [
+                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",    value: ("[Download →](" + $pixeldrain_url + ")"), inline: true  } else empty end),
+                        (if $gofile_url     != "" then { name: "🟠  Gofile",        value: ("[Download →](" + $gofile_url + ")"),     inline: true  } else empty end),
+                        (if $archive_url    != "" then { name: "🏛️  Archive.org",  value: ("[Download →](" + $archive_url + ")"),    inline: true  } else empty end),
+                        (if ($pixeldrain_url == "" and $gofile_url == "" and $archive_url == "") then
+                            { name: "❌  Downloads",  value: "All cloud uploads failed — check logs", inline: false }
+                        else empty end),
+                        { name: "💬  Live Chat",   value: $chat_status, inline: true },
+                        { name: "📊  Dashboard",   value: ("[View Archive →](" + $dash_url + ")"), inline: false }
+                    ]
+                ),
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "📐  Quality",
-                    "value": "`${resolution}`",
-                    "inline": true
-                },
-                {
-                    "name": "🟢  Stream Start",
-                    "value": "`${start_time}`",
-                    "inline": true
-                },
-                {
-                    "name": "🔴  Stream End",
-                    "value": "`${end_time}`",
-                    "inline": true
-                },
-                {
-                    "name": "☁️  Mirrors",
-                    "value": "${upload_emoji} `${upload_count}/${upload_total}` uploaded",
-                    "inline": true
-                },
-                {
-                    "name": "📥  Download & Watch",
-                    "value": "${links_value}",
-                    "inline": false
-                }
-            ],
-            "footer": {
-                "text": "☪️ The Muslim Lantern Archive  •  All recordings are permanent",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "recordings"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NOTIFICATION 3: ❌ RECORDING FAILED
-#  Sent when all recording methods fail
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_recording_failed() {
     log_step "Sending RECORDING FAILED notification..."
-    
+
+    local reason="${1:-Unknown error}"
+    local retry_info="${2:-Auto-retry scheduled}"
     local title="${STREAM_TITLE:-Live Stream}"
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
     local thumbnail="${STREAM_THUMBNAIL:-}"
     local avatar="${AVATAR_URL:-}"
-    local error_msg="${1:-All recording methods exhausted}"
-    local retry_info="${2:-Auto-retry triggered in 2 minutes}"
-    local cookie_status="${COOKIE_STATUS:-unknown}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
-    local current_time
-    current_time=$(now_pkt)
-    
-    local esc_title esc_channel esc_error
-    esc_title=$(json_escape "$title")
-    esc_channel=$(json_escape "$channel")
-    esc_error=$(json_escape "$error_msg")
-    
-    # Diagnose the issue
-    local diagnosis="Unknown"
-    if echo "$error_msg" | grep -qi "technical difficulties"; then
-        diagnosis="YouTube is blocking the IP. WARP may not be connected or the IP has been flagged."
-    elif echo "$error_msg" | grep -qi "bot\|captcha\|sign in"; then
-        diagnosis="YouTube detected automated access. Cookies may need refreshing."
-    elif echo "$error_msg" | grep -qi "PO Token\|po_token"; then
-        diagnosis="YouTube requires a PO Token for this video. This is an industry-wide limitation."
-    elif echo "$error_msg" | grep -qi "not live\|no longer live"; then
-        diagnosis="Stream ended before recording could start."
-    else
-        diagnosis="All 6 recording methods (web, web_creator, default, mweb, streamlink) failed."
-    fi
-    
+    local fail_time
+    fail_time=$(now_pkt)
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "title": "❌  RECORDING FAILED",
-            "description": "> 📺 **${esc_title}**\\n> 👤 **${esc_channel}**\\n\\nThe recording engine exhausted **all available methods** (6 methods × 5 attempts = 30 tries).",
-            "color": ${COLOR_FAILED:-15158332},
-            "thumbnail": {
-                "url": "${thumbnail}"
-            },
-            "fields": [
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **Diagnosis** ━━━━━",
-                    "inline": false
+    payload=$(jq -n \
+        --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar      "$avatar" \
+        --arg title       "$title" \
+        --arg url         "$video_url" \
+        --arg channel     "$channel" \
+        --arg thumbnail   "$thumbnail" \
+        --arg reason      "$reason" \
+        --arg retry_info  "$retry_info" \
+        --arg fail_time   "$fail_time" \
+        --arg dash_url    "$dashboard_url" \
+        --arg timestamp   "$timestamp" \
+        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     ("❌  RECORDING FAILED  ·  " + $channel),
+                    url:      $url,
+                    icon_url: $avatar
                 },
-                {
-                    "name": "🔍  Root Cause",
-                    "value": "${diagnosis}",
-                    "inline": false
+                title:       $title,
+                url:         $url,
+                description: (
+                    "**" + $channel + "** was live but the recording failed after exhausting all 6 methods × 3 attempts.\n\n" +
+                    "> ⚠️ **" + $reason + "**"
+                ),
+                color: 15158332,
+                thumbnail: { url: $thumbnail },
+                fields: [
+                    { name: "⏰  Failed At",    value: $fail_time,    inline: true  },
+                    { name: "🔄  Retry Status", value: $retry_info,   inline: true  },
+                    { name: "🔗  Stream URL",   value: ("[▶️ YouTube](" + $url + ")   ·   [📊 Dashboard](" + $dash_url + ")"), inline: false }
+                ],
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Auto-retry dispatched"),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "📋  Error Details",
-                    "value": "\`\`\`\\n${esc_error}\\n\`\`\`",
-                    "inline": false
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **Status** ━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "🕐  Time",
-                    "value": "\`${current_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🍪  Cookies",
-                    "value": "\`${cookie_status}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🔄  Retry",
-                    "value": "${retry_info}",
-                    "inline": true
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **Troubleshooting** ━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "1️⃣  Refresh Cookies",
-                    "value": "Re-export fresh cookies from Firefox",
-                    "inline": false
-                },
-                {
-                    "name": "2️⃣  Update Secret",
-                    "value": "Update \`YOUTUBE_COOKIES\` in GitHub secrets",
-                    "inline": false
-                },
-                {
-                    "name": "3️⃣  Manual Run",
-                    "value": "**[▶️ Check if still live](${video_url})** — Then trigger a fresh workflow",
-                    "inline": false
-                }
-            ],
-            "author": {
-                "name": "${esc_channel} • Recording Failed",
-                "icon_url": "${avatar}"
-            },
-            "footer": {
-                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Auto-retry active",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "alerts"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NOTIFICATION 4: 📊 WEEKLY SUMMARY
-#  Detailed weekly analytics with per-stream breakdown
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_weekly_summary() {
     log_step "Sending WEEKLY SUMMARY notification..."
-    
+
+    local total_streams="${LIFETIME_TOTAL_STREAMS:-0}"
+    local total_hours="${LIFETIME_TOTAL_HOURS:-0}"
+    local total_gb="${LIFETIME_TOTAL_GB:-0}"
+    local avg_duration="${LIFETIME_AVG_DURATION:-0}"
+    local last_title="${STREAM_TITLE:-N/A}"
+    local last_channel="${STREAM_CHANNEL:-N/A}"
     local avatar="${AVATAR_URL:-}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
-    
-    local total_streams="${WEEKLY_TOTAL_STREAMS:-0}"
-    local total_hours="${WEEKLY_TOTAL_HOURS:-0}"
-    local total_gb="${WEEKLY_TOTAL_GB:-0}"
-    local avg_duration="${WEEKLY_AVG_DURATION:-0}"
-    local streams_list="${WEEKLY_STREAMS_LIST:-No streams recorded this week.}"
-    local lifetime_streams="${LIFETIME_TOTAL_STREAMS:-0}"
-    local lifetime_hours="${LIFETIME_TOTAL_HOURS:-0}"
-    local lifetime_gb="${LIFETIME_TOTAL_GB:-0}"
-    
-    local week_start week_end
-    week_start=$(TZ='Asia/Karachi' date -d 'last monday' '+%b %d' 2>/dev/null || date '+%b %d')
-    week_end=$(TZ='Asia/Karachi' date '+%b %d, %Y')
-    
-    local esc_list
-    esc_list=$(json_escape "$streams_list")
-    
-    # Performance indicator
-    local perf_emoji="⭐" perf_text="Great Week!"
-    if (( total_streams == 0 )); then
-        perf_emoji="😴" perf_text="No Activity"
-    elif (( total_streams >= 5 )); then
-        perf_emoji="🔥" perf_text="Outstanding!"
-    elif (( total_streams >= 3 )); then
-        perf_emoji="💪" perf_text="Solid Week!"
-    fi
-    
+    local week_date
+    week_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "title": "📊  WEEKLY PERFORMANCE REPORT",
-            "description": "**${week_start} — ${week_end}**\\n\\n${perf_emoji} ${perf_text} — Here's your automated recording system's weekly performance breakdown.",
-            "color": ${COLOR_WEEKLY:-3447003},
-            "fields": [
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **This Week** ━━━━━",
-                    "inline": false
+    payload=$(jq -n \
+        --arg username       "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar         "$avatar" \
+        --arg total_streams  "$total_streams" \
+        --arg total_hours    "$total_hours" \
+        --arg total_gb       "$total_gb" \
+        --arg avg_duration   "$avg_duration" \
+        --arg last_title     "$last_title" \
+        --arg last_channel   "$last_channel" \
+        --arg week_date      "$week_date" \
+        --arg dash_url       "$dashboard_url" \
+        --arg timestamp      "$timestamp" \
+        --arg bot_ver        "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     "📊  WEEKLY ARCHIVE REPORT",
+                    icon_url: $avatar
                 },
-                {
-                    "name": "📹  Streams",
-                    "value": "**${total_streams}** recorded",
-                    "inline": true
+                title: "☪️ The Muslim Lantern — Weekly Summary",
+                description: (
+                    "Here is your weekly archive summary for the recording bot.\n\n" +
+                    "**Week ending:** `" + $week_date + "`"
+                ),
+                color: 5793522,
+                fields: [
+                    { name: "🎬  Total Streams",    value: ("`" + $total_streams + "` recordings"),   inline: true  },
+                    { name: "⏱️  Total Hours",      value: ("`" + $total_hours + "h`"),               inline: true  },
+                    { name: "💾  Total Archived",   value: ("`" + $total_gb + " GB`"),                inline: true  },
+                    { name: "📏  Avg Duration",     value: ("`" + $avg_duration + "h` per stream"),   inline: true  },
+                    { name: "📺  Last Stream",      value: ("**" + $last_title + "**\nby " + $last_channel), inline: false },
+                    { name: "📊  Full Archive",     value: ("[Open Dashboard →](" + $dash_url + ")"), inline: false }
+                ],
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Weekly Report"),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "⏱️  Hours",
-                    "value": "**${total_hours}h** captured",
-                    "inline": true
-                },
-                {
-                    "name": "💾  Storage",
-                    "value": "**${total_gb} GB** saved",
-                    "inline": true
-                },
-                {
-                    "name": "📏  Avg Duration",
-                    "value": "\`${avg_duration}\` per stream",
-                    "inline": true
-                },
-                {
-                    "name": "☁️  Uploads",
-                    "value": "All links active ✅",
-                    "inline": true
-                },
-                {
-                    "name": "🛡️  System",
-                    "value": "🟢 Operational",
-                    "inline": true
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **Recordings** ━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "📝  This Week's Streams",
-                    "value": "${esc_list}",
-                    "inline": false
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **All-Time Stats** ━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "🏆  Total Streams",
-                    "value": "**${lifetime_streams}**",
-                    "inline": true
-                },
-                {
-                    "name": "⏰  Total Hours",
-                    "value": "**${lifetime_hours}h**",
-                    "inline": true
-                },
-                {
-                    "name": "📦  Total Storage",
-                    "value": "**${lifetime_gb} GB**",
-                    "inline": true
-                }
-            ],
-            "author": {
-                "name": "${RECORDER_NAME:-The Muslim Lantern} • Weekly Report",
-                "icon_url": "${avatar}"
-            },
-            "footer": {
-                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Automated Recording System",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "reports"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 5: 🔄 CLOUD LINKS REFRESHED
-#  Sent after the link preservation cycle runs
+#  NOTIFICATION 5: 🔄 LINKS REFRESHED
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_links_refreshed() {
     log_step "Sending LINKS REFRESHED notification..."
-    
+
+    local checked="${REFRESH_CHECKED:-0}"
+    local active="${REFRESH_ACTIVE:-0}"
+    local expired="${REFRESH_EXPIRED:-0}"
     local avatar="${AVATAR_URL:-}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
-    
-    local total_checked="${REFRESH_TOTAL_CHECKED:-0}"
-    local total_alive="${REFRESH_TOTAL_ALIVE:-0}"
-    local total_refreshed="${REFRESH_TOTAL_REFRESHED:-0}"
-    local total_dead="${REFRESH_TOTAL_DEAD:-0}"
-    local total_restored="${REFRESH_TOTAL_RESTORED:-0}"
-    local refresh_time="${REFRESH_TIME_FMT:-N/A}"
-    
-    local status_emoji="✅" status_text="All links healthy"
-    local embed_color=${COLOR_REFRESH:-5763757}
-    if (( total_dead > 0 )) && (( total_restored > 0 )); then
-        status_emoji="🔧" status_text="${total_restored} links restored from Archive.org"
-        embed_color=${COLOR_COMPLETE_PARTIAL:-16761095}
-    elif (( total_dead > 0 )); then
-        status_emoji="⚠️" status_text="${total_dead} dead links detected"
-        embed_color=${COLOR_FAILED:-15158332}
-    elif (( total_checked == 0 )); then
-        status_emoji="💭" status_text="No links to check yet"
-    fi
-    
-    # Health bar
-    local health_pct=100
-    if (( total_checked > 0 )); then
-        health_pct=$(( (total_alive * 100) / total_checked ))
-    fi
-    local health_bar=""
-    local filled=$(( health_pct / 10 ))
-    local empty=$(( 10 - filled ))
-    for ((i=0; i<filled; i++)); do health_bar+="🟢"; done
-    for ((i=0; i<empty; i++)); do health_bar+="⚪"; done
-    
+    local refresh_time
+    refresh_time=$(now_pkt)
+
+    local status_icon="✅"
+    [[ "${expired:-0}" != "0" ]] && status_icon="⚠️"
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "title": "🔄  CLOUD LINK PRESERVATION",
-            "description": "The automated link maintenance cycle has completed. All download links have been checked, pinged, and refreshed to **prevent expiration**.\\n\\n${health_bar} **${health_pct}%** Health",
-            "color": ${embed_color},
-            "fields": [
-                {
-                    "name": "🔍  Checked",
-                    "value": "**${total_checked}** links",
-                    "inline": true
+    payload=$(jq -n \
+        --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar      "$avatar" \
+        --arg checked     "$checked" \
+        --arg active      "$active" \
+        --arg expired     "$expired" \
+        --arg status_icon "$status_icon" \
+        --arg rtime       "$refresh_time" \
+        --arg dash_url    "$dashboard_url" \
+        --arg timestamp   "$timestamp" \
+        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     ("🔄  LINKS REFRESHED  ·  " + $status_icon),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "✅  Alive",
-                    "value": "**${total_alive}** healthy",
-                    "inline": true
+                title:       "Download Link Health Check",
+                description: "Periodic link refresh complete. All download links have been pinged to prevent expiry.",
+                color: 5763757,
+                fields: [
+                    { name: "🔗  Links Checked",   value: ("`" + $checked + "`"),   inline: true  },
+                    { name: "✅  Active Links",    value: ("`" + $active + "`"),    inline: true  },
+                    { name: "❌  Expired Links",   value: ("`" + $expired + "`"),   inline: true  },
+                    { name: "🕐  Refreshed At",    value: $rtime,                   inline: false },
+                    { name: "📊  Dashboard",       value: ("[Open Archive →](" + $dash_url + ")"), inline: false }
+                ],
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "🔄  Refreshed",
-                    "value": "**${total_refreshed}** reset",
-                    "inline": true
-                },
-                {
-                    "name": "💀  Dead",
-                    "value": "**${total_dead}** expired",
-                    "inline": true
-                },
-                {
-                    "name": "🏛️  Restored",
-                    "value": "**${total_restored}** from Archive",
-                    "inline": true
-                },
-                {
-                    "name": "⏱️  Duration",
-                    "value": "\`${refresh_time}\`",
-                    "inline": true
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "${status_emoji} **Status:** ${status_text}",
-                    "inline": false
-                }
-            ],
-            "author": {
-                "name": "${RECORDER_NAME:-The Muslim Lantern} • Link Manager",
-                "icon_url": "${avatar}"
-            },
-            "footer": {
-                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Next refresh in 3 days",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "refresh"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 6: 🛡️ SYSTEM HEALTH
-#  General system health check notification
+#  NOTIFICATION 6: 🟢 SYSTEM HEALTH
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_system_health() {
     log_step "Sending SYSTEM HEALTH notification..."
-    
+
+    local disk_space="${DISK_SPACE_GB:-N/A}"
+    local cookie_status="${COOKIE_STATUS:-unknown}"
+    local warp="${WARP_CONNECTED:-false}"
     local avatar="${AVATAR_URL:-}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
-    
-    local disk_space
-    disk_space=$(get_disk_space_gb 2>/dev/null || echo "N/A")
-    local disk_total
-    disk_total=$(get_total_disk_gb 2>/dev/null || echo "N/A")
-    local disk_used
-    disk_used=$(get_disk_used_percent 2>/dev/null || echo "N/A")
-    local ytdlp_ver
-    ytdlp_ver=$(yt-dlp --version 2>/dev/null || echo "N/A")
-    local ffmpeg_ver
-    ffmpeg_ver=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}' || echo "N/A")
-    local warp_status="${WARP_CONNECTED:-false}"
-    local cookie_status="${COOKIE_STATUS:-unknown}"
-    
-    local warp_text="🔴 Disconnected"
-    [[ "$warp_status" == "true" ]] && warp_text="🟢 Connected"
-    
-    local cookie_text="❓ Unknown"
-    [[ "$cookie_status" == "valid" ]] && cookie_text="✅ Valid"
-    [[ "$cookie_status" == "expired" ]] && cookie_text="⚠️ Expired"
-    [[ "$cookie_status" == "no_cookies" ]] && cookie_text="❌ None"
-    
-    # System health indicator
-    local health_status="🟢 ALL SYSTEMS OPERATIONAL"
-    local health_color=${COLOR_HEALTH:-10181046}
-    if [[ "$cookie_status" == "expired" ]]; then
-        health_status="🟡 DEGRADED — Cookies expired"
-        health_color=${COLOR_COOKIE_WARN:-16744448}
-    elif [[ "$warp_status" != "true" ]]; then
-        health_status="🟡 DEGRADED — WARP disconnected"
-        health_color=${COLOR_COOKIE_WARN:-16744448}
-    fi
-    
+    local check_time
+    check_time=$(now_pkt)
+
+    local cookie_icon="🟢 Valid"
+    [[ "$cookie_status" == "expired" ]]      && cookie_icon="🔴 Expired"
+    [[ "$cookie_status" == "no_cookies" ]]   && cookie_icon="🟡 None"
+    [[ "$cookie_status" == "check_failed" ]] && cookie_icon="❓ Unknown"
+
+    local warp_val="🔴 Off"
+    [[ "$warp" == "true" ]] && warp_val="🟢 Connected"
+
+    local yt_dlp_ver
+    yt_dlp_ver=$(yt-dlp --version 2>/dev/null || echo "N/A")
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "title": "🛡️  SYSTEM HEALTH CHECK",
-            "description": "${health_status}\\n\\nAll components have been verified and the automated recording system is ready to capture streams.",
-            "color": ${health_color},
-            "fields": [
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **Infrastructure** ━━━━━",
-                    "inline": false
+    payload=$(jq -n \
+        --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar      "$avatar" \
+        --arg disk        "${disk_space} GB" \
+        --arg cookie_icon "$cookie_icon" \
+        --arg warp_val    "$warp_val" \
+        --arg yt_dlp_ver  "$yt_dlp_ver" \
+        --arg check_time  "$check_time" \
+        --arg dash_url    "$dashboard_url" \
+        --arg timestamp   "$timestamp" \
+        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     "🟢  SYSTEM HEALTH CHECK",
+                    icon_url: $avatar
                 },
-                {
-                    "name": "💾  Disk Space",
-                    "value": "\`${disk_space}/${disk_total} GB\`\\n(${disk_used}% used)",
-                    "inline": true
+                title:       "Recorder System Status",
+                description: "Automated health check results for the stream recorder bot.",
+                color: 10181046,
+                fields: [
+                    { name: "💾  Disk Space",   value: $disk,           inline: true  },
+                    { name: "🍪  Cookies",       value: $cookie_icon,    inline: true  },
+                    { name: "🌐  WARP",          value: $warp_val,       inline: true  },
+                    { name: "🤖  yt-dlp",        value: ("`" + $yt_dlp_ver + "`"),  inline: true  },
+                    { name: "🕐  Checked At",    value: $check_time,     inline: false },
+                    { name: "📊  Dashboard",     value: ("[Open Archive →](" + $dash_url + ")"), inline: false }
+                ],
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "🌐  WARP VPN",
-                    "value": "${warp_text}",
-                    "inline": true
-                },
-                {
-                    "name": "🍪  Cookies",
-                    "value": "${cookie_text}",
-                    "inline": true
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **Software** ━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "📦  yt-dlp",
-                    "value": "\`v${ytdlp_ver}\`",
-                    "inline": true
-                },
-                {
-                    "name": "🎬  ffmpeg",
-                    "value": "\`v${ffmpeg_ver}\`",
-                    "inline": true
-                },
-                {
-                    "name": "⏰  Checked",
-                    "value": "\`$(now_pkt)\`",
-                    "inline": true
-                }
-            ],
-            "author": {
-                "name": "${RECORDER_NAME:-The Muslim Lantern} • System Monitor",
-                "icon_url": "${avatar}"
-            },
-            "footer": {
-                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • Automated Health Check",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "reports"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 7: 🍪 COOKIE EXPIRY WARNING
-#  Sent when cookie health check fails or cookies are getting old
+#  NOTIFICATION 7: 🍪 COOKIE WARNING
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_cookie_warning() {
     log_step "Sending COOKIE WARNING notification..."
-    
-    local avatar="${AVATAR_URL:-}"
-    local timestamp
-    timestamp=$(now_utc_iso)
+
     local status="${1:-expired}"
     local days_old="${2:-unknown}"
-    
-    local title description embed_color
-    if [[ "$status" == "expired" ]]; then
-        title="🚨  COOKIES EXPIRED — ACTION REQUIRED"
-        description="Your YouTube cookies have **expired or stopped working**. Recording will continue with cookieless methods but **quality and reliability may be reduced**.\\n\\n⚠️ **Update your cookies immediately to restore full functionality.**"
-        embed_color=${COLOR_FAILED:-15158332}
-    else
-        title="🍪  COOKIES EXPIRING SOON"
-        description="Your YouTube cookies are **${days_old} days old** and approaching expiration. Update them soon to prevent recording issues."
-        embed_color=${COLOR_COOKIE_WARN:-16744448}
+    local avatar="${AVATAR_URL:-}"
+    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local timestamp
+    timestamp=$(now_utc_iso)
+    local warn_time
+    warn_time=$(now_pkt)
+
+    local warn_title="Cookies Expired — Action Required"
+    local warn_desc="Your YouTube cookies have **expired**. Recording will fail until they are renewed."
+    local warn_color=15158332
+    if [[ "$status" == "warning" ]]; then
+        warn_title="Cookie Expiry Warning — Update Soon"
+        warn_desc="Your YouTube cookies are getting old (**${days_old} days**). They may expire soon. Update them proactively to avoid missed recordings."
+        warn_color=16744448
     fi
-    
+
     local payload
-    payload=$(cat <<PAYLOAD
-{
-    "username": "${BOT_USERNAME:-☪️ The Muslim Lantern}",
-    "avatar_url": "${avatar}",
-    "embeds": [
-        {
-            "title": "${title}",
-            "description": "${description}",
-            "color": ${embed_color},
-            "fields": [
-                {
-                    "name": "🍪  Cookie Age",
-                    "value": "**${days_old} days**",
-                    "inline": true
+    payload=$(jq -n \
+        --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+        --arg avatar      "$avatar" \
+        --arg warn_title  "$warn_title" \
+        --arg warn_desc   "$warn_desc" \
+        --arg status      "$status" \
+        --arg days_old    "$days_old" \
+        --arg warn_time   "$warn_time" \
+        --arg timestamp   "$timestamp" \
+        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
+        --arg color       "$warn_color" \
+        '{
+            username:   $username,
+            avatar_url: $avatar,
+            embeds: [{
+                author: {
+                    name:     ("🍪  COOKIE ALERT  ·  " + $status),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "📊  Status",
-                    "value": "\`${status}\`",
-                    "inline": true
+                title:       $warn_title,
+                description: $warn_desc,
+                color: ($color | tonumber),
+                fields: [
+                    { name: "📅  Cookie Age",    value: ("`" + $days_old + " days`"),  inline: true  },
+                    { name: "⚠️  Status",        value: ("`" + $status + "`"),         inline: true  },
+                    { name: "🕐  Alert At",       value: $warn_time,                   inline: true  },
+                    {
+                        name:  "🔧  How to Fix (3 steps)",
+                        value: (
+                            "**1.** Open Chrome → YouTube → sign in\n" +
+                            "**2.** Install *EditThisCookie* → Export cookies\n" +
+                            "**3.** `base64 cookies.txt` → paste into **YOUTUBE_COOKIES** secret\n\n" +
+                            "*Go to: GitHub → Settings → Secrets → Actions → YOUTUBE_COOKIES*"
+                        ),
+                        inline: false
+                    }
+                ],
+                footer: {
+                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  UPDATE COOKIES TO RESTORE RECORDING"),
+                    icon_url: $avatar
                 },
-                {
-                    "name": "⏰  Checked",
-                    "value": "\`$(now_pkt)\`",
-                    "inline": true
-                },
-                {
-                    "name": "\\u200B",
-                    "value": "━━━━━ **How to Fix** ━━━━━",
-                    "inline": false
-                },
-                {
-                    "name": "1️⃣  Export Cookies",
-                    "value": "Open Firefox → Go to YouTube → Make sure you're logged in → Use **cookies.txt** extension to export",
-                    "inline": false
-                },
-                {
-                    "name": "2️⃣  Encode to Base64",
-                    "value": "Run: \`base64 -w 0 cookies.txt | clip\`",
-                    "inline": false
-                },
-                {
-                    "name": "3️⃣  Update GitHub Secret",
-                    "value": "Go to **Settings → Secrets → Actions** → Edit \`YOUTUBE_COOKIES\` → Paste the base64 string",
-                    "inline": false
-                }
-            ],
-            "author": {
-                "name": "${RECORDER_NAME:-The Muslim Lantern} • Cookie Monitor",
-                "icon_url": "${avatar}"
-            },
-            "footer": {
-                "text": "☪️ The Muslim Lantern v${RECORDER_VERSION:-2.2.0} • UPDATE COOKIES TO RESTORE",
-                "icon_url": "${avatar}"
-            },
-            "timestamp": "${timestamp}"
-        }
-    ]
-}
-PAYLOAD
-)
-    
+                timestamp: $timestamp
+            }]
+        }')
+
     send_discord_webhook "$payload" "alerts"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ENTRY POINT — called with a notification type argument
+#  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
@@ -903,4 +624,3 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             ;;
     esac
 fi
-

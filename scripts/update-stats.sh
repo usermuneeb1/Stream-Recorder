@@ -57,6 +57,11 @@ update_stats() {
     total_hours=$(echo "scale=2; $total_hours + $duration_hours" | bc)
     total_gb=$(echo "scale=2; $total_gb + $size_gb" | bc)
     avg_duration=$(echo "scale=2; $total_hours / $total_streams" | bc)
+    # Normalize bc output — bc omits leading zero (.13 → 0.13) which breaks jq tonumber
+    [[ "$total_hours"   == .* ]] && total_hours="0${total_hours}"
+    [[ "$total_gb"      == .* ]] && total_gb="0${total_gb}"
+    [[ "$avg_duration"  == .* ]] && avg_duration="0${avg_duration}"
+    [[ "$size_gb"       == .* ]] && size_gb="0${size_gb}"
     
     log_info "Updated: ${total_streams} streams, ${total_hours}h, ${total_gb} GB, avg ${avg_duration}h"
     
@@ -68,27 +73,27 @@ update_stats() {
     
     local new_stats
     new_stats=$(jq -n \
-        --argjson total_streams "$total_streams" \
-        --arg total_hours "$total_hours" \
-        --arg total_gb "$total_gb" \
+        --arg total_streams      "$total_streams" \
+        --arg total_hours        "$total_hours" \
+        --arg total_gb           "$total_gb" \
         --arg avg_duration_hours "$avg_duration" \
-        --arg last_title "$stream_title" \
-        --arg last_channel "$stream_channel" \
-        --arg last_date "$current_date" \
-        --arg last_duration "$(format_duration "$duration_sec")" \
-        --arg last_size_gb "$size_gb" \
-        --arg updated_at "$(now_utc_iso)" \
+        --arg last_title         "$stream_title" \
+        --arg last_channel       "$stream_channel" \
+        --arg last_date          "$current_date" \
+        --arg last_duration      "$(format_duration "$duration_sec")" \
+        --arg last_size_gb       "$size_gb" \
+        --arg updated_at         "$(now_utc_iso)" \
         '{
-            total_streams: $total_streams,
-            total_hours: ($total_hours | tonumber),
-            total_gb: ($total_gb | tonumber),
-            avg_duration_hours: ($avg_duration_hours | tonumber),
+            total_streams: ($total_streams | tonumber // 0 | floor),
+            total_hours: ($total_hours | tonumber // 0),
+            total_gb: ($total_gb | tonumber // 0),
+            avg_duration_hours: ($avg_duration_hours | tonumber // 0),
             last_stream: {
                 title: $last_title,
                 channel: $last_channel,
                 date: $last_date,
                 duration: $last_duration,
-                size_gb: ($last_size_gb | tonumber)
+                size_gb: ($last_size_gb | tonumber // 0)
             },
             updated_at: $updated_at
         }')
@@ -238,12 +243,20 @@ update_recordings_json() {
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
     local thumbnail="${STREAM_THUMBNAIL:-}"
-    local duration_sec="${RECORD_DURATION_SEC:-0}"
     local duration_fmt="${RECORD_DURATION_FMT:-00:00:00}"
-    local size_bytes="${RECORD_SIZE_BYTES:-0}"
     local size_human="${RECORD_SIZE_HUMAN:-0 B}"
-    local size_gb="${RECORD_SIZE_GB:-0.00}"
     local resolution="${RECORD_RESOLUTION:-N/A}"
+
+    # Sanitize numeric values — --argjson requires valid JSON (never empty string)
+    local duration_sec size_bytes size_gb
+    duration_sec="${RECORD_DURATION_SEC:-0}"
+    size_bytes="${RECORD_SIZE_BYTES:-0}"
+    size_gb="${RECORD_SIZE_GB:-0.00}"
+    # Ensure integers
+    [[ "$duration_sec" =~ ^[0-9]+$ ]] || duration_sec=0
+    [[ "$size_bytes"   =~ ^[0-9]+$ ]] || size_bytes=0
+    # Ensure size_gb has leading zero (bc may output .95 instead of 0.95)
+    [[ "$size_gb" == .* ]] && size_gb="0${size_gb}"
     local record_date
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
     local month_folder
@@ -274,9 +287,9 @@ update_recordings_json() {
         --arg channel "$channel" \
         --arg video_url "$video_url" \
         --arg thumbnail "$thumbnail" \
-        --argjson duration_sec "$duration_sec" \
-        --arg duration_fmt "$duration_fmt" \
-        --argjson size_bytes "$size_bytes" \
+        --arg duration_sec   "$duration_sec" \
+        --arg duration_fmt   "$duration_fmt" \
+        --arg size_bytes     "$size_bytes" \
         --arg size_human "$size_human" \
         --arg size_gb "$size_gb" \
         --arg resolution "$resolution" \
@@ -293,11 +306,11 @@ update_recordings_json() {
             channel: $channel,
             video_url: $video_url,
             thumbnail: $thumbnail,
-            duration_sec: $duration_sec,
+            duration_sec: ($duration_sec | tonumber // 0),
             duration_fmt: $duration_fmt,
-            size_bytes: $size_bytes,
+            size_bytes: ($size_bytes | tonumber // 0),
             size_human: $size_human,
-            size_gb: ($size_gb | tonumber),
+            size_gb: ($size_gb | tonumber // 0),
             resolution: $resolution,
             date: $date,
             month: $month,
