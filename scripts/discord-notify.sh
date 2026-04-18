@@ -175,6 +175,7 @@ PAYLOAD
 )
     
     send_discord_webhook "$payload" "alerts"
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NOTIFICATION 2: ✅ RECORDING COMPLETE
