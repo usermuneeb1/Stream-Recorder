@@ -59,7 +59,10 @@ record_method_a() {
         -o "$output_file" \
         "$video_url" 2>&1 | tail -5
     
-    return ${PIPESTATUS[0]}
+    local status=${PIPESTATUS[0]}
+    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -100,7 +103,10 @@ record_method_b() {
         -o "$output_file" \
         "$video_url" 2>&1 | tail -5
     
-    return ${PIPESTATUS[0]}
+    local status=${PIPESTATUS[0]}
+    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -126,7 +132,10 @@ record_method_c() {
         -o "$output_file" \
         "$video_url" 2>&1 | tail -5
     
-    return ${PIPESTATUS[0]}
+    local status=${PIPESTATUS[0]}
+    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -151,7 +160,10 @@ record_method_d() {
         -o "$output_file" \
         "$video_url" 2>&1 | tail -5
     
-    return ${PIPESTATUS[0]}
+    local status=${PIPESTATUS[0]}
+    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -179,7 +191,10 @@ record_method_e() {
         -o "$output_file" \
         "$video_url" 2>&1 | tail -5
     
-    return ${PIPESTATUS[0]}
+    local status=${PIPESTATUS[0]}
+    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -205,7 +220,10 @@ record_method_f() {
         --hls-live-restart \
         "$video_url" best 2>&1 | tail -5
     
-    return ${PIPESTATUS[0]}
+    local status=${PIPESTATUS[0]}
+    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
