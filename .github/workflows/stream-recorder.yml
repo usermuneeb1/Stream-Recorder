@@ -46,6 +46,11 @@ on:
         required: false
         default: "0"
         type: string
+      save_test_links:
+        description: "Save recording links to links.txt database"
+        required: false
+        default: "true"
+        type: boolean
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CONCURRENCY — Only one recording at a time, never cancel running jobs
@@ -299,7 +304,13 @@ jobs:
       - name: "🔗 Archive Links"
         if: steps.record.outputs.recording_success == 'true'
         continue-on-error: true
-        run: bash scripts/update-links.sh
+        run: |
+          SAVE_LINKS="${{ github.event.inputs.save_test_links }}"
+          if [[ "$SAVE_LINKS" == "false" ]]; then
+            echo "⏭️ save_test_links is false. Skipping links.txt database update."
+          else
+            bash scripts/update-links.sh
+          fi
 
       # ─── 14. SEND FAILED NOTIFICATION (if recording failed) ──────────────
       - name: "❌ Notify — Recording Failed"

@@ -453,7 +453,7 @@ notify_weekly_summary() {
                     name:     "The Muslim Lantern • Weekly Report",
                     icon_url: $avatar
                 },
-                title: "📊  WEEKLY PERFORMANCE REPORT\n" + $date_range,
+                title: ("📊  WEEKLY PERFORMANCE REPORT\n" + $date_range),
                 description: (
                     $greeting + " — Here'\''s your automated recording system'\''s weekly performance breakdown.\n\n" +
                     "━━━━━ This Week ━━━━━\n" + 
