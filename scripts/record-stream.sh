@@ -501,10 +501,28 @@ record_stream() {
             log_info "Checking if stream is still live..."
             # Wait 30s after a successful segment (YouTube CDN cache takes time to update)
             if [[ "$RECORDING_SUCCESS" == "true" ]]; then
-                log_info "Cooling down 30s after successful segment..."
-                sleep 30
-            else
-                random_sleep 3 8
+                # Verify if stream genuinely ended or just buffered/dropped
+                log_info "Cooling down 600s (10 minutes) before finalizing clip..."
+                log_info "This prevents fragmented recordings if the YouTube stream drops momentarily."
+                
+                local wait_iters=0
+                local is_ended="true"
+                while (( wait_iters < 10 )); do
+                    sleep 60
+                    (( wait_iters++ ))
+                    
+                    # Check if stream came back online
+                    if is_stream_live "$video_id"; then
+                        log_warn "Stream came back online during cooldown! Resuming recording loop..."
+                        is_ended="false"
+                        break
+                    fi
+                done
+                
+                if [[ "$is_ended" == "true" ]]; then
+                    log_info "Stream has verified ended — stopping recording loop"
+                    break
+                fi
             fi
             
             if is_stream_still_live "$video_id"; then

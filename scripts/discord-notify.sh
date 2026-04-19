@@ -25,9 +25,9 @@ source "$SCRIPT_DIR/utils.sh"
 get_webhook_url() {
     local type="$1"
     case "$type" in
-        alerts)      echo "${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}" ;;
-        recordings)  echo "${DISCORD_WEBHOOK_RECORDINGS:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}" ;;
-        refresh)     echo "${DISCORD_WEBHOOK_REFRESH:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}" ;;
+        alerts)      echo "${DISCORD_WEBHOOK_ALERTS:-}" ;;
+        recordings)  echo "${DISCORD_WEBHOOK_RECORDINGS:-}" ;;
+        refresh)     echo "${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}" ;;
         reports)     echo "${DISCORD_WEBHOOK_REPORTS:-${DISCORD_WEBHOOK_URL:-}}" ;;
         *)           echo "${DISCORD_WEBHOOK_URL:-}" ;;
     esac
@@ -40,37 +40,66 @@ get_webhook_url() {
 send_discord_webhook() {
     local payload="$1"
     local channel_type="${2:-default}"
+    local wait_id_file="${3:-}"
     local webhook_url
     webhook_url=$(get_webhook_url "$channel_type")
 
     if [[ -z "$webhook_url" ]]; then
-        log_warn "No Discord webhook for '${channel_type}' — skipping (set DISCORD_WEBHOOK_URL secret)"
+        log_warn "No Discord webhook for '${channel_type}' — skipping embed"
         return 0
     fi
 
+    local req_url="$webhook_url"
+    [[ -n "$wait_id_file" ]] && req_url="${webhook_url}?wait=true"
+
+    local out_tmp
+    out_tmp=$(mktemp)
     local http_code
-    http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+    http_code=$(curl -s -o "$out_tmp" -w '%{http_code}' \
         --max-time 30 \
         -H "Content-Type: application/json" \
         -d "$payload" \
-        "$webhook_url" 2>/dev/null)
+        "$req_url" 2>/dev/null)
 
     if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
         log_ok "Discord notification sent to [${channel_type}] (HTTP ${http_code})"
-        return 0
-    elif [[ "$http_code" == "429" ]]; then
-        log_warn "Discord rate limited — retrying in 5s..."
-        sleep 5
-        http_code=$(curl -s -o /dev/null -w '%{http_code}' \
-            --max-time 30 -H "Content-Type: application/json" \
-            -d "$payload" "$webhook_url" 2>/dev/null)
-        if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
-            log_ok "Discord notification sent on retry (HTTP ${http_code})"
-            return 0
+        if [[ -n "$wait_id_file" ]]; then
+            jq -r '.id // empty' "$out_tmp" > "$wait_id_file" 2>/dev/null || true
         fi
+        rm -f "$out_tmp"
+        return 0
     fi
 
     log_error "Discord notification FAILED (HTTP ${http_code})"
+    rm -f "$out_tmp"
+    return 1
+}
+
+patch_discord_webhook() {
+    local payload="$1"
+    local channel_type="${2:-default}"
+    local message_id="$3"
+    
+    local webhook_url
+    webhook_url=$(get_webhook_url "$channel_type")
+    
+    if [[ -z "$webhook_url" ]] || [[ -z "$message_id" ]] || [[ "$message_id" == "null" ]]; then
+        return 1
+    fi
+    
+    local patch_url="${webhook_url}/messages/${message_id}"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+        -X PATCH \
+        --max-time 30 \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
+        "$patch_url" 2>/dev/null)
+        
+    if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
+        log_ok "Discord message patched successfully [${channel_type}] (HTTP ${http_code})"
+        return 0
+    fi
     return 1
 }
 
@@ -102,19 +131,22 @@ notify_live_detected() {
     local warp_val="🔴 Off"
     [[ "${WARP_CONNECTED:-false}" == "true" ]] && warp_val="🟢 Active"
 
+    # Fallback to hqdefault explicitly as Discord sometimes caches/blocks maxres defaults from youtube
+    [[ -n "$video_id" ]] && thumbnail="https://i.ytimg.com/vi/${video_id}/hqdefault.jpg"
+
     local payload
     payload=$(jq -n \
         --arg username    "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
         --arg avatar      "$avatar" \
         --arg title       "$title" \
         --arg channel     "$channel" \
+        --arg url         "$video_url" \
         --arg thumbnail   "$thumbnail" \
         --arg dtime       "$detect_time" \
         --arg method      "$method" \
         --arg cookie      "${cookie_icon} ${cookie_status}" \
         --arg disk        "${disk_space} GB free" \
         --arg warp        "$warp_val" \
-        --arg dash_url    "$dashboard_url" \
         --arg timestamp   "$timestamp" \
         --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
@@ -124,11 +156,14 @@ notify_live_detected() {
             embeds: [{
                 author: {
                     name:     ("🔴  RECORDING STARTED  ─  " + $channel),
-                    icon_url: $avatar
+                    icon_url: $avatar,
+                    url:      $url
                 },
                 title:       $title,
+                url:         $url,
                 description: (
                     "A live stream from **" + $channel + "** has been detected and recording is now active.\n" +
+                    "> 🔗 **Watch Live**: " + $url + "\n" +
                     "> 🎬 **Multi-method recording engine engaged** — 6 methods × 3 retries = 18 chances to capture.\n" +
                     "> ☁️ **Triple cloud upload** (Gofile · Pixeldrain · Archive.org) will begin once complete."
                 ),
@@ -140,8 +175,7 @@ notify_live_detected() {
                     { name: "🍪  Cookies",         value: $cookie,              inline: true  },
                     { name: "💾  Disk Free",       value: $disk,                inline: true  },
                     { name: "🌐  WARP",            value: $warp,                inline: true  },
-                    { name: "🎛️  Status",         value: "`🔴 LIVE — RECORDING`", inline: true  },
-                    { name: "📊  Dashboard",       value: ("[View Archive →](" + $dash_url + ")"), inline: false }
+                    { name: "🎛️  Status",         value: "`🔴 LIVE — RECORDING`", inline: false  }
                 ],
                 footer: {
                     text:     ("☪️ " + $bot_name + "  ·  Stream Recorder v" + $bot_ver + "  ·  Recording in progress…"),
@@ -278,7 +312,19 @@ notify_recording_complete() {
             }]
         }')
 
-    send_discord_webhook "$payload" "recordings"
+    # Capture Message ID
+    local id_file
+    id_file=$(mktemp)
+    if send_discord_webhook "$payload" "recordings" "$id_file"; then
+        local msg_id
+        msg_id=$(cat "$id_file" 2>/dev/null || echo "")
+        rm -f "$id_file"
+        if [[ -n "$msg_id" ]]; then
+            export RECORD_DISCORD_MSG_ID="$msg_id"
+        fi
+    else
+        rm -f "$id_file"
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -360,15 +406,26 @@ notify_weekly_summary() {
     local total_streams="${LIFETIME_TOTAL_STREAMS:-0}"
     local total_hours="${LIFETIME_TOTAL_HOURS:-0}"
     local total_gb="${LIFETIME_TOTAL_GB:-0}"
+    local week_streams="${WEEK_STREAMS:-0}"
+    local week_hours="${WEEK_HOURS:-0}"
+    local week_gb="${WEEK_GB:-0}"
     local avg_duration="${LIFETIME_AVG_DURATION:-0}"
-    local last_title="${STREAM_TITLE:-N/A}"
-    local last_channel="${STREAM_CHANNEL:-N/A}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
-    local week_date
-    week_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
+    
+    # Calculate dynamically string dates for "Apr 13 — Apr 17, 2026"
+    local start_date
+    start_date=$(date -d "7 days ago" '+%b %d' 2>/dev/null || date -v-7d '+%b %d' 2>/dev/null || echo "1 Week Ago")
+    local end_date
+    end_date=$(date '+%b %d, %Y')
+    
+    local greeting="😴 No Activity"
+    local status="No streams recorded this week 😴"
+    if [[ "$week_streams" != "0" ]]; then
+        greeting="🎉 Great Week"
+        status="${week_streams} streams successfully archived."
+    fi
 
     local payload
     payload=$(jq -n \
@@ -377,11 +434,13 @@ notify_weekly_summary() {
         --arg total_streams  "$total_streams" \
         --arg total_hours    "$total_hours" \
         --arg total_gb       "$total_gb" \
+        --arg week_streams   "$week_streams" \
+        --arg week_hours     "$week_hours" \
+        --arg week_gb        "$week_gb" \
         --arg avg_duration   "$avg_duration" \
-        --arg last_title     "$last_title" \
-        --arg last_channel   "$last_channel" \
-        --arg week_date      "$week_date" \
-        --arg dash_url       "$dashboard_url" \
+        --arg date_range     "${start_date} — ${end_date}" \
+        --arg greeting       "$greeting" \
+        --arg status         "$status" \
         --arg timestamp      "$timestamp" \
         --arg bot_ver        "${RECORDER_VERSION:-2.2.0}" \
         --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
@@ -390,25 +449,31 @@ notify_weekly_summary() {
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     "📊  WEEKLY ARCHIVE REPORT",
+                    name:     "The Muslim Lantern • Weekly Report",
                     icon_url: $avatar
                 },
-                title: "☪️ The Muslim Lantern — Weekly Summary",
+                title: "📊  WEEKLY PERFORMANCE REPORT\n" + $date_range,
                 description: (
-                    "Here is your weekly archive summary for the recording bot.\n\n" +
-                    "**Week ending:** `" + $week_date + "`"
+                    $greeting + " — Here'\''s your automated recording system'\''s weekly performance breakdown.\n\n" +
+                    "━━━━━ This Week ━━━━━\n" + 
+                    "📹  **Streams**\n" + $week_streams + " recorded\n" +
+                    "⏱️  **Hours**\n" + $week_hours + "h captured\n" +
+                    "💾  **Storage**\n" + $week_gb + " GB saved\n" +
+                    "📏  **Avg Duration**\n" + $avg_duration + "h per stream\n" +
+                    "☁️  **Uploads**\nAll links active ✅\n" +
+                    "🛡️  **System**\n🟢 Operational\n\n" +
+                    
+                    "━━━━━ Recordings ━━━━━\n" +
+                    "📝  **This Week'\''s Streams**\n" + $status + "\n\n" +
+                    
+                    "━━━━━ All-Time Stats ━━━━━\n" +
+                    "🏆  **Total Streams**\n" + $total_streams + "\n" +
+                    "⏰  **Total Hours**\n" + $total_hours + "h\n" +
+                    "📦  **Total Storage**\n" + $total_gb + " GB\n"
                 ),
                 color: 5793522,
-                fields: [
-                    { name: "🎬  Total Streams",    value: ("`" + $total_streams + "` recordings"),   inline: true  },
-                    { name: "⏱️  Total Hours",      value: ("`" + $total_hours + "h`"),               inline: true  },
-                    { name: "💾  Total Archived",   value: ("`" + $total_gb + " GB`"),                inline: true  },
-                    { name: "📏  Avg Duration",     value: ("`" + $avg_duration + "h` per stream"),   inline: true  },
-                    { name: "📺  Last Stream",      value: ("**" + $last_title + "**\nby " + $last_channel), inline: false },
-                    { name: "📊  Full Archive",     value: ("[Open Dashboard →](" + $dash_url + ")"), inline: false }
-                ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Weekly Report"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + " • Automated Recording System"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp

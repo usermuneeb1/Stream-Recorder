@@ -393,22 +393,16 @@ github_api_write() {
         return 1
     fi
 
-    # Write to temp file — avoids ALL shell-expansion / curl -d "$var" issues
-    # that cause GitHub to return "Problems parsing JSON" for large payloads
-    local payload_file
-    payload_file=$(mktemp "/tmp/gha_payload_XXXXXX.json")
-    printf '%s' "$payload" > "$payload_file"
-
+    # Write to curl stdin directly — bypasses all file/shell/variable size limit
+    # and safely evades CRLF corruption inside github action runners.
     local response
-    response=$(curl -s -X PUT \
+    response=$(printf '%s' "$payload" | curl -s -X PUT \
         -H "Authorization: token $token" \
         -H "Accept: application/vnd.github.v3+json" \
         -H "Content-Type: application/json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        --data-binary "@${payload_file}" 2>/dev/null)
-
-    rm -f "$payload_file"
+        --data-binary @- 2>/dev/null)
     
     local commit_sha
     commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)

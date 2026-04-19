@@ -44,6 +44,9 @@ update_links() {
     entry+="Duration: ${duration_fmt}\n"
     entry+="Size:     ${size_human} (${size_gb} GB)\n"
     entry+="Uploads:  ${upload_count}/${upload_total}\n"
+    if [[ -n "${RECORD_DISCORD_MSG_ID:-}" ]]; then
+        entry+="MsgID:    ${RECORD_DISCORD_MSG_ID}\n"
+    fi
     entry+="--- Links ---\n"
     
     # Add Gofile links
