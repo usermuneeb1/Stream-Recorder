@@ -41,6 +41,11 @@ on:
         required: false
         default: "5"
         type: string
+      custom_duration_minutes:
+        description: "X minutes to record then stop (0 = infinite)"
+        required: false
+        default: "0"
+        type: string
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CONCURRENCY — Only one recording at a time, never cancel running jobs
@@ -255,7 +260,13 @@ jobs:
         id: record
         if: steps.detect.outputs.is_live == 'true'
         timeout-minutes: 300  # 5 hours max for recording
-        run: bash scripts/record-stream.sh
+        run: |
+          CUSTOM_DUR="${{ github.event.inputs.custom_duration_minutes }}"
+          if [[ -n "$CUSTOM_DUR" && "$CUSTOM_DUR" != "0" ]]; then
+            export MAX_RECORD_DURATION=$(( CUSTOM_DUR * 60 ))
+            echo "⏱️ Custom duration active: Will stop recording gracefully after $CUSTOM_DUR minutes."
+          fi
+          bash scripts/record-stream.sh
 
       # ─── 9. POST-PROCESS ─────────────────────────────────────────────────
       - name: "⚙️ Post-Process"
