@@ -249,6 +249,7 @@ notify_recording_complete() {
         --arg avatar         "$avatar" \
         --arg title          "$title" \
         --arg channel        "$channel" \
+        --arg video_url      "$video_url" \
         --arg thumbnail      "$thumbnail" \
         --arg duration       "$duration_fmt" \
         --arg size           "$size_human" \
@@ -273,11 +274,11 @@ notify_recording_complete() {
             embeds: [{
                 author: {
                     name:     ("✅  ARCHIVED  ─  " + $channel),
-                    url:      $dash_url,
+                    url:      $video_url,
                     icon_url: $avatar
                 },
                 title:       ("📼  " + $title),
-                url:         $dash_url,
+                url:         $video_url,
                 description: (
                     "**" + $channel + "** live stream has been fully recorded, processed, and uploaded to the cloud archive.\n" +
                     "\n" +
@@ -302,7 +303,7 @@ notify_recording_complete() {
                             { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
                         else empty end),
                         { name: "💬  Live Chat",    value: $chat_status,                                   inline: false },
-                        { name: "📊  Dashboard",    value: ("[📂 View Full Archive →](" + $dash_url + ")"),  inline: false }
+                        { name: "📺  YouTube Original", value: ("[▶️ Watch Original Stream](" + $video_url + ")"), inline: false }
                     ]
                 ),
                 footer: {
