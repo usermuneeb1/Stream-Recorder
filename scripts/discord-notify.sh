@@ -113,6 +113,7 @@ notify_live_detected() {
     local title="${STREAM_TITLE:-Live Stream}"
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
+    local video_id="${STREAM_VIDEO_ID:-}"
     local thumbnail="${STREAM_THUMBNAIL:-}"
     local method="${STREAM_DETECTION_METHOD:-Unknown}"
     local detect_time="${STREAM_DETECTION_TIME:-$(now_pkt)}"
@@ -525,14 +526,18 @@ notify_links_refreshed() {
                     icon_url: $avatar
                 },
                 title:       "Download Link Health Check",
-                description: "Periodic link refresh complete. All download links have been pinged to prevent expiry.",
+                description: (
+                    "Periodic link refresh complete. All download links have been pinged to prevent expiry.\n\n" +
+                    "> 📁 **Gofile** — Expires after 10 days of inactivity\n" +
+                    "> 💧 **Pixeldrain** — Expires after 60 days of inactivity\n" +
+                    "> 🏛️ **Archive.org** — Permanently safely archived"
+                ),
                 color: 5763757,
                 fields: [
                     { name: "🔗  Links Checked",   value: ("`" + $checked + "`"),   inline: true  },
                     { name: "✅  Active Links",    value: ("`" + $active + "`"),    inline: true  },
                     { name: "❌  Expired Links",   value: ("`" + $expired + "`"),   inline: true  },
-                    { name: "🕐  Refreshed At",    value: $rtime,                   inline: false },
-                    { name: "📊  Dashboard",       value: ("[Open Archive →](" + $dash_url + ")"), inline: false }
+                    { name: "🕐  Refreshed At",    value: $rtime,                   inline: false }
                 ],
                 footer: {
                     text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),

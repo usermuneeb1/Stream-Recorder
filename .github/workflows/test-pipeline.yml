@@ -2,6 +2,11 @@ name: "🧪 Test Pipeline & Features"
 
 on:
   workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'YouTube URL to test live recording (24/7 stream recommended)'
+        required: true
+        default: 'https://www.youtube.com/watch?v=bByGQJpEwRw'
 
 concurrency:
   group: stream-recorder-test
@@ -16,13 +21,16 @@ env:
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
   ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
   PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  GOFILE_API_KEY: ${{ secrets.GOFILE_API_KEY }}
+  WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
+  YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
   GH_PAT: ${{ secrets.GH_PAT }}
   RECORD_DIR: /tmp/stream-recorder
   TZ: Asia/Karachi
 
 jobs:
   test-features:
-    name: "🧪 Run Feature Tests"
+    name: "🧪 Run True Feature Tests (10 Min)"
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,95 +40,79 @@ jobs:
       - name: "📥 Checkout Repository"
         uses: actions/checkout@v4
 
-      - name: "📦 Install Test Dependencies"
+      - name: "📦 Install Dependencies"
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg jq curl bc
+          sudo apt-get install -y -qq ffmpeg jq curl bc python3
+          sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp 2>/dev/null || \
+          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+          sudo chmod a+rx /usr/local/bin/yt-dlp
+          pip3 install --quiet streamlink chat-downloader
           chmod +x scripts/*.sh
 
-      - name: "🧪 1. Mock Detection & Webhook Alert"
-        run: |
-          source scripts/utils.sh
-          source scripts/discord-notify.sh
-          
-          # Mock variables
-          export STREAM_TITLE="TEST PIPELINE — MOCK LIVE STREAM"
-          export STREAM_CHANNEL="The Muslim Lantern (Test)"
-          export STREAM_URL="https://usermuneeb1.github.io/Stream-Recorder/"
-          export STREAM_THUMBNAIL="https://i.ytimg.com/vi/default/maxresdefault.jpg"
-          export BOT_USERNAME="☪️ Test Bot"
-          
-          echo "Simulating Live Detected Alert..."
-          # Fake variables for discord payload
-          detect_time=$(now_pkt)
-          method="auto-mock-test"
-          cookie_icon="🍪"
-          cookie_status="NO_COOKIES"
-          disk_space="50.0"
-          warp_val="🔴 Off"
-          timestamp=$(now_utc_iso)
-          avatar="https://yt3.ggpht.com/ytc/AIdro_k60bEq5sYj3nN2r9sXo18zB9k8-n1q5Iq19O3FkQ=s88-c-k-c0x00ffffff-no-rj"
-          dashboard_url="https://usermuneeb1.github.io/Stream-Recorder/"
-          
-          # Send alert
-          if [[ -n "$DISCORD_WEBHOOK_ALERTS" || -n "$DISCORD_WEBHOOK_URL" ]]; then
-            notify_live_detected || true
-          fi
-
-      - name: "🧪 2. Mock Video Creation & Post Processing"
-        run: |
-          mkdir -p $RECORD_DIR
-          cd $RECORD_DIR
-          echo "Generating 5-second test video pattern..."
-          ffmpeg -f lavfi -i testsrc=duration=5:size=1280x720:rate=30 -f lavfi -i sine=frequency=1000:duration=5 -c:v libx264 -c:a aac -strict experimental "mock_test_video.mp4"
-          echo "Video generated. Size: $(du -sh mock_test_video.mp4 | cut -f1)"
-          cd -
-
-      - name: "🧪 3. Cloud Upload Algorithms (Pixeldrain Test)"
-        run: |
-          # We will just test Pixeldrain to keep it fast
-          export RECORD_DATE=$(date "+%Y-%m-%d")
-          export UPLOAD_FILE="MOCK_TEST.mp4"
-          mv $RECORD_DIR/mock_test_video.mp4 $RECORD_DIR/$UPLOAD_FILE
-          
-          if [[ -n "$PIXELDRAIN_API_KEY" ]]; then
-            echo "Testing Pixeldrain Auth Upload..."
-            # Pixeldrain specific
-            resp=$(curl -s -T "$RECORD_DIR/$UPLOAD_FILE" -u ":${PIXELDRAIN_API_KEY}" "https://pixeldrain.com/api/file/${UPLOAD_FILE}")
-            echo "Pixeldrain Response: $resp"
-            if echo "$resp" | grep -q '"success":true'; then
-              id=$(echo "$resp" | jq -r '.id')
-              export PIXELDRAIN_LINKS="Part 1|https://pixeldrain.com/u/${id}"
-              export UPLOAD_SUCCESS_COUNT=1
-            fi
-          else
-            echo "No Pixeldrain token, skipping upload."
-            export UPLOAD_SUCCESS_COUNT=0
-          fi
-          export UPLOAD_TOTAL_SERVICES=3
-
-      - name: "🧪 4. Final Data Archive & Webhook"
+      - name: "🌐 Configure WARP Proxy"
         continue-on-error: true
         run: |
-          # Fake metrics FIRST
-          export STREAM_TITLE="TEST PIPELINE — MOCK COMPLETE"
-          export STREAM_CHANNEL="The Muslim Lantern (Test)"
-          export RECORD_DURATION_FMT="00:00:05"
-          export RECORD_DURATION=5
-          export RECORD_SIZE_HUMAN="1.2 MB"
-          export RECORD_SIZE=1200000
-          export RECORD_RESOLUTION="1280x720"
-          export RECORD_FILE="MOCK_TEST.mp4"
-          export RECORD_PARTS="1"
+          source scripts/utils.sh
+          if [[ -n "${WARP_LICENSE_KEY}" ]]; then
+            curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+            sudo apt-get update && sudo apt-get install cloudflare-warp -y
+            warp-cli --accept-tos registration new
+            warp-cli --accept-tos mode proxy
+            warp-cli --accept-tos connect
+            sleep 5
+            export WARP_CONNECTED=true
+            echo "WARP_CONNECTED=true" >> $GITHUB_ENV
+          fi
+
+      - name: "🧪 1. Mock Detection"
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          # Set mock variables to the input URL
+          export STREAM_TEST_MODE="true"
+          export STREAM_URL="${{ github.event.inputs.test_url }}"
+          export STREAM_CHANNEL="Test Channel"
+          export STREAM_TITLE="LIVE PIPELINE TEST (10M)"
+          export STREAM_VIDEO_ID=$(echo "$STREAM_URL" | grep -oP 'v=\K[^&]+' || echo "TEST1234")
           
+          echo "STREAM_URL=${STREAM_URL}" >> $GITHUB_ENV
+          echo "STREAM_CHANNEL=${STREAM_CHANNEL}" >> $GITHUB_ENV
+          echo "STREAM_TITLE=${STREAM_TITLE}" >> $GITHUB_ENV
+          echo "STREAM_VIDEO_ID=${STREAM_VIDEO_ID}" >> $GITHUB_ENV
+          
+          # Send alert using the actual Live notification script component
+          notify_live_detected || true
+
+      - name: "🧪 2. Realistic 10-Minute Recording"
+        run: |
+          export RECORD_DIR="/tmp/stream-recorder"
+          mkdir -p "$RECORD_DIR"
+          
+          echo "Starting realistic 10-minute stream recording of ${STREAM_URL}..."
+          # The timeout command sends SIGINT (Ctrl+C) to ytdlp exactly after 10m so it safely flushes the MP4 file
+          timeout -s SIGINT 10m bash scripts/record-stream.sh || true
+          
+          echo "Recording phase complete."
+          ls -la "$RECORD_DIR"
+
+      - name: "🧪 3. Post-Process Component"
+        run: |
+          echo "Processing chunks into final MP4..."
+          bash scripts/post-process.sh
+
+      - name: "🧪 4. Cloud Upload Engine"
+        run: |
+          echo "Uploading..."
+          bash scripts/upload-clouds.sh
+
+      - name: "🧪 5. Notify & Archive"
+        run: |
+          echo "Executing update-stats, update-links and notify_recording_complete..."
           bash scripts/update-stats.sh
+          bash scripts/update-links.sh
           
           source scripts/utils.sh
           source scripts/discord-notify.sh
-          
-          # Send completion webhook
-          if [[ -n "$DISCORD_WEBHOOK_RECORDINGS" || -n "$DISCORD_WEBHOOK_URL" ]]; then
-            notify_recording_complete || true
-          fi
-          
-          echo "Test Pipeline Finished!"
+          notify_recording_complete || true
