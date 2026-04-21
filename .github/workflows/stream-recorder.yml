@@ -82,6 +82,10 @@ env:
   GH_PAT: ${{ secrets.GH_PAT }}
   WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  # Supabase (for dashboard chat upload)
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  SUPABASE_STORAGE_BUCKET: ${{ secrets.SUPABASE_STORAGE_BUCKET }}
   RECORD_DIR: /tmp/stream-recorder
   COOKIES_FILE: cookies.txt
   TZ: Asia/Karachi
@@ -285,6 +289,12 @@ jobs:
         if: steps.record.outputs.recording_success == 'true'
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
+
+      # ─── 10a. UPLOAD CHAT LOG TO SUPABASE ────────────────────────────────
+      - name: "📤 Upload Chat to Supabase"
+        if: steps.record.outputs.recording_success == 'true'
+        continue-on-error: true
+        run: bash scripts/upload-chat-supabase.sh
 
       # ─── 11. SEND COMPLETE NOTIFICATION ──────────────────────────────────
       - name: "✅ Notify — Recording Complete"
