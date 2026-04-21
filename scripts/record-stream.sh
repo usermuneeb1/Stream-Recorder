@@ -514,29 +514,31 @@ record_stream() {
             fi
         fi
         
-        # Check if stream is still live (only if we haven't reached max attempts)
+        # ── Post-recording: decide whether to loop for another segment ────────
         if (( attempt < max_attempts )); then
+            
+            # If a custom duration was set, this was a single-shot test run.
+            # Break immediately — don't loop or wait for live checks.
+            if [[ -n "${MAX_RECORD_DURATION:-}" ]] && [[ "${MAX_RECORD_DURATION}" != "0" ]]; then
+                log_info "Custom duration mode — single-shot recording complete. Breaking loop."
+                break
+            fi
+            
+            # Normal mode: verify the stream genuinely ended (not a micro-drop)
             log_info "Checking if stream is still live..."
-            # Wait 30s after a successful segment (YouTube CDN cache takes time to update)
             if [[ "$RECORDING_SUCCESS" == "true" ]]; then
-                # Verify if stream genuinely ended or just buffered/dropped
-                log_info "Cooling down 600s (10 minutes) before finalizing clip..."
-                log_info "This prevents fragmented recordings if the YouTube stream drops momentarily."
-                
+                log_info "Cooling down 600s (10 minutes) to verify stream truly ended..."
                 local wait_iters=0
                 local is_ended="true"
                 while (( wait_iters < 10 )); do
                     sleep 60
                     (( wait_iters++ ))
-                    
-                    # Check if stream came back online
                     if is_stream_live "$video_id"; then
                         log_warn "Stream came back online during cooldown! Resuming recording loop..."
                         is_ended="false"
                         break
                     fi
                 done
-                
                 if [[ "$is_ended" == "true" ]]; then
                     log_info "Stream has verified ended — stopping recording loop"
                     break
