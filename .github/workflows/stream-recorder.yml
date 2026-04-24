@@ -269,7 +269,9 @@ jobs:
           CUSTOM_DUR="${{ github.event.inputs.custom_duration_minutes }}"
           if [[ -n "$CUSTOM_DUR" && "$CUSTOM_DUR" != "0" ]]; then
             export MAX_RECORD_DURATION=$(( CUSTOM_DUR * 60 ))
-            echo "⏱️ Custom duration active: Will stop recording gracefully after $CUSTOM_DUR minutes."
+            export CUSTOM_DURATION_MODE=true
+            export MAX_RECORD_ATTEMPTS=1
+            echo "⏱️ Custom duration active: Recording from NOW for $CUSTOM_DUR minutes (no --live-from-start, single attempt)."
           fi
           bash scripts/record-stream.sh
 

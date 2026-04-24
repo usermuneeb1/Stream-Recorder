@@ -21,6 +21,10 @@ COOKIES_FILE="${COOKIES_FILE:-cookies.txt}"
 RECORDED_FILES=()
 RECORDING_SUCCESS=false
 
+# Custom duration mode: when set, we record from "now" (no --live-from-start)
+# so the timeout produces a file of approximately the requested length.
+CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD A: Cookies + web_creator Player
 #  Best quality, authenticated access, bypasses age restrictions
@@ -45,6 +49,9 @@ record_method_a() {
         return 1
     fi
     
+    local live_start_flag="--live-from-start"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
         --extractor-args "youtube:player_client=web" \
@@ -52,7 +59,7 @@ record_method_a() {
         --no-part \
         --no-continue \
         --no-check-certificates \
-        --live-from-start \
+        $live_start_flag \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -89,6 +96,9 @@ record_method_b() {
         return 1
     fi
     
+    local live_start_flag="--live-from-start"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
         --extractor-args "youtube:player_client=web_creator" \
@@ -96,7 +106,7 @@ record_method_b() {
         --no-part \
         --no-continue \
         --no-check-certificates \
-        --live-from-start \
+        $live_start_flag \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -120,12 +130,15 @@ record_method_c() {
     
     log_info "  Method C: Web player (no cookies, anonymous)"
     
+    local live_start_flag="--live-from-start"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --extractor-args "youtube:player_client=web" \
         --no-part \
         --no-continue \
         --no-check-certificates \
-        --live-from-start \
+        $live_start_flag \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -149,11 +162,14 @@ record_method_d() {
     
     log_info "  Method D: Default player (auto-detect best client)"
     
+    local live_start_flag="--live-from-start"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --no-part \
         --no-continue \
         --no-check-certificates \
-        --live-from-start \
+        $live_start_flag \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -178,13 +194,16 @@ record_method_e() {
     
     log_info "  Method E: Mobile web player (mweb)"
     
+    local live_start_flag="--live-from-start"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --extractor-args "youtube:player_client=mweb" \
         --user-agent "$mobile_ua" \
         --no-part \
         --no-continue \
         --no-check-certificates \
-        --live-from-start \
+        $live_start_flag \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -213,11 +232,14 @@ record_method_f() {
         return 1
     fi
     
+    local restart_flag="--hls-live-restart"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
+    
     timeout "${MAX_RECORD_DURATION:-18000}" streamlink \
         --output "$output_file" \
         --force \
         --stream-segment-threads 3 \
-        --hls-live-restart \
+        $restart_flag \
         "$video_url" best 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
