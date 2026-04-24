@@ -426,9 +426,15 @@ upload_to_clouds() {
 
     # ── Export results ──
     local gofile_str="" pixeldrain_str="" archive_str=""
-    (( ${#GOFILE_LINKS[@]}      > 0 )) && gofile_str=$(IFS=';'; echo "${GOFILE_LINKS[*]}")
-    (( ${#PIXELDRAIN_LINKS[@]}  > 0 )) && pixeldrain_str=$(IFS=';'; echo "${PIXELDRAIN_LINKS[*]}")
-    (( ${#ARCHIVE_LINKS[@]}     > 0 )) && archive_str=$(IFS=';'; echo "${ARCHIVE_LINKS[*]}")
+    if (( ${#GOFILE_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
+    fi
+    if (( ${#PIXELDRAIN_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; pixeldrain_str="${PIXELDRAIN_LINKS[*]}"; IFS="$_ifs"
+    fi
+    if (( ${#ARCHIVE_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; archive_str="${ARCHIVE_LINKS[*]}"; IFS="$_ifs"
+    fi
 
     set_env "GOFILE_LINKS"         "$gofile_str"
     set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"

@@ -533,7 +533,7 @@ record_stream() {
                 while (( wait_iters < 10 )); do
                     sleep 60
                     (( wait_iters++ ))
-                    if is_stream_live "$video_id"; then
+                    if is_stream_still_live "$video_id"; then
                         log_warn "Stream came back online during cooldown! Resuming recording loop..."
                         is_ended="false"
                         break
