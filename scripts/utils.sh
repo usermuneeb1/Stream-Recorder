@@ -393,16 +393,21 @@ github_api_write() {
         return 1
     fi
 
-    # Write to curl stdin directly — bypasses all file/shell/variable size limit
-    # and safely evades CRLF corruption inside github action runners.
+    # Write payload to temp file to avoid shell/pipe/CRLF corruption
+    local payload_file
+    payload_file=$(mktemp)
+    printf '%s' "$payload" > "$payload_file"
+    
     local response
-    response=$(printf '%s' "$payload" | curl -s -X PUT \
+    response=$(curl -s -X PUT \
         -H "Authorization: token $token" \
         -H "Accept: application/vnd.github.v3+json" \
         -H "Content-Type: application/json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        --data-binary @- 2>/dev/null)
+        -d "@${payload_file}" 2>/dev/null)
+    
+    rm -f "$payload_file"
     
     local commit_sha
     commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)
