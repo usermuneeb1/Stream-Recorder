@@ -76,4 +76,4 @@ jobs:
           echo "| ✅ Alive | ${REFRESH_TOTAL_ALIVE:-0} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🔄 Refreshed | ${REFRESH_TOTAL_REFRESHED:-0} |" >> $GITHUB_STEP_SUMMARY
           echo "| 💀 Dead | ${REFRESH_TOTAL_DEAD:-0} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🏛️ Restored | ${REFRESH_TOTAL_RESTORED:-0} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏛️ DC Msgs Edited | ${REFRESH_TOTAL_RESTORED:-0} |" >> $GITHUB_STEP_SUMMARY
