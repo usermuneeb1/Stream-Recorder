@@ -37,8 +37,10 @@ get_live_url() {
         channel_handle="$channel_input"
     fi
     
-    # Ensure it has @ if not a channel/ format
-    if [[ "$channel_handle" != "@"* ]] && [[ "$channel_handle" != "channel/"* ]] && [[ "$channel_handle" != "c/"* ]]; then
+    # Handle raw UC channel IDs → use channel/ prefix
+    if [[ "$channel_handle" =~ ^UC[a-zA-Z0-9_-]{20,}$ ]]; then
+        channel_handle="channel/${channel_handle}"
+    elif [[ "$channel_handle" != "@"* ]] && [[ "$channel_handle" != "channel/"* ]] && [[ "$channel_handle" != "c/"* ]]; then
         channel_handle="@${channel_handle}"
     fi
     
@@ -56,7 +58,10 @@ get_streams_url() {
         channel_handle="$channel_input"
     fi
     
-    if [[ "$channel_handle" != "@"* ]] && [[ "$channel_handle" != "channel/"* ]] && [[ "$channel_handle" != "c/"* ]]; then
+    # Handle raw UC channel IDs → use channel/ prefix
+    if [[ "$channel_handle" =~ ^UC[a-zA-Z0-9_-]{20,}$ ]]; then
+        channel_handle="channel/${channel_handle}"
+    elif [[ "$channel_handle" != "@"* ]] && [[ "$channel_handle" != "channel/"* ]] && [[ "$channel_handle" != "c/"* ]]; then
         channel_handle="@${channel_handle}"
     fi
     
