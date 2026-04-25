@@ -322,6 +322,61 @@ post_process() {
         return 1
     fi
     
+    # ── Stage 3.5: Create Compressed Version ──────────────────────────────────
+    # Creates a small, fast-download version alongside the HD original.
+    # Compressed: 720p, CRF 32, ultrafast preset, 96k audio → ~70-85% smaller
+    if [[ "${SKIP_COMPRESSED:-false}" != "true" ]]; then
+        log_separator
+        log_step "Stage 3.5: Creating Compressed Version"
+        
+        # Use the first (or only) processed file as source
+        local hd_source="${PROCESSED_FILES[0]}"
+        local compressed_name
+        compressed_name=$(basename "$hd_source" .mp4)
+        local compressed_file="${RECORD_DIR}/${compressed_name}_compressed.mp4"
+        
+        local compress_start
+        compress_start=$(now_epoch)
+        
+        local hd_size
+        hd_size=$(get_file_size "$hd_source")
+        log_info "  HD source: $(basename "$hd_source") ($(format_size "$hd_size"))"
+        log_info "  Target: 720p, CRF 32, ultrafast, 96k audio"
+        
+        if ffmpeg -y -i "$hd_source" \
+            -vf "scale=-2:720" \
+            -c:v libx264 -crf 32 -preset ultrafast \
+            -c:a aac -b:a 96k -ac 2 \
+            -movflags +faststart \
+            -max_muxing_queue_size 4096 \
+            "$compressed_file" 2>/dev/null; then
+            
+            if [[ -f "$compressed_file" ]] && is_valid_video "$compressed_file"; then
+                local compress_elapsed=$(( $(now_epoch) - compress_start ))
+                local comp_size
+                comp_size=$(get_file_size "$compressed_file")
+                local reduction=0
+                (( hd_size > 0 )) && reduction=$(( 100 - (comp_size * 100 / hd_size) ))
+                
+                log_ok "  Compressed version created in ${compress_elapsed}s"
+                log_info "  Size: $(format_size "$comp_size") (${reduction}% smaller than HD)"
+                
+                PROCESSED_FILES+=("$compressed_file")
+                set_env "COMPRESSED_FILE" "$compressed_file"
+                set_env "COMPRESSED_SIZE_HUMAN" "$(format_size "$comp_size")"
+                set_env "COMPRESSED_REDUCTION" "${reduction}%"
+            else
+                log_warn "  Compressed output is invalid — skipping"
+                rm -f "$compressed_file"
+            fi
+        else
+            log_warn "  Compression failed — HD-only upload will continue"
+            rm -f "$compressed_file"
+        fi
+    else
+        log_info "  Compressed version skipped (SKIP_COMPRESSED=true)"
+    fi
+    
     # ── Stage 4: Download Thumbnail (for Discord embed only — NOT uploaded to cloud) ──
     if [[ "${SAVE_THUMBNAIL:-true}" == "true" ]] && [[ -n "${STREAM_THUMBNAIL:-}" ]]; then
         log_separator

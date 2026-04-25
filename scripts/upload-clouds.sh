@@ -386,9 +386,17 @@ upload_to_clouds() {
 
         log_separator
         local part_name
-        part_name="Part${file_num}"
-        if (( total_files == 1 )); then
-            part_name="Full"
+        local basename_f
+        basename_f=$(basename "$f")
+        
+        # Detect compressed version
+        if [[ "$basename_f" == *"_compressed"* ]]; then
+            part_name="Compressed"
+        elif (( total_files <= 2 )); then
+            # If there are 2 files (HD + compressed), label the non-compressed as HD
+            part_name="HD"
+        else
+            part_name="Part${file_num}"
         fi
 
         log_step "Uploading ${part_name} of ${total_files}: $(basename "$f")"

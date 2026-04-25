@@ -224,12 +224,51 @@ notify_recording_complete() {
     [[ "$upload_count" != "$upload_total" ]]          && color=16761095   # amber — partial
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
+    # HD links (first entry or "HD" tagged)
     local gofile_url="" pixeldrain_url="" archive_url="" archive_id=""
-    [[ -n "${GOFILE_LINKS:-}" ]]     && gofile_url=$(echo "${GOFILE_LINKS}"     | cut -d';' -f1 | cut -d'|' -f2)
-    [[ -n "${PIXELDRAIN_LINKS:-}" ]] && pixeldrain_url=$(echo "${PIXELDRAIN_LINKS}" | cut -d';' -f1 | cut -d'|' -f2)
+    # Compressed links
+    local gofile_comp="" pixeldrain_comp="" archive_comp=""
+    
+    if [[ -n "${GOFILE_LINKS:-}" ]]; then
+        IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
+        for entry in "${_g[@]}"; do
+            local _part _link
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            if [[ "$_part" == "Compressed" ]]; then
+                gofile_comp="$_link"
+            elif [[ -z "$gofile_url" ]]; then
+                gofile_url="$_link"
+            fi
+        done
+    fi
+    if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
+        IFS=';' read -ra _p <<< "${PIXELDRAIN_LINKS}"
+        for entry in "${_p[@]}"; do
+            local _part _link
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            if [[ "$_part" == "Compressed" ]]; then
+                pixeldrain_comp="$_link"
+            elif [[ -z "$pixeldrain_url" ]]; then
+                pixeldrain_url="$_link"
+            fi
+        done
+    fi
     if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
-        archive_url=$(echo "${ARCHIVE_LINKS}" | cut -d';' -f1 | cut -d'|' -f2)
-        archive_id=$(echo  "${ARCHIVE_LINKS}" | cut -d';' -f1 | cut -d'|' -f3)
+        IFS=';' read -ra _a <<< "${ARCHIVE_LINKS}"
+        for entry in "${_a[@]}"; do
+            local _part _link _id
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            _id=$(echo "$entry" | cut -d'|' -f3)
+            if [[ "$_part" == "Compressed" ]]; then
+                archive_comp="$_link"
+            elif [[ -z "$archive_url" ]]; then
+                archive_url="$_link"
+                archive_id="$_id"
+            fi
+        done
     fi
 
     local chat_status="❌ Not archived"
@@ -242,6 +281,10 @@ notify_recording_complete() {
     upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "🟠 Gofile ✅"; else echo "🟠 Gofile ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
+    
+    # Compressed info
+    local comp_info="${COMPRESSED_SIZE_HUMAN:-}"
+    local comp_reduction="${COMPRESSED_REDUCTION:-}"
 
     local payload
     payload=$(jq -n \
@@ -262,6 +305,11 @@ notify_recording_complete() {
         --arg pixeldrain_url "$pixeldrain_url" \
         --arg archive_url    "$archive_url" \
         --arg archive_id     "$archive_id" \
+        --arg gofile_comp    "$gofile_comp" \
+        --arg pixeldrain_comp "$pixeldrain_comp" \
+        --arg archive_comp   "$archive_comp" \
+        --arg comp_info      "$comp_info" \
+        --arg comp_reduction "$comp_reduction" \
         --arg chat_status    "$chat_status" \
         --arg dash_url       "$dashboard_url" \
         --arg timestamp      "$timestamp" \
@@ -296,9 +344,21 @@ notify_recording_complete() {
                 fields: (
                     [
                         { name: "☁️  Upload Status", value: $upstatus, inline: false },
-                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",        value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: false } else empty end),
-                        (if $gofile_url     != "" then { name: "🟠  Gofile",            value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: false } else empty end),
-                        (if $archive_url    != "" then { name: "🏛️  Archive.org",     value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
+                        
+                        (if ($pixeldrain_url != "" or $gofile_url != "" or $archive_url != "") then
+                            { name: "━━━  📀 HD Version  ━━━", value: ("Original quality • " + $size), inline: false }
+                        else empty end),
+                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain (HD)",     value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: false } else empty end),
+                        (if $gofile_url     != "" then { name: "🟠  Gofile (HD)",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: false } else empty end),
+                        (if $archive_url    != "" then { name: "🏛️  Archive.org (HD)",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
+                        
+                        (if ($pixeldrain_comp != "" or $gofile_comp != "" or $archive_comp != "") then
+                            { name: ("━━━  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ━━━"), value: "720p • Fast download • Lower quality", inline: false }
+                        else empty end),
+                        (if $pixeldrain_comp != "" then { name: "🔵  Pixeldrain (Compressed)",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: false } else empty end),
+                        (if $gofile_comp     != "" then { name: "🟠  Gofile (Compressed)",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: false } else empty end),
+                        (if $archive_comp    != "" then { name: "🏛️  Archive.org (Compressed)", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
+                        
                         (if ($pixeldrain_url == "" and $gofile_url == "" and $archive_url == "") then
                             { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
                         else empty end),
