@@ -105,27 +105,27 @@ update_links() {
     
     local new_content
     # Find the header end and insert after it
-    if echo -e "$existing_links" | head -1 | grep -q "^#"; then
+    if printf '%b' "$existing_links" | head -1 | grep -q "^#"; then
         # Has header — insert after empty line following header
         local header_end
-        header_end=$(echo -e "$existing_links" | grep -n "^$" | head -1 | cut -d: -f1)
+        header_end=$(printf '%b' "$existing_links" | grep -n "^$" | head -1 | cut -d: -f1)
         if [[ -n "$header_end" ]]; then
             local header
-            header=$(echo -e "$existing_links" | head -n "$header_end")
+            header=$(printf '%b' "$existing_links" | head -n "$header_end")
             local body
-            body=$(echo -e "$existing_links" | tail -n +"$((header_end + 1))")
-            new_content="${header}\n\n$(echo -e "$entry")\n${body}"
+            body=$(printf '%b' "$existing_links" | tail -n +"$((header_end + 1))")
+            new_content="${header}\n\n$(printf '%b' "$entry")\n${body}"
         else
-            new_content="$(echo -e "$entry")\n${existing_links}"
+            new_content="$(printf '%b' "$entry")\n${existing_links}"
         fi
     else
-        new_content="$(echo -e "$entry")\n${existing_links}"
+        new_content="$(printf '%b' "$entry")\n${existing_links}"
     fi
     
     # ── Write to GitHub ──────────────────────────────────────────────────────
     log_step "Saving links.txt to GitHub..."
     
-    if github_api_write "links.txt" "$(echo -e "$new_content")" "🔗 New recording: ${stream_title} — $(TZ='Asia/Karachi' date '+%Y-%m-%d')"; then
+    if github_api_write "links.txt" "$(printf '%b' "$new_content")" "🔗 New recording: ${stream_title} — $(TZ='Asia/Karachi' date '+%Y-%m-%d')"; then
         log_ok "Links archive updated successfully"
     else
         log_warn "Failed to update links.txt on GitHub — will retry on next run"

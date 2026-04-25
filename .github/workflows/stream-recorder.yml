@@ -234,8 +234,10 @@ jobs:
             MAX_POLLS=$(( MAX_H * 60 ))
             POLL=0
             while (( POLL < MAX_POLLS )); do
-              if bash scripts/detect-stream.sh; then
-                # detect-stream.sh exits 0 only when live
+              bash scripts/detect-stream.sh
+              # detect-stream.sh sets is_live in GITHUB_OUTPUT — check it
+              if grep -q "is_live=true" "$GITHUB_OUTPUT" 2>/dev/null; then
+                echo "✅ Stream is LIVE — proceeding to record!"
                 break
               fi
               POLL=$(( POLL + 1 ))
