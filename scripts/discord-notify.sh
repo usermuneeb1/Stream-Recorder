@@ -150,42 +150,61 @@ notify_live_detected() {
         --arg cookie      "${cookie_icon} ${cookie_status}" \
         --arg disk        "${disk_space} GB free" \
         --arg warp        "$warp_val" \
+        --arg dash_url    "$dashboard_url" \
         --arg timestamp   "$timestamp" \
         --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
+        --arg repo_url    "https://github.com/${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}" \
         '{
             username:   $username,
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     ("🔴  RECORDING STARTED  ─  " + $channel),
+                    name:     ("🔴  LIVE NOW  ─  " + $channel),
                     icon_url: $avatar,
                     url:      $url
                 },
-                title:       $title,
+                title:       ("🎬  " + $title),
                 url:         $url,
                 description: (
-                    "A live stream from **" + $channel + "** has been detected and recording is now active.\n" +
-                    "> 🔗 **Watch Live**: " + $url + "\n" +
-                    "> 🎬 **Multi-method recording engine engaged** — 6 methods × 3 retries = 18 chances to capture.\n" +
-                    "> ☁️ **Triple cloud upload** (Gofile · Pixeldrain · Archive.org) will begin once complete."
+                    "> 🔴 **STREAM IS LIVE — RECORDING STARTED**\n" +
+                    "> \n" +
+                    "> A live stream from **" + $channel + "** has been\n" +
+                    "> detected and recording is now **active**.\n" +
+                    "\n" +
+                    "╔══════════════════════════════════════╗\n" +
+                    "║  🎯 **Recording Engine Active**            ║\n" +
+                    "║  6 methods × 3 retries = 18 chances    ║\n" +
+                    "║  ☁️ Triple cloud upload on completion    ║\n" +
+                    "╚══════════════════════════════════════╝"
                 ),
-                color: 15212032,
+                color: 16711680,
                 image: { url: $thumbnail },
                 fields: [
-                    { name: "🕐  Detected At",   value: $dtime,                inline: false },
+                    { name: "⸻⸻⸻⸻⸻⸻⸻", value: "**📡  System Status**", inline: false },
+                    { name: "🕐  Detected",      value: $dtime,                inline: true  },
                     { name: "🔍  Method",         value: ("`" + $method + "`"), inline: true  },
-                    { name: "🍪  Cookies",         value: $cookie,              inline: true  },
-                    { name: "💾  Disk Free",       value: $disk,                inline: true  },
-                    { name: "🌐  WARP",            value: $warp,                inline: true  },
-                    { name: "🎛️  Status",         value: "`🔴 LIVE — RECORDING`", inline: false  }
+                    { name: "🍪  Cookies",        value: $cookie,              inline: true  },
+                    { name: "💾  Disk Free",      value: $disk,                inline: true  },
+                    { name: "🌐  WARP",           value: $warp,                inline: true  },
+                    { name: "🎛️  Status",        value: "```diff\n+ 🔴 LIVE — RECORDING IN PROGRESS\n```", inline: false }
                 ],
                 footer: {
                     text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Recording in progress…  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
-            }]
+            }],
+            components: [
+                {
+                    type: 1,
+                    components: [
+                        { type: 2, style: 5, label: "🔴 Watch Live", url: $url },
+                        { type: 2, style: 5, label: "📊 Dashboard", url: $dash_url },
+                        { type: 2, style: 5, label: "⚙️ Actions", url: ($repo_url + "/actions") }
+                    ]
+                }
+            ]
         }')
 
     send_discord_webhook "$payload" "alerts"
@@ -317,55 +336,61 @@ notify_recording_complete() {
         --arg timestamp      "$timestamp" \
         --arg bot_ver        "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
+        --arg repo_url       "https://github.com/${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}" \
         --argjson color      "$color" \
         '{
             username:   $username,
             avatar_url: $avatar,
-            embeds: [{
+            embeds: [
+              {
                 author: {
-                    name:     ("✅  ARCHIVED  ─  " + $channel),
+                    name:     ("✅  ARCHIVED SUCCESSFULLY  ─  " + $channel),
                     url:      $video_url,
                     icon_url: $avatar
                 },
-                title:       ("📼  " + $title),
+                title:       ("🔥  " + $title),
                 url:         $video_url,
                 description: (
-                    "**" + $channel + "** live stream has been fully recorded, processed, and uploaded to the cloud archive.\n" +
+                    "> **" + $channel + "** live stream has been **recorded**, **processed**, and\n" +
+                    "> **uploaded** to the cloud archive.\n" +
                     "\n" +
-                    "```\n" +
-                    "  ⏱  Duration   " + $duration + "\n" +
-                    "  💾  File Size  " + $size + "\n" +
-                    "  📐  Resolution " + $resolution + "\n" +
-                    "  📅  Date       " + $date + "\n" +
-                    "  📦  Parts      " + $parts + "\n" +
-                    "  ☁️  Uploads   " + $uploads + " services\n" +
+                    "```ansi\n" +
+                    "\u001b[1;32m╔══════════════════════════════════════╗\u001b[0m\n" +
+                    "\u001b[1;32m║\u001b[0m  ⏱  Duration   " + $duration + "\n" +
+                    "\u001b[1;32m║\u001b[0m  💾  File Size  " + $size + "\n" +
+                    "\u001b[1;32m║\u001b[0m  📐  Resolution " + $resolution + "\n" +
+                    "\u001b[1;32m║\u001b[0m  📅  Date       " + $date + "\n" +
+                    "\u001b[1;32m║\u001b[0m  📦  Parts      " + $parts + "\n" +
+                    "\u001b[1;32m║\u001b[0m  ☁️  Uploads   " + $uploads + " services\n" +
+                    "\u001b[1;32m╚══════════════════════════════════════╝\u001b[0m\n" +
                     "```"
                 ),
                 color: $color,
                 thumbnail: { url: $thumbnail },
                 fields: (
                     [
-                        { name: "☁️  Upload Status", value: $upstatus, inline: false },
+                        { name: "⸻⸻⸻⸻⸻⸻⸻", value: ("**☁️  Upload Status**\n" + $upstatus), inline: false },
                         
                         (if ($pixeldrain_url != "" or $gofile_url != "" or $archive_url != "") then
-                            { name: "━━━  📀 HD Version  ━━━", value: ("Original quality • " + $size), inline: false }
+                            { name: "╔══  📀 HD  ══════════════════════╗", value: ("**Original quality** • " + $size), inline: false }
                         else empty end),
-                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain (HD)",     value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: false } else empty end),
-                        (if $gofile_url     != "" then { name: "🟠  Gofile (HD)",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: false } else empty end),
-                        (if $archive_url    != "" then { name: "🏛️  Archive.org (HD)",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
+                        (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",     value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: true } else empty end),
+                        (if $gofile_url     != "" then { name: "🟠  Gofile",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: true } else empty end),
+                        (if $archive_url    != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         
                         (if ($pixeldrain_comp != "" or $gofile_comp != "" or $archive_comp != "") then
-                            { name: ("━━━  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ━━━"), value: "720p • Fast download • Lower quality", inline: false }
+                            { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**720p** • Fast download • Lower quality", inline: false }
                         else empty end),
-                        (if $pixeldrain_comp != "" then { name: "🔵  Pixeldrain (Compressed)",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: false } else empty end),
-                        (if $gofile_comp     != "" then { name: "🟠  Gofile (Compressed)",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: false } else empty end),
-                        (if $archive_comp    != "" then { name: "🏛️  Archive.org (Compressed)", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
+                        (if $pixeldrain_comp != "" then { name: "🔵  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
+                        (if $gofile_comp     != "" then { name: "🟠  Gofile",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: true } else empty end),
+                        (if $archive_comp    != "" then { name: "🏛️  Archive.org", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
                         
                         (if ($pixeldrain_url == "" and $gofile_url == "" and $archive_url == "") then
                             { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
                         else empty end),
-                        { name: "💬  Live Chat",    value: $chat_status,                                   inline: false },
-                        { name: "📺  YouTube Original", value: ("[▶️ Watch Original Stream](" + $video_url + ")"), inline: false }
+                        { name: "⸻⸻⸻⸻⸻⸻⸻", value: "**📋  Additional Info**", inline: false },
+                        { name: "💬  Live Chat",    value: $chat_status,   inline: true },
+                        { name: "📺  Original",     value: ("[Watch on YT](" + $video_url + ")"), inline: true }
                     ]
                 ),
                 footer: {
@@ -373,7 +398,30 @@ notify_recording_complete() {
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
-            }]
+              }
+            ],
+            components: [
+                {
+                    type: 1,
+                    components: (
+                        [
+                            (if $pixeldrain_url != "" then { type: 2, style: 5, label: "📀 Download HD", url: $pixeldrain_url } else empty end),
+                            (if $pixeldrain_comp != "" then { type: 2, style: 5, label: "📱 Compressed", url: $pixeldrain_comp }
+                             elif $gofile_comp != "" then { type: 2, style: 5, label: "📱 Compressed", url: $gofile_comp }
+                             else empty end),
+                            { type: 2, style: 5, label: "📺 Watch Original", url: $video_url },
+                            { type: 2, style: 5, label: "📊 Dashboard", url: $dash_url }
+                        ]
+                    )
+                },
+                (if $archive_url != "" then
+                {
+                    type: 1,
+                    components: [
+                        { type: 2, style: 5, label: "🏛️ Archive.org (Permanent)", url: $archive_url }
+                    ]
+                } else empty end)
+            ]
         }')
 
     # Capture Message ID
