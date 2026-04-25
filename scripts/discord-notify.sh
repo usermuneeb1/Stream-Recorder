@@ -181,7 +181,7 @@ notify_live_detected() {
                     { name: "🎛️  Status",         value: "`🔴 LIVE — RECORDING`", inline: false  }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  Stream Recorder v" + $bot_ver + "  ·  Recording in progress…"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Recording in progress…  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -369,7 +369,7 @@ notify_recording_complete() {
                     ]
                 ),
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  Stream Recorder v" + $bot_ver + "  ·  Permanently Archived"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Permanently Archived  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -450,7 +450,7 @@ notify_recording_failed() {
                     { name: "📊  Dashboard",    value: ("[📂 View Archive →](" + $dash_url + ")"), inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  Auto-retry dispatched"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Auto-retry dispatched  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -537,7 +537,7 @@ notify_weekly_summary() {
                 ),
                 color: 5793522,
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + " • Automated Recording System"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Weekly Report  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -603,7 +603,7 @@ notify_links_refreshed() {
                     { name: "🕐  Refreshed At",    value: $rtime,                   inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Link Refresh  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -674,7 +674,7 @@ notify_system_health() {
                     { name: "📊  Dashboard",     value: ("[Open Archive →](" + $dash_url + ")"), inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  System Health  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -749,7 +749,7 @@ notify_cookie_warning() {
                     }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + "  ·  v" + $bot_ver + "  ·  UPDATE COOKIES TO RESTORE RECORDING"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  ⚠️ UPDATE COOKIES  ·  Made with ❤️ by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
