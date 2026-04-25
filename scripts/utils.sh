@@ -367,37 +367,42 @@ github_api_write() {
         "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
     sha=$(echo "$existing" | jq -r '.sha // empty' 2>/dev/null)
     
-    # Encode content to base64 (single line, no wrapping)
+    # Encode content to base64 — use printf (not echo) to handle special chars
+    # Write to temp file to avoid shell variable size/corruption limits
+    local content_file encoded_file
+    content_file=$(mktemp)
+    encoded_file=$(mktemp)
+    printf '%s' "$content" > "$content_file"
+    base64 -w 0 < "$content_file" > "$encoded_file"
+    rm -f "$content_file"
+    
     local encoded
-    encoded=$(echo -n "$content" | base64 -w 0)
+    encoded=$(cat "$encoded_file")
+    rm -f "$encoded_file"
     
     # Build JSON payload using jq (--arg properly JSON-escapes all values)
-    local payload
+    local payload_file
+    payload_file=$(mktemp)
     if [[ -n "$sha" ]]; then
-        payload=$(jq -n \
+        jq -n \
             --arg msg     "$message" \
             --arg content "$encoded" \
             --arg sha     "$sha" \
-            '{message: $msg, content: $content, sha: $sha}')
+            '{message: $msg, content: $content, sha: $sha}' > "$payload_file"
     else
-        payload=$(jq -n \
+        jq -n \
             --arg msg     "$message" \
             --arg content "$encoded" \
-            '{message: $msg, content: $content}')
+            '{message: $msg, content: $content}' > "$payload_file"
     fi
 
-    # Validate payload was produced — if jq failed, payload would be empty
-    if [[ -z "$payload" ]] || ! echo "$payload" | jq -e . >/dev/null 2>&1; then
+    # Validate payload was produced — if jq failed, file would be empty
+    if [[ ! -s "$payload_file" ]] || ! jq -e . "$payload_file" >/dev/null 2>&1; then
         log_error "Failed to build JSON payload for GitHub API write ($filepath)"
-        log_debug "jq exit=$? payload_len=${#payload}"
+        rm -f "$payload_file"
         return 1
     fi
 
-    # Write payload to temp file to avoid shell/pipe/CRLF corruption
-    local payload_file
-    payload_file=$(mktemp)
-    printf '%s' "$payload" > "$payload_file"
-    
     local response
     response=$(curl -s -X PUT \
         -H "Authorization: token $token" \
@@ -405,7 +410,7 @@ github_api_write() {
         -H "Content-Type: application/json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        -d "@${payload_file}" 2>/dev/null)
+        --data-binary "@${payload_file}" 2>/dev/null)
     
     rm -f "$payload_file"
     

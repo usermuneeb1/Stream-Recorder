@@ -397,23 +397,45 @@ upload_to_clouds() {
         local svc_success=0
 
         # ── Gofile ──
-        if upload_to_gofile "$f" "$part_name"; then
-            (( svc_success++ ))
+        if [[ "${GOFILE_SKIP:-false}" != "true" ]]; then
+            if upload_to_gofile "$f" "$part_name"; then
+                (( svc_success++ ))
+            else
+                log_warn "  Gofile: First attempt failed — retrying after 10s..."
+                sleep 10
+                if upload_to_gofile "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
+            fi
+        else
+            log_info "  Gofile: Skipped (GOFILE_SKIP=true)"
         fi
 
         # ── Pixeldrain ──
-        if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
+        if [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]]; then
             if upload_to_pixeldrain "$f" "$part_name"; then
                 (( svc_success++ ))
+            else
+                log_warn "  Pixeldrain: First attempt failed — retrying after 10s..."
+                sleep 10
+                if upload_to_pixeldrain "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
             fi
         else
-            log_info "  Pixeldrain: Skipped (ARCHIVE_SKIP=true)"
+            log_info "  Pixeldrain: Skipped (PIXELDRAIN_SKIP=true)"
         fi
 
         # ── Archive.org ──
         if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
             if upload_to_archive "$f" "$part_name"; then
                 (( svc_success++ ))
+            else
+                log_warn "  Archive.org: First attempt failed — retrying after 10s..."
+                sleep 10
+                if upload_to_archive "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
             fi
         else
             log_info "  Archive.org: Skipped (ARCHIVE_SKIP=true)"
