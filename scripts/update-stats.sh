@@ -25,8 +25,10 @@ update_stats() {
     
     local duration_hours
     duration_hours=$(echo "scale=4; $duration_sec / 3600" | bc)
+    [[ "$duration_hours" == .* ]] && duration_hours="0${duration_hours}"
     local size_gb
     size_gb=$(echo "scale=4; $size_bytes / 1073741824" | bc)
+    [[ "$size_gb" == .* ]] && size_gb="0${size_gb}"
     
     log_info "New recording data:"
     log_info "  Duration : $(format_duration "$duration_sec") (${duration_hours}h)"

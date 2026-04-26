@@ -411,52 +411,80 @@ github_api_write() {
         "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
     sha=$(echo "$existing" | jq -r '.sha // empty' 2>/dev/null)
     
-    # Encode content to base64 — use printf (not echo) to handle special chars
-    # Write to temp file to avoid shell variable size/corruption limits
-    local content_file encoded_file
-    content_file=$(mktemp)
-    encoded_file=$(mktemp)
-    printf '%s' "$content" > "$content_file"
-    base64 -w 0 < "$content_file" > "$encoded_file"
-    rm -f "$content_file"
+    # ── Step 1: Write raw content to a temp file ──
+    # Using a temp file avoids shell variable corruption, pipe issues, and
+    # CRLF injection that caused the persistent "Problems parsing JSON" error.
+    local tmp_content tmp_b64 tmp_payload
+    tmp_content=$(mktemp /tmp/gh_content_XXXX)
+    tmp_b64=$(mktemp /tmp/gh_b64_XXXX)
+    tmp_payload=$(mktemp /tmp/gh_payload_XXXX)
     
-    local encoded
-    encoded=$(cat "$encoded_file")
-    rm -f "$encoded_file"
+    # Write content — use printf to avoid echo adding newlines
+    printf '%s' "$content" > "$tmp_content"
     
-    # Build JSON payload using jq (--arg properly JSON-escapes all values)
-    local payload_file
-    payload_file=$(mktemp)
-    if [[ -n "$sha" ]]; then
-        jq -n \
-            --arg msg     "$message" \
-            --arg content "$encoded" \
-            --arg sha     "$sha" \
-            '{message: $msg, content: $content, sha: $sha}' > "$payload_file"
-    else
-        jq -n \
-            --arg msg     "$message" \
-            --arg content "$encoded" \
-            '{message: $msg, content: $content}' > "$payload_file"
-    fi
-
-    # Validate payload was produced — if jq failed, file would be empty
-    if [[ ! -s "$payload_file" ]] || ! jq -e . "$payload_file" >/dev/null 2>&1; then
-        log_error "Failed to build JSON payload for GitHub API write ($filepath)"
-        rm -f "$payload_file"
+    # ── Step 2: Base64 encode — strip ALL whitespace from output ──
+    base64 -w 0 < "$tmp_content" | tr -d '\r\n\t ' > "$tmp_b64"
+    rm -f "$tmp_content"
+    
+    # Read base64 string
+    local b64_str
+    b64_str=$(cat "$tmp_b64")
+    rm -f "$tmp_b64"
+    
+    if [[ -z "$b64_str" ]]; then
+        log_error "Base64 encoding produced empty output for $filepath"
+        rm -f "$tmp_payload"
         return 1
     fi
+    
+    # ── Step 3: Build JSON payload with jq → write directly to file ──
+    if [[ -n "$sha" ]]; then
+        jq -n --compact-output \
+            --arg msg     "$message" \
+            --arg content "$b64_str" \
+            --arg sha     "$sha" \
+            '{message: $msg, content: $content, sha: $sha}' > "$tmp_payload" 2>/dev/null
+    else
+        jq -n --compact-output \
+            --arg msg     "$message" \
+            --arg content "$b64_str" \
+            '{message: $msg, content: $content}' > "$tmp_payload" 2>/dev/null
+    fi
 
-    local response
-    response=$(curl -s -X PUT \
+    # Validate JSON was produced
+    if [[ ! -s "$tmp_payload" ]]; then
+        log_error "jq failed to build payload for $filepath"
+        rm -f "$tmp_payload"
+        return 1
+    fi
+    
+    if ! jq -e . "$tmp_payload" >/dev/null 2>&1; then
+        log_error "Payload is invalid JSON for $filepath"
+        rm -f "$tmp_payload"
+        return 1
+    fi
+    
+    local payload_size
+    payload_size=$(wc -c < "$tmp_payload" | tr -d ' ')
+    log_debug "  Payload size: ${payload_size} bytes for $filepath"
+    
+    # ── Step 4: Send to GitHub API ──
+    # Use -d @file (NOT --data-binary) to let curl handle the file reading
+    local response http_code
+    local tmp_response
+    tmp_response=$(mktemp /tmp/gh_resp_XXXX)
+    
+    http_code=$(curl -s -o "$tmp_response" -w '%{http_code}' \
+        -X PUT \
         -H "Authorization: token $token" \
         -H "Accept: application/vnd.github.v3+json" \
-        -H "Content-Type: application/json" \
+        -H "Content-Type: application/json; charset=utf-8" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        --data-binary "@${payload_file}" 2>/dev/null)
+        -d "@${tmp_payload}" 2>/dev/null)
     
-    rm -f "$payload_file"
+    response=$(cat "$tmp_response" 2>/dev/null)
+    rm -f "$tmp_payload" "$tmp_response"
     
     local commit_sha
     commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)
@@ -468,15 +496,15 @@ github_api_write() {
         local err_msg
         err_msg=$(echo "$response" | jq -r '.message // empty' 2>/dev/null)
         log_error "Failed to write file to GitHub: $filepath"
+        log_error "  HTTP status: $http_code"
         if [[ -n "$err_msg" ]]; then
             log_error "  GitHub API error: $err_msg"
             if [[ "$err_msg" == *"not accessible"* ]] || [[ "$err_msg" == *"Resource not accessible"* ]]; then
                 log_error "  FIX: Your GH_PAT needs 'Contents: Read and write' permission"
-                log_error "  Go to: GitHub → Settings → Developer settings → Personal access tokens"
-                log_error "  Create a new token with 'repo' scope (classic) or 'Contents: Read and write' (fine-grained)"
             fi
         fi
-        log_debug "Response: $response"
+        # Dump first 500 chars of response for debugging
+        log_debug "  Response (first 500 chars): ${response:0:500}"
         return 1
     fi
 }
