@@ -110,6 +110,50 @@ calc_duration_seconds() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  THUMBNAIL RESOLVER
+#  Tests YouTube thumbnail URLs and returns the best one that actually loads.
+#  maxresdefault.jpg often returns 404 for live streams — this finds one that works.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+resolve_youtube_thumbnail() {
+    local video_id="$1"
+    [[ -z "$video_id" ]] && return 1
+    
+    # Try URLs from highest to lowest quality
+    local -a urls=(
+        "https://i.ytimg.com/vi/${video_id}/maxresdefault.jpg"
+        "https://i.ytimg.com/vi/${video_id}/maxresdefault_live.jpg"
+        "https://i.ytimg.com/vi/${video_id}/sddefault.jpg"
+        "https://i.ytimg.com/vi/${video_id}/sddefault_live.jpg"
+        "https://i.ytimg.com/vi/${video_id}/hqdefault.jpg"
+        "https://i.ytimg.com/vi/${video_id}/mqdefault.jpg"
+    )
+    
+    for url in "${urls[@]}"; do
+        local http_code
+        http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+            --max-time 5 -L "$url" 2>/dev/null) || continue
+        
+        if [[ "$http_code" == "200" ]]; then
+            # Also check the image isn't the gray YouTube placeholder (120x90 = 1.4KB)
+            local content_length
+            content_length=$(curl -sI --max-time 5 -L "$url" 2>/dev/null | \
+                grep -i 'content-length' | tail -1 | tr -dc '0-9')
+            
+            # Real thumbnails are > 5KB; the gray placeholder is ~1.2KB
+            if [[ -n "$content_length" ]] && (( content_length > 5000 )); then
+                echo "$url"
+                return 0
+            fi
+        fi
+    done
+    
+    # Last resort — hqdefault always exists (even if it's a placeholder)
+    echo "https://i.ytimg.com/vi/${video_id}/hqdefault.jpg"
+    return 0
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  FORMATTING UTILITIES
 #  Convert raw numbers into human-readable strings
 # ═══════════════════════════════════════════════════════════════════════════════

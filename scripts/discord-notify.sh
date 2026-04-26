@@ -134,8 +134,13 @@ notify_live_detected() {
     local warp_val="🔴 Off"
     [[ "${WARP_CONNECTED:-false}" == "true" ]] && warp_val="🟢 Active"
 
-    # Use maxresdefault for full HD thumbnail (1920x1080)
-    [[ -n "$video_id" ]] && thumbnail="https://i.ytimg.com/vi/${video_id}/maxresdefault.jpg"
+    # Resolve best working thumbnail URL (tests maxres → sd → hq → mq)
+    if [[ -n "$video_id" ]]; then
+        local resolved_thumb
+        resolved_thumb=$(resolve_youtube_thumbnail "$video_id")
+        [[ -n "$resolved_thumb" ]] && thumbnail="$resolved_thumb"
+        log_info "  Thumbnail resolved: $thumbnail"
+    fi
 
     local payload
     payload=$(jq -n \
@@ -221,10 +226,18 @@ notify_recording_complete() {
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
     local thumbnail="${STREAM_THUMBNAIL:-}"
+    local video_id="${STREAM_VIDEO_ID:-}"
     local avatar="${AVATAR_URL:-}"
     local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
+    
+    # Resolve best working thumbnail
+    if [[ -n "$video_id" ]]; then
+        local resolved_thumb
+        resolved_thumb=$(resolve_youtube_thumbnail "$video_id")
+        [[ -n "$resolved_thumb" ]] && thumbnail="$resolved_thumb"
+    fi
 
     local duration_fmt="${RECORD_DURATION_FMT:-N/A}"
     local size_human="${RECORD_SIZE_HUMAN:-N/A}"
@@ -379,7 +392,7 @@ notify_recording_complete() {
                         (if $archive_url    != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         
                         (if ($pixeldrain_comp != "" or $gofile_comp != "" or $archive_comp != "") then
-                            { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**720p** • Fast download • Lower quality", inline: false }
+                            { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**480p** • Tiny file size • For storage", inline: false }
                         else empty end),
                         (if $pixeldrain_comp != "" then { name: "🔵  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
                         (if $gofile_comp     != "" then { name: "🟠  Gofile",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: true } else empty end),
@@ -452,10 +465,19 @@ notify_recording_failed() {
     local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local video_url="${STREAM_URL:-}"
     local thumbnail="${STREAM_THUMBNAIL:-}"
+    local video_id="${STREAM_VIDEO_ID:-}"
     local avatar="${AVATAR_URL:-}"
     local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
     local timestamp
     timestamp=$(now_utc_iso)
+    
+    # Resolve best working thumbnail
+    if [[ -n "$video_id" ]]; then
+        local resolved_thumb
+        resolved_thumb=$(resolve_youtube_thumbnail "$video_id")
+        [[ -n "$resolved_thumb" ]] && thumbnail="$resolved_thumb"
+    fi
+    
     local fail_time
     fail_time=$(now_pkt)
 
