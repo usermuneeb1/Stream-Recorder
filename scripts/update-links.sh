@@ -71,6 +71,17 @@ update_links() {
         done
     fi
     
+    # Add Streamtape links
+    if [[ -n "${STREAMTAPE_LINKS:-}" ]]; then
+        IFS=';' read -ra st_entries <<< "$STREAMTAPE_LINKS"
+        for st_entry in "${st_entries[@]}"; do
+            local st_part st_link
+            st_part=$(echo "$st_entry" | cut -d'|' -f1)
+            st_link=$(echo "$st_entry" | cut -d'|' -f2)
+            [[ -n "$st_link" ]] && entry+="[streamtape:${st_part}] ${st_link}\n"
+        done
+    fi
+    
     # Add Archive.org links
     if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
         IFS=';' read -ra a_entries <<< "$ARCHIVE_LINKS"

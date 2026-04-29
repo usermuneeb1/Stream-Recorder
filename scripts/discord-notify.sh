@@ -275,8 +275,9 @@ notify_recording_complete() {
     # Extract URLs from "PartName|url" semicolon-delimited env vars
     # HD links (first entry or "HD" tagged)
     local gofile_url="" pixeldrain_url="" archive_url="" archive_id=""
+    local streamtape_url=""
     # Compressed links
-    local gofile_comp="" pixeldrain_comp="" archive_comp=""
+    local gofile_comp="" pixeldrain_comp="" archive_comp="" streamtape_comp=""
     
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
@@ -319,6 +320,19 @@ notify_recording_complete() {
             fi
         done
     fi
+    if [[ -n "${STREAMTAPE_LINKS:-}" ]]; then
+        IFS=';' read -ra _st <<< "${STREAMTAPE_LINKS}"
+        for entry in "${_st[@]}"; do
+            local _part _link
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            if [[ "$_part" == "Compressed" ]]; then
+                streamtape_comp="$_link"
+            elif [[ -z "$streamtape_url" ]]; then
+                streamtape_url="$_link"
+            fi
+        done
+    fi
 
     local chat_status="❌ Not archived"
     [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ [Chat Log Available](${RECORD_CHAT_URL})"
@@ -328,6 +342,8 @@ notify_recording_complete() {
     upstatus+=$(if [[ -n "$pixeldrain_url" ]]; then echo "🔵 Pixeldrain ✅"; else echo "🔵 Pixeldrain ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "🟠 Gofile ✅"; else echo "🟠 Gofile ❌"; fi)
+    upstatus+=" · "
+    upstatus+=$(if [[ -n "$streamtape_url" ]]; then echo "🎥 Streamtape ✅"; else echo "🎥 Streamtape ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
     
@@ -354,8 +370,10 @@ notify_recording_complete() {
         --arg pixeldrain_url "$pixeldrain_url" \
         --arg archive_url    "$archive_url" \
         --arg archive_id     "$archive_id" \
+        --arg streamtape_url "$streamtape_url" \
         --arg gofile_comp    "$gofile_comp" \
         --arg pixeldrain_comp "$pixeldrain_comp" \
+        --arg streamtape_comp "$streamtape_comp" \
         --arg archive_comp   "$archive_comp" \
         --arg comp_info      "$comp_info" \
         --arg comp_reduction "$comp_reduction" \
@@ -404,13 +422,15 @@ notify_recording_complete() {
                         else empty end),
                         (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",     value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: true } else empty end),
                         (if $gofile_url     != "" then { name: "🟠  Gofile",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: true } else empty end),
+                        (if $streamtape_url != "" then { name: "🎥  Streamtape",     value: ("[▶️ Stream / ⬇️ Download](" + $streamtape_url + ")"),    inline: true } else empty end),
                         (if $archive_url    != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         
-                        (if ($pixeldrain_comp != "" or $gofile_comp != "" or $archive_comp != "") then
+                        (if ($pixeldrain_comp != "" or $gofile_comp != "" or $streamtape_comp != "" or $archive_comp != "") then
                             { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**480p** • Tiny file size • For storage", inline: false }
                         else empty end),
                         (if $pixeldrain_comp != "" then { name: "🔵  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
                         (if $gofile_comp     != "" then { name: "🟠  Gofile",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: true } else empty end),
+                        (if $streamtape_comp != "" then { name: "🎥  Streamtape",  value: ("[⬇️ Quick Download](" + $streamtape_comp + ")"), inline: true } else empty end),
                         (if $archive_comp    != "" then { name: "🏛️  Archive.org", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
                         
                         (if ($pixeldrain_url == "" and $gofile_url == "" and $archive_url == "") then

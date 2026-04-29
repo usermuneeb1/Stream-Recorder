@@ -116,7 +116,7 @@ parse_entries_from_links() {
     
     # Split by separator lines and emit JSON array of entries
     # Each entry has: title, msg_id, gofile_urls[], pixeldrain_urls[], archive_urls[]
-    local current_title="" current_msgid="" current_gofile="" current_pixeldrain="" current_archive=""
+    local current_title="" current_msgid="" current_gofile="" current_pixeldrain="" current_streamtape="" current_archive=""
     local entries_json="[]"
     local in_entry=false
     
@@ -130,11 +130,12 @@ parse_entries_from_links() {
                     --arg msgid "$current_msgid" \
                     --arg gofile "$current_gofile" \
                     --arg pixeldrain "$current_pixeldrain" \
+                    --arg streamtape "$current_streamtape" \
                     --arg archive "$current_archive" \
-                    '. + [{title: $title, msg_id: $msgid, gofile: $gofile, pixeldrain: $pixeldrain, archive: $archive}]')
+                    '. + [{title: $title, msg_id: $msgid, gofile: $gofile, pixeldrain: $pixeldrain, streamtape: $streamtape, archive: $archive}]')
             fi
             # Reset
-            current_title="" current_msgid="" current_gofile="" current_pixeldrain="" current_archive=""
+            current_title="" current_msgid="" current_gofile="" current_pixeldrain="" current_streamtape="" current_archive=""
             in_entry=true
             continue
         fi
@@ -152,6 +153,9 @@ parse_entries_from_links() {
         elif [[ "$line" =~ \[pixeldrain:[^\]]+\]\ *(https://[^ ]+) ]]; then
             [[ -n "$current_pixeldrain" ]] && current_pixeldrain+="|"
             current_pixeldrain+="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ \[streamtape:[^\]]+\]\ *(https://[^ ]+) ]]; then
+            [[ -n "$current_streamtape" ]] && current_streamtape+="|"
+            current_streamtape+="${BASH_REMATCH[1]}"
         elif [[ "$line" =~ \[archive:[^\]]+\]\ *(https://[^ ]+) ]]; then
             [[ -n "$current_archive" ]] && current_archive+="|"
             current_archive+="${BASH_REMATCH[1]}"
@@ -165,8 +169,9 @@ parse_entries_from_links() {
             --arg msgid "$current_msgid" \
             --arg gofile "$current_gofile" \
             --arg pixeldrain "$current_pixeldrain" \
+            --arg streamtape "$current_streamtape" \
             --arg archive "$current_archive" \
-            '. + [{title: $title, msg_id: $msgid, gofile: $gofile, pixeldrain: $pixeldrain, archive: $archive}]')
+            '. + [{title: $title, msg_id: $msgid, gofile: $gofile, pixeldrain: $pixeldrain, streamtape: $streamtape, archive: $archive}]')
     fi
     
     echo "$entries_json"

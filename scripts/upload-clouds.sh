@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — TRIPLE CLOUD REDUNDANCY UPLOAD                       ║
-# ║  Uploads every recording to 3 independent cloud services:                  ║
-# ║    1. Gofile     — No account needed, regional servers, 10-day retention   ║
-# ║    2. Pixeldrain — Fast CDN, API-based, 60-day retention                   ║
-# ║    3. Archive.org — PERMANENT, never expires, full metadata                ║
+# ║  📡 STREAM RECORDER — QUAD CLOUD REDUNDANCY UPLOAD                         ║
+# ║  Uploads every recording to 4 independent cloud services:                  ║
+# ║    1. Gofile      — No account needed, regional servers, 10-day retention  ║
+# ║    2. Pixeldrain  — Fast CDN, API-based, 60-day retention                  ║
+# ║    3. Streamtape  — Video hosting with streaming player                    ║
+# ║    4. Archive.org — PERMANENT, never expires, full metadata                ║
 # ║  Each upload is independent — one failure doesn't stop the others.         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -18,9 +19,10 @@ source "$SCRIPT_DIR/utils.sh"
 
 GOFILE_LINKS=()
 PIXELDRAIN_LINKS=()
+STREAMTAPE_LINKS=()
 ARCHIVE_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=3
+UPLOAD_TOTAL_SERVICES=4
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -350,11 +352,104 @@ upload_to_archive() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  MAIN UPLOAD ORCHESTRATOR
+#  SERVICE 4: STREAMTAPE UPLOAD
+#  Video hosting with built-in streaming player
+#  API: Get upload URL → POST file → get link
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_to_streamtape() {
+    local file="$1"
+    local part_name="$2"
+    local st_login="${STREAMTAPE_LOGIN:-}"
+    local st_key="${STREAMTAPE_KEY:-}"
+
+    if [[ -z "$st_login" ]] || [[ -z "$st_key" ]]; then
+        log_warn "  Streamtape: No API credentials (set STREAMTAPE_LOGIN + STREAMTAPE_KEY secrets)"
+        return 1
+    fi
+
+    log_info "  🎬 Streamtape: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+
+    local max_retries="${STREAMTAPE_MAX_RETRIES:-3}"
+    local attempt=1
+
+    while (( attempt <= max_retries )); do
+        log_debug "  Streamtape attempt ${attempt}/${max_retries}"
+
+        # Step 1: Get upload URL from Streamtape API
+        local ul_response
+        ul_response=$(curl -s --max-time 30 \
+            "https://api.streamtape.com/file/ul?login=${st_login}&key=${st_key}" \
+            2>/dev/null) || {
+            log_warn "  Streamtape: Failed to get upload URL (attempt ${attempt})"
+            (( attempt++ ))
+            sleep 10
+            continue
+        }
+
+        local ul_status ul_url
+        ul_status=$(echo "$ul_response" | jq -r '.status // 0' 2>/dev/null)
+        ul_url=$(echo "$ul_response" | jq -r '.result.url // empty' 2>/dev/null)
+
+        if [[ "$ul_status" != "200" ]] || [[ -z "$ul_url" ]]; then
+            local ul_msg
+            ul_msg=$(echo "$ul_response" | jq -r '.msg // "unknown error"' 2>/dev/null)
+            log_warn "  Streamtape: API error — ${ul_msg} (status ${ul_status})"
+            (( attempt++ ))
+            sleep 10
+            continue
+        fi
+
+        log_debug "  Streamtape: Got upload URL: ${ul_url}"
+
+        # Step 2: POST the file to the upload URL
+        local upload_start upload_response
+        upload_start=$(now_epoch)
+
+        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+            -F "file1=@${file}" \
+            "$ul_url" 2>/dev/null) || {
+            log_warn "  Streamtape: File upload failed (attempt ${attempt})"
+            (( attempt++ ))
+            sleep 10
+            continue
+        }
+
+        local upload_elapsed=$(( $(now_epoch) - upload_start ))
+
+        # Step 3: Parse result
+        local up_status up_url up_linkid
+        up_status=$(echo "$upload_response" | jq -r '.status // 0' 2>/dev/null)
+        up_url=$(echo "$upload_response" | jq -r '.result.url // empty' 2>/dev/null)
+
+        if [[ "$up_status" == "200" ]] && [[ -n "$up_url" ]]; then
+            # Build the viewable link
+            local link="$up_url"
+            local speed fsize
+            fsize=$(get_file_size "$file")
+            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+            log_ok "  Streamtape: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+            log_info "  Streamtape: Link → ${link}"
+            STREAMTAPE_LINKS+=("${part_name}|${link}")
+            return 0
+        fi
+
+        local up_msg
+        up_msg=$(echo "$upload_response" | jq -r '.msg // "unknown"' 2>/dev/null)
+        log_warn "  Streamtape: Upload failed — ${up_msg} (attempt ${attempt})"
+
+        (( attempt++ ))
+        sleep 10
+    done
+
+    log_error "  Streamtape: ❌ All ${max_retries} attempts failed"
+    return 1
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 
 upload_to_clouds() {
-    log_header "☁️ TRIPLE CLOUD REDUNDANCY UPLOAD"
+    log_header "☁️ QUAD CLOUD REDUNDANCY UPLOAD"
 
     UPLOAD_START_TIME=$(now_epoch)
 
@@ -434,6 +529,21 @@ upload_to_clouds() {
             log_info "  Pixeldrain: Skipped (PIXELDRAIN_SKIP=true)"
         fi
 
+        # ── Streamtape ──
+        if [[ "${STREAMTAPE_SKIP:-false}" != "true" ]]; then
+            if upload_to_streamtape "$f" "$part_name"; then
+                (( svc_success++ ))
+            else
+                log_warn "  Streamtape: First attempt failed — retrying after 10s..."
+                sleep 10
+                if upload_to_streamtape "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
+            fi
+        else
+            log_info "  Streamtape: Skipped (STREAMTAPE_SKIP=true)"
+        fi
+
         # ── Archive.org ──
         if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
             if upload_to_archive "$f" "$part_name"; then
@@ -455,12 +565,15 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" pixeldrain_str="" archive_str=""
+    local gofile_str="" pixeldrain_str="" streamtape_str="" archive_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#PIXELDRAIN_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; pixeldrain_str="${PIXELDRAIN_LINKS[*]}"; IFS="$_ifs"
+    fi
+    if (( ${#STREAMTAPE_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; streamtape_str="${STREAMTAPE_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#ARCHIVE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; archive_str="${ARCHIVE_LINKS[*]}"; IFS="$_ifs"
@@ -468,6 +581,7 @@ upload_to_clouds() {
 
     set_env "GOFILE_LINKS"         "$gofile_str"
     set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
+    set_env "STREAMTAPE_LINKS"     "$streamtape_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"
@@ -480,6 +594,7 @@ upload_to_clouds() {
     log_info "  Total elapsed      : ${upload_elapsed}s"
     [[ -n "$gofile_str"      ]] && log_ok  "  Gofile      ✅ : ${GOFILE_LINKS[*]}"
     [[ -n "$pixeldrain_str"  ]] && log_ok  "  Pixeldrain  ✅ : ${PIXELDRAIN_LINKS[*]}"
+    [[ -n "$streamtape_str"  ]] && log_ok  "  Streamtape  ✅ : ${STREAMTAPE_LINKS[*]}"
     [[ -n "$archive_str"     ]] && log_ok  "  Archive.org ✅ : ${ARCHIVE_LINKS[*]}"
     log_separator
 
