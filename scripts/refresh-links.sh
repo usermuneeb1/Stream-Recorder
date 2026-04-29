@@ -215,7 +215,7 @@ edit_discord_dead_links() {
         --arg dead_list   "$dead_list" \
         --arg archive     "$archive_field" \
         --arg timestamp   "$timestamp" \
-        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
         '{
             embeds: [{

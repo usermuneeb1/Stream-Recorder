@@ -54,14 +54,20 @@ send_discord_webhook() {
     local req_url="$webhook_url"
     [[ -n "$wait_id_file" ]] && req_url="${webhook_url}?wait=true"
 
-    local out_tmp
+    # Write payload to temp file to avoid shell arg length limits
+    local payload_tmp out_tmp
+    payload_tmp=$(mktemp)
     out_tmp=$(mktemp)
+    printf '%s' "$payload" > "$payload_tmp"
+
     local http_code
     http_code=$(curl -s -o "$out_tmp" -w '%{http_code}' \
         --max-time 30 \
         -H "Content-Type: application/json" \
-        -d "$payload" \
+        -d "@${payload_tmp}" \
         "$req_url" 2>/dev/null)
+
+    rm -f "$payload_tmp"
 
     if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
         log_ok "Discord notification sent to [${channel_type}] (HTTP ${http_code})"
@@ -73,6 +79,9 @@ send_discord_webhook() {
     fi
 
     log_error "Discord notification FAILED (HTTP ${http_code})"
+    local err_body
+    err_body=$(cat "$out_tmp" 2>/dev/null)
+    [[ -n "$err_body" ]] && log_debug "  Discord response: ${err_body:0:300}"
     rm -f "$out_tmp"
     return 1
 }
@@ -90,13 +99,19 @@ patch_discord_webhook() {
     fi
     
     local patch_url="${webhook_url}/messages/${message_id}"
+    local payload_tmp
+    payload_tmp=$(mktemp)
+    printf '%s' "$payload" > "$payload_tmp"
+    
     local http_code
     http_code=$(curl -s -o /dev/null -w '%{http_code}' \
         -X PATCH \
         --max-time 30 \
         -H "Content-Type: application/json" \
-        -d "$payload" \
+        -d "@${payload_tmp}" \
         "$patch_url" 2>/dev/null)
+    
+    rm -f "$payload_tmp"
         
     if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
         log_ok "Discord message patched successfully [${channel_type}] (HTTP ${http_code})"
@@ -494,7 +509,7 @@ notify_recording_failed() {
         --arg fail_time   "$fail_time" \
         --arg dash_url    "$dashboard_url" \
         --arg timestamp   "$timestamp" \
-        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
         '{
             username:   $username,
@@ -648,7 +663,7 @@ notify_links_refreshed() {
         --arg rtime       "$refresh_time" \
         --arg dash_url    "$dashboard_url" \
         --arg timestamp   "$timestamp" \
-        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
         '{
             username:   $username,
@@ -722,7 +737,7 @@ notify_system_health() {
         --arg check_time  "$check_time" \
         --arg dash_url    "$dashboard_url" \
         --arg timestamp   "$timestamp" \
-        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
         '{
             username:   $username,
@@ -789,7 +804,7 @@ notify_cookie_warning() {
         --arg days_old    "$days_old" \
         --arg warn_time   "$warn_time" \
         --arg timestamp   "$timestamp" \
-        --arg bot_ver     "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name    "${RECORDER_NAME:-The Muslim Lantern}" \
         --arg color       "$warn_color" \
         '{

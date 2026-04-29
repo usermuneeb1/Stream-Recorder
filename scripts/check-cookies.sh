@@ -48,7 +48,6 @@ check_cookie_health() {
         -b "$cookies_file" \
         -H "User-Agent: ${user_agent}" \
         -H "Accept-Language: en-US,en;q=0.9" \
-        -H "Cookie: CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI" \
         "https://www.youtube.com/" 2>/dev/null) || {
         log_warn "Could not reach YouTube — skipping cookie check"
         set_env "COOKIE_STATUS" "check_failed"

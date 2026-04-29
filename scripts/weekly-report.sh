@@ -79,7 +79,9 @@ generate_weekly_report() {
                         local d_mins=${BASH_REMATCH[2]}
                         local d_total_hours
                         d_total_hours=$(echo "scale=2; $d_hours + $d_mins / 60" | bc)
+                        [[ "$d_total_hours" == .* ]] && d_total_hours="0${d_total_hours}"
                         weekly_hours=$(echo "scale=2; $weekly_hours + $d_total_hours" | bc)
+                        [[ "$weekly_hours" == .* ]] && weekly_hours="0${weekly_hours}"
                     fi
                     
                     # Parse size
@@ -87,6 +89,7 @@ generate_weekly_report() {
                     s_val=$(echo "$entry_size" | grep -oP '[\d.]+(?=\s*GB)' | head -1)
                     if [[ -n "$s_val" ]]; then
                         weekly_gb=$(echo "scale=2; $weekly_gb + $s_val" | bc)
+                        [[ "$weekly_gb" == .* ]] && weekly_gb="0${weekly_gb}"
                     fi
                     
                     # Build stream list entry

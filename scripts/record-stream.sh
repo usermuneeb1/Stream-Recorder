@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  📡 STREAM RECORDER — BULLETPROOF RECORDING ENGINE                          ║
-# ║  6-method, 5-attempt approach to guarantee successful recording.            ║
-# ║  Methods: web_creator → tv → ios → android → mweb → streamlink            ║
+# ║  6-method, 3-attempt approach to guarantee successful recording.            ║
+# ║  Methods: web → tv → ios → android_vr → mweb → streamlink                ║
 # ║  Each attempt checks if stream is still live before retrying.              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -83,7 +83,7 @@ record_method_b() {
     local user_agent
     user_agent=$(rotate_user_agent)
     
-    log_info "  Method B: Cookies + web_creator player"
+    log_info "  Method B: Cookies + tv player"
     
     # Skip if cookies are expired or missing
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
@@ -101,7 +101,7 @@ record_method_b() {
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
-        --extractor-args "youtube:player_client=web_creator" \
+        --extractor-args "youtube:player_client=tv" \
         --user-agent "$user_agent" \
         --no-part \
         --no-continue \
@@ -128,13 +128,13 @@ record_method_c() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method C: Web player (no cookies, anonymous)"
+    log_info "  Method C: iOS player (no cookies, anonymous)"
     
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        --extractor-args "youtube:player_client=web" \
+        --extractor-args "youtube:player_client=ios" \
         --no-part \
         --no-continue \
         --no-check-certificates \
@@ -160,12 +160,13 @@ record_method_d() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method D: Default player (auto-detect best client)"
+    log_info "  Method D: Android VR player (no cookies)"
     
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
+        --extractor-args "youtube:player_client=android_vr" \
         --no-part \
         --no-continue \
         --no-check-certificates \
@@ -539,9 +540,9 @@ record_stream() {
         # ── Post-recording: decide whether to loop for another segment ────────
         if (( attempt < max_attempts )); then
             
-            # If a custom duration was set, this was a single-shot test run.
+            # If custom duration mode, this was a single-shot run.
             # Break immediately — don't loop or wait for live checks.
-            if [[ -n "${MAX_RECORD_DURATION:-}" ]] && [[ "${MAX_RECORD_DURATION}" != "0" ]]; then
+            if [[ "${CUSTOM_DURATION_MODE:-false}" == "true" ]]; then
                 log_info "Custom duration mode — single-shot recording complete. Breaking loop."
                 break
             fi

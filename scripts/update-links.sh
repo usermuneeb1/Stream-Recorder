@@ -85,7 +85,7 @@ update_links() {
     entry+="========================================\n"
     
     log_info "Entry preview:"
-    echo -e "$entry" | head -20
+    printf '%b' "$entry" | head -20
     
     # ── Read existing links.txt ──────────────────────────────────────────────
     log_step "Reading existing links.txt..."
