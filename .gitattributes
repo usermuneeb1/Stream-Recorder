@@ -1,0 +1,9 @@
+# Force LF line endings for all shell scripts and text files
+# This prevents Windows CRLF from corrupting bash scripts on Linux (GitHub Actions)
+*.sh text eol=lf
+*.env text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.md text eol=lf

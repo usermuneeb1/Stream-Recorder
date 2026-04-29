@@ -141,6 +141,10 @@ jobs:
           # Install streamlink and chat-downloader
           pip3 install --quiet streamlink chat-downloader
           
+          # Strip Windows CRLF line endings — these corrupt JSON payloads
+          # This is the root fix for "Problems parsing JSON" GitHub API errors
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          
           # Make scripts executable
           chmod +x scripts/*.sh
           
