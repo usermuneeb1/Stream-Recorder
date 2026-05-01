@@ -82,6 +82,17 @@ update_links() {
         done
     fi
     
+    # Add Abyss.to links
+    if [[ -n "${ABYSS_LINKS:-}" ]]; then
+        IFS=';' read -ra ab_entries <<< "$ABYSS_LINKS"
+        for ab_entry in "${ab_entries[@]}"; do
+            local ab_part ab_link
+            ab_part=$(echo "$ab_entry" | cut -d'|' -f1)
+            ab_link=$(echo "$ab_entry" | cut -d'|' -f2)
+            [[ -n "$ab_link" ]] && entry+="[abyss:${ab_part}] ${ab_link} (PERMANENT)\n"
+        done
+    fi
+    
     # Add Archive.org links
     if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
         IFS=';' read -ra a_entries <<< "$ARCHIVE_LINKS"

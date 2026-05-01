@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — QUAD CLOUD REDUNDANCY UPLOAD                         ║
-# ║  Uploads every recording to 4 independent cloud services:                  ║
+# ║  📡 STREAM RECORDER — 5x CLOUD REDUNDANCY UPLOAD                            ║
+# ║  Uploads every recording to 5 independent cloud services:                  ║
 # ║    1. Gofile      — No account needed, regional servers, 10-day retention  ║
 # ║    2. Pixeldrain  — Fast CDN, API-based, 60-day retention                  ║
 # ║    3. Streamtape  — Video hosting with streaming player                    ║
-# ║    4. Archive.org — PERMANENT, never expires, full metadata                ║
+# ║    4. Abyss.to    — Permanent video hosting, unlimited, never deletes      ║
+# ║    5. Archive.org — PERMANENT, never expires, full metadata                ║
 # ║  Each upload is independent — one failure doesn't stop the others.         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -20,9 +21,10 @@ source "$SCRIPT_DIR/utils.sh"
 GOFILE_LINKS=()
 PIXELDRAIN_LINKS=()
 STREAMTAPE_LINKS=()
+ABYSS_LINKS=()
 ARCHIVE_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=4
+UPLOAD_TOTAL_SERVICES=5
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -447,9 +449,74 @@ upload_to_streamtape() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  SERVICE 5: ABYSS.TO (HYDRAX) UPLOAD
+#  Permanent video hosting — unlimited storage, never deletes
+#  API: POST file to up.hydrax.net/{key} → get slug → abyss.to/v/{slug}
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_to_abyss() {
+    local file="$1"
+    local part_name="$2"
+    local abyss_key="${ABYSS_API_KEY:-}"
+
+    if [[ -z "$abyss_key" ]]; then
+        log_warn "  Abyss.to: No API key (set ABYSS_API_KEY secret)"
+        return 1
+    fi
+
+    log_info "  🌀 Abyss.to: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+
+    local max_retries="${ABYSS_MAX_RETRIES:-3}"
+    local attempt=1
+
+    while (( attempt <= max_retries )); do
+        log_debug "  Abyss.to attempt ${attempt}/${max_retries}"
+
+        local upload_start upload_response
+        upload_start=$(now_epoch)
+
+        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+            -F "file=@${file}" \
+            "http://up.hydrax.net/${abyss_key}" 2>/dev/null) || {
+            log_warn "  Abyss.to: Upload failed (attempt ${attempt})"
+            (( attempt++ ))
+            sleep 10
+            continue
+        }
+
+        local upload_elapsed=$(( $(now_epoch) - upload_start ))
+
+        # Parse response
+        local ab_status ab_slug ab_msg
+        ab_status=$(echo "$upload_response" | jq -r '.status // false' 2>/dev/null)
+        ab_slug=$(echo "$upload_response" | jq -r '.slug // empty' 2>/dev/null)
+        ab_msg=$(echo "$upload_response" | jq -r '.msg // empty' 2>/dev/null)
+
+        if [[ "$ab_status" == "true" ]] && [[ -n "$ab_slug" ]]; then
+            local link="https://abyss.to/v/${ab_slug}"
+            local speed fsize
+            fsize=$(get_file_size "$file")
+            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+            log_ok "  Abyss.to: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+            log_info "  Abyss.to: Link → ${link}"
+            log_info "  Abyss.to: Slug → ${ab_slug}"
+            ABYSS_LINKS+=("${part_name}|${link}|${ab_slug}")
+            return 0
+        fi
+
+        log_warn "  Abyss.to: Upload failed — ${ab_msg:-unknown error} (attempt ${attempt})"
+
+        (( attempt++ ))
+        sleep 10
+    done
+
+    log_error "  Abyss.to: ❌ All ${max_retries} attempts failed"
+    return 1
+}
+
 
 upload_to_clouds() {
-    log_header "☁️ QUAD CLOUD REDUNDANCY UPLOAD"
+    log_header "☁️ 5x CLOUD REDUNDANCY UPLOAD"
 
     UPLOAD_START_TIME=$(now_epoch)
 
@@ -544,6 +611,21 @@ upload_to_clouds() {
             log_info "  Streamtape: Skipped (STREAMTAPE_SKIP=true)"
         fi
 
+        # ── Abyss.to ──
+        if [[ "${ABYSS_SKIP:-false}" != "true" ]]; then
+            if upload_to_abyss "$f" "$part_name"; then
+                (( svc_success++ ))
+            else
+                log_warn "  Abyss.to: First attempt failed — retrying after 10s..."
+                sleep 10
+                if upload_to_abyss "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
+            fi
+        else
+            log_info "  Abyss.to: Skipped (ABYSS_SKIP=true)"
+        fi
+
         # ── Archive.org ──
         if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
             if upload_to_archive "$f" "$part_name"; then
@@ -565,7 +647,7 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" pixeldrain_str="" streamtape_str="" archive_str=""
+    local gofile_str="" pixeldrain_str="" streamtape_str="" abyss_str="" archive_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
     fi
@@ -575,6 +657,9 @@ upload_to_clouds() {
     if (( ${#STREAMTAPE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; streamtape_str="${STREAMTAPE_LINKS[*]}"; IFS="$_ifs"
     fi
+    if (( ${#ABYSS_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; abyss_str="${ABYSS_LINKS[*]}"; IFS="$_ifs"
+    fi
     if (( ${#ARCHIVE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; archive_str="${ARCHIVE_LINKS[*]}"; IFS="$_ifs"
     fi
@@ -582,6 +667,7 @@ upload_to_clouds() {
     set_env "GOFILE_LINKS"         "$gofile_str"
     set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
     set_env "STREAMTAPE_LINKS"     "$streamtape_str"
+    set_env "ABYSS_LINKS"          "$abyss_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"
@@ -595,6 +681,7 @@ upload_to_clouds() {
     [[ -n "$gofile_str"      ]] && log_ok  "  Gofile      ✅ : ${GOFILE_LINKS[*]}"
     [[ -n "$pixeldrain_str"  ]] && log_ok  "  Pixeldrain  ✅ : ${PIXELDRAIN_LINKS[*]}"
     [[ -n "$streamtape_str"  ]] && log_ok  "  Streamtape  ✅ : ${STREAMTAPE_LINKS[*]}"
+    [[ -n "$abyss_str"       ]] && log_ok  "  Abyss.to    ✅ : ${ABYSS_LINKS[*]}"
     [[ -n "$archive_str"     ]] && log_ok  "  Archive.org ✅ : ${ARCHIVE_LINKS[*]}"
     log_separator
 
