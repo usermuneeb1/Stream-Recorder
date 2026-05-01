@@ -426,30 +426,28 @@ github_api_write() {
     base64 -w 0 < "$tmp_content" | tr -d '\r\n\t ' > "$tmp_b64"
     rm -f "$tmp_content"
     
-    # Read base64 string
-    local b64_str
-    b64_str=$(cat "$tmp_b64")
-    rm -f "$tmp_b64"
-    
-    if [[ -z "$b64_str" ]]; then
+    # Check base64 file is not empty
+    if [[ ! -s "$tmp_b64" ]]; then
         log_error "Base64 encoding produced empty output for $filepath"
-        rm -f "$tmp_payload"
+        rm -f "$tmp_b64" "$tmp_payload"
         return 1
     fi
     
     # ── Step 3: Build JSON payload with jq → write directly to file ──
+    # Use --rawfile to read base64 from file directly, avoiding shell variable corruption
     if [[ -n "$sha" ]]; then
         jq -n --compact-output \
             --arg msg     "$message" \
-            --arg content "$b64_str" \
+            --rawfile b64 "$tmp_b64" \
             --arg sha     "$sha" \
-            '{message: $msg, content: $content, sha: $sha}' > "$tmp_payload" 2>/dev/null
+            '{message: $msg, content: ($b64 | gsub("\\s"; "")), sha: $sha}' > "$tmp_payload" 2>/dev/null
     else
         jq -n --compact-output \
             --arg msg     "$message" \
-            --arg content "$b64_str" \
-            '{message: $msg, content: $content}' > "$tmp_payload" 2>/dev/null
+            --rawfile b64 "$tmp_b64" \
+            '{message: $msg, content: ($b64 | gsub("\\s"; ""))}' > "$tmp_payload" 2>/dev/null
     fi
+    rm -f "$tmp_b64"
 
     # Validate JSON was produced
     if [[ ! -s "$tmp_payload" ]]; then
