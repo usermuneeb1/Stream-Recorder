@@ -864,9 +864,9 @@ notify_cookie_warning() {
                     {
                         name:  "🔧  How to Fix (3 steps)",
                         value: (
-                            "**1.** Open Chrome → YouTube → sign in\n" +
-                            "**2.** Install *EditThisCookie* → Export cookies\n" +
-                            "**3.** `base64 cookies.txt` → paste into **YOUTUBE_COOKIES** secret\n\n" +
+                            "**1.** Open Chrome/Kiwi → YouTube → sign in\n" +
+                            "**2.** Use *Get cookies.txt LOCALLY* extension → Export\n" +
+                            "**3.** Copy ALL text → paste into **YOUTUBE_COOKIES** secret (RAW text, NOT base64)\n\n" +
                             "*Go to: GitHub → Settings → Secrets → Actions → YOUTUBE_COOKIES*"
                         ),
                         inline: false
