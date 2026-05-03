@@ -71,25 +71,14 @@ update_links() {
         done
     fi
     
-    # Add Streamtape links
-    if [[ -n "${STREAMTAPE_LINKS:-}" ]]; then
-        IFS=';' read -ra st_entries <<< "$STREAMTAPE_LINKS"
-        for st_entry in "${st_entries[@]}"; do
-            local st_part st_link
-            st_part=$(echo "$st_entry" | cut -d'|' -f1)
-            st_link=$(echo "$st_entry" | cut -d'|' -f2)
-            [[ -n "$st_link" ]] && entry+="[streamtape:${st_part}] ${st_link}\n"
-        done
-    fi
-    
-    # Add Abyss.to links
-    if [[ -n "${ABYSS_LINKS:-}" ]]; then
-        IFS=';' read -ra ab_entries <<< "$ABYSS_LINKS"
-        for ab_entry in "${ab_entries[@]}"; do
-            local ab_part ab_link
-            ab_part=$(echo "$ab_entry" | cut -d'|' -f1)
-            ab_link=$(echo "$ab_entry" | cut -d'|' -f2)
-            [[ -n "$ab_link" ]] && entry+="[abyss:${ab_part}] ${ab_link} (PERMANENT)\n"
+    # Add AnonMP4 links
+    if [[ -n "${ANONMP4_LINKS:-}" ]]; then
+        IFS=';' read -ra am_entries <<< "$ANONMP4_LINKS"
+        for am_entry in "${am_entries[@]}"; do
+            local am_part am_link
+            am_part=$(echo "$am_entry" | cut -d'|' -f1)
+            am_link=$(echo "$am_entry" | cut -d'|' -f2)
+            [[ -n "$am_link" ]] && entry+="[anonmp4:${am_part}] ${am_link} (PERMANENT)\n"
         done
     fi
     

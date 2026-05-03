@@ -275,9 +275,9 @@ notify_recording_complete() {
     # Extract URLs from "PartName|url" semicolon-delimited env vars
     # HD links (first entry or "HD" tagged)
     local gofile_url="" pixeldrain_url="" archive_url="" archive_id=""
-    local streamtape_url="" abyss_url=""
+    local anonmp4_url=""
     # Compressed links
-    local gofile_comp="" pixeldrain_comp="" archive_comp="" streamtape_comp="" abyss_comp=""
+    local gofile_comp="" pixeldrain_comp="" archive_comp="" anonmp4_comp=""
     
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
@@ -320,32 +320,20 @@ notify_recording_complete() {
             fi
         done
     fi
-    if [[ -n "${STREAMTAPE_LINKS:-}" ]]; then
-        IFS=';' read -ra _st <<< "${STREAMTAPE_LINKS}"
+    if [[ -n "${ANONMP4_LINKS:-}" ]]; then
+        IFS=';' read -ra _st <<< "${ANONMP4_LINKS}"
         for entry in "${_st[@]}"; do
             local _part _link
             _part=$(echo "$entry" | cut -d'|' -f1)
             _link=$(echo "$entry" | cut -d'|' -f2)
             if [[ "$_part" == "Compressed" ]]; then
-                streamtape_comp="$_link"
-            elif [[ -z "$streamtape_url" ]]; then
-                streamtape_url="$_link"
+                anonmp4_comp="$_link"
+            elif [[ -z "$anonmp4_url" ]]; then
+                anonmp4_url="$_link"
             fi
         done
     fi
-    if [[ -n "${ABYSS_LINKS:-}" ]]; then
-        IFS=';' read -ra _ab <<< "${ABYSS_LINKS}"
-        for entry in "${_ab[@]}"; do
-            local _part _link
-            _part=$(echo "$entry" | cut -d'|' -f1)
-            _link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ "$_part" == "Compressed" ]]; then
-                abyss_comp="$_link"
-            elif [[ -z "$abyss_url" ]]; then
-                abyss_url="$_link"
-            fi
-        done
-    fi
+
 
     local chat_status="❌ Not archived"
     [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ [Chat Log Available](${RECORD_CHAT_URL})"
@@ -356,9 +344,7 @@ notify_recording_complete() {
     upstatus+=" · "
     upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "🟠 Gofile ✅"; else echo "🟠 Gofile ❌"; fi)
     upstatus+=" · "
-    upstatus+=$(if [[ -n "$streamtape_url" ]]; then echo "🎥 Streamtape ✅"; else echo "🎥 Streamtape ❌"; fi)
-    upstatus+=" · "
-    upstatus+=$(if [[ -n "$abyss_url" ]]; then echo "🌀 Abyss ✅"; else echo "🌀 Abyss ❌"; fi)
+    upstatus+=$(if [[ -n "$anonmp4_url" ]]; then echo "📹 AnonMP4 ✅"; else echo "📹 AnonMP4 ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
     
@@ -385,12 +371,10 @@ notify_recording_complete() {
         --arg pixeldrain_url "$pixeldrain_url" \
         --arg archive_url    "$archive_url" \
         --arg archive_id     "$archive_id" \
-        --arg streamtape_url "$streamtape_url" \
-        --arg abyss_url      "$abyss_url" \
+        --arg anonmp4_url    "$anonmp4_url" \
         --arg gofile_comp    "$gofile_comp" \
         --arg pixeldrain_comp "$pixeldrain_comp" \
-        --arg streamtape_comp "$streamtape_comp" \
-        --arg abyss_comp     "$abyss_comp" \
+        --arg anonmp4_comp   "$anonmp4_comp" \
         --arg archive_comp   "$archive_comp" \
         --arg comp_info      "$comp_info" \
         --arg comp_reduction "$comp_reduction" \
@@ -439,17 +423,15 @@ notify_recording_complete() {
                         else empty end),
                         (if $pixeldrain_url != "" then { name: "🔵  Pixeldrain",     value: ("[▶️ Watch / ⬇️ Download](" + $pixeldrain_url + ")"),    inline: true } else empty end),
                         (if $gofile_url     != "" then { name: "🟠  Gofile",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: true } else empty end),
-                        (if $streamtape_url != "" then { name: "🎥  Streamtape",     value: ("[▶️ Stream / ⬇️ Download](" + $streamtape_url + ")"),    inline: true } else empty end),
-                        (if $abyss_url      != "" then { name: "🌀  Abyss.to",       value: ("[▶️ Stream / ⬇️ Download](" + $abyss_url + ") (PERMANENT)"), inline: true } else empty end),
+                        (if $anonmp4_url != "" then { name: "📹  AnonMP4",      value: ("[▶️ Stream / ⬇️ Download](" + $anonmp4_url + ") (PERMANENT)"), inline: true } else empty end),
                         (if $archive_url    != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         
-                        (if ($pixeldrain_comp != "" or $gofile_comp != "" or $streamtape_comp != "" or $abyss_comp != "" or $archive_comp != "") then
+                        (if ($pixeldrain_comp != "" or $gofile_comp != "" or $anonmp4_comp != "" or $archive_comp != "") then
                             { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**480p** • Tiny file size • For storage", inline: false }
                         else empty end),
                         (if $pixeldrain_comp != "" then { name: "🔵  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
                         (if $gofile_comp     != "" then { name: "🟠  Gofile",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: true } else empty end),
-                        (if $streamtape_comp != "" then { name: "🎥  Streamtape",  value: ("[⬇️ Quick Download](" + $streamtape_comp + ")"), inline: true } else empty end),
-                        (if $abyss_comp      != "" then { name: "🌀  Abyss.to",    value: ("[⬇️ Quick Download](" + $abyss_comp + ")"),     inline: true } else empty end),
+                        (if $anonmp4_comp    != "" then { name: "📹  AnonMP4",     value: ("[⬇️ Quick Download](" + $anonmp4_comp + ")"),    inline: true } else empty end),
                         (if $archive_comp    != "" then { name: "🏛️  Archive.org", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
                         
                         (if ($pixeldrain_url == "" and $gofile_url == "" and $archive_url == "") then

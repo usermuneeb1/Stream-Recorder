@@ -79,9 +79,6 @@ env:
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
   ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
   PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
-  STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
-  STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
-  ABYSS_API_KEY: ${{ secrets.ABYSS_API_KEY }}
   GH_PAT: ${{ secrets.GH_PAT }}
   WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
@@ -383,7 +380,7 @@ jobs:
           log_info "Duration      : ${RECORD_DURATION_FMT:-N/A}"
           log_info "File size     : ${RECORD_SIZE_HUMAN:-N/A}"
           log_info "Parts         : ${RECORD_PARTS:-N/A}"
-          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-5}"
+          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-4}"
           log_info "WARP          : ${WARP_CONNECTED:-false}"
           log_info "Disk space    : $(get_disk_space_gb 2>/dev/null || echo 'N/A') GB"
           
@@ -397,5 +394,5 @@ jobs:
           echo "| 🎬 Recorded | ${RECORDING_SUCCESS:-false} |" >> $GITHUB_STEP_SUMMARY
           echo "| ⏱️ Duration | ${RECORD_DURATION_FMT:-N/A} |" >> $GITHUB_STEP_SUMMARY
           echo "| 💾 Size | ${RECORD_SIZE_HUMAN:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-5} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-4} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 WARP | ${WARP_CONNECTED:-false} |" >> $GITHUB_STEP_SUMMARY
