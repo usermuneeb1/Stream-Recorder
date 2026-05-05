@@ -71,17 +71,6 @@ update_links() {
         done
     fi
     
-    # Add AnonMP4 links
-    if [[ -n "${ANONMP4_LINKS:-}" ]]; then
-        IFS=';' read -ra am_entries <<< "$ANONMP4_LINKS"
-        for am_entry in "${am_entries[@]}"; do
-            local am_part am_link
-            am_part=$(echo "$am_entry" | cut -d'|' -f1)
-            am_link=$(echo "$am_entry" | cut -d'|' -f2)
-            [[ -n "$am_link" ]] && entry+="[anonmp4:${am_part}] ${am_link} (PERMANENT)\n"
-        done
-    fi
-    
     # Add Archive.org links
     if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
         IFS=';' read -ra a_entries <<< "$ARCHIVE_LINKS"

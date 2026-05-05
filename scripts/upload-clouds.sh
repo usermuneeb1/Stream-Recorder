@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — QUAD CLOUD REDUNDANCY UPLOAD                         ║
-# ║  Uploads every recording to 4 independent cloud services:                  ║
+# ║  📡 STREAM RECORDER — TRIPLE CLOUD REDUNDANCY UPLOAD                       ║
+# ║  Uploads every recording to 3 independent cloud services:                  ║
 # ║    1. Gofile      — No account needed, regional servers, 10-day retention  ║
 # ║    2. Pixeldrain  — Fast CDN, API-based, 60-day retention                  ║
-# ║    3. AnonMP4     — Permanent video hosting, no auth, 20GB max             ║
-# ║    4. Archive.org — PERMANENT, never expires, full metadata                ║
+# ║    3. Archive.org — PERMANENT, never expires, full metadata                ║
 # ║  Each upload is independent — one failure doesn't stop the others.         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -19,10 +18,9 @@ source "$SCRIPT_DIR/utils.sh"
 
 GOFILE_LINKS=()
 PIXELDRAIN_LINKS=()
-ANONMP4_LINKS=()
 ARCHIVE_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=4
+UPLOAD_TOTAL_SERVICES=3
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -351,68 +349,9 @@ upload_to_archive() {
     return 1
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  SERVICE 3: ANONMP4 UPLOAD
-#  Anonymous permanent video hosting — no auth, 20GB max, video player
-#  API: POST file to anonmp4api.xyz/upload → get watch_url
-# ═══════════════════════════════════════════════════════════════════════════════
-
-upload_to_anonmp4() {
-    local file="$1"
-    local part_name="$2"
-
-    log_info "  📹 AnonMP4: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
-
-    local max_retries="${ANONMP4_MAX_RETRIES:-3}"
-    local attempt=1
-
-    while (( attempt <= max_retries )); do
-        log_debug "  AnonMP4 attempt ${attempt}/${max_retries}"
-
-        local upload_start upload_response
-        upload_start=$(now_epoch)
-
-        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
-            -X POST \
-            -F "file=@${file}" \
-            "https://anonmp4api.xyz/upload" 2>/dev/null) || {
-            log_warn "  AnonMP4: Upload failed (attempt ${attempt})"
-            (( attempt++ ))
-            sleep 10
-            continue
-        }
-
-        local upload_elapsed=$(( $(now_epoch) - upload_start ))
-
-        local am_success am_watch am_video_id am_msg
-        am_success=$(echo "$upload_response" | jq -r '.success // false' 2>/dev/null)
-        am_watch=$(echo "$upload_response" | jq -r '.watch_url // empty' 2>/dev/null)
-        am_video_id=$(echo "$upload_response" | jq -r '.video_id // empty' 2>/dev/null)
-
-        if [[ "$am_success" == "true" ]] && [[ -n "$am_watch" ]]; then
-            local speed fsize
-            fsize=$(get_file_size "$file")
-            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  AnonMP4: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
-            log_info "  AnonMP4: Link → ${am_watch}"
-            log_info "  AnonMP4: Video ID → ${am_video_id}"
-            ANONMP4_LINKS+=("${part_name}|${am_watch}|${am_video_id}")
-            return 0
-        fi
-
-        am_msg=$(echo "$upload_response" | jq -r '.error.message // .message // "unknown error"' 2>/dev/null)
-        log_warn "  AnonMP4: Upload failed — ${am_msg} (attempt ${attempt})"
-
-        (( attempt++ ))
-        sleep 10
-    done
-
-    log_error "  AnonMP4: ❌ All ${max_retries} attempts failed"
-    return 1
-}
 
 upload_to_clouds() {
-    log_header "☁️ QUAD CLOUD REDUNDANCY UPLOAD"
+    log_header "☁️ TRIPLE CLOUD REDUNDANCY UPLOAD"
 
     UPLOAD_START_TIME=$(now_epoch)
 
@@ -492,20 +431,6 @@ upload_to_clouds() {
             log_info "  Pixeldrain: Skipped (PIXELDRAIN_SKIP=true)"
         fi
 
-        # ── AnonMP4 ──
-        if [[ "${ANONMP4_SKIP:-false}" != "true" ]]; then
-            if upload_to_anonmp4 "$f" "$part_name"; then
-                (( svc_success++ ))
-            else
-                log_warn "  AnonMP4: First attempt failed — retrying after 10s..."
-                sleep 10
-                if upload_to_anonmp4 "$f" "$part_name"; then
-                    (( svc_success++ ))
-                fi
-            fi
-        else
-            log_info "  AnonMP4: Skipped (ANONMP4_SKIP=true)"
-        fi
 
         # ── Archive.org ──
         if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
@@ -528,15 +453,12 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" pixeldrain_str="" anonmp4_str="" archive_str=""
+    local gofile_str="" pixeldrain_str="" archive_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#PIXELDRAIN_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; pixeldrain_str="${PIXELDRAIN_LINKS[*]}"; IFS="$_ifs"
-    fi
-    if (( ${#ANONMP4_LINKS[@]} > 0 )); then
-        local _ifs="$IFS"; IFS=';'; anonmp4_str="${ANONMP4_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#ARCHIVE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; archive_str="${ARCHIVE_LINKS[*]}"; IFS="$_ifs"
@@ -544,7 +466,6 @@ upload_to_clouds() {
 
     set_env "GOFILE_LINKS"         "$gofile_str"
     set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
-    set_env "ANONMP4_LINKS"        "$anonmp4_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"
@@ -557,7 +478,6 @@ upload_to_clouds() {
     log_info "  Total elapsed      : ${upload_elapsed}s"
     [[ -n "$gofile_str"      ]] && log_ok  "  Gofile      ✅ : ${GOFILE_LINKS[*]}"
     [[ -n "$pixeldrain_str"  ]] && log_ok  "  Pixeldrain  ✅ : ${PIXELDRAIN_LINKS[*]}"
-    [[ -n "$anonmp4_str"     ]] && log_ok  "  AnonMP4     ✅ : ${ANONMP4_LINKS[*]}"
     [[ -n "$archive_str"     ]] && log_ok  "  Archive.org ✅ : ${ARCHIVE_LINKS[*]}"
     log_separator
 
