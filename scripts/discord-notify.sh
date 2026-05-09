@@ -61,11 +61,23 @@ send_discord_webhook() {
     printf '%s' "$payload" > "$payload_tmp"
 
     local http_code
-    http_code=$(curl -s -o "$out_tmp" -w '%{http_code}' \
-        --max-time 30 \
-        -H "Content-Type: application/json" \
-        -d "@${payload_tmp}" \
-        "$req_url" 2>/dev/null)
+    local thumb_file="${LOCAL_THUMBNAIL_PATH:-}"
+
+    # If we have a local thumbnail, send as multipart with file attachment
+    if [[ -n "$thumb_file" ]] && [[ -s "$thumb_file" ]]; then
+        log_info "  Attaching local thumbnail to Discord webhook"
+        http_code=$(curl -s -o "$out_tmp" -w '%{http_code}' \
+            --max-time 30 \
+            -F "payload_json=<${payload_tmp}" \
+            -F "files[0]=@${thumb_file};filename=thumbnail.jpg;type=image/jpeg" \
+            "$req_url" 2>/dev/null)
+    else
+        http_code=$(curl -s -o "$out_tmp" -w '%{http_code}' \
+            --max-time 30 \
+            -H "Content-Type: application/json" \
+            -d "@${payload_tmp}" \
+            "$req_url" 2>/dev/null)
+    fi
 
     rm -f "$payload_tmp"
 
@@ -155,6 +167,12 @@ notify_live_detected() {
         resolved_thumb=$(resolve_youtube_thumbnail "$video_id")
         [[ -n "$resolved_thumb" ]] && thumbnail="$resolved_thumb"
         log_info "  Thumbnail resolved: $thumbnail"
+    fi
+
+    # If local thumbnail was downloaded (private streams), use Discord attachment
+    if [[ -s "${LOCAL_THUMBNAIL_PATH:-}" ]]; then
+        thumbnail="attachment://thumbnail.jpg"
+        log_info "  Using local thumbnail attachment (private stream)"
     fi
 
     local payload
@@ -252,6 +270,11 @@ notify_recording_complete() {
         local resolved_thumb
         resolved_thumb=$(resolve_youtube_thumbnail "$video_id")
         [[ -n "$resolved_thumb" ]] && thumbnail="$resolved_thumb"
+    fi
+
+    # If local thumbnail exists (private streams), use Discord attachment
+    if [[ -s "${LOCAL_THUMBNAIL_PATH:-}" ]]; then
+        thumbnail="attachment://thumbnail.jpg"
     fi
 
     local duration_fmt="${RECORD_DURATION_FMT:-N/A}"
@@ -493,6 +516,11 @@ notify_recording_failed() {
         local resolved_thumb
         resolved_thumb=$(resolve_youtube_thumbnail "$video_id")
         [[ -n "$resolved_thumb" ]] && thumbnail="$resolved_thumb"
+    fi
+
+    # If local thumbnail exists (private streams), use Discord attachment
+    if [[ -s "${LOCAL_THUMBNAIL_PATH:-}" ]]; then
+        thumbnail="attachment://thumbnail.jpg"
     fi
     
     local fail_time

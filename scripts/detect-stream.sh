@@ -412,6 +412,42 @@ _export_detection_results() {
     set_env "STREAM_DETECTION_METHOD" "$DETECTED_METHOD"
     set_env "STREAM_DETECTION_TIME" "$(now_pkt)"
     set_env "STREAM_START_EPOCH" "$(now_epoch)"
+
+    # ── Download thumbnail locally (works for private/unlisted via cookies) ──
+    local thumb_dir="${RECORD_DIR:-/tmp/stream-recorder}"
+    mkdir -p "$thumb_dir"
+    local local_thumb="${thumb_dir}/stream_thumbnail.jpg"
+
+    if [[ -n "$DETECTED_THUMBNAIL" ]]; then
+        local dl_args=(-sL --max-time 15 -o "$local_thumb")
+        [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && dl_args+=(-b "${COOKIES_FILE:-cookies.txt}")
+
+        if curl "${dl_args[@]}" "$DETECTED_THUMBNAIL" 2>/dev/null && [[ -s "$local_thumb" ]]; then
+            local thumb_size
+            thumb_size=$(wc -c < "$local_thumb" | tr -d ' ')
+            if (( thumb_size > 5000 )); then
+                log_ok "Thumbnail downloaded locally (${thumb_size} bytes) — will attach to Discord"
+                set_env "LOCAL_THUMBNAIL_PATH" "$local_thumb"
+            else
+                log_warn "Thumbnail too small (placeholder?) — trying yt-dlp"
+                rm -f "$local_thumb"
+            fi
+        fi
+
+        # Fallback: use yt-dlp to grab thumbnail (works for private streams)
+        if [[ ! -s "$local_thumb" ]] && command -v yt-dlp &>/dev/null; then
+            local ytdl_args=(--write-thumbnail --skip-download --convert-thumbnails jpg -o "${thumb_dir}/stream_thumbnail" --no-warnings -q)
+            [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && ytdl_args+=(--cookies "${COOKIES_FILE:-cookies.txt}")
+            
+            if yt-dlp "${ytdl_args[@]}" "https://www.youtube.com/watch?v=${DETECTED_VIDEO_ID}" 2>/dev/null; then
+                # yt-dlp saves as stream_thumbnail.jpg
+                if [[ -s "$local_thumb" ]]; then
+                    log_ok "Thumbnail grabbed via yt-dlp (authenticated)"
+                    set_env "LOCAL_THUMBNAIL_PATH" "$local_thumb"
+                fi
+            fi
+        fi
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
