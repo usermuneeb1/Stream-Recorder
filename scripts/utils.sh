@@ -148,7 +148,15 @@ resolve_youtube_thumbnail() {
         fi
     done
     
-    # Last resort — hqdefault always exists (even if it's a placeholder)
+    # All YouTube thumbnails failed (stream is private/deleted)
+    # Use channel avatar or custom fallback
+    if [[ -n "${AVATAR_URL:-}" ]]; then
+        log_debug "  Thumbnail: All YT URLs failed (private?), using avatar fallback"
+        echo "${AVATAR_URL}"
+        return 0
+    fi
+    
+    # Absolute last resort — hqdefault (may show gray placeholder)
     echo "https://i.ytimg.com/vi/${video_id}/hqdefault.jpg"
     return 0
 }
