@@ -1,14 +1,14 @@
 {
-    "total_streams": 0,
-    "total_hours": 0,
-    "total_gb": 0,
-    "avg_duration_hours": 0,
-    "last_stream": {
-        "title": "",
-        "channel": "",
-        "date": "",
-        "duration": "00:00:00",
-        "size_gb": 0
-    },
-    "updated_at": ""
+  "total_streams": 1,
+  "total_hours": 0.1677,
+  "total_gb": 0.2368,
+  "avg_duration_hours": 0.16,
+  "last_stream": {
+    "title": "PUBG MOBILE Evolving Universe Live Stream #NRIGaming 2026-05-10 07:51",
+    "channel": "NRI Gaming",
+    "date": "2026-05-10 08:06:04 AM PKT",
+    "duration": "00:10:04",
+    "size_gb": 0.2368
+  },
+  "updated_at": "2026-05-10T03:06:05.000Z"
 }
