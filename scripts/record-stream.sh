@@ -26,8 +26,9 @@ RECORDING_SUCCESS=false
 CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD A: Cookies + web_creator Player
-#  Best quality, authenticated access, bypasses age restrictions
+#  web_creator bypasses the n-challenge that blocks the regular 'web' client
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_a() {
@@ -36,7 +37,7 @@ record_method_a() {
     local user_agent
     user_agent=$(rotate_user_agent)
     
-    log_info "  Method A: Cookies + web player"
+    log_info "  Method A: Cookies + web_creator player"
     
     # Skip if cookies are expired or missing
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
@@ -54,7 +55,7 @@ record_method_a() {
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
-        --extractor-args "youtube:player_client=web" \
+        --extractor-args "youtube:player_client=web_creator" \
         --user-agent "$user_agent" \
         --no-part \
         --no-continue \
@@ -67,14 +68,13 @@ record_method_a() {
         "$video_url" 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
-    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
     [[ "$status" == "124" ]] && return 0
     return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD B: Cookies + tv Player
-#  Sometimes bypasses bot detection that blocks web_creator
+#  RECORDING METHOD B: Cookies + tv_embedded Player
+#  Embedded TV player — bypasses n-challenge and most bot detection
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_b() {
@@ -83,9 +83,8 @@ record_method_b() {
     local user_agent
     user_agent=$(rotate_user_agent)
     
-    log_info "  Method B: Cookies + tv player"
+    log_info "  Method B: Cookies + tv_embedded player"
     
-    # Skip if cookies are expired or missing
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
         log_warn "  Method B: Cookies expired — skipping"
         return 1
@@ -101,7 +100,7 @@ record_method_b() {
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
         --cookies "$COOKIES_FILE" \
-        --extractor-args "youtube:player_client=tv" \
+        --extractor-args "youtube:player_client=tv_embedded" \
         --user-agent "$user_agent" \
         --no-part \
         --no-continue \
@@ -114,27 +113,26 @@ record_method_b() {
         "$video_url" 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
-    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
     [[ "$status" == "124" ]] && return 0
     return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD C: iOS Player (No Cookies)
-#  Works for public streams without authentication
+#  RECORDING METHOD C: mediaconnect Player (No Cookies)
+#  Newer YouTube client — no PO token required (unlike ios)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_c() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method C: iOS player (no cookies, anonymous)"
+    log_info "  Method C: mediaconnect player (no cookies)"
     
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        --extractor-args "youtube:player_client=ios" \
+        --extractor-args "youtube:player_client=mediaconnect" \
         --no-part \
         --no-continue \
         --no-check-certificates \
@@ -146,26 +144,31 @@ record_method_c() {
         "$video_url" 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
-    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
     [[ "$status" == "124" ]] && return 0
     return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD D: Android Player (No Cookies)
-#  Fallback for mobile-format streams
+#  RECORDING METHOD D: Android VR Player (PROVEN WORKING)
+#  Bypasses n-challenge entirely — most reliable as of May 2026
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_d() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method D: Android VR player (no cookies)"
+    log_info "  Method D: Android VR player (proven working)"
     
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    local cookies_arg=""
+    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+    fi
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
+        $cookies_arg \
         --extractor-args "youtube:player_client=android_vr" \
         --no-part \
         --no-continue \
@@ -178,14 +181,13 @@ record_method_d() {
         "$video_url" 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
-    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
     [[ "$status" == "124" ]] && return 0
     return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD E: Mobile Web Player (No Cookies)
-#  Simplest client, minimal chance of blocking
+#  RECORDING METHOD E: Mobile Web Player
+#  mweb client with mobile user-agent — minimal bot detection
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_e() {
@@ -198,7 +200,13 @@ record_method_e() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    local cookies_arg=""
+    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+    fi
+    
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
+        $cookies_arg \
         --extractor-args "youtube:player_client=mweb" \
         --user-agent "$mobile_ua" \
         --no-part \
@@ -212,14 +220,13 @@ record_method_e() {
         "$video_url" 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
-    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
     [[ "$status" == "124" ]] && return 0
     return "$status"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD F: Streamlink (Completely Different Tool)
-#  Uses HLS directly, bypasses yt-dlp entirely
+#  Uses HLS directly, bypasses yt-dlp entirely — different codebase
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_f() {
@@ -236,7 +243,14 @@ record_method_f() {
     local restart_flag="--hls-live-restart"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
     
+    # Use cookies with streamlink if available
+    local cookies_arg=""
+    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        cookies_arg="--http-cookie-file ${COOKIES_FILE:-cookies.txt}"
+    fi
+    
     timeout "${MAX_RECORD_DURATION:-18000}" streamlink \
+        $cookies_arg \
         --output "$output_file" \
         --force \
         --stream-segment-threads 3 \
@@ -244,7 +258,6 @@ record_method_f() {
         "$video_url" best 2>&1 | tail -5
     
     local status=${PIPESTATUS[0]}
-    # 124 is the exit code for timeout, which means yt-dlp safely truncated the file.
     [[ "$status" == "124" ]] && return 0
     return "$status"
 }
