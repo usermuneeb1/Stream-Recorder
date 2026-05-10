@@ -220,6 +220,14 @@ jobs:
         continue-on-error: true
         run: bash scripts/check-cookies.sh
 
+      # ─── 5c. SETUP CLOUDFLARE WARP ─────────────────────────────────────────
+      # Masks GitHub Actions IP to bypass YouTube datacenter IP blocks.
+      # Without this, YouTube returns empty/blocked responses for all methods.
+      - name: "🌐 Setup Cloudflare WARP"
+        if: steps.disk_check.outputs.disk_ok == 'true'
+        continue-on-error: true
+        run: bash scripts/setup-warp.sh
+
       # ─── 6. DETECT LIVE STREAM ───────────────────────────────────────────
       - name: "🔍 Detect Live Stream"
         id: detect
