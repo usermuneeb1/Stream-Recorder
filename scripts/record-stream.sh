@@ -338,20 +338,20 @@ attempt_recording() {
     log_info "  Output: ${output_base}"
     
     local methods=(
+        "record_method_d"
+        "record_method_f"
+        "record_method_e"
         "record_method_a"
         "record_method_b"
         "record_method_c"
-        "record_method_d"
-        "record_method_e"
-        "record_method_f"
     )
     local method_names=(
-        "A: Cookies+web"
-        "B: Cookies+web_creator"
-        "C: Web (anonymous)"
-        "D: Default (auto)"
+        "D: Android VR (best)"
+        "F: Streamlink (HLS)"
         "E: Mobile Web"
-        "F: Streamlink"
+        "A: Cookies+web"
+        "B: Cookies+tv"
+        "C: iOS (anonymous)"
     )
     
     for i in "${!methods[@]}"; do
