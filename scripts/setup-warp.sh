@@ -116,20 +116,27 @@ setup_warp() {
     log_info "Waiting for WARP connection (timeout: ${timeout}s)..."
 
     while (( waited < timeout )); do
-        local status
-        status=$(warp-cli --accept-tos status 2>/dev/null || warp-cli status 2>/dev/null || echo "")
+        local status=""
+        status=$(warp-cli --accept-tos status 2>/dev/null || warp-cli status 2>/dev/null || echo "unknown")
+        log_debug "  WARP status (${waited}s): ${status}"
 
-        if echo "$status" | grep -qi "connected"; then
-            connected=true
-            break
+        # Check for various connected patterns
+        if echo "$status" | grep -qiE "connected|status.*connected|connection.*success"; then
+            # Make sure it's not "Disconnected"
+            if ! echo "$status" | grep -qi "disconnected"; then
+                connected=true
+                log_ok "WARP connected! (after ${waited}s)"
+                break
+            fi
         fi
 
-        sleep 2
-        (( waited += 2 ))
+        sleep 3
+        (( waited += 3 ))
     done
 
     if [[ "$connected" != "true" ]]; then
         log_error "WARP connection timed out after ${timeout}s"
+        log_info "Last status: ${status:-unknown}"
         _warp_fallback
         return 0
     fi
