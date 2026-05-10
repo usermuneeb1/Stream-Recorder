@@ -474,7 +474,8 @@ upload_to_clouds() {
 
     log_separator
     log_ok "═══ UPLOAD SUMMARY ═══"
-    log_info "  Services succeeded : ${UPLOAD_SUCCESS_COUNT}/${UPLOAD_TOTAL_SERVICES} per file"
+    local expected_total=$(( UPLOAD_TOTAL_SERVICES * total_files ))
+    log_info "  Services succeeded : ${UPLOAD_SUCCESS_COUNT}/${expected_total} (${UPLOAD_TOTAL_SERVICES} services × ${total_files} files)"
     log_info "  Total elapsed      : ${upload_elapsed}s"
     [[ -n "$gofile_str"      ]] && log_ok  "  Gofile      ✅ : ${GOFILE_LINKS[*]}"
     [[ -n "$pixeldrain_str"  ]] && log_ok  "  Pixeldrain  ✅ : ${PIXELDRAIN_LINKS[*]}"

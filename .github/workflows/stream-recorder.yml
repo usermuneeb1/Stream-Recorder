@@ -282,7 +282,7 @@ jobs:
           notify_live_detected
 
 
-      # ─── 9. RECORD THE STREAM ────────────────────────────────────────────
+      # ─── 8. RECORD THE STREAM ────────────────────────────────────────────
       - name: "🎬 Record Stream"
         id: record
         if: steps.detect.outputs.is_live == 'true'
@@ -297,20 +297,20 @@ jobs:
           fi
           bash scripts/record-stream.sh
 
-      # ─── 9. POST-PROCESS ─────────────────────────────────────────────────
+      # ─── 9. POST-PROCESS ──────────────────────────────────────────────────
       - name: "⚙️ Post-Process"
         id: process
         if: steps.record.outputs.recording_success == 'true'
         run: bash scripts/post-process.sh
 
-      # ─── 10. UPLOAD TO CLOUDS ────────────────────────────────────────────
+      # ─── 10. UPLOAD TO CLOUDS ───────────────────────────────────────────
       - name: "☁️ Upload to Clouds"
         id: upload
         if: steps.record.outputs.recording_success == 'true'
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
 
-      # ─── 11. SEND COMPLETE NOTIFICATION ──────────────────────────────────
+      # ─── 11. SEND COMPLETE NOTIFICATION ─────────────────────────────────
       - name: "✅ Notify — Recording Complete"
         if: steps.record.outputs.recording_success == 'true'
         run: |
@@ -318,13 +318,13 @@ jobs:
           source scripts/discord-notify.sh
           notify_recording_complete
 
-      # ─── 12. UPDATE STATISTICS ───────────────────────────────────────────
+      # ─── 12. UPDATE STATISTICS ──────────────────────────────────────────
       - name: "📊 Update Statistics"
         if: steps.record.outputs.recording_success == 'true'
         continue-on-error: true
         run: bash scripts/update-stats.sh
 
-      # ─── 13. ARCHIVE LINKS ───────────────────────────────────────────────
+      # ─── 13. ARCHIVE LINKS ──────────────────────────────────────────────
       - name: "🔗 Archive Links"
         if: steps.record.outputs.recording_success == 'true'
         continue-on-error: true
@@ -396,7 +396,7 @@ jobs:
           log_info "Duration      : ${RECORD_DURATION_FMT:-N/A}"
           log_info "File size     : ${RECORD_SIZE_HUMAN:-N/A}"
           log_info "Parts         : ${RECORD_PARTS:-N/A}"
-          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-4}"
+          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3}"
           log_info "WARP          : ${WARP_CONNECTED:-false}"
           log_info "Disk space    : $(get_disk_space_gb 2>/dev/null || echo 'N/A') GB"
           
@@ -410,5 +410,5 @@ jobs:
           echo "| 🎬 Recorded | ${RECORDING_SUCCESS:-false} |" >> $GITHUB_STEP_SUMMARY
           echo "| ⏱️ Duration | ${RECORD_DURATION_FMT:-N/A} |" >> $GITHUB_STEP_SUMMARY
           echo "| 💾 Size | ${RECORD_SIZE_HUMAN:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-4} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 WARP | ${WARP_CONNECTED:-false} |" >> $GITHUB_STEP_SUMMARY
