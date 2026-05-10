@@ -191,10 +191,18 @@ jobs:
           log_header "🍪 COOKIE PREPARATION"
           
           if [[ -n "${YOUTUBE_COOKIES:-}" ]]; then
-            echo "$YOUTUBE_COOKIES" | base64 -d > cookies.txt 2>/dev/null || {
-              log_warn "Failed to decode cookies — recording without authentication"
-              rm -f cookies.txt
-            }
+            # Try base64 decode first, then fall back to plaintext
+            if echo "$YOUTUBE_COOKIES" | base64 -d > cookies_b64.tmp 2>/dev/null && \
+               [[ -s cookies_b64.tmp ]] && \
+               head -1 cookies_b64.tmp | grep -qi "netscape\|mozilla\|#\|\.youtube"; then
+              mv cookies_b64.tmp cookies.txt
+              log_ok "Cookies decoded from base64"
+            else
+              rm -f cookies_b64.tmp
+              # Plaintext cookies (same as cookie-keepalive)
+              echo "$YOUTUBE_COOKIES" > cookies.txt
+              log_ok "Cookies stored as plaintext"
+            fi
             
             if [[ -f cookies.txt ]] && [[ -s cookies.txt ]]; then
               line_count=$(wc -l < cookies.txt)
@@ -207,7 +215,7 @@ jobs:
                 log_warn "Cookie format may be invalid — proceeding anyway"
               fi
             else
-              log_warn "Cookie file is empty after decode"
+              log_warn "Cookie file is empty"
               rm -f cookies.txt
             fi
           else
