@@ -16,6 +16,23 @@ source "$SCRIPT_DIR/utils.sh"
 setup_warp() {
     log_header "🌐 CLOUDFLARE WARP SETUP"
 
+    # ── Skip if already connected (step 8 re-runs this) ─────────────────────
+    if [[ "${WARP_CONNECTED:-false}" == "true" ]]; then
+        log_ok "WARP already connected — skipping re-setup"
+        return 0
+    fi
+
+    # Also check if warp-cli is already connected
+    if command -v warp-cli &>/dev/null; then
+        local current_status
+        current_status=$(warp-cli --accept-tos status 2>/dev/null || warp-cli status 2>/dev/null || echo "")
+        if echo "$current_status" | grep -qiE "connected" && ! echo "$current_status" | grep -qi "disconnected"; then
+            log_ok "WARP already connected (detected via warp-cli)"
+            set_env "WARP_CONNECTED" "true"
+            return 0
+        fi
+    fi
+
     # ── Check if WARP is enabled ─────────────────────────────────────────────
     if [[ "${ENABLE_WARP:-true}" != "true" ]]; then
         log_warn "WARP is disabled in config — skipping"

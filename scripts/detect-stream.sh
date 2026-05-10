@@ -83,11 +83,17 @@ detect_method_1_redirect() {
     
     # Follow redirects and capture the final URL
     local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
+    local cookie_args=(-H "Cookie: ${bypass_cookie}")
+    # Also use YouTube auth cookies if available
+    if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]]; then
+        cookie_args=(-b "cookies.txt")
+    fi
+    
     local final_url
     final_url=$(curl -sL -o /dev/null -w '%{url_effective}' \
         --max-time 15 \
         -H "User-Agent: ${user_agent}" \
-        -H "Cookie: ${bypass_cookie}" \
+        "${cookie_args[@]}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         -H "Accept: text/html,application/xhtml+xml" \
         "$live_url" 2>/dev/null) || {
@@ -255,10 +261,15 @@ detect_method_3_streams_tab() {
     
     # Fetch the streams tab
     local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
+    local cookie_args=(-H "Cookie: ${bypass_cookie}")
+    if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]]; then
+        cookie_args=(-b "cookies.txt")
+    fi
+    
     local page_content
     page_content=$(curl -s --max-time 20 \
         -H "User-Agent: ${user_agent}" \
-        -H "Cookie: ${bypass_cookie}" \
+        "${cookie_args[@]}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         -H "Accept: text/html,application/xhtml+xml" \
         "$streams_url" 2>/dev/null) || {
@@ -491,6 +502,7 @@ is_stream_still_live() {
     local is_live
     is_live=$(timeout 20 yt-dlp --dump-json --no-download \
         --extractor-args "youtube:player_client=mweb" \
+        --no-check-formats --ignore-no-formats-error \
         --socket-timeout 5 \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null \
         | jq -r '.is_live // false' 2>/dev/null)
