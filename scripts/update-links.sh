@@ -60,6 +60,17 @@ update_links() {
         done
     fi
     
+    # Add Buzzheavier links
+    if [[ -n "${BUZZHEAVIER_LINKS:-}" ]]; then
+        IFS=';' read -ra bz_entries <<< "$BUZZHEAVIER_LINKS"
+        for bz_entry in "${bz_entries[@]}"; do
+            local bz_part bz_link
+            bz_part=$(echo "$bz_entry" | cut -d'|' -f1)
+            bz_link=$(echo "$bz_entry" | cut -d'|' -f2)
+            [[ -n "$bz_link" ]] && entry+="[buzzheavier:${bz_part}] ${bz_link}\n"
+        done
+    fi
+    
     # Add Pixeldrain links
     if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
         IFS=';' read -ra p_entries <<< "$PIXELDRAIN_LINKS"

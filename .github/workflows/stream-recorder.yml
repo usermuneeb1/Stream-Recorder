@@ -396,7 +396,7 @@ jobs:
           log_info "Duration      : ${RECORD_DURATION_FMT:-N/A}"
           log_info "File size     : ${RECORD_SIZE_HUMAN:-N/A}"
           log_info "Parts         : ${RECORD_PARTS:-N/A}"
-          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-2}"
+          log_info "Uploads       : ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3}"
           log_info "WARP          : ${WARP_CONNECTED:-false}"
           log_info "Disk space    : $(get_disk_space_gb 2>/dev/null || echo 'N/A') GB"
           
@@ -410,5 +410,5 @@ jobs:
           echo "| 🎬 Recorded | ${RECORDING_SUCCESS:-false} |" >> $GITHUB_STEP_SUMMARY
           echo "| ⏱️ Duration | ${RECORD_DURATION_FMT:-N/A} |" >> $GITHUB_STEP_SUMMARY
           echo "| 💾 Size | ${RECORD_SIZE_HUMAN:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-2} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 WARP | ${WARP_CONNECTED:-false} |" >> $GITHUB_STEP_SUMMARY

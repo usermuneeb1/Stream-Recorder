@@ -2,9 +2,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  📡 STREAM RECORDER — TRIPLE CLOUD REDUNDANCY UPLOAD                       ║
 # ║  Uploads every recording to 3 independent cloud services:                  ║
-# ║    1. Gofile      — No account needed, regional servers, 10-day retention  ║
-# ║    2. Pixeldrain  — Fast CDN, API-based, 60-day retention                  ║
-# ║    3. Archive.org — PERMANENT, never expires, full metadata                ║
+# ║    1. Gofile       — No account needed, regional servers, 10-day retention ║
+# ║    2. Buzzheavier  — Anonymous PUT upload, no IP bans, no account needed   ║
+# ║    3. Archive.org  — PERMANENT, never expires, full metadata               ║
 # ║  Each upload is independent — one failure doesn't stop the others.         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
@@ -17,10 +17,11 @@ source "$SCRIPT_DIR/utils.sh"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 GOFILE_LINKS=()
+BUZZHEAVIER_LINKS=()
 PIXELDRAIN_LINKS=()
 ARCHIVE_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=2
+UPLOAD_TOTAL_SERVICES=3
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -215,6 +216,73 @@ upload_to_pixeldrain() {
     done
 
     log_error "  Pixeldrain: ❌ All ${max_retries} attempts failed"
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SERVICE 2: BUZZHEAVIER UPLOAD
+#  Anonymous PUT upload — no account, no IP bans, no rate limits.
+#  API: PUT https://w.buzzheavier.com/{filename}
+#  Response: JSON with download URL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_to_buzzheavier() {
+    local file="$1"
+    local part_name="$2"
+    local safe_filename
+    safe_filename=$(make_safe_filename "$(basename "$file")")
+    local max_retries="${BUZZHEAVIER_MAX_RETRIES:-3}"
+    local attempt=1
+
+    log_info "  🟡 Buzzheavier: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+
+    while (( attempt <= max_retries )); do
+        local upload_start upload_response http_code json_body
+        upload_start=$(now_epoch)
+
+        log_debug "  Buzzheavier attempt ${attempt}/${max_retries}"
+
+        # Simple PUT upload — file content as request body
+        upload_response=$(curl -s \
+            --max-time "${UPLOAD_TIMEOUT:-3600}" \
+            -T "$file" \
+            -w $'\n%{http_code}' \
+            "https://w.buzzheavier.com/${safe_filename}" \
+            2>/dev/null) || true
+
+        local upload_elapsed=$(( $(now_epoch) - upload_start ))
+
+        # -w appends HTTP code as the last line; separate it from JSON body
+        http_code=$(echo "$upload_response" | tail -1)
+        json_body=$(echo "$upload_response" | head -n -1)
+
+        log_debug "  Buzzheavier HTTP ${http_code} body: ${json_body:0:300}"
+
+        # Parse response — Buzzheavier returns JSON with file info
+        local file_id download_url
+        file_id=$(echo "$json_body" | jq -r '.id // empty' 2>/dev/null)
+
+        if [[ -n "$file_id" ]] && [[ "$http_code" =~ ^2 ]]; then
+            # Build download link
+            download_url="https://buzzheavier.com/f/${file_id}"
+            local speed fsize
+            fsize=$(get_file_size "$file")
+            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+            log_ok "  Buzzheavier: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+            log_info "  Buzzheavier: Link → ${download_url}"
+            BUZZHEAVIER_LINKS+=("${part_name}|${download_url}")
+            return 0
+        fi
+
+        local err_msg
+        err_msg=$(echo "$json_body" | jq -r '.message // .error // empty' 2>/dev/null)
+        log_warn "  Buzzheavier: attempt ${attempt} — HTTP=${http_code} msg='${err_msg:-no message}'"
+
+        (( attempt++ ))
+        sleep 5
+    done
+
+    log_error "  Buzzheavier: ❌ All ${max_retries} attempts failed"
     return 1
 }
 
@@ -416,19 +484,26 @@ upload_to_clouds() {
             log_info "  Gofile: Skipped (GOFILE_SKIP=true)"
         fi
 
-        # ── Pixeldrain ──
-        if [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]]; then
-            if upload_to_pixeldrain "$f" "$part_name"; then
+        # ── Buzzheavier ──
+        if [[ "${BUZZHEAVIER_SKIP:-false}" != "true" ]]; then
+            if upload_to_buzzheavier "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  Pixeldrain: First attempt failed — retrying after 10s..."
+                log_warn "  Buzzheavier: First attempt failed — retrying after 10s..."
                 sleep 10
-                if upload_to_pixeldrain "$f" "$part_name"; then
+                if upload_to_buzzheavier "$f" "$part_name"; then
                     (( svc_success++ ))
                 fi
             fi
         else
-            log_info "  Pixeldrain: Skipped (PIXELDRAIN_SKIP=true)"
+            log_info "  Buzzheavier: Skipped (BUZZHEAVIER_SKIP=true)"
+        fi
+
+        # ── Pixeldrain (disabled — IP banned on GitHub runners) ──
+        if [[ "${PIXELDRAIN_SKIP:-true}" != "true" ]]; then
+            if upload_to_pixeldrain "$f" "$part_name"; then
+                (( svc_success++ ))
+            fi
         fi
 
 
@@ -453,9 +528,12 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" pixeldrain_str="" archive_str=""
+    local gofile_str="" buzzheavier_str="" pixeldrain_str="" archive_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
+    fi
+    if (( ${#BUZZHEAVIER_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; buzzheavier_str="${BUZZHEAVIER_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#PIXELDRAIN_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; pixeldrain_str="${PIXELDRAIN_LINKS[*]}"; IFS="$_ifs"
@@ -465,6 +543,7 @@ upload_to_clouds() {
     fi
 
     set_env "GOFILE_LINKS"         "$gofile_str"
+    set_env "BUZZHEAVIER_LINKS"    "$buzzheavier_str"
     set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
@@ -477,9 +556,10 @@ upload_to_clouds() {
     local expected_total=$(( UPLOAD_TOTAL_SERVICES * total_files ))
     log_info "  Services succeeded : ${UPLOAD_SUCCESS_COUNT}/${expected_total} (${UPLOAD_TOTAL_SERVICES} services × ${total_files} files)"
     log_info "  Total elapsed      : ${upload_elapsed}s"
-    [[ -n "$gofile_str"      ]] && log_ok  "  Gofile      ✅ : ${GOFILE_LINKS[*]}"
-    [[ -n "$pixeldrain_str"  ]] && log_ok  "  Pixeldrain  ✅ : ${PIXELDRAIN_LINKS[*]}"
-    [[ -n "$archive_str"     ]] && log_ok  "  Archive.org ✅ : ${ARCHIVE_LINKS[*]}"
+    [[ -n "$gofile_str"       ]] && log_ok  "  Gofile       ✅ : ${GOFILE_LINKS[*]}"
+    [[ -n "$buzzheavier_str"  ]] && log_ok  "  Buzzheavier  ✅ : ${BUZZHEAVIER_LINKS[*]}"
+    [[ -n "$pixeldrain_str"   ]] && log_ok  "  Pixeldrain   ✅ : ${PIXELDRAIN_LINKS[*]}"
+    [[ -n "$archive_str"      ]] && log_ok  "  Archive.org  ✅ : ${ARCHIVE_LINKS[*]}"
     log_separator
 
     if (( UPLOAD_SUCCESS_COUNT == 0 )); then
