@@ -20,7 +20,7 @@ GOFILE_LINKS=()
 PIXELDRAIN_LINKS=()
 ARCHIVE_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=3
+UPLOAD_TOTAL_SERVICES=2
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
