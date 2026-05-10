@@ -175,12 +175,15 @@ detect_method_2_ytdlp() {
     user_agent=$(rotate_user_agent)
     
     # Try yt-dlp dump-json
+    # --ignore-no-formats-error: YouTube's n-challenge may fail but we only need metadata
     local json_output ytdlp_err
     ytdlp_err=$(mktemp)
     json_output=$(timeout 30 yt-dlp \
         --dump-json \
         --no-download \
         --no-playlist \
+        --no-check-formats \
+        --ignore-no-formats-error \
         --user-agent "$user_agent" \
         --extractor-args "youtube:player_client=web" \
         $cookies_arg \

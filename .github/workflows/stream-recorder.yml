@@ -130,13 +130,17 @@ jobs:
           # Update package list
           sudo apt-get update -qq
           
-          # Install core tools
+          # Install core tools (nodejs is pre-installed on GitHub runners)
           sudo apt-get install -y -qq ffmpeg jq bc curl python3
           
           # Install yt-dlp (nightly build for latest YouTube anti-bot patches)
           sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp 2>/dev/null || \
           sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
           sudo chmod a+rx /usr/local/bin/yt-dlp
+          
+          # Install yt-dlp PO token / nsig challenge solver
+          # Required for YouTube's JavaScript-based anti-bot challenge (n parameter)
+          pip3 install --quiet bgutil-ytdlp-pot-provider 2>/dev/null || true
           
           # Install streamlink and chat-downloader
           pip3 install --quiet streamlink chat-downloader
@@ -154,6 +158,7 @@ jobs:
           echo "ffmpeg version: $(ffmpeg -version 2>&1 | head -1)"
           echo "streamlink version: $(streamlink --version 2>/dev/null || echo 'N/A')"
           echo "jq version: $(jq --version)"
+          echo "node version: $(node --version 2>/dev/null || echo 'N/A')"
           echo "──────────────────────────────────────"
 
 
