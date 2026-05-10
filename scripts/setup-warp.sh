@@ -65,18 +65,36 @@ setup_warp() {
 
     log_ok "Cloudflare WARP CLI installed"
 
+    # ── Wait for WARP daemon to be ready ─────────────────────────────────────
+    log_step "Waiting for WARP daemon to start..."
+    local daemon_wait=0
+    while (( daemon_wait < 15 )); do
+        if warp-cli --accept-tos status &>/dev/null || warp-cli status &>/dev/null; then
+            log_ok "WARP daemon is ready"
+            break
+        fi
+        sleep 2
+        (( daemon_wait += 2 ))
+    done
+
+    if (( daemon_wait >= 15 )); then
+        log_warn "WARP daemon slow to start — attempting registration anyway"
+    fi
+
     # ── Register device ──────────────────────────────────────────────────────
     log_step "Registering WARP device..."
 
     # Register new device (accepts TOS automatically)
-    if ! warp-cli --accept-tos registration new 2>/dev/null; then
+    local reg_output
+    reg_output=$(warp-cli --accept-tos registration new 2>&1) || {
+        log_warn "Registration (new syntax) failed: ${reg_output}"
         # Try older CLI syntax
-        if ! warp-cli register 2>/dev/null; then
-            log_error "Failed to register WARP device"
+        reg_output=$(warp-cli register 2>&1) || {
+            log_error "Failed to register WARP device: ${reg_output}"
             _warp_fallback
             return 0
-        fi
-    fi
+        }
+    }
 
     log_ok "WARP device registered"
 

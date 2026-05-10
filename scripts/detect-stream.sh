@@ -175,7 +175,8 @@ detect_method_2_ytdlp() {
     user_agent=$(rotate_user_agent)
     
     # Try yt-dlp dump-json
-    local json_output
+    local json_output ytdlp_err
+    ytdlp_err=$(mktemp)
     json_output=$(timeout 30 yt-dlp \
         --dump-json \
         --no-download \
@@ -183,10 +184,17 @@ detect_method_2_ytdlp() {
         --user-agent "$user_agent" \
         --extractor-args "youtube:player_client=web" \
         $cookies_arg \
-        "$live_url" 2>/dev/null) || {
+        "$live_url" 2>"$ytdlp_err") || {
+        local err_msg
+        err_msg=$(cat "$ytdlp_err" 2>/dev/null | tail -3)
         log_warn "Method 2: yt-dlp dump-json failed"
+        [[ -n "$err_msg" ]] && log_info "  yt-dlp error: ${err_msg}"
+        log_info "  URL tried: ${live_url}"
+        log_info "  Cookies: ${cookies_arg:-none}"
+        rm -f "$ytdlp_err"
         return 1
     }
+    rm -f "$ytdlp_err"
     
     if [[ -z "$json_output" ]]; then
         log_info "Method 2: No JSON output"
