@@ -284,7 +284,7 @@ notify_recording_complete() {
     local record_date
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
     local upload_count="${UPLOAD_SUCCESS_COUNT:-0}"
-    local upload_total="${UPLOAD_TOTAL_SERVICES:-3}"
+    local upload_total="${UPLOAD_EXPECTED_COUNT:-3}"
     local upload_elapsed="${UPLOAD_ELAPSED_HUMAN:-N/A}"
     local process_time="${PROCESS_ELAPSED:-N/A}"
     local warp_ip="${WARP_IP:-N/A}"

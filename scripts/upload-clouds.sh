@@ -611,6 +611,7 @@ upload_to_clouds() {
     log_info "Total size: $(format_size "$total_size")"
 
     local file_num=0
+    local expected_total_uploads=0
     for f in "${FILES[@]}"; do
         (( file_num++ ))
         if [[ ! -f "$f" ]]; then
@@ -641,6 +642,7 @@ upload_to_clouds() {
 
         # ── 1. Gofile (uploads ALL files — HD + compressed) ──
         if [[ "${GOFILE_SKIP:-false}" != "true" ]]; then
+            (( expected_total_uploads++ ))
             if upload_to_gofile "$f" "$part_name"; then
                 (( svc_success++ ))
             else
@@ -658,6 +660,7 @@ upload_to_clouds() {
         if [[ "$is_compressed" == "true" ]]; then
             log_info "  Dailymotion: Skipped (compressed — HD only)"
         elif [[ "${DAILYMOTION_SKIP:-false}" != "true" ]]; then
+            (( expected_total_uploads++ ))
             if upload_to_dailymotion "$f" "$part_name"; then
                 (( svc_success++ ))
             else
@@ -675,6 +678,7 @@ upload_to_clouds() {
         if [[ "$is_compressed" == "true" ]]; then
             log_info "  MEGA.nz: Skipped (compressed — HD only)"
         elif [[ "${MEGA_SKIP:-false}" != "true" ]]; then
+            (( expected_total_uploads++ ))
             if upload_to_mega "$f" "$part_name"; then
                 (( svc_success++ ))
             else
@@ -692,6 +696,7 @@ upload_to_clouds() {
         if [[ "$is_compressed" == "true" ]]; then
             log_info "  Archive.org: Skipped (compressed — HD only)"
         elif [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
+            (( expected_total_uploads++ ))
             if upload_to_archive "$f" "$part_name"; then
                 (( svc_success++ ))
             else
@@ -730,14 +735,14 @@ upload_to_clouds() {
     set_env "MEGA_LINKS"           "$mega_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
+    set_env "UPLOAD_EXPECTED_COUNT" "$expected_total_uploads"
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"
 
     local upload_elapsed=$(( $(now_epoch) - UPLOAD_START_TIME ))
 
     log_separator
     log_ok "═══ UPLOAD SUMMARY ═══"
-    local expected_total=$(( UPLOAD_TOTAL_SERVICES * total_files ))
-    log_info "  Services succeeded : ${UPLOAD_SUCCESS_COUNT}/${expected_total} (${UPLOAD_TOTAL_SERVICES} services × ${total_files} files)"
+    log_info "  Services succeeded : ${UPLOAD_SUCCESS_COUNT}/${expected_total_uploads} (${UPLOAD_TOTAL_SERVICES} active services)"
     log_info "  Total elapsed      : ${upload_elapsed}s"
     [[ -n "$gofile_str"       ]] && log_ok  "  Gofile       ✅ : ${GOFILE_LINKS[*]}"
     [[ -n "$dailymotion_str"  ]] && log_ok  "  Dailymotion  ✅ : ${DAILYMOTION_LINKS[*]}"
