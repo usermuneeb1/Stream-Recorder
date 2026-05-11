@@ -636,8 +636,10 @@ upload_to_clouds() {
         log_separator
 
         local svc_success=0
+        local is_compressed=false
+        [[ "$part_name" == "Compressed" ]] && is_compressed=true
 
-        # ── 1. Gofile ──
+        # ── 1. Gofile (uploads ALL files — HD + compressed) ──
         if [[ "${GOFILE_SKIP:-false}" != "true" ]]; then
             if upload_to_gofile "$f" "$part_name"; then
                 (( svc_success++ ))
@@ -652,8 +654,10 @@ upload_to_clouds() {
             log_info "  Gofile: Skipped (GOFILE_SKIP=true)"
         fi
 
-        # ── 2. Dailymotion ──
-        if [[ "${DAILYMOTION_SKIP:-false}" != "true" ]]; then
+        # ── 2. Dailymotion (HD only — skip compressed) ──
+        if [[ "$is_compressed" == "true" ]]; then
+            log_info "  Dailymotion: Skipped (compressed — HD only)"
+        elif [[ "${DAILYMOTION_SKIP:-false}" != "true" ]]; then
             if upload_to_dailymotion "$f" "$part_name"; then
                 (( svc_success++ ))
             else
@@ -667,8 +671,10 @@ upload_to_clouds() {
             log_info "  Dailymotion: Skipped"
         fi
 
-        # ── 3. MEGA.nz ──
-        if [[ "${MEGA_SKIP:-false}" != "true" ]]; then
+        # ── 3. MEGA.nz (HD only — skip compressed) ──
+        if [[ "$is_compressed" == "true" ]]; then
+            log_info "  MEGA.nz: Skipped (compressed — HD only)"
+        elif [[ "${MEGA_SKIP:-false}" != "true" ]]; then
             if upload_to_mega "$f" "$part_name"; then
                 (( svc_success++ ))
             else
@@ -682,8 +688,10 @@ upload_to_clouds() {
             log_info "  MEGA.nz: Skipped"
         fi
 
-        # ── 4. Archive.org ──
-        if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
+        # ── 4. Archive.org (HD only — skip compressed) ──
+        if [[ "$is_compressed" == "true" ]]; then
+            log_info "  Archive.org: Skipped (compressed — HD only)"
+        elif [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
             if upload_to_archive "$f" "$part_name"; then
                 (( svc_success++ ))
             else
