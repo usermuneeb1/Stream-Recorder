@@ -2,9 +2,9 @@
   "status": "degraded",
   "pings_ok": 3,
   "pings_total": 4,
-  "days_until_expiry": 156,
+  "days_until_expiry": 155,
   "earliest_expiry": "2026-10-13 01:11 PM PKT",
-  "keepalive_at": "2026-05-10T00:23:31.000Z",
+  "keepalive_at": "2026-05-11T07:41:33.000Z",
   "valid_cookies": 21,
-  "expired_cookies": 11
+  "expired_cookies": 13
 }
