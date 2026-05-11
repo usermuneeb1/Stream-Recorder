@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — TRIPLE CLOUD REDUNDANCY UPLOAD                       ║
-# ║  Uploads every recording to 3 independent cloud services:                  ║
-# ║    1. Gofile       — No account needed, regional servers, 10-day retention ║
-# ║    2. Buzzheavier  — Anonymous PUT upload, no IP bans, no account needed   ║
-# ║    3. Archive.org  — PERMANENT, never expires, full metadata               ║
-# ║  Each upload is independent — one failure doesn't stop the others.         ║
+# ║  📡 STREAM RECORDER — MULTI-CLOUD REDUNDANCY UPLOAD                        ║
+# ║  Uploads every recording to multiple independent cloud services:            ║
+# ║    1. Gofile       — No account needed, 10-day retention                   ║
+# ║    2. Dailymotion  — PERMANENT, 2GB max, video platform                    ║
+# ║    3. MEGA.nz      — PERMANENT, 20GB free, encrypted cloud                 ║
+# ║    4. Archive.org  — PERMANENT, never expires, full metadata                ║
+# ║  Each upload is independent — one failure doesn't stop the others.          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -17,11 +18,12 @@ source "$SCRIPT_DIR/utils.sh"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 GOFILE_LINKS=()
-BUZZHEAVIER_LINKS=()
-PIXELDRAIN_LINKS=()
+DAILYMOTION_LINKS=()
+MEGA_LINKS=()
 ARCHIVE_LINKS=()
+PIXELDRAIN_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=3
+UPLOAD_TOTAL_SERVICES=4
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -220,74 +222,231 @@ upload_to_pixeldrain() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SERVICE 2: BUZZHEAVIER UPLOAD
-#  Anonymous PUT upload — no account, no IP bans, no rate limits.
-#  API: PUT https://w.buzzheavier.com/{filename}
-#  Response: JSON with download URL
+#  SERVICE 2: DAILYMOTION UPLOAD
+#  PERMANENT video hosting — 2GB max per video.
+#  OAuth2 password grant → get upload URL → upload file → publish video.
+#  Requires: DAILYMOTION_API_KEY, DAILYMOTION_API_SECRET,
+#            DAILYMOTION_USERNAME, DAILYMOTION_PASSWORD
 # ═══════════════════════════════════════════════════════════════════════════════
 
-upload_to_buzzheavier() {
+upload_to_dailymotion() {
     local file="$1"
     local part_name="$2"
-    local safe_filename
-    safe_filename=$(make_safe_filename "$(basename "$file")")
-    local max_retries="${BUZZHEAVIER_MAX_RETRIES:-3}"
-    local attempt=1
+    local api_key="${DAILYMOTION_API_KEY:-}"
+    local api_secret="${DAILYMOTION_API_SECRET:-}"
+    local dm_user="${DAILYMOTION_USERNAME:-}"
+    local dm_pass="${DAILYMOTION_PASSWORD:-}"
 
-    log_info "  🟡 Buzzheavier: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+    if [[ -z "$api_key" ]] || [[ -z "$api_secret" ]] || [[ -z "$dm_user" ]] || [[ -z "$dm_pass" ]]; then
+        log_warn "  Dailymotion: Missing credentials — skipping (need DAILYMOTION_API_KEY, API_SECRET, USERNAME, PASSWORD)"
+        return 1
+    fi
 
-    while (( attempt <= max_retries )); do
-        local upload_start upload_response http_code json_body
-        upload_start=$(now_epoch)
+    # Check file size — Dailymotion max is 2GB
+    local fsize
+    fsize=$(get_file_size "$file")
+    if (( fsize > 2147483648 )); then
+        log_warn "  Dailymotion: File too large ($(format_size "$fsize") > 2GB max) — skipping"
+        return 1
+    fi
 
-        log_debug "  Buzzheavier attempt ${attempt}/${max_retries}"
+    log_info "  🔵 Dailymotion: Uploading $(basename "$file") ($(format_size "$fsize"))..."
+    local upload_start
+    upload_start=$(now_epoch)
 
-        # Simple PUT upload — file content as request body
-        upload_response=$(curl -s \
-            --max-time "${UPLOAD_TIMEOUT:-3600}" \
-            -T "$file" \
-            -w $'\n%{http_code}' \
-            "https://w.buzzheavier.com/${safe_filename}" \
-            2>/dev/null) || true
+    # Step 1: Get OAuth2 access token
+    log_debug "  Dailymotion: Getting access token..."
+    local token_response access_token
+    token_response=$(curl -s --max-time 30 \
+        -X POST "https://api.dailymotion.com/oauth/token" \
+        -d "grant_type=password" \
+        -d "client_id=${api_key}" \
+        -d "client_secret=${api_secret}" \
+        -d "username=${dm_user}" \
+        -d "password=${dm_pass}" \
+        -d "scope=manage_videos" \
+        2>/dev/null) || true
 
-        local upload_elapsed=$(( $(now_epoch) - upload_start ))
-
-        # -w appends HTTP code as the last line; separate it from JSON body
-        http_code=$(echo "$upload_response" | tail -1)
-        json_body=$(echo "$upload_response" | head -n -1)
-
-        log_debug "  Buzzheavier HTTP ${http_code} body: ${json_body:0:300}"
-
-        # Parse response — Buzzheavier returns JSON with file info
-        local file_id download_url
-        file_id=$(echo "$json_body" | jq -r '.id // empty' 2>/dev/null)
-
-        if [[ -n "$file_id" ]] && [[ "$http_code" =~ ^2 ]]; then
-            # Build download link
-            download_url="https://buzzheavier.com/f/${file_id}"
-            local speed fsize
-            fsize=$(get_file_size "$file")
-            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  Buzzheavier: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
-            log_info "  Buzzheavier: Link → ${download_url}"
-            BUZZHEAVIER_LINKS+=("${part_name}|${download_url}")
-            return 0
-        fi
-
+    access_token=$(echo "$token_response" | jq -r '.access_token // empty' 2>/dev/null)
+    if [[ -z "$access_token" ]]; then
         local err_msg
-        err_msg=$(echo "$json_body" | jq -r '.message // .error // empty' 2>/dev/null)
-        log_warn "  Buzzheavier: attempt ${attempt} — HTTP=${http_code} msg='${err_msg:-no message}'"
+        err_msg=$(echo "$token_response" | jq -r '.error_description // .error // empty' 2>/dev/null)
+        log_error "  Dailymotion: Auth failed — ${err_msg:-unknown error}"
+        return 1
+    fi
+    log_debug "  Dailymotion: Token obtained"
 
-        (( attempt++ ))
-        sleep 5
-    done
+    # Step 2: Get upload URL
+    log_debug "  Dailymotion: Getting upload URL..."
+    local upload_info upload_url
+    upload_info=$(curl -s --max-time 30 \
+        -H "Authorization: Bearer ${access_token}" \
+        "https://api.dailymotion.com/file/upload" \
+        2>/dev/null) || true
 
-    log_error "  Buzzheavier: ❌ All ${max_retries} attempts failed"
+    upload_url=$(echo "$upload_info" | jq -r '.upload_url // empty' 2>/dev/null)
+    if [[ -z "$upload_url" ]]; then
+        log_error "  Dailymotion: Failed to get upload URL"
+        return 1
+    fi
+
+    # Step 3: Upload the file
+    log_debug "  Dailymotion: Uploading file to ${upload_url:0:50}..."
+    local upload_response video_url
+    upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+        -F "file=@${file}" \
+        "$upload_url" \
+        2>/dev/null) || true
+
+    video_url=$(echo "$upload_response" | jq -r '.url // empty' 2>/dev/null)
+    if [[ -z "$video_url" ]]; then
+        log_error "  Dailymotion: File upload failed"
+        return 1
+    fi
+
+    # Step 4: Publish the video
+    log_debug "  Dailymotion: Publishing video..."
+    local title="${STREAM_TITLE:-Live Stream Recording}"
+    # Dailymotion title max 255 chars
+    title="${title:0:255}"
+    local channel="${STREAM_CHANNEL:-Stream}"
+    local record_date
+    record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
+
+    local publish_response video_id
+    publish_response=$(curl -s --max-time 30 \
+        -X POST "https://api.dailymotion.com/me/videos" \
+        -H "Authorization: Bearer ${access_token}" \
+        -d "url=${video_url}" \
+        -d "title=${title}" \
+        -d "channel=news" \
+        -d "published=true" \
+        -d "is_created_for_kids=false" \
+        --data-urlencode "description=Live stream recording of ${title} by ${channel}. Recorded on ${record_date}. Part: ${part_name}." \
+        --data-urlencode "tags=${channel},livestream,recording" \
+        2>/dev/null) || true
+
+    video_id=$(echo "$publish_response" | jq -r '.id // empty' 2>/dev/null)
+    if [[ -n "$video_id" ]]; then
+        local link="https://www.dailymotion.com/video/${video_id}"
+        local upload_elapsed=$(( $(now_epoch) - upload_start ))
+        local speed
+        (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+        log_ok "  Dailymotion: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+        log_info "  Dailymotion: Link → ${link} (PERMANENT)"
+        DAILYMOTION_LINKS+=("${part_name}|${link}")
+        return 0
+    fi
+
+    local err_msg
+    err_msg=$(echo "$publish_response" | jq -r '.error.message // .error // empty' 2>/dev/null)
+    log_error "  Dailymotion: Publish failed — ${err_msg:-unknown error}"
     return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SERVICE 3: ARCHIVE.ORG UPLOAD
+#  SERVICE 3: MEGA.NZ UPLOAD
+#  PERMANENT encrypted cloud storage — 20GB free.
+#  Uses megatools CLI: megaput (upload) + megals -e (get public link).
+#  Requires: MEGA_EMAIL, MEGA_PASSWORD
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_to_mega() {
+    local file="$1"
+    local part_name="$2"
+    local mega_email="${MEGA_EMAIL:-}"
+    local mega_pass="${MEGA_PASSWORD:-}"
+
+    if [[ -z "$mega_email" ]] || [[ -z "$mega_pass" ]]; then
+        log_warn "  MEGA.nz: Missing credentials — skipping (need MEGA_EMAIL, MEGA_PASSWORD)"
+        return 1
+    fi
+
+    log_info "  🔴 MEGA.nz: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+    local upload_start
+    upload_start=$(now_epoch)
+
+    # Install megatools if not available
+    if ! command -v megaput &>/dev/null; then
+        log_info "  MEGA.nz: Installing megatools..."
+        sudo apt-get install -y -qq megatools 2>/dev/null || {
+            log_error "  MEGA.nz: Failed to install megatools"
+            return 1
+        }
+    fi
+
+    # Create config file for authentication
+    local mega_rc="/tmp/.megarc"
+    cat > "$mega_rc" << EOF
+[Login]
+Username = ${mega_email}
+Password = ${mega_pass}
+EOF
+    chmod 600 "$mega_rc"
+
+    # Create remote directory for organization
+    local remote_dir="/Root/StreamRecorder"
+    megamkdir --config "$mega_rc" "$remote_dir" 2>/dev/null || true
+
+    # Upload the file
+    local safe_filename
+    safe_filename=$(make_safe_filename "$(basename "$file")")
+    local remote_path="${remote_dir}/${safe_filename}"
+
+    local max_retries="${MEGA_MAX_RETRIES:-3}"
+    local attempt=1
+
+    while (( attempt <= max_retries )); do
+        log_debug "  MEGA.nz: Upload attempt ${attempt}/${max_retries}"
+
+        if megaput --config "$mega_rc" --path "$remote_dir/" "$file" 2>/dev/null; then
+            # Get public link
+            local export_output public_link
+            export_output=$(megals --config "$mega_rc" -e "$remote_path" 2>/dev/null) || \
+            export_output=$(megals --config "$mega_rc" -e "${remote_dir}/$(basename "$file")" 2>/dev/null) || true
+
+            # megals -e output format: "https://mega.nz/file/xxx#yyy /Root/path/file.mp4"
+            public_link=$(echo "$export_output" | grep -oP 'https://mega\.nz/\S+' | head -1)
+
+            if [[ -z "$public_link" ]]; then
+                # Try to export using megals
+                log_debug "  MEGA.nz: Trying to find uploaded file..."
+                export_output=$(megals --config "$mega_rc" -e "$remote_dir/" 2>/dev/null) || true
+                public_link=$(echo "$export_output" | grep "$(basename "$file")" | grep -oP 'https://mega\.nz/\S+' | head -1)
+            fi
+
+            local upload_elapsed=$(( $(now_epoch) - upload_start ))
+            local fsize speed
+            fsize=$(get_file_size "$file")
+            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+
+            if [[ -n "$public_link" ]]; then
+                log_ok "  MEGA.nz: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+                log_info "  MEGA.nz: Link → ${public_link} (PERMANENT)"
+                MEGA_LINKS+=("${part_name}|${public_link}")
+            else
+                # File uploaded but couldn't get public link — still a success
+                log_ok "  MEGA.nz: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+                log_warn "  MEGA.nz: File uploaded but public link unavailable (check mega.nz account)"
+                MEGA_LINKS+=("${part_name}|https://mega.nz (check account)")
+            fi
+
+            rm -f "$mega_rc"
+            return 0
+        fi
+
+        log_warn "  MEGA.nz: Upload attempt ${attempt} failed"
+        (( attempt++ ))
+        sleep 10
+    done
+
+    rm -f "$mega_rc"
+    log_error "  MEGA.nz: ❌ All ${max_retries} attempts failed"
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SERVICE 4: ARCHIVE.ORG UPLOAD
 #  PERMANENT storage — files NEVER expire. Rich metadata.
 #
 #  ROOT CAUSE OF PAST FAILURES:
@@ -419,7 +578,7 @@ upload_to_archive() {
 
 
 upload_to_clouds() {
-    log_header "☁️ TRIPLE CLOUD REDUNDANCY UPLOAD"
+    log_header "☁️ MULTI-CLOUD REDUNDANCY UPLOAD"
 
     UPLOAD_START_TIME=$(now_epoch)
 
@@ -432,7 +591,16 @@ upload_to_clouds() {
     IFS='|' read -ra FILES <<< "$files_list"
     local total_files=${#FILES[@]}
 
+    # Count active services dynamically
+    local active_services=0
+    [[ "${GOFILE_SKIP:-false}" != "true" ]] && (( active_services++ ))
+    [[ "${DAILYMOTION_SKIP:-false}" != "true" ]] && [[ -n "${DAILYMOTION_API_KEY:-}" ]] && (( active_services++ ))
+    [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]] && (( active_services++ ))
+    [[ "${ARCHIVE_SKIP:-false}" != "true" ]] && [[ -n "${ARCHIVE_ACCESS_KEY:-}" ]] && (( active_services++ ))
+    UPLOAD_TOTAL_SERVICES=$active_services
+
     log_info "Files to upload: ${total_files}"
+    log_info "Active services: ${active_services}"
     log_info "Upload started : $(now_pkt)"
 
     local total_size=0
@@ -458,7 +626,6 @@ upload_to_clouds() {
         if [[ "$basename_f" == *"_compressed"* ]]; then
             part_name="Compressed"
         elif (( total_files <= 2 )); then
-            # If there are 2 files (HD + compressed), label the non-compressed as HD
             part_name="HD"
         else
             part_name="Part${file_num}"
@@ -469,7 +636,7 @@ upload_to_clouds() {
 
         local svc_success=0
 
-        # ── Gofile ──
+        # ── 1. Gofile ──
         if [[ "${GOFILE_SKIP:-false}" != "true" ]]; then
             if upload_to_gofile "$f" "$part_name"; then
                 (( svc_success++ ))
@@ -484,30 +651,37 @@ upload_to_clouds() {
             log_info "  Gofile: Skipped (GOFILE_SKIP=true)"
         fi
 
-        # ── Buzzheavier ──
-        if [[ "${BUZZHEAVIER_SKIP:-false}" != "true" ]]; then
-            if upload_to_buzzheavier "$f" "$part_name"; then
+        # ── 2. Dailymotion ──
+        if [[ "${DAILYMOTION_SKIP:-false}" != "true" ]]; then
+            if upload_to_dailymotion "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  Buzzheavier: First attempt failed — retrying after 10s..."
+                log_warn "  Dailymotion: First attempt failed — retrying after 10s..."
                 sleep 10
-                if upload_to_buzzheavier "$f" "$part_name"; then
+                if upload_to_dailymotion "$f" "$part_name"; then
                     (( svc_success++ ))
                 fi
             fi
         else
-            log_info "  Buzzheavier: Skipped (BUZZHEAVIER_SKIP=true)"
+            log_info "  Dailymotion: Skipped"
         fi
 
-        # ── Pixeldrain (disabled — IP banned on GitHub runners) ──
-        if [[ "${PIXELDRAIN_SKIP:-true}" != "true" ]]; then
-            if upload_to_pixeldrain "$f" "$part_name"; then
+        # ── 3. MEGA.nz ──
+        if [[ "${MEGA_SKIP:-false}" != "true" ]]; then
+            if upload_to_mega "$f" "$part_name"; then
                 (( svc_success++ ))
+            else
+                log_warn "  MEGA.nz: First attempt failed — retrying after 10s..."
+                sleep 10
+                if upload_to_mega "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
             fi
+        else
+            log_info "  MEGA.nz: Skipped"
         fi
 
-
-        # ── Archive.org ──
+        # ── 4. Archive.org ──
         if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
             if upload_to_archive "$f" "$part_name"; then
                 (( svc_success++ ))
@@ -528,23 +702,23 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" buzzheavier_str="" pixeldrain_str="" archive_str=""
+    local gofile_str="" dailymotion_str="" mega_str="" archive_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
     fi
-    if (( ${#BUZZHEAVIER_LINKS[@]} > 0 )); then
-        local _ifs="$IFS"; IFS=';'; buzzheavier_str="${BUZZHEAVIER_LINKS[*]}"; IFS="$_ifs"
+    if (( ${#DAILYMOTION_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; dailymotion_str="${DAILYMOTION_LINKS[*]}"; IFS="$_ifs"
     fi
-    if (( ${#PIXELDRAIN_LINKS[@]} > 0 )); then
-        local _ifs="$IFS"; IFS=';'; pixeldrain_str="${PIXELDRAIN_LINKS[*]}"; IFS="$_ifs"
+    if (( ${#MEGA_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; mega_str="${MEGA_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#ARCHIVE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; archive_str="${ARCHIVE_LINKS[*]}"; IFS="$_ifs"
     fi
 
     set_env "GOFILE_LINKS"         "$gofile_str"
-    set_env "BUZZHEAVIER_LINKS"    "$buzzheavier_str"
-    set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
+    set_env "DAILYMOTION_LINKS"    "$dailymotion_str"
+    set_env "MEGA_LINKS"           "$mega_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"
@@ -557,8 +731,8 @@ upload_to_clouds() {
     log_info "  Services succeeded : ${UPLOAD_SUCCESS_COUNT}/${expected_total} (${UPLOAD_TOTAL_SERVICES} services × ${total_files} files)"
     log_info "  Total elapsed      : ${upload_elapsed}s"
     [[ -n "$gofile_str"       ]] && log_ok  "  Gofile       ✅ : ${GOFILE_LINKS[*]}"
-    [[ -n "$buzzheavier_str"  ]] && log_ok  "  Buzzheavier  ✅ : ${BUZZHEAVIER_LINKS[*]}"
-    [[ -n "$pixeldrain_str"   ]] && log_ok  "  Pixeldrain   ✅ : ${PIXELDRAIN_LINKS[*]}"
+    [[ -n "$dailymotion_str"  ]] && log_ok  "  Dailymotion  ✅ : ${DAILYMOTION_LINKS[*]}"
+    [[ -n "$mega_str"         ]] && log_ok  "  MEGA.nz      ✅ : ${MEGA_LINKS[*]}"
     [[ -n "$archive_str"      ]] && log_ok  "  Archive.org  ✅ : ${ARCHIVE_LINKS[*]}"
     log_separator
 

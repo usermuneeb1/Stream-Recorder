@@ -60,14 +60,25 @@ update_links() {
         done
     fi
     
-    # Add Buzzheavier links
-    if [[ -n "${BUZZHEAVIER_LINKS:-}" ]]; then
-        IFS=';' read -ra bz_entries <<< "$BUZZHEAVIER_LINKS"
-        for bz_entry in "${bz_entries[@]}"; do
-            local bz_part bz_link
-            bz_part=$(echo "$bz_entry" | cut -d'|' -f1)
-            bz_link=$(echo "$bz_entry" | cut -d'|' -f2)
-            [[ -n "$bz_link" ]] && entry+="[buzzheavier:${bz_part}] ${bz_link}\n"
+    # Add Dailymotion links
+    if [[ -n "${DAILYMOTION_LINKS:-}" ]]; then
+        IFS=';' read -ra dm_entries <<< "$DAILYMOTION_LINKS"
+        for dm_entry in "${dm_entries[@]}"; do
+            local dm_part dm_link
+            dm_part=$(echo "$dm_entry" | cut -d'|' -f1)
+            dm_link=$(echo "$dm_entry" | cut -d'|' -f2)
+            [[ -n "$dm_link" ]] && entry+="[dailymotion:${dm_part}] ${dm_link} (PERMANENT)\n"
+        done
+    fi
+    
+    # Add MEGA.nz links
+    if [[ -n "${MEGA_LINKS:-}" ]]; then
+        IFS=';' read -ra mega_entries <<< "$MEGA_LINKS"
+        for mega_entry in "${mega_entries[@]}"; do
+            local mega_part mega_link
+            mega_part=$(echo "$mega_entry" | cut -d'|' -f1)
+            mega_link=$(echo "$mega_entry" | cut -d'|' -f2)
+            [[ -n "$mega_link" ]] && entry+="[mega:${mega_part}] ${mega_link} (PERMANENT)\n"
         done
     fi
     
