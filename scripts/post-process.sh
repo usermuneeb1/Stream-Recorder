@@ -380,25 +380,51 @@ post_process() {
         log_info "  Compressed version skipped (SKIP_COMPRESSED=true)"
     fi
     
-    # ── Stage 4: Download Thumbnail (for Discord embed only — NOT uploaded to cloud) ──
-    if [[ "${SAVE_THUMBNAIL:-true}" == "true" ]] && [[ -n "${STREAM_THUMBNAIL:-}" ]]; then
+    # ── Stage 4: Ensure Thumbnail (for Discord embed only — NOT uploaded to cloud) ──
+    if [[ "${SAVE_THUMBNAIL:-true}" == "true" ]]; then
         log_separator
-        log_step "Downloading Thumbnail (for Discord only)..."
-        local thumb_ext="jpg"
-        [[ "$STREAM_THUMBNAIL" == *".webp"* ]] && thumb_ext="webp"
-        local thumb_file="${RECORD_DIR}/${base_name}_thumbnail.${thumb_ext}"
+        log_step "Checking Thumbnail (for Discord only)..."
         
-        if curl -sL --max-time 15 -o "$thumb_file" "$STREAM_THUMBNAIL"; then
-            if [[ -s "$thumb_file" ]]; then
-                log_ok "Thumbnail saved (Discord embed only — will NOT be uploaded to cloud)"
-                # NOTE: NOT adding to PROCESSED_FILES — thumbnail stays local for Discord
-                set_env "LOCAL_THUMBNAIL_PATH" "$thumb_file"
+        # If detection already saved a valid local thumbnail, keep it — DON'T re-download
+        # (YouTube returns a gray placeholder after stream ends / for private streams)
+        local existing_thumb="${LOCAL_THUMBNAIL_PATH:-}"
+        if [[ -s "$existing_thumb" ]]; then
+            local existing_size
+            existing_size=$(wc -c < "$existing_thumb" | tr -d ' ')
+            if (( existing_size > 5000 )); then
+                log_ok "Using thumbnail from detection phase (${existing_size} bytes) — skipping re-download"
             else
-                log_warn "Downloaded thumbnail is empty"
-                rm -f "$thumb_file"
+                log_warn "Existing thumbnail too small (${existing_size}b) — trying re-download"
+                existing_thumb=""
             fi
         else
-            log_warn "Failed to download thumbnail"
+            existing_thumb=""
+        fi
+        
+        # Only re-download if we don't have a valid local copy
+        if [[ -z "$existing_thumb" ]] && [[ -n "${STREAM_THUMBNAIL:-}" ]]; then
+            local thumb_ext="jpg"
+            [[ "$STREAM_THUMBNAIL" == *".webp"* ]] && thumb_ext="webp"
+            local thumb_file="${RECORD_DIR}/${base_name}_thumbnail.${thumb_ext}"
+            
+            if curl -sL --max-time 15 -o "$thumb_file" "$STREAM_THUMBNAIL"; then
+                if [[ -s "$thumb_file" ]]; then
+                    local dl_size
+                    dl_size=$(wc -c < "$thumb_file" | tr -d ' ')
+                    if (( dl_size > 5000 )); then
+                        log_ok "Thumbnail downloaded (${dl_size} bytes)"
+                        set_env "LOCAL_THUMBNAIL_PATH" "$thumb_file"
+                    else
+                        log_warn "Downloaded thumbnail is a placeholder (${dl_size}b) — discarding"
+                        rm -f "$thumb_file"
+                    fi
+                else
+                    log_warn "Downloaded thumbnail is empty"
+                    rm -f "$thumb_file"
+                fi
+            else
+                log_warn "Failed to download thumbnail"
+            fi
         fi
     fi
     
