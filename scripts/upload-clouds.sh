@@ -321,6 +321,7 @@ upload_to_dailymotion() {
         -d "title=${title}" \
         -d "channel=news" \
         -d "published=true" \
+        -d "private=true" \
         -d "is_created_for_kids=false" \
         --data-urlencode "description=Live stream recording of ${title} by ${channel}. Recorded on ${record_date}. Part: ${part_name}." \
         --data-urlencode "tags=${channel},livestream,recording" \
