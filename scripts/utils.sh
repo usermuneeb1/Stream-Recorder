@@ -255,14 +255,12 @@ sanitize_filename() {
     echo "$name"
 }
 
-# Generate a safe output filename with date
+# Generate a safe output filename (no date — date is in metadata)
 generate_output_filename() {
     local title="$1"
-    local date_str
-    date_str=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
     local safe_title
     safe_title=$(sanitize_filename "$title")
-    echo "${safe_title} - ${date_str}"
+    echo "$safe_title"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
