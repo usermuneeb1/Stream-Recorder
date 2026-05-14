@@ -509,7 +509,7 @@ upload_to_archive() {
             -w '%{http_code}|%{exitcode}|%{time_total}' \
             -H "authorization: LOW ${access_key}:${secret_key}" \
             -H "x-archive-auto-make-bucket: 1" \
-            -H "x-archive-meta-title: ${title} (${record_date})" \
+            -H "x-archive-meta-title: ${title}" \
             -H "x-archive-meta-creator: ${channel}" \
             -H "x-archive-meta-date: ${record_date}" \
             -H "x-archive-meta-description: Live stream recording of ${title} by ${channel}. Recorded on ${record_date}. Part: ${part_name}." \
