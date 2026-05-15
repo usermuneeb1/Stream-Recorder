@@ -263,6 +263,43 @@ record_method_f() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  RECORDING METHOD G: Plain yt-dlp (Default — No Player Override)
+#  Lets yt-dlp auto-select the best client. Most reliable general method.
+#  This is what "yt-dlp JSON Dump" detection method uses internally.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+record_method_g() {
+    local video_url="$1"
+    local output_file="$2"
+    
+    log_info "  Method G: Plain yt-dlp (default auto-select)"
+    
+    local live_start_flag="--live-from-start"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
+    
+    local cookies_arg=""
+    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+    fi
+    
+    timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
+        $cookies_arg \
+        --no-part \
+        --no-continue \
+        --no-check-certificates \
+        $live_start_flag \
+        --fixup never \
+        -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
+        --merge-output-format mp4 \
+        -o "$output_file" \
+        "$video_url" 2>&1 | tail -5
+    
+    local status=${PIPESTATUS[0]}
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  FILE VALIDATOR — Check if recorded file is valid
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -338,7 +375,7 @@ validate_recorded_file() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING ATTEMPT — Tries all 6 methods in sequence
+#  RECORDING ATTEMPT — Tries all 7 methods in sequence
 # ═══════════════════════════════════════════════════════════════════════════════
 
 attempt_recording() {
@@ -351,20 +388,22 @@ attempt_recording() {
     log_info "  Output: ${output_base}"
     
     local methods=(
+        "record_method_g"
         "record_method_d"
-        "record_method_f"
-        "record_method_e"
         "record_method_a"
         "record_method_b"
+        "record_method_e"
         "record_method_c"
+        "record_method_f"
     )
     local method_names=(
+        "G: Plain yt-dlp (default)"
         "D: Android VR (best)"
-        "F: Streamlink (HLS)"
+        "A: Cookies+web_creator"
+        "B: Cookies+tv_embedded"
         "E: Mobile Web"
-        "A: Cookies+web"
-        "B: Cookies+tv"
         "C: iOS (anonymous)"
+        "F: Streamlink (HLS)"
     )
     
     for i in "${!methods[@]}"; do
@@ -388,7 +427,7 @@ attempt_recording() {
         sleep "${METHOD_RETRY_DELAY:-5}"
     done
     
-    log_error "  All 6 methods failed for attempt ${attempt_num}"
+    log_error "  All 7 methods failed for attempt ${attempt_num}"
     return 1
 }
 
@@ -499,7 +538,7 @@ record_stream() {
     log_info "Stream    : ${stream_title}"
     log_info "Video ID  : ${video_id}"
     log_info "URL       : ${video_url}"
-    log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-3} attempts × 6 methods = $((${MAX_RECORD_ATTEMPTS:-3} * 6)) chances"
+    log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-3} attempts × 7 methods = $((${MAX_RECORD_ATTEMPTS:-3} * 7)) chances"
     log_info "Started   : $(now_pkt)"
     
     # ── Prepare directories ──────────────────────────────────────────────────

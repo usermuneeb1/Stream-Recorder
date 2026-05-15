@@ -212,7 +212,7 @@ notify_live_detected() {
                     "\n" +
                     "╔══════════════════════════════════════╗\n" +
                     "║  🎯 **Recording Engine Active**            ║\n" +
-                    "║  6 methods × 3 retries = 18 chances    ║\n" +
+                    "║  7 methods × 3 retries = 21 chances    ║\n" +
                     "║  ☁️ Triple cloud upload on completion    ║\n" +
                     "╚══════════════════════════════════════╝"
                 ),
