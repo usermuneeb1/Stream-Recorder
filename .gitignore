@@ -36,3 +36,10 @@ desktop.ini
 # Python cache
 __pycache__/
 *.pyc
+
+# Debug/test dumps (never commit)
+dump.json
+output.json
+cookie_keepalive.json
+lofi.html
+sava.html
