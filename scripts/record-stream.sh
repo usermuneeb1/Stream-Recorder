@@ -606,11 +606,106 @@ record_stream() {
     fi
     
     if [[ ${#RECORDED_FILES[@]} -eq 0 ]]; then
-        log_error "═══ RECORDING FAILED ═══"
-        log_error "All ${max_attempts} attempts × 6 methods failed to produce a valid file"
-        set_env "RECORDING_SUCCESS" "false"
-        set_output "recording_success" "false"
-        return 1
+        log_warn "═══ LIVE RECORDING FAILED — TRYING VOD RESCUE ═══"
+        log_info "All live methods failed — attempting to grab VOD replay before it goes private..."
+        
+        # ── VOD RESCUE FALLBACK ──────────────────────────────────────────
+        # After a stream ends, the VOD stays public for a few minutes
+        # before the streamer can make it private. We try anonymous
+        # download methods to grab it in that window.
+        # This works even with EXPIRED cookies.
+        # ─────────────────────────────────────────────────────────────────
+        
+        local vod_rescued=false
+        local vod_output="${RECORD_DIR}/vod_rescue.mp4"
+        local vod_methods=(
+            "android_vr"
+            "ios"
+            "mweb"
+        )
+        local vod_method_names=(
+            "Android VR (anonymous)"
+            "iOS (anonymous)"
+            "Mobile Web (anonymous)"
+        )
+        
+        for i in "${!vod_methods[@]}"; do
+            local client="${vod_methods[$i]}"
+            local mname="${vod_method_names[$i]}"
+            
+            log_info "  🆘 VOD Rescue attempt $((i+1))/${#vod_methods[@]}: ${mname}..."
+            
+            # Try downloading the full VOD (not live, just the replay)
+            if timeout 1800 yt-dlp \
+                --extractor-args "youtube:player_client=${client}" \
+                --no-part \
+                --no-continue \
+                --no-check-certificates \
+                --no-live-from-start \
+                -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
+                --merge-output-format mp4 \
+                -o "$vod_output" \
+                "$video_url" 2>&1 | tail -5; then
+                
+                # Check if file is valid
+                if [[ -f "$vod_output" ]]; then
+                    local vod_size
+                    vod_size=$(get_file_size "$vod_output")
+                    if (( vod_size >= 5000000 )); then  # At least 5MB
+                        log_ok "  🆘 VOD Rescue SUCCESS! Method: ${mname} — $(format_size "$vod_size")"
+                        RECORDED_FILES+=("$vod_output")
+                        RECORDING_SUCCESS=true
+                        vod_rescued=true
+                        break
+                    else
+                        log_warn "  VOD file too small ($(format_size "$vod_size")) — trying next method"
+                        rm -f "$vod_output"
+                    fi
+                fi
+            fi
+            
+            # Also try with cookies if available (they might still work for VOD even if live failed)
+            if [[ "$vod_rescued" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
+                log_info "  🆘 VOD Rescue retry with cookies: ${mname}..."
+                if timeout 1800 yt-dlp \
+                    --cookies "$COOKIES_FILE" \
+                    --extractor-args "youtube:player_client=${client}" \
+                    --no-part \
+                    --no-continue \
+                    --no-check-certificates \
+                    --no-live-from-start \
+                    -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
+                    --merge-output-format mp4 \
+                    -o "$vod_output" \
+                    "$video_url" 2>&1 | tail -5; then
+                    
+                    if [[ -f "$vod_output" ]]; then
+                        local vod_size
+                        vod_size=$(get_file_size "$vod_output")
+                        if (( vod_size >= 5000000 )); then
+                            log_ok "  🆘 VOD Rescue SUCCESS (with cookies)! Method: ${mname} — $(format_size "$vod_size")"
+                            RECORDED_FILES+=("$vod_output")
+                            RECORDING_SUCCESS=true
+                            vod_rescued=true
+                            break
+                        else
+                            rm -f "$vod_output"
+                        fi
+                    fi
+                fi
+            fi
+            
+            sleep 5
+        done
+        
+        if [[ "$vod_rescued" != "true" ]]; then
+            log_error "═══ RECORDING FAILED ═══"
+            log_error "All live methods AND VOD rescue failed"
+            log_error "The stream may have been made private before we could grab it"
+            set_env "RECORDING_SUCCESS" "false"
+            set_output "recording_success" "false"
+            return 1
+        fi
     fi
     
     log_ok "═══ RECORDED ${#RECORDED_FILES[@]} SEGMENT(S) ═══"
