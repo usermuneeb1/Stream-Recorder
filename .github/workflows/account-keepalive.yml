@@ -1,0 +1,195 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🔄 ACCOUNT KEEP-ALIVE — Prevents MEGA & Dailymotion file deletion         ║
+# ║  Runs monthly to keep cloud accounts active.                                ║
+# ║                                                                             ║
+# ║  MEGA.nz:     Deletes files after 90 days of inactivity                    ║
+# ║  Dailymotion: Archives videos after 13 months of inactivity                ║
+# ║  Archive.org: No keep-alive needed (truly permanent)                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🔄 Account Keep-Alive"
+
+on:
+  schedule:
+    # Run on the 1st and 15th of every month at 10:00 UTC (3:00 PM PKT)
+    - cron: "0 10 1 * *"     # 1st of month
+    - cron: "0 10 15 * *"    # 15th of month (safety — twice a month)
+  workflow_dispatch:           # Manual trigger
+
+env:
+  MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+  MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+  DAILYMOTION_API_KEY: ${{ secrets.DAILYMOTION_API_KEY }}
+  DAILYMOTION_API_SECRET: ${{ secrets.DAILYMOTION_API_SECRET }}
+  DAILYMOTION_USERNAME: ${{ secrets.DAILYMOTION_USERNAME }}
+  DAILYMOTION_PASSWORD: ${{ secrets.DAILYMOTION_PASSWORD }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  keepalive:
+    name: "🔄 Keep Accounts Active"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: "🔄 MEGA.nz — Keep Alive"
+        id: mega
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "🔴 MEGA.nz Keep-Alive"
+          echo "═══════════════════════════════════════"
+
+          if [[ -z "$MEGA_EMAIL" ]] || [[ -z "$MEGA_PASSWORD" ]]; then
+            echo "⚠️ MEGA credentials not set — skipping"
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Install megatools
+          sudo apt-get install -y -qq megatools 2>/dev/null
+
+          # Create config
+          cat > /tmp/.megarc << EOF
+          [Login]
+          Username = ${MEGA_EMAIL}
+          Password = ${MEGA_PASSWORD}
+          EOF
+          chmod 600 /tmp/.megarc
+
+          # List files — this counts as account activity
+          echo "📂 Listing MEGA files (this counts as login activity)..."
+          if megals --config /tmp/.megarc /Root/ 2>/dev/null; then
+            FILE_COUNT=$(megals --config /tmp/.megarc -R /Root/ 2>/dev/null | wc -l)
+            echo "✅ MEGA keep-alive successful — $FILE_COUNT files found"
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "files=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+            # Also check storage usage
+            USAGE=$(megadf --config /tmp/.megarc 2>/dev/null | head -3 || echo "N/A")
+            echo "📊 Storage: $USAGE"
+            echo "usage<<EOF" >> $GITHUB_OUTPUT
+            echo "$USAGE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "❌ MEGA keep-alive failed — check credentials"
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+          rm -f /tmp/.megarc
+
+      - name: "🔵 Dailymotion — Keep Alive"
+        id: dailymotion
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "🔵 Dailymotion Keep-Alive"
+          echo "═══════════════════════════════════════"
+
+          if [[ -z "$DAILYMOTION_API_KEY" ]] || [[ -z "$DAILYMOTION_PASSWORD" ]]; then
+            echo "⚠️ Dailymotion credentials not set — skipping"
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get OAuth token — this counts as account activity
+          echo "🔑 Authenticating with Dailymotion..."
+          TOKEN_RESPONSE=$(curl -s --max-time 30 \
+            -X POST "https://api.dailymotion.com/oauth/token" \
+            -d "grant_type=password" \
+            -d "client_id=${DAILYMOTION_API_KEY}" \
+            -d "client_secret=${DAILYMOTION_API_SECRET}" \
+            -d "username=${DAILYMOTION_USERNAME}" \
+            -d "password=${DAILYMOTION_PASSWORD}" \
+            -d "scope=manage_videos" \
+            2>/dev/null) || true
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty' 2>/dev/null)
+
+          if [[ -n "$ACCESS_TOKEN" ]]; then
+            # List videos — this confirms account is active
+            echo "📂 Listing Dailymotion videos..."
+            VIDEOS_RESPONSE=$(curl -s --max-time 30 \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              "https://api.dailymotion.com/me/videos?fields=id,title,created_time&limit=5" \
+              2>/dev/null) || true
+
+            VIDEO_COUNT=$(echo "$VIDEOS_RESPONSE" | jq -r '.total // 0' 2>/dev/null)
+            echo "✅ Dailymotion keep-alive successful — $VIDEO_COUNT videos on account"
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "videos=$VIDEO_COUNT" >> $GITHUB_OUTPUT
+          else
+            ERROR=$(echo "$TOKEN_RESPONSE" | jq -r '.error_description // .error // "unknown"' 2>/dev/null)
+            echo "❌ Dailymotion keep-alive failed — $ERROR"
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "📡 Send Discord Report"
+        if: always()
+        run: |
+          MEGA_STATUS="${{ steps.mega.outputs.status }}"
+          MEGA_FILES="${{ steps.mega.outputs.files }}"
+          DM_STATUS="${{ steps.dailymotion.outputs.status }}"
+          DM_VIDEOS="${{ steps.dailymotion.outputs.videos }}"
+
+          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+
+          # Build status icons
+          MEGA_ICON="⚠️ Skipped"
+          [[ "$MEGA_STATUS" == "success" ]] && MEGA_ICON="✅ Active ($MEGA_FILES files)"
+          [[ "$MEGA_STATUS" == "failed" ]] && MEGA_ICON="❌ Failed"
+
+          DM_ICON="⚠️ Skipped"
+          [[ "$DM_STATUS" == "success" ]] && DM_ICON="✅ Active ($DM_VIDEOS videos)"
+          [[ "$DM_STATUS" == "failed" ]] && DM_ICON="❌ Failed"
+
+          # Overall color
+          COLOR=5763757  # green
+          if [[ "$MEGA_STATUS" == "failed" ]] || [[ "$DM_STATUS" == "failed" ]]; then
+            COLOR=15158332  # red
+          elif [[ "$MEGA_STATUS" == "skipped" ]] && [[ "$DM_STATUS" == "skipped" ]]; then
+            COLOR=16776960  # yellow
+          fi
+
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          DATE_STR=$(TZ='Asia/Karachi' date '+%B %d, %Y')
+
+          PAYLOAD=$(jq -n \
+            --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+            --arg avatar "${AVATAR_URL:-}" \
+            --arg date "$DATE_STR" \
+            --arg mega "$MEGA_ICON" \
+            --arg dm "$DM_ICON" \
+            --arg timestamp "$TIMESTAMP" \
+            --argjson color "$COLOR" \
+            '{
+              username: $username,
+              avatar_url: $avatar,
+              embeds: [{
+                title: "🔄 Monthly Account Keep-Alive",
+                description: (
+                  "> **Automatic activity ping** to prevent cloud services\n" +
+                  "> from deleting recordings due to inactivity.\n\n" +
+                  "**📅 Date:** " + $date + "\n\n" +
+                  "**🔴 MEGA.nz:** " + $mega + "\n" +
+                  "*(Deletes files after 90 days of inactivity)*\n\n" +
+                  "**🔵 Dailymotion:** " + $dm + "\n" +
+                  "*(Archives videos after 13 months of inactivity)*\n\n" +
+                  "**🏛️ Archive.org:** ✅ No action needed\n" +
+                  "*(Truly permanent — no inactivity rules)*"
+                ),
+                color: $color,
+                footer: {
+                  text: "☪️ Account Keep-Alive · Runs twice monthly · Made with ❤️ by Muneeb Ahmad"
+                },
+                timestamp: $timestamp
+              }]
+            }')
+
+          curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" \
+            --max-time 15 \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK"
