@@ -427,6 +427,16 @@ _export_detection_results() {
     
     set_env "STREAM_IS_LIVE" "true"
     set_env "STREAM_VIDEO_ID" "$DETECTED_VIDEO_ID"
+    
+    # Clean trailing date/time from title (yt-dlp adds "2026-05-16 05:00" to live stream titles)
+    local clean_title="$DETECTED_TITLE"
+    clean_title=$(echo "$clean_title" | sed 's/[[:space:]]*[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}[[:space:]]*[0-9]\{2\}:[0-9]\{2\}[[:space:]]*$//')
+    clean_title=$(echo "$clean_title" | sed 's/[[:space:]]*[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}[[:space:]]*$//')
+    # Trim trailing whitespace
+    clean_title=$(echo "$clean_title" | sed 's/[[:space:]]*$//')
+    [[ -z "$clean_title" ]] && clean_title="$DETECTED_TITLE"
+    DETECTED_TITLE="$clean_title"
+    
     set_env "STREAM_TITLE" "$DETECTED_TITLE"
     set_env "STREAM_CHANNEL" "$DETECTED_CHANNEL"
     set_env "STREAM_THUMBNAIL" "$DETECTED_THUMBNAIL"

@@ -247,7 +247,7 @@ upload_to_dailymotion() {
     fsize=$(get_file_size "$file")
     if (( fsize > 2147483648 )); then
         log_warn "  Dailymotion: File too large ($(format_size "$fsize") > 2GB max) — skipping"
-        return 1
+        return 2  # return 2 = permanent skip, don't retry
     fi
 
     log_info "  🔵 Dailymotion: Uploading $(basename "$file") ($(format_size "$fsize"))..."
@@ -400,7 +400,8 @@ EOF
     while (( attempt <= max_retries )); do
         log_debug "  MEGA.nz: Upload attempt ${attempt}/${max_retries}"
 
-        if megaput --config "$mega_rc" --path "$remote_dir/" "$file" 2>/dev/null; then
+        local mega_error=""
+        mega_error=$(megaput --config "$mega_rc" --path "$remote_dir/" "$file" 2>&1) && {
             # Get public link
             local export_output public_link
             export_output=$(megals --config "$mega_rc" -e "$remote_path" 2>/dev/null) || \
@@ -434,9 +435,10 @@ EOF
 
             rm -f "$mega_rc"
             return 0
-        fi
+        }
 
         log_warn "  MEGA.nz: Upload attempt ${attempt} failed"
+        log_warn "  MEGA.nz: Error: ${mega_error}"
         (( attempt++ ))
         sleep 10
     done
@@ -661,8 +663,13 @@ upload_to_clouds() {
             log_info "  Dailymotion: Skipped (compressed — HD only)"
         elif [[ "${DAILYMOTION_SKIP:-false}" != "true" ]]; then
             (( expected_total_uploads++ ))
-            if upload_to_dailymotion "$f" "$part_name"; then
+            upload_to_dailymotion "$f" "$part_name"
+            local dm_rc=$?
+            if [[ $dm_rc -eq 0 ]]; then
                 (( svc_success++ ))
+            elif [[ $dm_rc -eq 2 ]]; then
+                # Permanent skip (file too large) — don't retry, don't count as expected
+                (( expected_total_uploads-- ))
             else
                 log_warn "  Dailymotion: First attempt failed — retrying after 10s..."
                 sleep 10
