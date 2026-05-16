@@ -165,6 +165,7 @@ jobs:
             --arg timestamp "$TIMESTAMP" \
             --argjson color "$COLOR" \
             '{
+              content: "@everyone",
               username: $username,
               avatar_url: $avatar,
               embeds: [{

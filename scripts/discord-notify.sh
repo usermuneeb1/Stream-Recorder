@@ -58,6 +58,10 @@ send_discord_webhook() {
     local payload_tmp out_tmp
     payload_tmp=$(mktemp)
     out_tmp=$(mktemp)
+    
+    # Inject @everyone mention into every notification
+    payload=$(echo "$payload" | jq '. + {content: "@everyone"}')
+    
     printf '%s' "$payload" > "$payload_tmp"
 
     local http_code
