@@ -435,7 +435,10 @@ _export_detection_results() {
     # Trim trailing whitespace
     clean_title=$(echo "$clean_title" | sed 's/[[:space:]]*$//')
     [[ -z "$clean_title" ]] && clean_title="$DETECTED_TITLE"
-    DETECTED_TITLE="$clean_title"
+    # Append just the date (no time) at the end
+    local today_date
+    today_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
+    DETECTED_TITLE="${clean_title} ${today_date}"
     
     set_env "STREAM_TITLE" "$DETECTED_TITLE"
     set_env "STREAM_CHANNEL" "$DETECTED_CHANNEL"
