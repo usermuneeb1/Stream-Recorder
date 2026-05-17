@@ -3,8 +3,8 @@
 # ║  📡 STREAM RECORDER — MULTI-CLOUD REDUNDANCY UPLOAD                        ║
 # ║  Uploads every recording to multiple independent cloud services:            ║
 # ║    1. Gofile       — No account needed, 10-day retention                   ║
-# ║    2. Dailymotion  — PERMANENT, 2GB max, video platform                    ║
-# ║    3. MEGA.nz      — PERMANENT, 20GB free, encrypted cloud                 ║
+# ║    2. Dailymotion  — PERMANENT, 2GB/2h max, video platform                 ║
+# ║    3. Pixeldrain   — 60 days, 10GB/file, download links                    ║
 # ║    4. Archive.org  — PERMANENT, never expires, full metadata                ║
 # ║  Each upload is independent — one failure doesn't stop the others.          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -693,22 +693,20 @@ upload_to_clouds() {
             log_info "  Dailymotion: Skipped"
         fi
 
-        # ── 3. MEGA.nz (HD only — skip compressed) ──
-        if [[ "$is_compressed" == "true" ]]; then
-            log_info "  MEGA.nz: Skipped (compressed — HD only)"
-        elif [[ "${MEGA_SKIP:-false}" != "true" ]]; then
+        # ── 3. Pixeldrain (uploads ALL files — HD + compressed) ──
+        if [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]]; then
             (( expected_total_uploads++ ))
-            if upload_to_mega "$f" "$part_name"; then
+            if upload_to_pixeldrain "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  MEGA.nz: First attempt failed — retrying after 10s..."
+                log_warn "  Pixeldrain: First attempt failed — retrying after 10s..."
                 sleep 10
-                if upload_to_mega "$f" "$part_name"; then
+                if upload_to_pixeldrain "$f" "$part_name"; then
                     (( svc_success++ ))
                 fi
             fi
         else
-            log_info "  MEGA.nz: Skipped"
+            log_info "  Pixeldrain: Skipped (PIXELDRAIN_SKIP=true)"
         fi
 
         # ── 4. Archive.org (HD only — skip compressed) ──
@@ -735,15 +733,15 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" dailymotion_str="" mega_str="" archive_str=""
+    local gofile_str="" dailymotion_str="" pixeldrain_str="" archive_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#DAILYMOTION_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; dailymotion_str="${DAILYMOTION_LINKS[*]}"; IFS="$_ifs"
     fi
-    if (( ${#MEGA_LINKS[@]} > 0 )); then
-        local _ifs="$IFS"; IFS=';'; mega_str="${MEGA_LINKS[*]}"; IFS="$_ifs"
+    if (( ${#PIXELDRAIN_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; pixeldrain_str="${PIXELDRAIN_LINKS[*]}"; IFS="$_ifs"
     fi
     if (( ${#ARCHIVE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; archive_str="${ARCHIVE_LINKS[*]}"; IFS="$_ifs"
@@ -751,7 +749,7 @@ upload_to_clouds() {
 
     set_env "GOFILE_LINKS"         "$gofile_str"
     set_env "DAILYMOTION_LINKS"    "$dailymotion_str"
-    set_env "MEGA_LINKS"           "$mega_str"
+    set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
     set_env "UPLOAD_EXPECTED_COUNT" "$expected_total_uploads"
@@ -765,7 +763,7 @@ upload_to_clouds() {
     log_info "  Total elapsed      : ${upload_elapsed}s"
     [[ -n "$gofile_str"       ]] && log_ok  "  Gofile       ✅ : ${GOFILE_LINKS[*]}"
     [[ -n "$dailymotion_str"  ]] && log_ok  "  Dailymotion  ✅ : ${DAILYMOTION_LINKS[*]}"
-    [[ -n "$mega_str"         ]] && log_ok  "  MEGA.nz      ✅ : ${MEGA_LINKS[*]}"
+    [[ -n "$pixeldrain_str"   ]] && log_ok  "  Pixeldrain   ✅ : ${PIXELDRAIN_LINKS[*]}"
     [[ -n "$archive_str"      ]] && log_ok  "  Archive.org  ✅ : ${ARCHIVE_LINKS[*]}"
     log_separator
 
