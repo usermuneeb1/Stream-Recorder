@@ -250,6 +250,13 @@ upload_to_dailymotion() {
         return 2  # return 2 = permanent skip, don't retry
     fi
 
+    # Check duration — Dailymotion free accounts have max ~2 hour limit
+    local duration_sec="${RECORD_DURATION_SEC:-0}"
+    if (( duration_sec > 7200 )); then
+        log_warn "  Dailymotion: Video too long ($(( duration_sec / 60 )) min > 120 min max) — skipping"
+        return 2  # permanent skip
+    fi
+
     log_info "  🔵 Dailymotion: Uploading $(basename "$file") ($(format_size "$fsize"))..."
     local upload_start
     upload_start=$(now_epoch)
@@ -342,6 +349,11 @@ upload_to_dailymotion() {
     local err_msg
     err_msg=$(echo "$publish_response" | jq -r '.error.message // .error // empty' 2>/dev/null)
     log_error "  Dailymotion: Publish failed — ${err_msg:-unknown error}"
+    
+    # If duration too long, return 2 (permanent skip, don't retry)
+    if echo "$err_msg" | grep -qi 'duration.*too long'; then
+        return 2
+    fi
     return 1
 }
 

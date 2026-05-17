@@ -52,11 +52,11 @@ jobs:
           sudo apt-get install -y -qq megatools 2>/dev/null
 
           # Create config
-          cat > /tmp/.megarc << EOF
-          [Login]
-          Username = ${MEGA_EMAIL}
-          Password = ${MEGA_PASSWORD}
-          EOF
+          cat > /tmp/.megarc << 'MEGARC'
+[Login]
+MEGARC
+          echo "Username = ${MEGA_EMAIL}" >> /tmp/.megarc
+          echo "Password = ${MEGA_PASSWORD}" >> /tmp/.megarc
           chmod 600 /tmp/.megarc
 
           # List files — this counts as account activity
