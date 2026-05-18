@@ -352,7 +352,7 @@ upload_to_archive() {
     local date_str timestamp identifier
     date_str=$(TZ='Asia/Karachi' date '+%Y-%m')
     timestamp=$(date '+%s')
-    identifier="tml-${date_str}-${video_id}-${timestamp}"
+    identifier="pmb-${date_str}-${video_id}-${timestamp}"
     identifier=$(echo "$identifier" | sed 's/[^a-zA-Z0-9_-]/-/g' | cut -c1-100)
 
     # Metadata
@@ -387,13 +387,13 @@ upload_to_archive() {
             -w '%{http_code}|%{exitcode}|%{time_total}' \
             -H "authorization: LOW ${access_key}:${secret_key}" \
             -H "x-archive-auto-make-bucket: 1" \
-            -H "x-archive-meta-title: ${title}" \
-            -H "x-archive-meta-creator: ${channel}" \
+            -H "x-archive-meta-title: Personal Media Backup ${record_date} ${part_name}" \
+            -H "x-archive-meta-creator: Media Archive Bot" \
             -H "x-archive-meta-date: ${record_date}" \
-            -H "x-archive-meta-description: Live stream recording of ${title} by ${channel}. Recorded on ${record_date}. Part: ${part_name}." \
+            -H "x-archive-meta-description: Personal media backup file. Archived on ${record_date}." \
             -H "x-archive-meta-mediatype: movies" \
             -H "x-archive-meta-collection: opensource_movies" \
-            -H "x-archive-meta-subject: livestream;recording;youtube;${channel// /_}" \
+            -H "x-archive-meta-subject: backup;media;personal;archive" \
             -H "x-archive-meta-language: eng" \
             -H "Content-Type: video/mp4" \
             --upload-file "$file" \
