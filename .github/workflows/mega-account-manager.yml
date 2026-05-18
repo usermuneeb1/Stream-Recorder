@@ -1,0 +1,245 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🔴 MEGA Account Manager — Generate & Maintain MEGA.nz Accounts           ║
+# ║  Uses github.com/f-o/MEGA-Account-Generator approach:                     ║
+# ║    • Generates accounts with temporary Mail.tm emails                     ║
+# ║    • Auto-verifies via email link                                         ║
+# ║    • Signs into all accounts monthly to prevent deletion                  ║
+# ║  Accounts are stored encrypted in accounts.csv (committed to repo).       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🔴 MEGA Account Manager"
+
+on:
+  # Manual trigger — for generating new accounts or force sign-in
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - signin       # Sign into all accounts (keep-alive)
+          - generate     # Generate new accounts
+          - both         # Generate + Sign in
+      num_accounts:
+        description: "Number of accounts to generate (only for generate/both)"
+        required: false
+        default: "3"
+        type: string
+      account_password:
+        description: "Password for new accounts (leave empty for random)"
+        required: false
+        default: ""
+        type: string
+
+  # Scheduled: Sign in on the 1st and 15th of every month (keep-alive)
+  schedule:
+    - cron: "0 10 1 * *"     # 1st of month at 10:00 UTC
+    - cron: "0 10 15 * *"    # 15th of month at 10:00 UTC
+
+env:
+  GH_PAT: ${{ secrets.GH_PAT }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  mega-manager:
+    name: "🔴 MEGA Account Manager"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ─── 1. CHECKOUT ─────────────────────────────────────────────────────
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
+      - name: "📦 Install Dependencies"
+        run: |
+          echo "📦 Installing megatools & Python dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq megatools python3-pip
+          pip3 install --quiet -r scripts/mega/requirements.txt
+          
+          # Verify
+          echo "megatools: $(megatools --version 2>&1 | head -1 || echo 'installed')"
+          echo "python3: $(python3 --version)"
+
+      # ─── 3. GENERATE ACCOUNTS (if requested) ─────────────────────────────
+      - name: "🔴 Generate MEGA Accounts"
+        id: generate
+        if: >-
+          github.event_name == 'workflow_dispatch' && 
+          (github.event.inputs.action == 'generate' || github.event.inputs.action == 'both')
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "🔴 Generating MEGA Accounts"
+          echo "═══════════════════════════════════════"
+          
+          NUM="${{ github.event.inputs.num_accounts }}"
+          NUM="${NUM:-3}"
+          PASS="${{ github.event.inputs.account_password }}"
+          
+          ARGS="-n $NUM"
+          [[ -n "$PASS" ]] && ARGS="$ARGS -p $PASS"
+          
+          echo "Generating $NUM accounts..."
+          
+          if python3 scripts/mega/generate_accounts.py $ARGS; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            # Count accounts
+            TOTAL=$(tail -n +2 scripts/mega/accounts.csv 2>/dev/null | wc -l)
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+            echo "✅ Generation complete — $TOTAL total accounts"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Generation failed"
+          fi
+
+      # ─── 4. SIGN IN TO ALL ACCOUNTS (keep-alive) ─────────────────────────
+      - name: "🔄 Sign In to All Accounts"
+        id: signin
+        if: >-
+          github.event_name == 'schedule' || 
+          github.event.inputs.action == 'signin' || 
+          github.event.inputs.action == 'both'
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "🔄 MEGA Account Keep-Alive Sign-In"
+          echo "═══════════════════════════════════════"
+          
+          if [[ ! -f scripts/mega/accounts.csv ]]; then
+            echo "⚠️ No accounts.csv found — skipping sign-in"
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          TOTAL=$(tail -n +2 scripts/mega/accounts.csv 2>/dev/null | wc -l)
+          echo "Found $TOTAL accounts to sign in..."
+          
+          if python3 scripts/mega/signin_accounts.py; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=partial" >> $GITHUB_OUTPUT
+          fi
+          
+          # Read results
+          if [[ -f scripts/mega/signin_results.json ]]; then
+            SUCCESS=$(jq -r '.success' scripts/mega/signin_results.json)
+            FAILED=$(jq -r '.failed' scripts/mega/signin_results.json)
+            TOTAL_R=$(jq -r '.total' scripts/mega/signin_results.json)
+            echo "success_count=$SUCCESS" >> $GITHUB_OUTPUT
+            echo "failed_count=$FAILED" >> $GITHUB_OUTPUT
+            echo "total_count=$TOTAL_R" >> $GITHUB_OUTPUT
+          fi
+
+      # ─── 5. COMMIT UPDATED ACCOUNTS ──────────────────────────────────────
+      - name: "💾 Commit Account Changes"
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          
+          # Remove temp files
+          rm -f scripts/mega/signin_results.json
+          
+          # Check for changes
+          if git diff --quiet scripts/mega/accounts.csv 2>/dev/null && \
+             ! git ls-files --others --exclude-standard | grep -q 'scripts/mega/accounts.csv'; then
+            echo "📝 No account changes to commit"
+            exit 0
+          fi
+          
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder.local"
+          git add scripts/mega/accounts.csv 2>/dev/null || true
+          
+          if git diff --cached --quiet; then
+            echo "📝 No staged changes"
+            exit 0
+          fi
+          
+          TIMESTAMP=$(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')
+          git commit -m "🔴 MEGA accounts updated — ${TIMESTAMP}"
+          git push
+          echo "✅ Account changes committed"
+
+      # ─── 6. DISCORD NOTIFICATION ──────────────────────────────────────────
+      - name: "📡 Send Discord Report"
+        if: always()
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+          
+          GEN_STATUS="${{ steps.generate.outputs.status }}"
+          GEN_TOTAL="${{ steps.generate.outputs.total }}"
+          SIGNIN_STATUS="${{ steps.signin.outputs.status }}"
+          SIGNIN_SUCCESS="${{ steps.signin.outputs.success_count }}"
+          SIGNIN_FAILED="${{ steps.signin.outputs.failed_count }}"
+          SIGNIN_TOTAL="${{ steps.signin.outputs.total_count }}"
+          
+          # Build description
+          DESC="> **MEGA Account Manager** automatic maintenance run.\n\n"
+          
+          if [[ -n "$GEN_STATUS" ]]; then
+            if [[ "$GEN_STATUS" == "success" ]]; then
+              DESC+="**🔴 Account Generation:** ✅ Success\n"
+              DESC+="**📊 Total Accounts:** ${GEN_TOTAL}\n\n"
+            else
+              DESC+="**🔴 Account Generation:** ❌ Failed\n\n"
+            fi
+          fi
+          
+          if [[ -n "$SIGNIN_STATUS" ]]; then
+            if [[ "$SIGNIN_STATUS" == "success" ]]; then
+              DESC+="**🔄 Keep-Alive Sign-In:** ✅ All Active\n"
+              DESC+="**📊 Results:** ${SIGNIN_SUCCESS}/${SIGNIN_TOTAL} accounts alive\n"
+            elif [[ "$SIGNIN_STATUS" == "partial" ]]; then
+              DESC+="**🔄 Keep-Alive Sign-In:** ⚠️ Partial\n"
+              DESC+="**📊 Results:** ${SIGNIN_SUCCESS}/${SIGNIN_TOTAL} alive, ${SIGNIN_FAILED} failed\n"
+              DESC+="**⚠️ Action:** Failed accounts may need regeneration\n"
+            elif [[ "$SIGNIN_STATUS" == "skipped" ]]; then
+              DESC+="**🔄 Keep-Alive Sign-In:** ⏭️ Skipped (no accounts.csv)\n"
+            fi
+          fi
+          
+          # Color
+          COLOR=5763757  # green
+          if [[ "$GEN_STATUS" == "failed" ]] || [[ "$SIGNIN_STATUS" == "partial" ]]; then
+            COLOR=16744448  # orange
+          fi
+          if [[ "$SIGNIN_FAILED" -gt 0 ]] 2>/dev/null; then
+            COLOR=15158332  # red
+          fi
+          
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          
+          PAYLOAD=$(jq -n \
+            --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+            --arg avatar "${AVATAR_URL:-}" \
+            --arg desc "$DESC" \
+            --arg timestamp "$TIMESTAMP" \
+            --argjson color "$COLOR" \
+            '{
+              content: "@everyone",
+              username: $username,
+              avatar_url: $avatar,
+              embeds: [{
+                title: "🔴 MEGA Account Manager Report",
+                description: $desc,
+                color: $color,
+                footer: {
+                  text: "☪️ MEGA Account Manager · Runs twice monthly · Made with ❤️ by Muneeb Ahmad"
+                },
+                timestamp: $timestamp
+              }]
+            }')
+          
+          curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" \
+            --max-time 15 \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK"

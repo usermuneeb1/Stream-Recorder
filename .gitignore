@@ -43,3 +43,9 @@ output.json
 cookie_keepalive.json
 lofi.html
 sava.html
+
+# MEGA temporary files (accounts.csv is intentionally tracked)
+scripts/mega/signin_results.json
+scripts/mega/.last_account_index
+scripts/mega/accounts.old.csv
+.megarc

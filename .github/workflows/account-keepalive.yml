@@ -1,10 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔄 ACCOUNT KEEP-ALIVE — Prevents MEGA & Dailymotion file deletion         ║
-# ║  Runs monthly to keep cloud accounts active.                                ║
-# ║                                                                             ║
-# ║  MEGA.nz:     Deletes files after 90 days of inactivity                    ║
-# ║  Dailymotion: Archives videos after 13 months of inactivity                ║
-# ║  Archive.org: No keep-alive needed (truly permanent)                       ║
+# ║  🔄 ACCOUNT KEEP-ALIVE — Prevents MEGA file deletion                      ║
+# ║  Runs monthly to keep MEGA cloud accounts active.                          ║
+# ║                                                                            ║
+# ║  MEGA.nz:     Deletes files after 90 days of inactivity                   ║
+# ║  Archive.org: No keep-alive needed (truly permanent)                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "🔄 Account Keep-Alive"
@@ -19,10 +18,6 @@ on:
 env:
   MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-  DAILYMOTION_API_KEY: ${{ secrets.DAILYMOTION_API_KEY }}
-  DAILYMOTION_API_SECRET: ${{ secrets.DAILYMOTION_API_SECRET }}
-  DAILYMOTION_USERNAME: ${{ secrets.DAILYMOTION_USERNAME }}
-  DAILYMOTION_PASSWORD: ${{ secrets.DAILYMOTION_PASSWORD }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
@@ -35,121 +30,105 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: "🔄 MEGA.nz — Keep Alive"
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🔴 MEGA.nz — Keep Alive"
         id: mega
         run: |
           echo "═══════════════════════════════════════"
           echo "🔴 MEGA.nz Keep-Alive"
           echo "═══════════════════════════════════════"
 
-          if [[ -z "$MEGA_EMAIL" ]] || [[ -z "$MEGA_PASSWORD" ]]; then
-            echo "⚠️ MEGA credentials not set — skipping"
-            echo "status=skipped" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           # Install megatools
-          sudo apt-get install -y -qq megatools 2>/dev/null
+          sudo apt-get install -y -qq megatools python3 2>/dev/null
 
-          # Create config
-          cat > /tmp/.megarc << 'MEGARC'
+          MEGA_OK=0
+          MEGA_TOTAL=0
+
+          # Method 1: Sign into the main MEGA account (from secrets)
+          if [[ -n "$MEGA_EMAIL" ]] && [[ -n "$MEGA_PASSWORD" ]]; then
+            cat > /tmp/.megarc << 'MEGARC'
 [Login]
 MEGARC
-          echo "Username = ${MEGA_EMAIL}" >> /tmp/.megarc
-          echo "Password = ${MEGA_PASSWORD}" >> /tmp/.megarc
-          chmod 600 /tmp/.megarc
+            echo "Username = ${MEGA_EMAIL}" >> /tmp/.megarc
+            echo "Password = ${MEGA_PASSWORD}" >> /tmp/.megarc
+            chmod 600 /tmp/.megarc
 
-          # List files — this counts as account activity
-          echo "📂 Listing MEGA files (this counts as login activity)..."
-          if megals --config /tmp/.megarc /Root/ 2>/dev/null; then
-            FILE_COUNT=$(megals --config /tmp/.megarc -R /Root/ 2>/dev/null | wc -l)
-            echo "✅ MEGA keep-alive successful — $FILE_COUNT files found"
-            echo "status=success" >> $GITHUB_OUTPUT
-            echo "files=$FILE_COUNT" >> $GITHUB_OUTPUT
+            echo "📂 Signing into main MEGA account..."
+            if megals --config /tmp/.megarc /Root/ 2>/dev/null; then
+              FILE_COUNT=$(megals --config /tmp/.megarc -R /Root/ 2>/dev/null | wc -l)
+              echo "✅ Main account alive — $FILE_COUNT files"
+              MEGA_OK=$((MEGA_OK + 1))
+              MEGA_TOTAL=$((MEGA_TOTAL + 1))
 
-            # Also check storage usage
-            USAGE=$(megadf --config /tmp/.megarc 2>/dev/null | head -3 || echo "N/A")
-            echo "📊 Storage: $USAGE"
-            echo "usage<<EOF" >> $GITHUB_OUTPUT
-            echo "$USAGE" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+              USAGE=$(megadf --config /tmp/.megarc 2>/dev/null | head -3 || echo "N/A")
+              echo "📊 Storage: $USAGE"
+            else
+              echo "❌ Main account sign-in failed"
+              MEGA_TOTAL=$((MEGA_TOTAL + 1))
+            fi
+            rm -f /tmp/.megarc
           else
-            echo "❌ MEGA keep-alive failed — check credentials"
-            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "⚠️ MEGA_EMAIL/MEGA_PASSWORD not set — skipping main account"
           fi
 
-          rm -f /tmp/.megarc
+          # Method 2: Sign into ALL generated accounts (from accounts.csv)
+          if [[ -f scripts/mega/accounts.csv ]]; then
+            echo ""
+            echo "📂 Signing into generated accounts (accounts.csv)..."
+            pip3 install --quiet -r scripts/mega/requirements.txt 2>/dev/null || true
+            
+            if python3 scripts/mega/signin_accounts.py; then
+              GEN_SUCCESS=$(jq -r '.success' scripts/mega/signin_results.json 2>/dev/null || echo "0")
+              GEN_TOTAL=$(jq -r '.total' scripts/mega/signin_results.json 2>/dev/null || echo "0")
+              MEGA_OK=$((MEGA_OK + GEN_SUCCESS))
+              MEGA_TOTAL=$((MEGA_TOTAL + GEN_TOTAL))
+              echo "✅ Generated accounts: ${GEN_SUCCESS}/${GEN_TOTAL} alive"
+            else
+              GEN_TOTAL=$(jq -r '.total' scripts/mega/signin_results.json 2>/dev/null || echo "0")
+              GEN_SUCCESS=$(jq -r '.success' scripts/mega/signin_results.json 2>/dev/null || echo "0")
+              MEGA_OK=$((MEGA_OK + GEN_SUCCESS))
+              MEGA_TOTAL=$((MEGA_TOTAL + GEN_TOTAL))
+              echo "⚠️ Some generated accounts failed"
+            fi
+            rm -f scripts/mega/signin_results.json
+          else
+            echo "ℹ️ No accounts.csv — no generated accounts to check"
+          fi
 
-      - name: "🔵 Dailymotion — Keep Alive"
-        id: dailymotion
-        run: |
-          echo "═══════════════════════════════════════"
-          echo "🔵 Dailymotion Keep-Alive"
-          echo "═══════════════════════════════════════"
-
-          if [[ -z "$DAILYMOTION_API_KEY" ]] || [[ -z "$DAILYMOTION_PASSWORD" ]]; then
-            echo "⚠️ Dailymotion credentials not set — skipping"
+          # Set output
+          if [[ $MEGA_TOTAL -eq 0 ]]; then
             echo "status=skipped" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Get OAuth token — this counts as account activity
-          echo "🔑 Authenticating with Dailymotion..."
-          TOKEN_RESPONSE=$(curl -s --max-time 30 \
-            -X POST "https://api.dailymotion.com/oauth/token" \
-            -d "grant_type=password" \
-            -d "client_id=${DAILYMOTION_API_KEY}" \
-            -d "client_secret=${DAILYMOTION_API_SECRET}" \
-            -d "username=${DAILYMOTION_USERNAME}" \
-            -d "password=${DAILYMOTION_PASSWORD}" \
-            -d "scope=manage_videos" \
-            2>/dev/null) || true
-
-          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty' 2>/dev/null)
-
-          if [[ -n "$ACCESS_TOKEN" ]]; then
-            # List videos — this confirms account is active
-            echo "📂 Listing Dailymotion videos..."
-            VIDEOS_RESPONSE=$(curl -s --max-time 30 \
-              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-              "https://api.dailymotion.com/me/videos?fields=id,title,created_time&limit=5" \
-              2>/dev/null) || true
-
-            VIDEO_COUNT=$(echo "$VIDEOS_RESPONSE" | jq -r '.total // 0' 2>/dev/null)
-            echo "✅ Dailymotion keep-alive successful — $VIDEO_COUNT videos on account"
+          elif [[ $MEGA_OK -eq $MEGA_TOTAL ]]; then
             echo "status=success" >> $GITHUB_OUTPUT
-            echo "videos=$VIDEO_COUNT" >> $GITHUB_OUTPUT
           else
-            ERROR=$(echo "$TOKEN_RESPONSE" | jq -r '.error_description // .error // "unknown"' 2>/dev/null)
-            echo "❌ Dailymotion keep-alive failed — $ERROR"
-            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "status=partial" >> $GITHUB_OUTPUT
           fi
+          echo "files=${MEGA_OK}/${MEGA_TOTAL}" >> $GITHUB_OUTPUT
 
       - name: "📡 Send Discord Report"
         if: always()
         run: |
           MEGA_STATUS="${{ steps.mega.outputs.status }}"
           MEGA_FILES="${{ steps.mega.outputs.files }}"
-          DM_STATUS="${{ steps.dailymotion.outputs.status }}"
-          DM_VIDEOS="${{ steps.dailymotion.outputs.videos }}"
 
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
           [[ -z "$WEBHOOK" ]] && exit 0
 
           # Build status icons
           MEGA_ICON="⚠️ Skipped"
-          [[ "$MEGA_STATUS" == "success" ]] && MEGA_ICON="✅ Active ($MEGA_FILES files)"
+          [[ "$MEGA_STATUS" == "success" ]] && MEGA_ICON="✅ All Active ($MEGA_FILES accounts)"
+          [[ "$MEGA_STATUS" == "partial" ]] && MEGA_ICON="⚠️ Partial ($MEGA_FILES accounts alive)"
           [[ "$MEGA_STATUS" == "failed" ]] && MEGA_ICON="❌ Failed"
-
-          DM_ICON="⚠️ Skipped"
-          [[ "$DM_STATUS" == "success" ]] && DM_ICON="✅ Active ($DM_VIDEOS videos)"
-          [[ "$DM_STATUS" == "failed" ]] && DM_ICON="❌ Failed"
 
           # Overall color
           COLOR=5763757  # green
-          if [[ "$MEGA_STATUS" == "failed" ]] || [[ "$DM_STATUS" == "failed" ]]; then
+          if [[ "$MEGA_STATUS" == "failed" ]]; then
             COLOR=15158332  # red
-          elif [[ "$MEGA_STATUS" == "skipped" ]] && [[ "$DM_STATUS" == "skipped" ]]; then
+          elif [[ "$MEGA_STATUS" == "partial" ]]; then
+            COLOR=16744448  # orange
+          elif [[ "$MEGA_STATUS" == "skipped" ]]; then
             COLOR=16776960  # yellow
           fi
 
@@ -161,7 +140,6 @@ MEGARC
             --arg avatar "${AVATAR_URL:-}" \
             --arg date "$DATE_STR" \
             --arg mega "$MEGA_ICON" \
-            --arg dm "$DM_ICON" \
             --arg timestamp "$TIMESTAMP" \
             --argjson color "$COLOR" \
             '{
@@ -176,8 +154,6 @@ MEGARC
                   "**📅 Date:** " + $date + "\n\n" +
                   "**🔴 MEGA.nz:** " + $mega + "\n" +
                   "*(Deletes files after 90 days of inactivity)*\n\n" +
-                  "**🔵 Dailymotion:** " + $dm + "\n" +
-                  "*(Archives videos after 13 months of inactivity)*\n\n" +
                   "**🏛️ Archive.org:** ✅ No action needed\n" +
                   "*(Truly permanent — no inactivity rules)*"
                 ),

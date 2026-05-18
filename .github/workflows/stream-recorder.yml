@@ -78,14 +78,11 @@ env:
   YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
   ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
-  # Dailymotion (PERMANENT — 2GB max per video)
-  DAILYMOTION_API_KEY: ${{ secrets.DAILYMOTION_API_KEY }}
-  DAILYMOTION_API_SECRET: ${{ secrets.DAILYMOTION_API_SECRET }}
-  DAILYMOTION_USERNAME: ${{ secrets.DAILYMOTION_USERNAME }}
-  DAILYMOTION_PASSWORD: ${{ secrets.DAILYMOTION_PASSWORD }}
-  # MEGA.nz (PERMANENT — 20GB free)
+  # MEGA.nz (PERMANENT — 20GB free, auto-rotating accounts)
   MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+  # Pixeldrain (60-day retention, 10GB/file)
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
   GH_PAT: ${{ secrets.GH_PAT }}
   WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
@@ -138,7 +135,7 @@ jobs:
           sudo apt-get update -qq
           
           # Install core tools (nodejs is pre-installed on GitHub runners)
-          sudo apt-get install -y -qq ffmpeg jq bc curl python3
+          sudo apt-get install -y -qq ffmpeg jq bc curl python3 megatools
           
           # Install yt-dlp (nightly build for latest YouTube anti-bot patches)
           sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp 2>/dev/null || \
