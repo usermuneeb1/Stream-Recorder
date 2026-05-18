@@ -2,11 +2,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  🔴 MEGA Account Generator — Multi-Provider Edition                        ║
 # ║  Generates MEGA.nz accounts using multiple temp email services.            ║
-# ║  Based on: github.com/f-o/MEGA-Account-Generator (MIT License)            ║
-# ║  Adapted for Stream Recorder with multi-provider fallback:                 ║
-# ║    1. 1secmail  — 7 domains, simple API, most reliable                    ║
-# ║    2. Mail.tm   — Original provider, pymailtm library                      ║
-# ║    3. Mail.gw   — Mail.tm alternative, different domains                   ║
+# ║  Provider priority: Gmailnator → Mail.tm → Mail.gw → 1secmail            ║
+# ║                                                                            ║
+# ║  If Gmailnator email creation works but verification fails, it            ║
+# ║  automatically retries the FULL cycle with the next provider.             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import subprocess
@@ -15,52 +14,64 @@ import time
 import random
 import string
 import csv
-import threading
 import argparse
 from faker import Faker
 
-# Import our multi-provider email system
-from email_providers import get_temp_email, wait_for_verification, find_url
+from email_providers import (
+    get_temp_email, wait_for_verification, find_url,
+    GmailnatorProvider, MailTmProvider, MailGwProvider, OneSecMailProvider,
+    PROVIDERS
+)
 
 fake = Faker()
 
-# CSV file path — relative to this script's directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(SCRIPT_DIR, "accounts.csv")
 
+# Track providers that fail verification (skip them for remaining accounts)
+failed_providers = set()
+
 
 def get_random_string(length):
-    """Generate a random alphanumeric string."""
     letters = string.ascii_lowercase + string.ascii_uppercase + string.digits
     return "".join(random.choice(letters) for _ in range(length))
 
 
-class MegaAccount:
-    def __init__(self, name, password):
-        self.name = name
-        self.password = password
-        self.email = None
-        self.provider = None
-        self.verify_command = None
+def try_create_account(name, password, provider_classes=None):
+    """
+    Try the FULL cycle: create email → register MEGA → verify email.
+    If verification fails, returns False so caller can retry with next provider.
+    """
+    if provider_classes is None:
+        # Filter out providers that already failed verification
+        provider_classes = [p for p in PROVIDERS if p.name not in failed_providers]
+        if not provider_classes:
+            provider_classes = PROVIDERS  # reset if all failed
 
-    def register(self):
-        """Register a new MEGA account using a temp email from any provider."""
-        # Get temp email from best available provider
-        self.provider, self.email = get_temp_email()
+    for ProviderClass in provider_classes:
+        if ProviderClass.name in failed_providers:
+            print(f"⏭️ Skipping {ProviderClass.name} (verification failed earlier)")
+            continue
 
-        if not self.email:
-            print("❌ Could not get temp email from any provider")
-            return None
+        provider = ProviderClass()
+        print(f"📧 Trying {provider.name}...")
 
-        print(f"\r> [{self.email}]: Registering MEGA account...", end="\033[K", flush=True)
+        # Step 1: Create email
+        email = provider.create_email()
+        if not email:
+            print(f"❌ {provider.name} — could not create email, trying next...")
+            continue
 
-        # Register with MEGA using megatools
+        print(f"✅ Got email: {email} ({provider.name})")
+
+        # Step 2: Register with MEGA
+        print(f"> [{email}]: Registering MEGA account...")
         registration = subprocess.run(
             [
                 "megatools", "reg", "--scripted", "--register",
-                "--email", self.email,
-                "--name", self.name,
-                "--password", self.password,
+                "--email", email,
+                "--name", name,
+                "--password", password,
             ],
             universal_newlines=True,
             stdout=subprocess.PIPE,
@@ -68,48 +79,50 @@ class MegaAccount:
         )
 
         if registration.returncode != 0:
-            print(f"\r> [{self.email}]: megatools reg failed: {registration.stderr.strip()[:100]}", end="\033[K\n", flush=True)
-            return None
+            err = registration.stderr.strip()[:150]
+            print(f"> [{email}]: megatools reg failed: {err}")
+            continue
 
-        self.verify_command = registration.stdout
-        return self.email
+        verify_command = registration.stdout
+        print(f"> [{email}]: Registered. Waiting for verification email...")
 
-    def verify(self):
-        """Verify the MEGA account via email confirmation link."""
-        print(f"\r> [{self.email}]: Waiting for verification email via {self.provider.name}...", end="\033[K", flush=True)
-
-        # Wait for email using the provider that created it
+        # Step 3: Wait for verification email
+        # Use generous timeout and match ANY email (not just "verification")
+        timeout = 180 if provider.name == "Gmailnator" else 120
         email_body = wait_for_verification(
-            self.provider,
-            subject_contains="verification",
-            timeout=90
+            provider,
+            subject_contains="",  # match ANY email — don't filter by subject
+            timeout=timeout
         )
 
         if not email_body:
-            print(f"\r> [{self.email}]: No verification email received via {self.provider.name}", end="\033[K\n", flush=True)
-            return False
+            print(f"> [{email}]: ❌ No verification email via {provider.name} — marking as unreliable")
+            failed_providers.add(provider.name)
+            print(f"🔄 Retrying this account with next provider...")
+            continue
 
-        # Extract verification link
+        # Step 4: Extract verification link
         links = find_url(email_body)
         if not links:
-            print(f"\r> [{self.email}]: No verification link found in email", end="\033[K\n", flush=True)
-            return False
+            print(f"> [{email}]: No verification link found in email body")
+            print(f"  Email body preview: {email_body[:200]}")
+            failed_providers.add(provider.name)
+            continue
 
-        # Find the MEGA verification link
         mega_link = None
         for link in links:
             if 'mega' in link.lower():
                 mega_link = link
                 break
         if not mega_link:
-            mega_link = links[0]  # fallback to first link
+            mega_link = links[0]
 
-        self.verify_command = str(self.verify_command).replace("@LINK@", mega_link)
+        verify_command = str(verify_command).replace("@LINK@", mega_link)
 
-        # Run verification command
+        # Step 5: Run verification
         try:
             verification = subprocess.run(
-                self.verify_command,
+                verify_command,
                 shell=True,
                 check=True,
                 stdout=subprocess.PIPE,
@@ -118,42 +131,26 @@ class MegaAccount:
             )
 
             if "registered successfully!" in str(verification.stdout):
-                print(f"\r> [{self.email}] ✅ Successfully registered and verified via {self.provider.name}", end="\033[K", flush=True)
-                print(f"\n{self.email} - {self.password}")
+                print(f"> [{email}] ✅ Successfully registered and verified via {provider.name}")
+                print(f"  {email} — {password}")
 
-                # Save to CSV
                 with open(CSV_FILE, "a", newline='') as csvfile:
                     csvwriter = csv.writer(csvfile)
                     csvwriter.writerow([
-                        self.email,
-                        self.password,
-                        "-",           # Usage
-                        "-",           # Mail password (not applicable for all providers)
-                        "-",           # Mail ID
-                        self.provider.name  # Provider used
+                        email, password, "-", "-", "-", provider.name
                     ])
                 return True
             else:
-                print(f"\r> [{self.email}]: Verification command didn't confirm success", end="\033[K\n", flush=True)
+                print(f"> [{email}]: Verification command didn't confirm success")
+                print(f"  stdout: {verification.stdout[:200]}")
                 return False
 
         except subprocess.CalledProcessError as e:
-            print(f"\r> [{self.email}]: Verification command failed: {e}", end="\033[K\n", flush=True)
+            print(f"> [{email}]: Verification command failed: {e}")
             return False
 
-
-def new_account(password=None):
-    """Create and verify a single new MEGA account."""
-    if password is None:
-        password = get_random_string(random.randint(8, 14))
-
-    acc = MegaAccount(fake.name(), password)
-    email = acc.register()
-
-    if email:
-        acc.verify()
-    else:
-        print("⚠️ Skipping verification — registration failed")
+    print("❌ All providers exhausted for this account")
+    return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -161,27 +158,17 @@ def new_account(password=None):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 parser = argparse.ArgumentParser(description="Create New MEGA Accounts (Multi-Provider)")
-parser.add_argument(
-    "-n", "--number",
-    type=int, default=3,
-    help="Number of accounts to create (default: 3)",
-)
-parser.add_argument(
-    "-p", "--password",
-    type=str, default=None,
-    help="Password to use for all accounts (default: random per account)",
-)
+parser.add_argument("-n", "--number", type=int, default=3, help="Number of accounts to create")
+parser.add_argument("-p", "--password", type=str, default=None, help="Password for all accounts")
 args = parser.parse_args()
 
-
 if __name__ == "__main__":
-    # Ensure CSV file exists with correct headers
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, "w", newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(["Email", "MEGA Password", "Usage", "Mail.tm Password", "Mail.tm ID", "Purpose"])
 
-    # Validate CSV format
+    # Validate CSV
     with open(CSV_FILE) as csvfile:
         csvreader = csv.reader(csvfile)
         header = next(csvreader)
@@ -189,18 +176,28 @@ if __name__ == "__main__":
             print("CSV file is not in the correct format. Please use convert_csv.py to convert it.")
             exit(1)
 
+    provider_names = " → ".join([p.name for p in PROVIDERS])
+
     print(f"═══════════════════════════════════════")
     print(f"🔴 MEGA Account Generator — Multi-Provider")
     print(f"═══════════════════════════════════════")
     print(f"📊 Generating {args.number} accounts...")
-    print(f"📧 Email providers: 1secmail → Mail.tm → Mail.gw")
+    print(f"📧 Providers: {provider_names}")
+    print(f"🔄 Auto-fallback: if verification fails, retries with next provider")
     print(f"═══════════════════════════════════════")
 
+    success_count = 0
     for i in range(args.number):
         print(f"\n{'─'*40}")
         print(f"📦 Account {i+1}/{args.number}")
         print(f"{'─'*40}")
-        new_account(password=args.password)
+
+        password = args.password or get_random_string(random.randint(8, 14))
+        name = fake.name()
+
+        if try_create_account(name, password):
+            success_count += 1
+
         if i < args.number - 1:
             delay = random.randint(3, 8)
             print(f"\n⏳ Waiting {delay}s before next account...")
@@ -210,5 +207,7 @@ if __name__ == "__main__":
     total = 0
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE) as f:
-            total = sum(1 for _ in f) - 1  # minus header
-    print(f"✅ Done! {total} total accounts in {CSV_FILE}")
+            total = sum(1 for _ in f) - 1
+    print(f"✅ Done! {success_count}/{args.number} new accounts created")
+    print(f"📊 Total accounts in CSV: {total}")
+    print(f"✅ Accounts saved to {CSV_FILE}")

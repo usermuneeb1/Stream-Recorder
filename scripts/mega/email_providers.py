@@ -93,8 +93,8 @@ class GmailnatorProvider:
         print(f"  [{self.name}] All email types exhausted")
         return None
 
-    def wait_for_email(self, subject_contains="verify", timeout=120):
-        """Poll Gmailnator inbox for verification email."""
+    def wait_for_email(self, subject_contains="", timeout=180):
+        """Poll Gmailnator inbox for verification email with debug logging."""
         if not self.email or not self.api_key:
             return None
 
@@ -105,32 +105,45 @@ class GmailnatorProvider:
         }
 
         start = time.time()
+        poll_count = 0
         while time.time() - start < timeout:
+            poll_count += 1
+            elapsed = int(time.time() - start)
             try:
-                # List inbox messages
                 resp = requests.post(
                     f"{self.BASE_URL}/inbox/",
                     headers=headers,
-                    json={"email": self.email, "limit": 5},
+                    json={"email": self.email, "limit": 10},
                     timeout=15,
                 )
 
                 if resp.status_code == 200:
                     data = resp.json()
                     messages = data.get("messages", [])
+                    msg_count = data.get("message_count", len(messages))
+
+                    if poll_count <= 3 or poll_count % 5 == 0:
+                        print(f"  [{self.name}] Poll #{poll_count} ({elapsed}s) — {msg_count} messages found")
 
                     if messages:
-                        # Find the verification email
+                        # Show what we found
+                        for msg in messages:
+                            subj = msg.get("subject", "N/A")
+                            sender = msg.get("from", "N/A")
+                            print(f"  [{self.name}] 📨 From: {sender} | Subject: {subj}")
+
+                        # Pick the best message (MEGA verification)
                         target_msg = None
                         for msg in messages:
                             subj = msg.get("subject", "").lower()
-                            if "mega" in subj or "verify" in subj or "confirm" in subj:
+                            sender = msg.get("from", "").lower()
+                            if "mega" in subj or "mega" in sender or "verify" in subj or "confirm" in subj:
                                 target_msg = msg
                                 break
                         if not target_msg:
-                            target_msg = messages[0]  # fallback to first message
+                            target_msg = messages[0]
 
-                        # Read full message content
+                        # Read full message
                         msg_id = target_msg["id"]
                         msg_resp = requests.get(
                             f"{self.BASE_URL}/inbox/{msg_id}",
@@ -145,13 +158,30 @@ class GmailnatorProvider:
                             msg_data = msg_resp.json()
                             content = msg_data.get("content", "")
                             if content:
+                                print(f"  [{self.name}] ✅ Got email content ({len(content)} chars)")
                                 return content
+                            else:
+                                print(f"  [{self.name}] ⚠️ Message has no content field")
+                        else:
+                            print(f"  [{self.name}] ⚠️ Read message HTTP {msg_resp.status_code}")
+
+                elif resp.status_code == 429:
+                    print(f"  [{self.name}] ⚠️ Rate limited on inbox check — waiting 10s")
+                    time.sleep(10)
+                    continue
+                elif resp.status_code == 404:
+                    if poll_count <= 2:
+                        print(f"  [{self.name}] Inbox not ready yet (404) — waiting...")
+                else:
+                    if poll_count <= 3:
+                        print(f"  [{self.name}] Inbox HTTP {resp.status_code}: {resp.text[:100]}")
 
             except Exception as e:
-                print(f"  [{self.name}] Inbox check error: {e}")
+                print(f"  [{self.name}] Inbox error: {e}")
 
-            time.sleep(5)
+            time.sleep(8)  # Poll every 8s to conserve API calls
 
+        print(f"  [{self.name}] ⏰ Timeout after {poll_count} polls ({timeout}s)")
         return None
 
 
