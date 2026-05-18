@@ -39,6 +39,7 @@ on:
 
 env:
   GH_PAT: ${{ secrets.GH_PAT }}
+  RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
