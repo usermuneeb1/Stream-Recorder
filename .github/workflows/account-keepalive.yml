@@ -43,7 +43,6 @@ jobs:
           echo "🔴 MEGA.nz Keep-Alive"
           echo "═══════════════════════════════════════"
 
-          # Install megatools
           sudo apt-get install -y -qq megatools python3 2>/dev/null
 
           MEGA_OK=0
@@ -51,9 +50,7 @@ jobs:
 
           # Method 1: Sign into the main MEGA account (from secrets)
           if [[ -n "$MEGA_EMAIL" ]] && [[ -n "$MEGA_PASSWORD" ]]; then
-            cat > /tmp/.megarc << 'MEGARC'
-[Login]
-MEGARC
+            echo "[Login]" > /tmp/.megarc
             echo "Username = ${MEGA_EMAIL}" >> /tmp/.megarc
             echo "Password = ${MEGA_PASSWORD}" >> /tmp/.megarc
             chmod 600 /tmp/.megarc
@@ -81,7 +78,7 @@ MEGARC
             echo ""
             echo "📂 Signing into generated accounts (accounts.csv)..."
             pip3 install --quiet -r scripts/mega/requirements.txt 2>/dev/null || true
-            
+
             if python3 scripts/mega/signin_accounts.py; then
               GEN_SUCCESS=$(jq -r '.success' scripts/mega/signin_results.json 2>/dev/null || echo "0")
               GEN_TOTAL=$(jq -r '.total' scripts/mega/signin_results.json 2>/dev/null || echo "0")
@@ -119,20 +116,18 @@ MEGARC
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
           [[ -z "$WEBHOOK" ]] && exit 0
 
-          # Build status icons
           MEGA_ICON="⚠️ Skipped"
           [[ "$MEGA_STATUS" == "success" ]] && MEGA_ICON="✅ All Active ($MEGA_FILES accounts)"
           [[ "$MEGA_STATUS" == "partial" ]] && MEGA_ICON="⚠️ Partial ($MEGA_FILES accounts alive)"
           [[ "$MEGA_STATUS" == "failed" ]] && MEGA_ICON="❌ Failed"
 
-          # Overall color
-          COLOR=5763757  # green
+          COLOR=5763757
           if [[ "$MEGA_STATUS" == "failed" ]]; then
-            COLOR=15158332  # red
+            COLOR=15158332
           elif [[ "$MEGA_STATUS" == "partial" ]]; then
-            COLOR=16744448  # orange
+            COLOR=16744448
           elif [[ "$MEGA_STATUS" == "skipped" ]]; then
-            COLOR=16776960  # yellow
+            COLOR=16776960
           fi
 
           TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
