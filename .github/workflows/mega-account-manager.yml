@@ -4,7 +4,7 @@
 # ║    • Generates accounts with temporary Mail.tm emails                     ║
 # ║    • Auto-verifies via email link                                         ║
 # ║    • Signs into all accounts monthly to prevent deletion                  ║
-# ║  Accounts are stored encrypted in accounts.csv (committed to repo).       ║
+# ║  Accounts are stored in accounts.csv (committed to repo).                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "🔴 MEGA Account Manager"
@@ -18,8 +18,8 @@ on:
         required: true
         type: choice
         options:
-          - signin       # Sign into all accounts (keep-alive)
           - generate     # Generate new accounts
+          - signin       # Sign into all accounts (keep-alive)
           - both         # Generate + Sign in
       num_accounts:
         description: "Number of accounts to generate (only for generate/both)"
@@ -50,24 +50,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    permissions:
+      contents: write
+
     steps:
       # ─── 1. CHECKOUT ─────────────────────────────────────────────────────
       - name: "📥 Checkout Repository"
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_PAT }}
 
       # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
       - name: "📦 Install Dependencies"
         run: |
           echo "📦 Installing megatools & Python dependencies..."
           sudo apt-get update -qq
-          sudo apt-get install -y -qq megatools python3-pip
+          
+          # Install megatools (try apt first, then manual download)
+          if ! sudo apt-get install -y -qq megatools 2>/dev/null; then
+            echo "⚠️ apt install failed — trying manual megatools install..."
+            # Download megatools binary directly
+            wget -q "https://megatools.megous.com/builds/builds/megatools-1.11.1.20230212-linux-x86_64.tar.gz" -O /tmp/megatools.tar.gz 2>/dev/null || \
+            wget -q "https://xff.cz/megatools/builds/builds/megatools-1.11.1.20230212-linux-x86_64.tar.gz" -O /tmp/megatools.tar.gz 2>/dev/null
+            
+            if [[ -f /tmp/megatools.tar.gz ]]; then
+              cd /tmp && tar xzf megatools.tar.gz
+              sudo cp /tmp/megatools-*/megatools /usr/local/bin/ 2>/dev/null || \
+              sudo cp /tmp/megatools-*/mega* /usr/local/bin/ 2>/dev/null || true
+              cd $GITHUB_WORKSPACE
+            fi
+          fi
+          
+          # Install Python dependencies
           pip3 install --quiet -r scripts/mega/requirements.txt
           
-          # Verify
-          echo "megatools: $(megatools --version 2>&1 | head -1 || echo 'installed')"
+          # Verify installations
+          echo "──────────────────────────────────────"
+          echo "megatools: $(megatools --version 2>&1 | head -1 || echo 'NOT FOUND')"
+          which megatools || which megaput || echo "⚠️ megatools binary not in PATH"
           echo "python3: $(python3 --version)"
+          pip3 list 2>/dev/null | grep -E "pymailtm|faker|requests" || true
+          echo "──────────────────────────────────────"
 
       # ─── 3. GENERATE ACCOUNTS (if requested) ─────────────────────────────
       - name: "🔴 Generate MEGA Accounts"
@@ -88,16 +109,29 @@ jobs:
           [[ -n "$PASS" ]] && ARGS="$ARGS -p $PASS"
           
           echo "Generating $NUM accounts..."
+          echo "Working directory: $(pwd)"
+          echo "CSV location: scripts/mega/accounts.csv"
           
-          if python3 scripts/mega/generate_accounts.py $ARGS; then
+          # Run the generator with full output (no suppression)
+          python3 scripts/mega/generate_accounts.py $ARGS 2>&1
+          GEN_RC=$?
+          
+          if [[ $GEN_RC -eq 0 ]]; then
             echo "status=success" >> $GITHUB_OUTPUT
-            # Count accounts
             TOTAL=$(tail -n +2 scripts/mega/accounts.csv 2>/dev/null | wc -l)
             echo "total=$TOTAL" >> $GITHUB_OUTPUT
             echo "✅ Generation complete — $TOTAL total accounts"
+            echo ""
+            echo "📋 accounts.csv contents (emails only):"
+            tail -n +2 scripts/mega/accounts.csv 2>/dev/null | cut -d',' -f1 || true
           else
             echo "status=failed" >> $GITHUB_OUTPUT
-            echo "❌ Generation failed"
+            echo "❌ Generation failed with exit code: $GEN_RC"
+            echo ""
+            echo "Common causes:"
+            echo "  - Mail.tm may be temporarily down"
+            echo "  - megatools 'reg' command may be blocked"
+            echo "  - Rate limited by Mail.tm (wait 5 min and retry)"
           fi
 
       # ─── 4. SIGN IN TO ALL ACCOUNTS (keep-alive) ─────────────────────────
@@ -146,15 +180,13 @@ jobs:
           # Remove temp files
           rm -f scripts/mega/signin_results.json
           
-          # Check for changes
-          if git diff --quiet scripts/mega/accounts.csv 2>/dev/null && \
-             ! git ls-files --others --exclude-standard | grep -q 'scripts/mega/accounts.csv'; then
-            echo "📝 No account changes to commit"
+          # Check if accounts.csv exists and has changes
+          if [[ ! -f scripts/mega/accounts.csv ]]; then
+            echo "📝 No accounts.csv found — nothing to commit"
             exit 0
           fi
           
-          git config user.name "Stream Recorder Bot"
-          git config user.email "bot@stream-recorder.local"
+          # Check for any changes (new file or modified)
           git add scripts/mega/accounts.csv 2>/dev/null || true
           
           if git diff --cached --quiet; then
@@ -162,10 +194,19 @@ jobs:
             exit 0
           fi
           
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder.local"
+          
           TIMESTAMP=$(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')
           git commit -m "🔴 MEGA accounts updated — ${TIMESTAMP}"
+          
+          # Push with PAT if available, otherwise try default token
+          if [[ -n "${GH_PAT:-}" ]]; then
+            git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
+          
           git push
-          echo "✅ Account changes committed"
+          echo "✅ Account changes committed and pushed"
 
       # ─── 6. DISCORD NOTIFICATION ──────────────────────────────────────────
       - name: "📡 Send Discord Report"
@@ -189,7 +230,8 @@ jobs:
               DESC+="**🔴 Account Generation:** ✅ Success\n"
               DESC+="**📊 Total Accounts:** ${GEN_TOTAL}\n\n"
             else
-              DESC+="**🔴 Account Generation:** ❌ Failed\n\n"
+              DESC+="**🔴 Account Generation:** ❌ Failed\n"
+              DESC+="Check workflow logs for details.\n\n"
             fi
           fi
           
