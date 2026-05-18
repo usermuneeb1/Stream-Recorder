@@ -198,14 +198,25 @@ jobs:
                 continue
               fi
 
+              # Make filename unique by prepending identifier (avoids "File already exists" error)
+              UNIQUE_NAME="${identifier}_${filename}"
+              UPLOAD_FILE="/tmp/transfer/${UNIQUE_NAME}"
+              mv "$LOCAL_FILE" "$UPLOAD_FILE" 2>/dev/null || UPLOAD_FILE="$LOCAL_FILE"
+
               # Upload to MEGA
-              echo "  ⬆️ Uploading to MEGA: $FOLDER/$filename"
-              if megaput --config /tmp/.megarc --path "$FOLDER/" "$LOCAL_FILE" 2>&1; then
-                echo "  ✅ Uploaded: $filename"
+              echo "  ⬆️ Uploading to MEGA: $FOLDER/$UNIQUE_NAME"
+              if megaput --config /tmp/.megarc --no-ask-password --path "$FOLDER/" "$UPLOAD_FILE" 2>&1; then
+                echo "  ✅ Uploaded: $UNIQUE_NAME"
                 SUCCESS=$((SUCCESS + 1))
               else
-                echo "  ❌ MEGA upload failed"
-                FAILED=$((FAILED + 1))
+                echo "  ⚠️ Retrying without rename..."
+                if megaput --config /tmp/.megarc --no-ask-password --path "$FOLDER/" "$UPLOAD_FILE" 2>&1; then
+                  echo "  ✅ Uploaded on retry"
+                  SUCCESS=$((SUCCESS + 1))
+                else
+                  echo "  ❌ MEGA upload failed"
+                  FAILED=$((FAILED + 1))
+                fi
               fi
 
               # Cleanup to save disk space

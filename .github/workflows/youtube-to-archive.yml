@@ -1,9 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  📺 YouTube Channel → Archive.org                                          ║
 # ║  Downloads entire YouTube channels/playlists and archives them.            ║
-# ║  Each playlist → separate Archive.org item (like a folder).               ║
-# ║  Full metadata: channel name, video title, description, date.              ║
-# ║  NOT anonymous — this is for public archival/preservation.                 ║
+# ║  Each playlist → separate Archive.org group. Full metadata.               ║
+# ║  Downloads ONE video at a time → upload → delete → next (saves disk).     ║
+# ║  Resumable: re-run and it skips already-archived videos.                   ║
+# ║  Requires YOUTUBE_COOKIES secret for bot bypass.                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "📺 YouTube → Archive.org"
@@ -47,6 +48,11 @@ on:
         required: false
         type: boolean
         default: true
+      start_from:
+        description: "Start from video # (skip first N-1 videos, for resuming)"
+        required: false
+        default: "1"
+        type: string
 
 env:
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
@@ -54,6 +60,7 @@ env:
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
   TZ: Asia/Karachi
 
 jobs:
@@ -70,22 +77,53 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq aria2 ffmpeg python3-pip
-          pip3 install -q yt-dlp 2>/dev/null || pip install -q yt-dlp
-          echo "✅ Tools: yt-dlp + ffmpeg + aria2 + jq"
+
+          # Install deno (JS runtime required by yt-dlp for YouTube)
+          curl -fsSL https://deno.land/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.deno/bin:$PATH"
+
+          # Install latest yt-dlp
+          pip3 install -q --upgrade yt-dlp 2>/dev/null || pip install -q --upgrade yt-dlp
+
+          echo "✅ Tools: yt-dlp + deno + ffmpeg + jq"
+          yt-dlp --version
+          deno --version || echo "⚠️ deno not in path yet"
+
+      - name: "🍪 Setup YouTube Cookies"
+        run: |
+          if [[ -n "$YOUTUBE_COOKIES" ]]; then
+            echo "$YOUTUBE_COOKIES" > /tmp/cookies.txt
+            echo "✅ YouTube cookies loaded ($(wc -l < /tmp/cookies.txt) lines)"
+          else
+            echo "⚠️ No YOUTUBE_COOKIES secret — YouTube may block downloads"
+            echo "   To fix: export cookies from browser → add as YOUTUBE_COOKIES secret"
+            touch /tmp/cookies.txt
+          fi
 
       - name: "📺 Process YouTube Content"
         id: process
         run: |
+          export PATH="$HOME/.deno/bin:$PATH"
+
           URL="${{ github.event.inputs.url }}"
           MODE="${{ github.event.inputs.mode }}"
           CHANNEL="${{ github.event.inputs.channel_name }}"
           QUALITY="${{ github.event.inputs.quality }}"
           MAX_VIDEOS="${{ github.event.inputs.max_videos }}"
           SKIP_EXISTING="${{ github.event.inputs.skip_existing }}"
+          START_FROM="${{ github.event.inputs.start_from }}"
           ACCESS="${ARCHIVE_ACCESS_KEY}"
           SECRET="${ARCHIVE_SECRET_KEY}"
 
           [[ "$MAX_VIDEOS" == "0" ]] && MAX_VIDEOS=""
+          [[ -z "$START_FROM" ]] && START_FROM=1
+
+          # Cookie args
+          COOKIE_ARGS=""
+          if [[ -s /tmp/cookies.txt ]]; then
+            COOKIE_ARGS="--cookies /tmp/cookies.txt"
+          fi
 
           # Quality format
           case "$QUALITY" in
@@ -100,19 +138,19 @@ jobs:
           echo "  URL: $URL"
           echo "  Mode: $MODE"
           echo "  Quality: $QUALITY"
+          echo "  Start from: #$START_FROM"
+          echo "  Cookies: $(if [[ -s /tmp/cookies.txt ]]; then echo '✅ loaded'; else echo '❌ none'; fi)"
           echo "═══════════════════════════════════════"
 
           # ─── Step 1: Get channel/playlist info ───
           echo ""
           echo "🔍 Scanning YouTube content..."
 
-          # Get flat playlist info (no download)
-          yt-dlp --flat-playlist -J "$URL" 2>/dev/null > /tmp/yt_info.json || {
+          yt-dlp --flat-playlist -J $COOKIE_ARGS "$URL" 2>/dev/null > /tmp/yt_info.json || {
             echo "❌ Failed to fetch YouTube info"
             exit 1
           }
 
-          # Check if it's a channel (has multiple playlists) or single playlist
           TYPE=$(python3 -c "
           import json
           with open('/tmp/yt_info.json') as f:
@@ -126,47 +164,35 @@ jobs:
 
           IFS='|' read -r YT_TYPE YT_TITLE YT_UPLOADER ENTRY_COUNT <<< "$TYPE"
 
-          # Use provided channel name or auto-detect
           [[ -z "$CHANNEL" ]] && CHANNEL="$YT_UPLOADER"
           [[ -z "$CHANNEL" ]] && CHANNEL="$YT_TITLE"
 
-          # Create safe prefix for Archive.org identifiers
           SAFE_CHANNEL=$(echo "$CHANNEL" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-30)
 
           echo ""
           echo "📺 Channel: $CHANNEL"
           echo "📋 Type: $YT_TYPE"
-          echo "📊 Videos/Playlists: $ENTRY_COUNT"
+          echo "📊 Entries: $ENTRY_COUNT"
           echo "🏷️ Archive prefix: $SAFE_CHANNEL"
-          echo ""
 
-          # ─── Step 2: Extract video list with playlist info ───
-          echo "📋 Building video list..."
-
+          # ─── Step 2: Extract video list ───
           python3 << 'PYEOF' > /tmp/video_list.tsv
-          import json, sys
-
+          import json
           with open('/tmp/yt_info.json') as f:
               data = json.load(f)
-
           playlist_title = data.get('title', 'Uploads')
-          entries = data.get('entries', [])
-
-          for entry in entries:
+          for entry in data.get('entries', []):
               if not entry:
                   continue
-              # Check if this entry is itself a playlist (channel page with playlists)
               if entry.get('_type') == 'playlist':
-                  # This is a sub-playlist — we'll handle it as a group
                   vid_id = entry.get('id', '')
                   title = entry.get('title', 'Unknown Playlist')
                   url = entry.get('url', entry.get('webpage_url', ''))
                   print(f"PLAYLIST\t{vid_id}\t{title}\t{url}")
               else:
-                  # This is a video entry
                   vid_id = entry.get('id', entry.get('url', ''))
                   title = entry.get('title', 'Unknown')
-                  duration = entry.get('duration', 0)
+                  duration = entry.get('duration', 0) or 0
                   print(f"VIDEO\t{vid_id}\t{title}\t{playlist_title}\t{duration}")
           PYEOF
 
@@ -183,26 +209,22 @@ jobs:
             echo "═══════════════════════════════════════"
 
             if [[ "$PLAYLIST_COUNT" -gt 0 ]]; then
-              echo ""
               echo "📂 Sub-Playlists:"
               grep "^PLAYLIST" /tmp/video_list.tsv | while IFS=$'\t' read -r _ pid ptitle purl; do
-                echo "  📁 $ptitle ($purl)"
+                echo "  📁 $ptitle"
               done
             fi
 
             if [[ "$VIDEO_COUNT" -gt 0 ]]; then
-              echo ""
               echo "🎬 Videos:"
-              COUNT=0
-              grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vplaylist vdur; do
-                COUNT=$((COUNT + 1))
-                DUR_MIN=$((vdur / 60))
-                echo "  $COUNT. [$vplaylist] $vtitle (${DUR_MIN}min) [ID: $vid]"
+              C=0
+              grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vpl vdur; do
+                C=$((C + 1))
+                echo "  $C. $vtitle [ID: $vid]"
               done
             fi
 
-            echo ""
-            echo "total=$VIDEO_COUNT" >> $GITHUB_OUTPUT
+            echo "total=$((VIDEO_COUNT + PLAYLIST_COUNT))" >> $GITHUB_OUTPUT
             echo "success=0" >> $GITHUB_OUTPUT
             echo "failed=0" >> $GITHUB_OUTPUT
             echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
@@ -212,7 +234,8 @@ jobs:
           # ─── UPLOAD MODE ───
           echo ""
           echo "═══════════════════════════════════════"
-          echo "🚀 UPLOAD MODE — Downloading & Archiving"
+          echo "🚀 UPLOAD MODE — Download → Upload → Delete → Next"
+          echo "  💾 Disk: ONE video at a time (max ~2GB used)"
           echo "═══════════════════════════════════════"
 
           SUCCESS=0
@@ -220,7 +243,102 @@ jobs:
           SKIPPED=0
           TOTAL=0
 
-          # Process sub-playlists first (if channel URL)
+          # ─── Function: download & upload one video ───
+          process_video() {
+            local vid="$1" vtitle="$2" vplaylist="$3" archive_prefix="$4"
+
+            TOTAL=$((TOTAL + 1))
+
+            # Skip if before start_from
+            if [[ "$TOTAL" -lt "$START_FROM" ]]; then
+              echo "  ⏭️ Skipping (before start_from=$START_FROM)"
+              SKIPPED=$((SKIPPED + 1))
+              return
+            fi
+
+            ITEM_ID="${archive_prefix}-${vid}"
+
+            # Check if already on Archive.org
+            if [[ "$SKIP_EXISTING" == "true" ]]; then
+              EXISTS=$(curl -s -o /dev/null -w '%{http_code}' "https://archive.org/metadata/$ITEM_ID" 2>/dev/null)
+              if [[ "$EXISTS" == "200" ]]; then
+                echo "  ⏭️ Already on Archive.org — skipping"
+                SKIPPED=$((SKIPPED + 1))
+                return
+              fi
+            fi
+
+            # Download (one video, then delete after upload)
+            mkdir -p /tmp/transfer
+            rm -rf /tmp/transfer/*
+
+            echo "  ⬇️ Downloading..."
+            if yt-dlp \
+              -f "$FORMAT" \
+              --merge-output-format mp4 \
+              -o "/tmp/transfer/%(title).80s [%(id)s].%(ext)s" \
+              --retries 5 \
+              --socket-timeout 30 \
+              --no-playlist \
+              $COOKIE_ARGS \
+              "https://www.youtube.com/watch?v=${vid}" 2>&1; then
+
+              FILE=$(find /tmp/transfer -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.webm" \) | head -1)
+
+              if [[ -z "$FILE" ]]; then
+                echo "  ❌ No file after download"
+                FAILED=$((FAILED + 1))
+                rm -rf /tmp/transfer/*
+                return
+              fi
+
+              FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
+              SIZE_MB=$((FILESIZE / 1024 / 1024))
+              SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._\[\]-]/-/g')
+              DATE_STR=$(date '+%Y-%m-%d')
+
+              echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
+
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+                --max-time 7200 \
+                -H "authorization: LOW ${ACCESS}:${SECRET}" \
+                -H "x-archive-auto-make-bucket: 1" \
+                -H "x-archive-meta-title: ${vtitle}" \
+                -H "x-archive-meta-creator: ${CHANNEL}" \
+                -H "x-archive-meta-date: ${DATE_STR}" \
+                -H "x-archive-meta-description: ${vtitle} by ${CHANNEL}. Playlist: ${vplaylist}." \
+                -H "x-archive-meta-mediatype: movies" \
+                -H "x-archive-meta-collection: opensource_movies" \
+                -H "x-archive-meta-subject: youtube;${CHANNEL// /+};${vplaylist// /+};archive" \
+                -H "x-archive-meta-language: eng" \
+                -H "Content-Type: video/mp4" \
+                --upload-file "$FILE" \
+                "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}")
+
+              if [[ "$HTTP_CODE" =~ ^2 ]]; then
+                echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
+                SUCCESS=$((SUCCESS + 1))
+              else
+                echo "  ❌ Archive.org HTTP $HTTP_CODE"
+                FAILED=$((FAILED + 1))
+              fi
+            else
+              echo "  ❌ Download failed"
+              FAILED=$((FAILED + 1))
+            fi
+
+            # CRITICAL: Delete video to save disk space
+            rm -rf /tmp/transfer/*
+            echo "  🗑️ Cleaned up disk"
+
+            # Show remaining disk
+            DISK_FREE=$(df -h /tmp | tail -1 | awk '{print $4}')
+            echo "  💾 Disk free: $DISK_FREE"
+
+            sleep 2
+          }
+
+          # ─── Process sub-playlists (channel URL) ───
           if [[ "$PLAYLIST_COUNT" -gt 0 ]]; then
             echo ""
             echo "📂 Processing $PLAYLIST_COUNT playlists..."
@@ -231,11 +349,13 @@ jobs:
               echo "📁 Playlist: $ptitle"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-              # Get videos in this playlist
               PLAYLIST_ARGS=""
               [[ -n "$MAX_VIDEOS" ]] && PLAYLIST_ARGS="--playlist-end $MAX_VIDEOS"
 
-              yt-dlp --flat-playlist -J $PLAYLIST_ARGS "$purl" 2>/dev/null > /tmp/sub_playlist.json || continue
+              yt-dlp --flat-playlist -J $PLAYLIST_ARGS $COOKIE_ARGS "$purl" 2>/dev/null > /tmp/sub_playlist.json || {
+                echo "  ⚠️ Could not fetch playlist — skipping"
+                continue
+              }
 
               python3 << 'SUBEOF' > /tmp/sub_videos.tsv
           import json
@@ -244,119 +364,45 @@ jobs:
           pl_title = data.get('title', 'Unknown')
           for e in data.get('entries', []):
               if e and e.get('id'):
-                  print(f"{e['id']}\t{e.get('title','Unknown')}\t{pl_title}\t{e.get('duration',0)}")
+                  dur = e.get('duration', 0) or 0
+                  print(f"{e['id']}\t{e.get('title','Unknown')}\t{pl_title}\t{dur}")
           SUBEOF
 
               SUB_COUNT=$(wc -l < /tmp/sub_videos.tsv)
               echo "  📊 $SUB_COUNT videos in playlist"
 
-              # Safe playlist name for Archive.org
               SAFE_PLAYLIST=$(echo "$ptitle" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
-              ARCHIVE_ID="${SAFE_CHANNEL}-${SAFE_PLAYLIST}"
+              ARCHIVE_PREFIX="${SAFE_CHANNEL}-${SAFE_PLAYLIST}"
 
               VCOUNT=0
               while IFS=$'\t' read -r vid vtitle vplaylist vdur; do
                 [[ -z "$vid" ]] && continue
                 VCOUNT=$((VCOUNT + 1))
-                TOTAL=$((TOTAL + 1))
 
                 echo ""
                 echo "  ──────────────────────────────"
                 echo "  🎬 [$VCOUNT/$SUB_COUNT] $vtitle"
 
-                # Check if already archived
-                if [[ "$SKIP_EXISTING" == "true" ]]; then
-                  CHECK_ID="${ARCHIVE_ID}-${vid}"
-                  EXISTS=$(curl -s -o /dev/null -w '%{http_code}' "https://archive.org/metadata/$CHECK_ID" 2>/dev/null)
-                  if [[ "$EXISTS" == "200" ]]; then
-                    echo "  ⏭️ Already archived — skipping"
-                    SKIPPED=$((SKIPPED + 1))
-                    continue
-                  fi
-                fi
-
-                # Download video
-                mkdir -p /tmp/transfer
-                rm -f /tmp/transfer/*
-
-                if yt-dlp \
-                  -f "$FORMAT" \
-                  --merge-output-format mp4 \
-                  -o "/tmp/transfer/%(title).80s.%(ext)s" \
-                  --retries 3 \
-                  --socket-timeout 30 \
-                  "https://www.youtube.com/watch?v=${vid}" 2>&1; then
-
-                  FILE=$(find /tmp/transfer -name "*.mp4" -o -name "*.mkv" -o -name "*.webm" | head -1)
-
-                  if [[ -z "$FILE" ]]; then
-                    echo "  ❌ No file after download"
-                    FAILED=$((FAILED + 1))
-                    continue
-                  fi
-
-                  FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
-                  SIZE_MB=$((FILESIZE / 1024 / 1024))
-                  SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._-]/-/g')
-                  ITEM_ID="${ARCHIVE_ID}-${vid}"
-                  DATE_STR=$(date '+%Y-%m-%d')
-
-                  echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
-                  echo "     Item: $ITEM_ID"
-
-                  HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
-                    --max-time 7200 \
-                    -H "authorization: LOW ${ACCESS}:${SECRET}" \
-                    -H "x-archive-auto-make-bucket: 1" \
-                    -H "x-archive-meta-title: ${vtitle}" \
-                    -H "x-archive-meta-creator: ${CHANNEL}" \
-                    -H "x-archive-meta-date: ${DATE_STR}" \
-                    -H "x-archive-meta-description: ${vtitle} by ${CHANNEL}. Playlist: ${vplaylist}." \
-                    -H "x-archive-meta-mediatype: movies" \
-                    -H "x-archive-meta-collection: opensource_movies" \
-                    -H "x-archive-meta-subject: youtube;${CHANNEL// /+};${SAFE_PLAYLIST};archive" \
-                    -H "x-archive-meta-language: eng" \
-                    -H "Content-Type: video/mp4" \
-                    --upload-file "$FILE" \
-                    "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}")
-
-                  if [[ "$HTTP_CODE" =~ ^2 ]]; then
-                    echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
-                    SUCCESS=$((SUCCESS + 1))
-                  else
-                    echo "  ❌ Archive.org HTTP $HTTP_CODE"
-                    FAILED=$((FAILED + 1))
-                  fi
-                else
-                  echo "  ❌ Download failed"
-                  FAILED=$((FAILED + 1))
-                fi
-
-                # Cleanup
-                rm -rf /tmp/transfer/*
-                sleep 2
+                process_video "$vid" "$vtitle" "$vplaylist" "$ARCHIVE_PREFIX"
 
               done < /tmp/sub_videos.tsv
 
             done
           fi
 
-          # Process direct videos (if playlist URL, not channel)
+          # ─── Process direct videos (playlist URL) ───
           if [[ "$VIDEO_COUNT" -gt 0 ]] && [[ "$PLAYLIST_COUNT" -eq 0 ]]; then
             echo ""
             echo "🎬 Processing $VIDEO_COUNT videos..."
 
             SAFE_PLAYLIST=$(echo "$YT_TITLE" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
-            ARCHIVE_ID="${SAFE_CHANNEL}-${SAFE_PLAYLIST}"
+            ARCHIVE_PREFIX="${SAFE_CHANNEL}-${SAFE_PLAYLIST}"
 
             VCOUNT=0
-            LIMIT_COUNT=0
             grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vplaylist vdur; do
               [[ -z "$vid" ]] && continue
               VCOUNT=$((VCOUNT + 1))
-              TOTAL=$((TOTAL + 1))
 
-              # Apply max_videos limit
               if [[ -n "$MAX_VIDEOS" ]] && [[ "$VCOUNT" -gt "$MAX_VIDEOS" ]]; then
                 break
               fi
@@ -365,75 +411,7 @@ jobs:
               echo "  ──────────────────────────────"
               echo "  🎬 [$VCOUNT/$VIDEO_COUNT] $vtitle"
 
-              # Check if already archived
-              if [[ "$SKIP_EXISTING" == "true" ]]; then
-                CHECK_ID="${ARCHIVE_ID}-${vid}"
-                EXISTS=$(curl -s -o /dev/null -w '%{http_code}' "https://archive.org/metadata/$CHECK_ID" 2>/dev/null)
-                if [[ "$EXISTS" == "200" ]]; then
-                  echo "  ⏭️ Already archived — skipping"
-                  SKIPPED=$((SKIPPED + 1))
-                  continue
-                fi
-              fi
-
-              # Download
-              mkdir -p /tmp/transfer
-              rm -f /tmp/transfer/*
-
-              if yt-dlp \
-                -f "$FORMAT" \
-                --merge-output-format mp4 \
-                -o "/tmp/transfer/%(title).80s.%(ext)s" \
-                --retries 3 \
-                --socket-timeout 30 \
-                "https://www.youtube.com/watch?v=${vid}" 2>&1; then
-
-                FILE=$(find /tmp/transfer -name "*.mp4" -o -name "*.mkv" -o -name "*.webm" | head -1)
-
-                if [[ -z "$FILE" ]]; then
-                  echo "  ❌ No file after download"
-                  FAILED=$((FAILED + 1))
-                  continue
-                fi
-
-                FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
-                SIZE_MB=$((FILESIZE / 1024 / 1024))
-                SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._-]/-/g')
-                ITEM_ID="${ARCHIVE_ID}-${vid}"
-                DATE_STR=$(date '+%Y-%m-%d')
-
-                echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
-
-                HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
-                  --max-time 7200 \
-                  -H "authorization: LOW ${ACCESS}:${SECRET}" \
-                  -H "x-archive-auto-make-bucket: 1" \
-                  -H "x-archive-meta-title: ${vtitle}" \
-                  -H "x-archive-meta-creator: ${CHANNEL}" \
-                  -H "x-archive-meta-date: ${DATE_STR}" \
-                  -H "x-archive-meta-description: ${vtitle} by ${CHANNEL}. Playlist: ${vplaylist}." \
-                  -H "x-archive-meta-mediatype: movies" \
-                  -H "x-archive-meta-collection: opensource_movies" \
-                  -H "x-archive-meta-subject: youtube;${CHANNEL// /+};${SAFE_PLAYLIST};archive" \
-                  -H "x-archive-meta-language: eng" \
-                  -H "Content-Type: video/mp4" \
-                  --upload-file "$FILE" \
-                  "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}")
-
-                if [[ "$HTTP_CODE" =~ ^2 ]]; then
-                  echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
-                  SUCCESS=$((SUCCESS + 1))
-                else
-                  echo "  ❌ Archive.org HTTP $HTTP_CODE"
-                  FAILED=$((FAILED + 1))
-                fi
-              else
-                echo "  ❌ Download failed"
-                FAILED=$((FAILED + 1))
-              fi
-
-              rm -rf /tmp/transfer/*
-              sleep 2
+              process_video "$vid" "$vtitle" "$vplaylist" "$ARCHIVE_PREFIX"
 
             done
           fi
@@ -446,12 +424,23 @@ jobs:
           echo "  ⏭️ Skipped:  $SKIPPED"
           echo "  📊 Total:    $TOTAL"
           echo "═══════════════════════════════════════"
+          echo ""
+          if [[ "$FAILED" -gt 0 ]]; then
+            RESUME=$((TOTAL - FAILED + 1))
+            echo "💡 To resume: re-run with start_from=$RESUME and skip_existing=true"
+          fi
 
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
           echo "success=$SUCCESS" >> $GITHUB_OUTPUT
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
           echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+
+      - name: "🧹 Cleanup"
+        if: always()
+        run: |
+          rm -f /tmp/cookies.txt
+          rm -rf /tmp/transfer
 
       - name: "📡 Send Discord Report"
         if: always()
@@ -475,9 +464,7 @@ jobs:
           FIELDS=$(echo "$FIELDS" | jq --arg v "${CHANNEL:-Unknown}" '. + [{"name":"📺 Channel","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "$MODE" '. + [{"name":"⚙️ Mode","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "${{ github.event.inputs.quality }}" '. + [{"name":"🎥 Quality","value":$v,"inline":true}]')
-
           FIELDS=$(echo "$FIELDS" | jq '. + [{"name":"\u200b","value":"\u200b","inline":false}]')
-
           FIELDS=$(echo "$FIELDS" | jq --arg v "${SUCCESS:-0}" '. + [{"name":"✅ Uploaded","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "${FAILED:-0}" '. + [{"name":"❌ Failed","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "${SKIPPED:-0}" '. + [{"name":"⏭️ Skipped","value":$v,"inline":true}]')
@@ -496,7 +483,7 @@ jobs:
               avatar_url: $avatar,
               embeds: [{
                 title: "📺 YouTube → Archive.org Complete",
-                description: "> YouTube channel/playlist archived to Archive.org\n> with full metadata, organized by playlist.",
+                description: "> YouTube channel/playlist archived to Archive.org\n> One video at a time — disk safe. Resumable.",
                 color: $color,
                 fields: $fields,
                 footer: { text: "📺 YouTube Channel Archiver" },
