@@ -24,7 +24,7 @@ on:
       num_accounts:
         description: "Number of accounts to generate (only for generate/both)"
         required: false
-        default: "3"
+        default: "10"
         type: string
       account_password:
         description: "Password for new accounts (leave empty for random)"

@@ -261,11 +261,12 @@ class MailGwProvider:
 #  MULTI-PROVIDER MANAGER — Tries each provider with automatic fallback
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Default provider order (can be overridden)
+# Default provider order — Mail.tm first because MEGA blocks most disposable domains
+# but Mail.tm's domains (like wshu.net) are not on MEGA's blocklist.
 PROVIDERS = [
-    OneSecMailProvider,   # Try 1secmail first (most reliable, 7 domains, no library)
-    MailTmProvider,       # Then Mail.tm (original, needs pymailtm)
-    MailGwProvider,       # Then Mail.gw (Mail.tm alternative)
+    MailTmProvider,       # Mail.tm first (proven to work with MEGA registration)
+    MailGwProvider,       # Mail.gw second (same API, different domains)
+    OneSecMailProvider,   # 1secmail last (MEGA may block these domains)
 ]
 
 
