@@ -21,7 +21,7 @@ on:
       archive_query:
         description: "Archive.org search query (e.g. 'identifier:tml-*' or 'identifier:pmb-*')"
         required: false
-        default: "identifier:tml-* OR identifier:pmb-*"
+        default: "identifier:tml-2026-*"
         type: string
       mega_folder:
         description: "MEGA folder to upload to (e.g. /Root/Archive)"
