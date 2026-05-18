@@ -1,64 +1,32 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔴 MEGA Account Generator                                                 ║
-# ║  Generates MEGA.nz accounts using temporary Mail.tm emails.                ║
+# ║  🔴 MEGA Account Generator — Multi-Provider Edition                        ║
+# ║  Generates MEGA.nz accounts using multiple temp email services.            ║
 # ║  Based on: github.com/f-o/MEGA-Account-Generator (MIT License)            ║
-# ║  Adapted for Stream Recorder pipeline automation.                          ║
+# ║  Adapted for Stream Recorder with multi-provider fallback:                 ║
+# ║    1. 1secmail  — 7 domains, simple API, most reliable                    ║
+# ║    2. Mail.tm   — Original provider, pymailtm library                      ║
+# ║    3. Mail.gw   — Mail.tm alternative, different domains                   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-import requests
 import subprocess
 import os
 import time
-import re
 import random
 import string
 import csv
 import threading
 import argparse
-import pymailtm
-from pymailtm.pymailtm import CouldNotGetAccountException, CouldNotGetMessagesException
 from faker import Faker
+
+# Import our multi-provider email system
+from email_providers import get_temp_email, wait_for_verification, find_url
+
 fake = Faker()
 
 # CSV file path — relative to this script's directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(SCRIPT_DIR, "accounts.csv")
-
-
-def check_limit(value):
-    """Validate thread count is ≤ 8 to avoid Mail.tm rate limits."""
-    ivalue = int(value)
-    if ivalue <= 8:
-        return ivalue
-    else:
-        raise argparse.ArgumentTypeError("You cannot use more than 8 threads.")
-
-
-parser = argparse.ArgumentParser(description="Create New MEGA Accounts")
-parser.add_argument(
-    "-n", "--number",
-    type=int, default=3,
-    help="Number of accounts to create (default: 3)",
-)
-parser.add_argument(
-    "-t", "--threads",
-    type=check_limit, default=None,
-    help="Number of threads for concurrent creation (max 8)",
-)
-parser.add_argument(
-    "-p", "--password",
-    type=str, default=None,
-    help="Password to use for all accounts (default: random per account)",
-)
-args = parser.parse_args()
-
-
-def find_url(text):
-    """Extract URLs from text."""
-    regex = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»""'']))"
-    url = re.findall(regex, text)
-    return [x[0] for x in url]
 
 
 def get_random_string(length):
@@ -72,54 +40,21 @@ class MegaAccount:
         self.name = name
         self.password = password
         self.email = None
-        self.email_id = None
-        self.email_password = None
+        self.provider = None
         self.verify_command = None
 
-    def generate_mail(self):
-        """Generate a temporary Mail.tm account for verification."""
-        for i in range(5):
-            try:
-                mail = pymailtm.MailTm()
-                acc = mail.get_account()
-            except CouldNotGetAccountException:
-                print(f"\r> Could not get new Mail.tm account. Retrying ({i+1} of 5)...", end="\n")
-                sleep_output = ""
-                for j in range(random.randint(8, 15)):
-                    sleep_output += ". "
-                    print("\r" + sleep_output, end="\033[K", flush=True)
-                    time.sleep(1)
-            else:
-                break
-        else:
-            print("\nCould not get account. You are most likely blocked from Mail.tm.")
-            print("Please wait 5 minutes and try again with fewer accounts/threads.")
-            exit(1)
-
-        self.email = acc.address
-        self.email_id = acc.id_
-        self.email_password = acc.password
-
-    def get_mail(self):
-        """Fetch the latest email from the Mail.tm account."""
-        while True:
-            try:
-                mail = pymailtm.Account(self.email_id, self.email, self.email_password)
-                messages = mail.get_messages()
-                break
-            except (CouldNotGetAccountException, CouldNotGetMessagesException):
-                print("> Could not get latest email. Retrying...")
-                time.sleep(random.randint(5, 15))
-        if len(messages) == 0:
-            return None
-        return messages[0]
-
     def register(self):
-        """Register a new MEGA account using megatools."""
-        self.generate_mail()
+        """Register a new MEGA account using a temp email from any provider."""
+        # Get temp email from best available provider
+        self.provider, self.email = get_temp_email()
 
-        print(f"\r> [{self.email}]: Registering account...", end="\033[K", flush=True)
+        if not self.email:
+            print("❌ Could not get temp email from any provider")
+            return None
 
+        print(f"\r> [{self.email}]: Registering MEGA account...", end="\033[K", flush=True)
+
+        # Register with MEGA using megatools
         registration = subprocess.run(
             [
                 "megatools", "reg", "--scripted", "--register",
@@ -132,63 +67,111 @@ class MegaAccount:
             stderr=subprocess.PIPE,
         )
 
+        if registration.returncode != 0:
+            print(f"\r> [{self.email}]: megatools reg failed: {registration.stderr.strip()[:100]}", end="\033[K\n", flush=True)
+            return None
+
         self.verify_command = registration.stdout
         return self.email
 
     def verify(self):
         """Verify the MEGA account via email confirmation link."""
-        confirm_message = None
-        for i in range(5):
-            confirm_message = self.get_mail()
-            if confirm_message is not None and "verification required".lower() in confirm_message.subject.lower():
-                confirm_message = self.get_mail()
-                break
-            print(f"\r> [{self.email}]: Waiting for verification email... ({i+1} of 5)", end="\033[K", flush=True)
-            time.sleep(5)
+        print(f"\r> [{self.email}]: Waiting for verification email via {self.provider.name}...", end="\033[K", flush=True)
 
-        if confirm_message is None:
-            print(f"\r> [{self.email}]: Failed to verify account. No verification email received.", end="\033[K", flush=True)
-            return False
-
-        links = find_url(confirm_message.text)
-        if not links:
-            print(f"\r> [{self.email}]: No verification link found in email.", end="\033[K", flush=True)
-            return False
-
-        self.verify_command = str(self.verify_command).replace("@LINK@", links[0])
-
-        verification = subprocess.run(
-            self.verify_command,
-            shell=True,
-            check=True,
-            stdout=subprocess.PIPE,
-            universal_newlines=True,
+        # Wait for email using the provider that created it
+        email_body = wait_for_verification(
+            self.provider,
+            subject_contains="verification",
+            timeout=90
         )
 
-        if "registered successfully!" in str(verification.stdout):
-            print(f"\r> [{self.email}] Successfully registered and verified.", end="\033[K", flush=True)
-            print(f"\n{self.email} - {self.password}")
+        if not email_body:
+            print(f"\r> [{self.email}]: No verification email received via {self.provider.name}", end="\033[K\n", flush=True)
+            return False
 
-            # Save to CSV
-            with open(CSV_FILE, "a", newline='') as csvfile:
-                csvwriter = csv.writer(csvfile)
-                csvwriter.writerow([self.email, self.password, "-", self.email_password, self.email_id, "-"])
-            return True
-        else:
-            print("Failed to verify account.")
+        # Extract verification link
+        links = find_url(email_body)
+        if not links:
+            print(f"\r> [{self.email}]: No verification link found in email", end="\033[K\n", flush=True)
+            return False
+
+        # Find the MEGA verification link
+        mega_link = None
+        for link in links:
+            if 'mega' in link.lower():
+                mega_link = link
+                break
+        if not mega_link:
+            mega_link = links[0]  # fallback to first link
+
+        self.verify_command = str(self.verify_command).replace("@LINK@", mega_link)
+
+        # Run verification command
+        try:
+            verification = subprocess.run(
+                self.verify_command,
+                shell=True,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+            )
+
+            if "registered successfully!" in str(verification.stdout):
+                print(f"\r> [{self.email}] ✅ Successfully registered and verified via {self.provider.name}", end="\033[K", flush=True)
+                print(f"\n{self.email} - {self.password}")
+
+                # Save to CSV
+                with open(CSV_FILE, "a", newline='') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow([
+                        self.email,
+                        self.password,
+                        "-",           # Usage
+                        "-",           # Mail password (not applicable for all providers)
+                        "-",           # Mail ID
+                        self.provider.name  # Provider used
+                    ])
+                return True
+            else:
+                print(f"\r> [{self.email}]: Verification command didn't confirm success", end="\033[K\n", flush=True)
+                return False
+
+        except subprocess.CalledProcessError as e:
+            print(f"\r> [{self.email}]: Verification command failed: {e}", end="\033[K\n", flush=True)
             return False
 
 
-def new_account():
+def new_account(password=None):
     """Create and verify a single new MEGA account."""
-    if args.password is None:
+    if password is None:
         password = get_random_string(random.randint(8, 14))
-    else:
-        password = args.password
+
     acc = MegaAccount(fake.name(), password)
     email = acc.register()
-    print(f"\r> [{email}]: Registered. Waiting for verification email...", end="\033[K", flush=True)
-    acc.verify()
+
+    if email:
+        acc.verify()
+    else:
+        print("⚠️ Skipping verification — registration failed")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  MAIN
+# ═══════════════════════════════════════════════════════════════════════════════
+
+parser = argparse.ArgumentParser(description="Create New MEGA Accounts (Multi-Provider)")
+parser.add_argument(
+    "-n", "--number",
+    type=int, default=3,
+    help="Number of accounts to create (default: 3)",
+)
+parser.add_argument(
+    "-p", "--password",
+    type=str, default=None,
+    help="Password to use for all accounts (default: random per account)",
+)
+args = parser.parse_args()
 
 
 if __name__ == "__main__":
@@ -206,19 +189,26 @@ if __name__ == "__main__":
             print("CSV file is not in the correct format. Please use convert_csv.py to convert it.")
             exit(1)
 
-    # Generate accounts
-    if args.threads:
-        print(f"Generating {args.number} accounts using {args.threads} threads.")
-        threads = []
-        for i in range(args.number):
-            t = threading.Thread(target=new_account)
-            threads.append(t)
-            t.start()
-        for t in threads:
-            t.join()
-    else:
-        print(f"Generating {args.number} accounts.")
-        for _ in range(args.number):
-            new_account()
+    print(f"═══════════════════════════════════════")
+    print(f"🔴 MEGA Account Generator — Multi-Provider")
+    print(f"═══════════════════════════════════════")
+    print(f"📊 Generating {args.number} accounts...")
+    print(f"📧 Email providers: 1secmail → Mail.tm → Mail.gw")
+    print(f"═══════════════════════════════════════")
 
-    print(f"\n✅ Done! Accounts saved to {CSV_FILE}")
+    for i in range(args.number):
+        print(f"\n{'─'*40}")
+        print(f"📦 Account {i+1}/{args.number}")
+        print(f"{'─'*40}")
+        new_account(password=args.password)
+        if i < args.number - 1:
+            delay = random.randint(3, 8)
+            print(f"\n⏳ Waiting {delay}s before next account...")
+            time.sleep(delay)
+
+    print(f"\n{'═'*40}")
+    total = 0
+    if os.path.exists(CSV_FILE):
+        with open(CSV_FILE) as f:
+            total = sum(1 for _ in f) - 1  # minus header
+    print(f"✅ Done! {total} total accounts in {CSV_FILE}")
