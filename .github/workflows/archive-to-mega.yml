@@ -102,12 +102,17 @@ jobs:
           echo "  Max items: $MAX_ITEMS"
           echo "═══════════════════════════════════════"
 
-          # Search Archive.org for items
-          ENCODED_QUERY=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ.get('ARCHIVE_QUERY', '')))")
-          SEARCH_URL="https://archive.org/advancedsearch.php?q=${ENCODED_QUERY}&fl[]=identifier&fl[]=title&rows=${MAX_ITEMS}&output=json"
-
+          # Search Archive.org for items (use --data-urlencode to let curl handle encoding)
           echo "🔍 Searching Archive.org..."
-          RESULTS=$(curl -s "$SEARCH_URL" 2>/dev/null)
+          RESULTS=$(curl -s -G "https://archive.org/advancedsearch.php" \
+            --data-urlencode "q=${QUERY}" \
+            --data-urlencode "fl[]=identifier" \
+            --data-urlencode "fl[]=title" \
+            --data-urlencode "rows=${MAX_ITEMS}" \
+            --data-urlencode "output=json" \
+            2>/dev/null)
+
+          echo "  Raw result count: $(echo "$RESULTS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('response',{}).get('numFound',0))" 2>/dev/null || echo 'unknown')"
           IDENTIFIERS=$(echo "$RESULTS" | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
