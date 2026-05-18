@@ -1,0 +1,285 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  📦 Archive.org → MEGA Migration                                           ║
+# ║  Downloads your entire Archive.org collection and re-uploads to MEGA.      ║
+# ║  Uses a CUSTOM MEGA account (not the round-robin auto-generated ones).     ║
+# ║  You can specify any MEGA account credentials per run.                     ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "📦 Archive → MEGA Migration"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mega_email:
+        description: "MEGA account email to upload to"
+        required: true
+        type: string
+      mega_password:
+        description: "MEGA account password"
+        required: true
+        type: string
+      archive_query:
+        description: "Archive.org search query (e.g. 'identifier:tml-*' or 'identifier:pmb-*')"
+        required: false
+        default: "identifier:tml-* OR identifier:pmb-*"
+        type: string
+      mega_folder:
+        description: "MEGA folder to upload to (e.g. /Root/Archive)"
+        required: false
+        default: "/Root/Archive"
+        type: string
+      max_items:
+        description: "Max items to process (0 = all)"
+        required: false
+        default: "0"
+        type: string
+
+env:
+  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
+  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  migrate:
+    name: "📦 Archive → MEGA"
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install Tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq megatools aria2 python3
+          echo "✅ Tools installed"
+
+      - name: "🔑 Setup MEGA Account"
+        run: |
+          M_EMAIL="${{ github.event.inputs.mega_email }}"
+          M_PASS="${{ github.event.inputs.mega_password }}"
+          FOLDER="${{ github.event.inputs.mega_folder }}"
+
+          echo "[Login]" > /tmp/.megarc
+          echo "Username = ${M_EMAIL}" >> /tmp/.megarc
+          echo "Password = ${M_PASS}" >> /tmp/.megarc
+          chmod 600 /tmp/.megarc
+
+          echo "🔑 Testing MEGA login..."
+          if megals --config /tmp/.megarc /Root/ 2>/dev/null; then
+            echo "✅ MEGA login OK: ${M_EMAIL}"
+          else
+            echo "❌ MEGA login failed for ${M_EMAIL}"
+            exit 1
+          fi
+
+          # Create destination folder if needed
+          if [[ "$FOLDER" != "/Root/" ]] && [[ "$FOLDER" != "/Root" ]]; then
+            megamkdir --config /tmp/.megarc "$FOLDER" 2>/dev/null || true
+            echo "📁 Folder ready: $FOLDER"
+          fi
+
+          # Check storage
+          megadf --config /tmp/.megarc 2>/dev/null || true
+
+      - name: "📦 Download from Archive.org & Upload to MEGA"
+        id: migrate
+        run: |
+          QUERY="${{ github.event.inputs.archive_query }}"
+          FOLDER="${{ github.event.inputs.mega_folder }}"
+          MAX_ITEMS="${{ github.event.inputs.max_items }}"
+          [[ "$MAX_ITEMS" == "0" ]] && MAX_ITEMS=9999
+
+          echo "═══════════════════════════════════════"
+          echo "📦 Archive.org → MEGA Migration"
+          echo "  Query: $QUERY"
+          echo "  MEGA folder: $FOLDER"
+          echo "  Max items: $MAX_ITEMS"
+          echo "═══════════════════════════════════════"
+
+          # Search Archive.org for items
+          ENCODED_QUERY=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$QUERY'))")
+          SEARCH_URL="https://archive.org/advancedsearch.php?q=${ENCODED_QUERY}&fl[]=identifier&fl[]=title&rows=${MAX_ITEMS}&output=json"
+
+          echo "🔍 Searching Archive.org..."
+          RESULTS=$(curl -s "$SEARCH_URL" 2>/dev/null)
+          IDENTIFIERS=$(echo "$RESULTS" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          docs = data.get('response', {}).get('docs', [])
+          for d in docs:
+              ident = d.get('identifier', '')
+              title = d.get('title', 'Unknown')
+              if ident:
+                  print(f'{ident}|{title}')
+          " 2>/dev/null || true)
+
+          if [[ -z "$IDENTIFIERS" ]]; then
+            echo "⚠️ No items found for query: $QUERY"
+            echo "total=0" >> $GITHUB_OUTPUT
+            echo "success=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          TOTAL=$(echo "$IDENTIFIERS" | wc -l)
+          echo "📊 Found $TOTAL items to migrate"
+          echo ""
+
+          SUCCESS=0
+          FAILED=0
+          SKIPPED=0
+          COUNT=0
+
+          while IFS='|' read -r identifier title; do
+            [[ -z "$identifier" ]] && continue
+            COUNT=$((COUNT + 1))
+
+            echo "──────────────────────────────────────"
+            echo "📦 [$COUNT/$TOTAL] $identifier"
+            echo "  Title: $title"
+
+            # Get list of files in this item
+            FILES_JSON=$(curl -s "https://archive.org/metadata/$identifier/files" 2>/dev/null)
+            FILES=$(echo "$FILES_JSON" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          files = data.get('result', [])
+          for f in files:
+              name = f.get('name', '')
+              fmt = f.get('format', '')
+              size = f.get('size', '0')
+              # Only get video files (mp4, mkv, etc.) — skip metadata/thumbs
+              if name.endswith(('.mp4', '.mkv', '.webm', '.avi', '.mov', '.ts')):
+                  print(f'{name}|{size}')
+          " 2>/dev/null || true)
+
+            if [[ -z "$FILES" ]]; then
+              echo "  ⚠️ No video files found — skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            while IFS='|' read -r filename filesize; do
+              [[ -z "$filename" ]] && continue
+
+              SIZE_MB=$((filesize / 1024 / 1024))
+              echo "  ⬇️ Downloading: $filename ($SIZE_MB MB)"
+
+              DOWNLOAD_URL="https://archive.org/download/${identifier}/${filename}"
+              LOCAL_FILE="/tmp/transfer/${filename}"
+              mkdir -p /tmp/transfer
+
+              # Download with aria2
+              aria2c -x 16 -s 16 -k 1M \
+                --max-tries=3 \
+                --dir=/tmp/transfer \
+                --out="$filename" \
+                --console-log-level=warn \
+                "$DOWNLOAD_URL" 2>&1 || {
+                  echo "  ❌ Download failed"
+                  FAILED=$((FAILED + 1))
+                  continue
+                }
+
+              if [[ ! -f "$LOCAL_FILE" ]]; then
+                echo "  ❌ File not found after download"
+                FAILED=$((FAILED + 1))
+                continue
+              fi
+
+              # Upload to MEGA
+              echo "  ⬆️ Uploading to MEGA: $FOLDER/$filename"
+              if megaput --config /tmp/.megarc --path "$FOLDER/" "$LOCAL_FILE" 2>&1; then
+                echo "  ✅ Uploaded: $filename"
+                SUCCESS=$((SUCCESS + 1))
+              else
+                echo "  ❌ MEGA upload failed"
+                FAILED=$((FAILED + 1))
+              fi
+
+              # Cleanup to save disk space
+              rm -f "$LOCAL_FILE"
+
+            done <<< "$FILES"
+
+            echo ""
+            sleep 2
+
+          done <<< "$IDENTIFIERS"
+
+          echo "═══════════════════════════════════════"
+          echo "📦 Migration Complete"
+          echo "  ✅ Uploaded: $SUCCESS files"
+          echo "  ❌ Failed:   $FAILED files"
+          echo "  ⏭️ Skipped:  $SKIPPED items (no video)"
+          echo "  📊 Total:    $TOTAL items processed"
+          echo "═══════════════════════════════════════"
+
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+      - name: "🧹 Cleanup"
+        if: always()
+        run: |
+          rm -f /tmp/.megarc
+          rm -rf /tmp/transfer
+
+      - name: "📡 Send Discord Report"
+        if: always()
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+
+          TOTAL="${{ steps.migrate.outputs.total }}"
+          SUCCESS="${{ steps.migrate.outputs.success }}"
+          FAILED="${{ steps.migrate.outputs.failed }}"
+          SKIPPED="${{ steps.migrate.outputs.skipped }}"
+          M_EMAIL="${{ github.event.inputs.mega_email }}"
+          FOLDER="${{ github.event.inputs.mega_folder }}"
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+          COLOR=5763757
+          [[ "$FAILED" -gt 0 ]] 2>/dev/null && COLOR=16744448
+
+          PAYLOAD=$(jq -n \
+            --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+            --arg avatar "${AVATAR_URL:-}" \
+            --arg email "$M_EMAIL" \
+            --arg folder "$FOLDER" \
+            --arg total "${TOTAL:-0}" \
+            --arg success "${SUCCESS:-0}" \
+            --arg failed "${FAILED:-0}" \
+            --arg skipped "${SKIPPED:-0}" \
+            --arg timestamp "$TIMESTAMP" \
+            --argjson color "$COLOR" \
+            '{
+              username: $username,
+              avatar_url: $avatar,
+              embeds: [{
+                title: "📦 Archive → MEGA Migration Complete",
+                description: (
+                  "> Migrated Archive.org collection to MEGA.\n\n" +
+                  "**🔴 MEGA Account:** `" + $email + "`\n" +
+                  "**📁 Folder:** `" + $folder + "`\n\n" +
+                  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                  "✅ **Uploaded:** " + $success + " files\n" +
+                  "❌ **Failed:** " + $failed + " files\n" +
+                  "⏭️ **Skipped:** " + $skipped + " items\n" +
+                  "📊 **Total:** " + $total + " items processed"
+                ),
+                color: $color,
+                footer: { text: "📦 Archive → MEGA Migration" },
+                timestamp: $timestamp
+              }]
+            }')
+
+          curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" "$WEBHOOK"

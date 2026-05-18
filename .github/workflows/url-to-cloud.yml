@@ -1,0 +1,290 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🚀 URL-to-Cloud Transfer — Download any file & upload to cloud            ║
+# ║  Uses GitHub Actions' fast internet (~10Gbps) as a transfer proxy.         ║
+# ║  Supports: Gofile, Pixeldrain, Archive.org, MEGA.nz                        ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🚀 URL-to-Cloud Transfer"
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: "Direct download URL of the file"
+        required: true
+        type: string
+      filename:
+        description: "Custom filename (leave empty to auto-detect)"
+        required: false
+        default: ""
+        type: string
+      destination:
+        description: "Upload destination"
+        required: true
+        type: choice
+        options:
+          - gofile
+          - pixeldrain
+          - archive
+          - mega
+          - all
+      mega_email:
+        description: "MEGA email (only for mega/all — leave empty for default)"
+        required: false
+        default: ""
+        type: string
+      mega_password:
+        description: "MEGA password (only for mega/all — leave empty for default)"
+        required: false
+        default: ""
+        type: string
+      archive_title:
+        description: "Archive.org title (only for archive/all)"
+        required: false
+        default: "Personal Media Backup"
+        type: string
+
+env:
+  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
+  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+  MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  transfer:
+    name: "🚀 Download & Upload"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install Tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq megatools aria2 bc
+          echo "✅ Tools installed"
+
+      - name: "⬇️ Download File"
+        id: download
+        run: |
+          URL="${{ github.event.inputs.file_url }}"
+          CUSTOM_NAME="${{ github.event.inputs.filename }}"
+
+          echo "═══════════════════════════════════════"
+          echo "⬇️ Downloading file..."
+          echo "  URL: $URL"
+          echo "═══════════════════════════════════════"
+
+          mkdir -p /tmp/transfer
+
+          # Download with aria2 (fast, multi-connection)
+          aria2c -x 16 -s 16 -k 1M \
+            --max-tries=5 \
+            --retry-wait=5 \
+            --dir=/tmp/transfer \
+            --console-log-level=notice \
+            "$URL" 2>&1 || {
+              # Fallback to curl
+              echo "⚠️ aria2 failed — trying curl..."
+              curl -L -o "/tmp/transfer/downloaded_file" \
+                --max-time 7200 \
+                --retry 3 \
+                "$URL"
+            }
+
+          # Find the downloaded file
+          FILE=$(find /tmp/transfer -type f -not -name "*.aria2" | head -1)
+
+          if [[ -z "$FILE" ]] || [[ ! -f "$FILE" ]]; then
+            echo "❌ Download failed — no file found"
+            exit 1
+          fi
+
+          # Rename if custom name given
+          if [[ -n "$CUSTOM_NAME" ]]; then
+            DIR=$(dirname "$FILE")
+            mv "$FILE" "$DIR/$CUSTOM_NAME"
+            FILE="$DIR/$CUSTOM_NAME"
+          fi
+
+          FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo "0")
+          FILENAME=$(basename "$FILE")
+          FILESIZE_MB=$((FILESIZE / 1024 / 1024))
+
+          echo "✅ Downloaded: $FILENAME ($FILESIZE_MB MB)"
+          echo "filepath=$FILE" >> $GITHUB_OUTPUT
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+          echo "filesize=$FILESIZE" >> $GITHUB_OUTPUT
+          echo "filesize_mb=$FILESIZE_MB" >> $GITHUB_OUTPUT
+
+      - name: "☁️ Upload to Gofile"
+        if: >-
+          github.event.inputs.destination == 'gofile' ||
+          github.event.inputs.destination == 'all'
+        id: gofile
+        run: |
+          FILE="${{ steps.download.outputs.filepath }}"
+          echo "🟠 Uploading to Gofile..."
+
+          SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name' 2>/dev/null || echo "store1")
+          RESPONSE=$(curl -s -F "file=@$FILE" "https://${SERVER}.gofile.io/uploadFile")
+          LINK=$(echo "$RESPONSE" | jq -r '.data.downloadPage // empty')
+
+          if [[ -n "$LINK" ]]; then
+            echo "✅ Gofile: $LINK"
+            echo "link=$LINK" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Gofile upload failed: $RESPONSE"
+          fi
+
+      - name: "☁️ Upload to Pixeldrain"
+        if: >-
+          github.event.inputs.destination == 'pixeldrain' ||
+          github.event.inputs.destination == 'all'
+        id: pixeldrain
+        run: |
+          FILE="${{ steps.download.outputs.filepath }}"
+          FILENAME="${{ steps.download.outputs.filename }}"
+          echo "🟣 Uploading to Pixeldrain..."
+
+          RESPONSE=$(curl -s -T "$FILE" \
+            -u ":${PIXELDRAIN_API_KEY}" \
+            "https://pixeldrain.com/api/file/${FILENAME}")
+          FILE_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
+
+          if [[ -n "$FILE_ID" ]]; then
+            LINK="https://pixeldrain.com/u/${FILE_ID}"
+            echo "✅ Pixeldrain: $LINK"
+            echo "link=$LINK" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Pixeldrain upload failed: $RESPONSE"
+          fi
+
+      - name: "☁️ Upload to Archive.org"
+        if: >-
+          github.event.inputs.destination == 'archive' ||
+          github.event.inputs.destination == 'all'
+        id: archive
+        run: |
+          FILE="${{ steps.download.outputs.filepath }}"
+          FILENAME="${{ steps.download.outputs.filename }}"
+          TITLE="${{ github.event.inputs.archive_title }}"
+          [[ -z "$TITLE" ]] && TITLE="Personal Media Backup"
+
+          echo "🏛️ Uploading to Archive.org..."
+
+          TIMESTAMP=$(date '+%s')
+          DATE_STR=$(date '+%Y-%m-%d')
+          SAFE_NAME=$(echo "$FILENAME" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          IDENTIFIER="pmb-$(date '+%Y-%m')-${TIMESTAMP}"
+
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            --max-time 7200 \
+            -H "authorization: LOW ${ARCHIVE_ACCESS_KEY}:${ARCHIVE_SECRET_KEY}" \
+            -H "x-archive-auto-make-bucket: 1" \
+            -H "x-archive-meta-title: ${TITLE}" \
+            -H "x-archive-meta-creator: Media Archive Bot" \
+            -H "x-archive-meta-date: ${DATE_STR}" \
+            -H "x-archive-meta-description: Personal media backup." \
+            -H "x-archive-meta-mediatype: movies" \
+            -H "x-archive-meta-collection: opensource_movies" \
+            -H "x-archive-meta-subject: backup;media;personal" \
+            -H "Content-Type: application/octet-stream" \
+            --upload-file "$FILE" \
+            "https://s3.us.archive.org/${IDENTIFIER}/${SAFE_NAME}")
+
+          if [[ "$HTTP_CODE" =~ ^2 ]]; then
+            LINK="https://archive.org/details/${IDENTIFIER}"
+            echo "✅ Archive.org: $LINK"
+            echo "link=$LINK" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Archive.org failed: HTTP $HTTP_CODE"
+          fi
+
+      - name: "☁️ Upload to MEGA"
+        if: >-
+          github.event.inputs.destination == 'mega' ||
+          github.event.inputs.destination == 'all'
+        id: mega
+        run: |
+          FILE="${{ steps.download.outputs.filepath }}"
+          echo "🔴 Uploading to MEGA..."
+
+          # Use custom credentials if provided, otherwise use secrets
+          M_EMAIL="${{ github.event.inputs.mega_email }}"
+          M_PASS="${{ github.event.inputs.mega_password }}"
+          [[ -z "$M_EMAIL" ]] && M_EMAIL="${MEGA_EMAIL}"
+          [[ -z "$M_PASS" ]] && M_PASS="${MEGA_PASSWORD}"
+
+          if [[ -z "$M_EMAIL" ]] || [[ -z "$M_PASS" ]]; then
+            echo "❌ No MEGA credentials (set mega_email/mega_password or MEGA_EMAIL/MEGA_PASSWORD secrets)"
+            exit 1
+          fi
+
+          echo "[Login]" > /tmp/.megarc
+          echo "Username = ${M_EMAIL}" >> /tmp/.megarc
+          echo "Password = ${M_PASS}" >> /tmp/.megarc
+          chmod 600 /tmp/.megarc
+
+          if megaput --config /tmp/.megarc --path /Root/ "$FILE"; then
+            echo "✅ MEGA: Uploaded to ${M_EMAIL}"
+            echo "link=mega://${M_EMAIL}" >> $GITHUB_OUTPUT
+          else
+            echo "❌ MEGA upload failed"
+          fi
+          rm -f /tmp/.megarc
+
+      - name: "📡 Send Discord Report"
+        if: always()
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+
+          FILENAME="${{ steps.download.outputs.filename }}"
+          FILESIZE="${{ steps.download.outputs.filesize_mb }}"
+          DEST="${{ github.event.inputs.destination }}"
+          GOFILE="${{ steps.gofile.outputs.link }}"
+          PIXELDRAIN="${{ steps.pixeldrain.outputs.link }}"
+          ARCHIVE="${{ steps.archive.outputs.link }}"
+          MEGA="${{ steps.mega.outputs.link }}"
+
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+          FIELDS="[]"
+          FIELDS=$(echo "$FIELDS" | jq --arg v "$FILENAME" '. + [{"name":"📄 File","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${FILESIZE} MB" '. + [{"name":"💾 Size","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${DEST}" '. + [{"name":"☁️ Destination","value":$v,"inline":true}]')
+
+          [[ -n "$GOFILE" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[$GOFILE]($GOFILE)" '. + [{"name":"🟠 Gofile","value":$v,"inline":false}]')
+          [[ -n "$PIXELDRAIN" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[$PIXELDRAIN]($PIXELDRAIN)" '. + [{"name":"🟣 Pixeldrain","value":$v,"inline":false}]')
+          [[ -n "$ARCHIVE" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[$ARCHIVE]($ARCHIVE)" '. + [{"name":"🏛️ Archive.org","value":$v,"inline":false}]')
+          [[ -n "$MEGA" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "$MEGA" '. + [{"name":"🔴 MEGA","value":$v,"inline":false}]')
+
+          PAYLOAD=$(jq -n \
+            --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+            --arg avatar "${AVATAR_URL:-}" \
+            --arg timestamp "$TIMESTAMP" \
+            --argjson fields "$FIELDS" \
+            '{
+              username: $username,
+              avatar_url: $avatar,
+              embeds: [{
+                title: "🚀 URL-to-Cloud Transfer Complete",
+                description: "> File downloaded and uploaded via GitHub Actions fast internet.",
+                color: 5763757,
+                fields: $fields,
+                footer: { text: "🚀 URL-to-Cloud Transfer" },
+                timestamp: $timestamp
+              }]
+            }')
+
+          curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" "$WEBHOOK"
