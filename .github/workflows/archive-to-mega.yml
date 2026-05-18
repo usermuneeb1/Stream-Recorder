@@ -90,6 +90,7 @@ jobs:
         id: migrate
         run: |
           QUERY="${{ github.event.inputs.archive_query }}"
+          export ARCHIVE_QUERY="$QUERY"
           FOLDER="${{ github.event.inputs.mega_folder }}"
           MAX_ITEMS="${{ github.event.inputs.max_items }}"
           [[ "$MAX_ITEMS" == "0" ]] && MAX_ITEMS=9999
@@ -102,7 +103,7 @@ jobs:
           echo "═══════════════════════════════════════"
 
           # Search Archive.org for items
-          ENCODED_QUERY=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$QUERY'))")
+          ENCODED_QUERY=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ.get('ARCHIVE_QUERY', '')))")
           SEARCH_URL="https://archive.org/advancedsearch.php?q=${ENCODED_QUERY}&fl[]=identifier&fl[]=title&rows=${MAX_ITEMS}&output=json"
 
           echo "🔍 Searching Archive.org..."
