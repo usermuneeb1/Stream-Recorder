@@ -214,74 +214,173 @@ jobs:
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
           [[ -z "$WEBHOOK" ]] && exit 0
-          
+
           GEN_STATUS="${{ steps.generate.outputs.status }}"
           GEN_TOTAL="${{ steps.generate.outputs.total }}"
           SIGNIN_STATUS="${{ steps.signin.outputs.status }}"
           SIGNIN_SUCCESS="${{ steps.signin.outputs.success_count }}"
           SIGNIN_FAILED="${{ steps.signin.outputs.failed_count }}"
           SIGNIN_TOTAL="${{ steps.signin.outputs.total_count }}"
-          
-          # Build description
-          DESC="> **MEGA Account Manager** automatic maintenance run.\n\n"
-          
+
+          ACTION="${{ github.event.inputs.action }}"
+          [[ -z "$ACTION" ]] && ACTION="signin (scheduled)"
+
+          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          DATE_STR=$(TZ='Asia/Karachi' date '+%A, %B %d, %Y')
+          TIME_STR=$(TZ='Asia/Karachi' date '+%I:%M %p PKT')
+
+          # ─── Determine overall status ───
+          OVERALL_ICON="✅"
+          OVERALL_TEXT="All Systems Operational"
+          COLOR=5763757  # green
+
+          if [[ "$GEN_STATUS" == "failed" ]]; then
+            OVERALL_ICON="❌"
+            OVERALL_TEXT="Generation Failed"
+            COLOR=15158332  # red
+          elif [[ "$SIGNIN_STATUS" == "partial" ]]; then
+            OVERALL_ICON="⚠️"
+            OVERALL_TEXT="Some Accounts Need Attention"
+            COLOR=16744448  # orange
+          elif [[ "$SIGNIN_STATUS" == "skipped" ]] && [[ -z "$GEN_STATUS" ]]; then
+            OVERALL_ICON="⚠️"
+            OVERALL_TEXT="No Accounts Found"
+            COLOR=16776960  # yellow
+          fi
+
+          # ─── Build fields array ───
+          FIELDS="[]"
+
+          # Action field
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg action "$ACTION" \
+            '. + [{"name": "🎯 Action Performed", "value": ("```\n" + ($action | ascii_upcase) + "\n```"), "inline": true}]')
+
+          # Date field
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg date "$DATE_STR" \
+            '. + [{"name": "📅 Date", "value": $date, "inline": true}]')
+
+          # Time field
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg time "$TIME_STR" \
+            '. + [{"name": "🕐 Time", "value": $time, "inline": true}]')
+
+          # Spacer
+          FIELDS=$(echo "$FIELDS" | jq '. + [{"name": "\u200b", "value": "\u200b", "inline": false}]')
+
+          # Generation results (if applicable)
           if [[ -n "$GEN_STATUS" ]]; then
             if [[ "$GEN_STATUS" == "success" ]]; then
-              DESC+="**🔴 Account Generation:** ✅ Success\n"
-              DESC+="**📊 Total Accounts:** ${GEN_TOTAL}\n\n"
+              STORAGE_GB=$((GEN_TOTAL * 20))
+              GEN_VALUE="✅ **Successfully Generated**\n\n"
+              GEN_VALUE+="╔══════════════════════════╗\n"
+              GEN_VALUE+="║  📊 **Total Accounts:** \`${GEN_TOTAL}\`\n"
+              GEN_VALUE+="║  💾 **Total Storage:** \`${STORAGE_GB} GB\`\n"
+              GEN_VALUE+="║  🔄 **Rotation:** Round-Robin\n"
+              GEN_VALUE+="╚══════════════════════════╝"
             else
-              DESC+="**🔴 Account Generation:** ❌ Failed\n"
-              DESC+="Check workflow logs for details.\n\n"
+              GEN_VALUE="❌ **Generation Failed**\n\n"
+              GEN_VALUE+="Check [workflow logs](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) for details.\n"
+              GEN_VALUE+="Common causes:\n"
+              GEN_VALUE+="• Mail.tm temporarily down\n"
+              GEN_VALUE+="• MEGA rate limiting\n"
+              GEN_VALUE+="• Try again in 5 minutes"
             fi
+            FIELDS=$(echo "$FIELDS" | jq \
+              --arg val "$GEN_VALUE" \
+              '. + [{"name": "🔴 Account Generation", "value": $val, "inline": false}]')
           fi
-          
+
+          # Sign-in results (if applicable)
           if [[ -n "$SIGNIN_STATUS" ]]; then
             if [[ "$SIGNIN_STATUS" == "success" ]]; then
-              DESC+="**🔄 Keep-Alive Sign-In:** ✅ All Active\n"
-              DESC+="**📊 Results:** ${SIGNIN_SUCCESS}/${SIGNIN_TOTAL} accounts alive\n"
+              STORAGE_GB=$((SIGNIN_TOTAL * 20))
+
+              # Build progress bar
+              PROGRESS="██████████"
+              SIGNIN_VALUE="✅ **All Accounts Healthy**\n\n"
+              SIGNIN_VALUE+="\`${PROGRESS}\` **${SIGNIN_SUCCESS}/${SIGNIN_TOTAL}** accounts alive\n\n"
+              SIGNIN_VALUE+="╔══════════════════════════╗\n"
+              SIGNIN_VALUE+="║  ✅ **Active:**  \`${SIGNIN_SUCCESS}\` accounts\n"
+              SIGNIN_VALUE+="║  ❌ **Failed:**  \`0\` accounts\n"
+              SIGNIN_VALUE+="║  💾 **Storage:** \`~${STORAGE_GB} GB\` available\n"
+              SIGNIN_VALUE+="║  🛡️ **Status:**  All Protected\n"
+              SIGNIN_VALUE+="╚══════════════════════════╝\n\n"
+              SIGNIN_VALUE+="*Next keep-alive: ~15 days*"
             elif [[ "$SIGNIN_STATUS" == "partial" ]]; then
-              DESC+="**🔄 Keep-Alive Sign-In:** ⚠️ Partial\n"
-              DESC+="**📊 Results:** ${SIGNIN_SUCCESS}/${SIGNIN_TOTAL} alive, ${SIGNIN_FAILED} failed\n"
-              DESC+="**⚠️ Action:** Failed accounts may need regeneration\n"
+              ALIVE_PCT=0
+              [[ "$SIGNIN_TOTAL" -gt 0 ]] && ALIVE_PCT=$((SIGNIN_SUCCESS * 100 / SIGNIN_TOTAL))
+              BLOCKS=$((ALIVE_PCT / 10))
+              EMPTY=$((10 - BLOCKS))
+              PROGRESS=$(printf '█%.0s' $(seq 1 $BLOCKS 2>/dev/null) 2>/dev/null)$(printf '░%.0s' $(seq 1 $EMPTY 2>/dev/null) 2>/dev/null)
+              [[ -z "$PROGRESS" ]] && PROGRESS="░░░░░░░░░░"
+
+              SIGNIN_VALUE="⚠️ **Some Accounts Need Attention**\n\n"
+              SIGNIN_VALUE+="\`${PROGRESS}\` **${SIGNIN_SUCCESS}/${SIGNIN_TOTAL}** (${ALIVE_PCT}%)\n\n"
+              SIGNIN_VALUE+="╔══════════════════════════╗\n"
+              SIGNIN_VALUE+="║  ✅ **Active:**  \`${SIGNIN_SUCCESS}\` accounts\n"
+              SIGNIN_VALUE+="║  ❌ **Failed:**  \`${SIGNIN_FAILED}\` accounts\n"
+              SIGNIN_VALUE+="║  ⚠️ **Action:**  Regenerate failed\n"
+              SIGNIN_VALUE+="╚══════════════════════════╝\n\n"
+              SIGNIN_VALUE+="*Run \`generate\` to create replacement accounts*"
             elif [[ "$SIGNIN_STATUS" == "skipped" ]]; then
-              DESC+="**🔄 Keep-Alive Sign-In:** ⏭️ Skipped (no accounts.csv)\n"
+              SIGNIN_VALUE="⏭️ **Skipped**\n\n"
+              SIGNIN_VALUE+="No \`accounts.csv\` found.\n"
+              SIGNIN_VALUE+="Run with action \`generate\` first."
             fi
+            FIELDS=$(echo "$FIELDS" | jq \
+              --arg val "$SIGNIN_VALUE" \
+              '. + [{"name": "🔄 Keep-Alive Health Check", "value": $val, "inline": false}]')
           fi
-          
-          # Color
-          COLOR=5763757  # green
-          if [[ "$GEN_STATUS" == "failed" ]] || [[ "$SIGNIN_STATUS" == "partial" ]]; then
-            COLOR=16744448  # orange
-          fi
-          if [[ "$SIGNIN_FAILED" -gt 0 ]] 2>/dev/null; then
-            COLOR=15158332  # red
-          fi
-          
-          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          
+
+          # System info footer field
+          SYS_VALUE="☁️ Provider: **MEGA.nz** (20GB/account)\n"
+          SYS_VALUE+="📧 Email: **Mail.tm** → Mail.gw → 1secmail\n"
+          SYS_VALUE+="🔄 Upload: **Round-Robin** rotation\n"
+          SYS_VALUE+="⏰ Keep-Alive: **1st & 15th** monthly"
+          FIELDS=$(echo "$FIELDS" | jq \
+            --arg val "$SYS_VALUE" \
+            '. + [{"name": "⚙️ System Configuration", "value": $val, "inline": false}]')
+
+          # ─── Build final payload ───
           PAYLOAD=$(jq -n \
             --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
             --arg avatar "${AVATAR_URL:-}" \
-            --arg desc "$DESC" \
+            --arg overall_icon "$OVERALL_ICON" \
+            --arg overall_text "$OVERALL_TEXT" \
             --arg timestamp "$TIMESTAMP" \
+            --arg run_url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --argjson color "$COLOR" \
+            --argjson fields "$FIELDS" \
             '{
-              content: "@everyone",
               username: $username,
               avatar_url: $avatar,
               embeds: [{
-                title: "🔴 MEGA Account Manager Report",
-                description: $desc,
+                author: {
+                  name: "MEGA Account Manager",
+                  icon_url: "https://mega.nz/favicon.ico"
+                },
+                title: ($overall_icon + " " + $overall_text),
+                url: $run_url,
+                description: (
+                  "> Automated MEGA.nz account management system.\n" +
+                  "> Ensures cloud storage accounts remain active\n" +
+                  "> and available for stream archival.\n\n" +
+                  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                ),
                 color: $color,
+                fields: $fields,
                 footer: {
-                  text: "☪️ MEGA Account Manager · Runs twice monthly · Made with ❤️ by Muneeb Ahmad"
+                  text: "☪️ MEGA Account Manager · Made with ❤️ by Muneeb Ahmad"
                 },
                 timestamp: $timestamp
               }]
             }')
-          
+
           curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" \
             --max-time 15 \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD" \
             "$WEBHOOK"
+
