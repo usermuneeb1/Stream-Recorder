@@ -89,8 +89,13 @@ jobs:
           echo "$HOME/.deno/bin" >> $GITHUB_PATH
           export PATH="$HOME/.deno/bin:$PATH"
 
-          # Install latest yt-dlp (nightly for latest YouTube fixes)
-          pip3 install -q --upgrade yt-dlp 2>/dev/null || pip install -q --upgrade yt-dlp
+          # Install yt-dlp NIGHTLY (has latest YouTube anti-bot fixes)
+          pip3 install -q --upgrade "yt-dlp[default]" 2>/dev/null || pip install -q --upgrade yt-dlp
+          # Try to get absolute latest nightly build
+          pip3 install -q --upgrade --pre yt-dlp 2>/dev/null || true
+
+          # Install OAuth2 plugin (more reliable than cookies in CI/CD)
+          pip3 install -q yt-dlp-youtube-oauth2 2>/dev/null || true
 
           echo "✅ Tools installed"
           yt-dlp --version
@@ -278,10 +283,21 @@ jobs:
           FAILED=0
           SKIPPED=0
           TOTAL=0
+          CONSECUTIVE_FAILS=0
+          ABORT=false
+          MAX_CONSECUTIVE_FAILS=5
+
+          # Player clients to try (fallback order)
+          PLAYER_CLIENTS=("web_creator" "mweb" "tv" "default")
 
           # ─── Function: download & upload one video ───
           process_video() {
             local vid="$1" vtitle="$2" vplaylist="$3" archive_prefix="$4"
+
+            # Check abort flag
+            if [[ "$ABORT" == "true" ]]; then
+              return
+            fi
 
             TOTAL=$((TOTAL + 1))
 
@@ -308,63 +324,93 @@ jobs:
             mkdir -p /tmp/transfer
             rm -rf /tmp/transfer/*
 
-            echo "  ⬇️ Downloading..."
-            if yt-dlp \
-              -f "$FORMAT" \
-              --merge-output-format mp4 \
-              -o "/tmp/transfer/%(title).80s [%(id)s].%(ext)s" \
-              --retries 5 \
-              --socket-timeout 30 \
-              --no-playlist \
-              --sleep-requests 3 \
-              --min-sleep-interval 5 \
-              --max-sleep-interval 20 \
-              --extractor-args "youtube:player_client=web_creator" \
-              $COOKIE_ARGS \
-              "https://www.youtube.com/watch?v=${vid}" 2>&1; then
+            # Try multiple player clients as fallback
+            local download_ok=false
+            for client in "${PLAYER_CLIENTS[@]}"; do
+              echo "  ⬇️ Downloading (client: $client)..."
+              if yt-dlp \
+                -f "$FORMAT" \
+                --merge-output-format mp4 \
+                -o "/tmp/transfer/%(title).80s [%(id)s].%(ext)s" \
+                --retries 3 \
+                --socket-timeout 30 \
+                --no-playlist \
+                --sleep-requests 3 \
+                --min-sleep-interval 5 \
+                --max-sleep-interval 20 \
+                --extractor-args "youtube:player_client=$client" \
+                $COOKIE_ARGS $PROXY_ARGS \
+                "https://www.youtube.com/watch?v=${vid}" 2>&1; then
+                download_ok=true
+                break
+              else
+                echo "  ⚠️ Client '$client' failed, trying next..."
+                rm -rf /tmp/transfer/*
+                sleep 3
+              fi
+            done
 
+            if [[ "$download_ok" == "true" ]]; then
               FILE=$(find /tmp/transfer -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.webm" \) | head -1)
 
               if [[ -z "$FILE" ]]; then
                 echo "  ❌ No file after download"
                 FAILED=$((FAILED + 1))
+                CONSECUTIVE_FAILS=$((CONSECUTIVE_FAILS + 1))
                 rm -rf /tmp/transfer/*
-                return
-              fi
-
-              FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
-              SIZE_MB=$((FILESIZE / 1024 / 1024))
-              SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._\[\]-]/-/g')
-              DATE_STR=$(date '+%Y-%m-%d')
-
-              echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
-
-              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
-                --max-time 7200 \
-                -H "authorization: LOW ${ACCESS}:${SECRET}" \
-                -H "x-archive-auto-make-bucket: 1" \
-                -H "x-archive-meta-title: ${vtitle}" \
-                -H "x-archive-meta-creator: ${CHANNEL}" \
-                -H "x-archive-meta-date: ${DATE_STR}" \
-                -H "x-archive-meta-description: ${vtitle} by ${CHANNEL}. Playlist: ${vplaylist}." \
-                -H "x-archive-meta-mediatype: movies" \
-                -H "x-archive-meta-collection: opensource_movies" \
-                -H "x-archive-meta-subject: youtube;${CHANNEL// /+};${vplaylist// /+};archive" \
-                -H "x-archive-meta-language: eng" \
-                -H "Content-Type: video/mp4" \
-                --upload-file "$FILE" \
-                "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}")
-
-              if [[ "$HTTP_CODE" =~ ^2 ]]; then
-                echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
-                SUCCESS=$((SUCCESS + 1))
               else
-                echo "  ❌ Archive.org HTTP $HTTP_CODE"
-                FAILED=$((FAILED + 1))
+                FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
+                SIZE_MB=$((FILESIZE / 1024 / 1024))
+                SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._\[\]-]/-/g')
+                DATE_STR=$(date '+%Y-%m-%d')
+
+                echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
+
+                HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+                  --max-time 7200 \
+                  -H "authorization: LOW ${ACCESS}:${SECRET}" \
+                  -H "x-archive-auto-make-bucket: 1" \
+                  -H "x-archive-meta-title: ${vtitle}" \
+                  -H "x-archive-meta-creator: ${CHANNEL}" \
+                  -H "x-archive-meta-date: ${DATE_STR}" \
+                  -H "x-archive-meta-description: ${vtitle} by ${CHANNEL}. Playlist: ${vplaylist}." \
+                  -H "x-archive-meta-mediatype: movies" \
+                  -H "x-archive-meta-collection: opensource_movies" \
+                  -H "x-archive-meta-subject: youtube;${CHANNEL// /+};${vplaylist// /+};archive" \
+                  -H "x-archive-meta-language: eng" \
+                  -H "Content-Type: video/mp4" \
+                  --upload-file "$FILE" \
+                  "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}")
+
+                if [[ "$HTTP_CODE" =~ ^2 ]]; then
+                  echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
+                  SUCCESS=$((SUCCESS + 1))
+                  CONSECUTIVE_FAILS=0  # Reset on success
+                else
+                  echo "  ❌ Archive.org HTTP $HTTP_CODE"
+                  FAILED=$((FAILED + 1))
+                  CONSECUTIVE_FAILS=$((CONSECUTIVE_FAILS + 1))
+                fi
               fi
             else
-              echo "  ❌ Download failed"
+              echo "  ❌ All player clients failed for this video"
               FAILED=$((FAILED + 1))
+              CONSECUTIVE_FAILS=$((CONSECUTIVE_FAILS + 1))
+            fi
+
+            # ─── EARLY ABORT: stop if too many consecutive failures ───
+            if [[ "$CONSECUTIVE_FAILS" -ge "$MAX_CONSECUTIVE_FAILS" ]]; then
+              echo ""
+              echo "🛑 ABORTING: $MAX_CONSECUTIVE_FAILS consecutive failures!"
+              echo "   YouTube is blocking all downloads."
+              echo "   Possible fixes:"
+              echo "   1. Re-export fresh cookies from browser → update YOUTUBE_COOKIES secret"
+              echo "   2. Set a YOUTUBE_PROXY secret (socks5://user:pass@host:port)"
+              echo "   3. Wait a few hours and try again"
+              echo "   4. Resume later with start_from=$((TOTAL + 1))"
+              echo ""
+              ABORT=true
+              return
             fi
 
             # CRITICAL: Delete video to save disk space
@@ -417,6 +463,7 @@ jobs:
               VCOUNT=0
               while IFS=$'\t' read -r vid vtitle vplaylist vdur; do
                 [[ -z "$vid" ]] && continue
+                [[ "$ABORT" == "true" ]] && break
                 VCOUNT=$((VCOUNT + 1))
 
                 echo ""
@@ -441,6 +488,7 @@ jobs:
             VCOUNT=0
             grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vplaylist vdur; do
               [[ -z "$vid" ]] && continue
+              [[ "$ABORT" == "true" ]] && break
               VCOUNT=$((VCOUNT + 1))
 
               if [[ -n "$MAX_VIDEOS" ]] && [[ "$VCOUNT" -gt "$MAX_VIDEOS" ]]; then
