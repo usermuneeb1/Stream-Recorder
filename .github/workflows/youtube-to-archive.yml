@@ -53,6 +53,11 @@ on:
         required: false
         default: "1"
         type: string
+      proxy:
+        description: "HTTP/SOCKS5 proxy URL (optional, overrides YOUTUBE_PROXY secret)"
+        required: false
+        default: ""
+        type: string
 
 env:
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
@@ -61,6 +66,7 @@ env:
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
   YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+  YOUTUBE_PROXY: ${{ secrets.YOUTUBE_PROXY }}
   TZ: Asia/Karachi
 
 jobs:
@@ -78,17 +84,35 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq aria2 ffmpeg python3-pip
 
-          # Install deno (JS runtime required by yt-dlp for YouTube)
+          # Install deno (JS runtime required by yt-dlp)
           curl -fsSL https://deno.land/install.sh | sh
           echo "$HOME/.deno/bin" >> $GITHUB_PATH
           export PATH="$HOME/.deno/bin:$PATH"
 
-          # Install latest yt-dlp
+          # Install latest yt-dlp (nightly for latest YouTube fixes)
           pip3 install -q --upgrade yt-dlp 2>/dev/null || pip install -q --upgrade yt-dlp
 
-          echo "✅ Tools: yt-dlp + deno + ffmpeg + jq"
+          echo "✅ Tools installed"
           yt-dlp --version
-          deno --version || echo "⚠️ deno not in path yet"
+
+      - name: "🌐 Setup Cloudflare WARP (bypass datacenter IP block)"
+        uses: sebst/actions-warp@v1
+        continue-on-error: true
+        with:
+          tos: YES
+
+      - name: "🌐 Verify WARP Connection"
+        continue-on-error: true
+        run: |
+          echo "🌐 Checking WARP connection..."
+          TRACE=$(curl -s --max-time 10 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null || echo "")
+          if echo "$TRACE" | grep -q "warp=on"; then
+            echo "✅ WARP is ON — traffic routed through Cloudflare"
+          else
+            echo "⚠️ WARP not detected — may still use datacenter IP"
+          fi
+          IP=$(curl -s --max-time 10 https://ifconfig.me 2>/dev/null || echo 'unknown')
+          echo "🌐 Current IP: $IP"
 
       - name: "🍪 Setup YouTube Cookies"
         run: |
@@ -119,11 +143,23 @@ jobs:
           [[ "$MAX_VIDEOS" == "0" ]] && MAX_VIDEOS=""
           [[ -z "$START_FROM" ]] && START_FROM=1
 
-          # Cookie args
+          # Cookie args + anti-bot args
           COOKIE_ARGS=""
           if [[ -s /tmp/cookies.txt ]]; then
             COOKIE_ARGS="--cookies /tmp/cookies.txt"
           fi
+
+          # Proxy support: workflow input overrides secret
+          PROXY="${{ github.event.inputs.proxy }}"
+          [[ -z "$PROXY" ]] && PROXY="${YOUTUBE_PROXY:-}"
+          PROXY_ARGS=""
+          if [[ -n "$PROXY" ]]; then
+            PROXY_ARGS="--proxy $PROXY"
+            echo "  🔀 Proxy: $PROXY"
+          fi
+
+          # Anti-bot: sleep between requests + use web_creator client
+          YTDLP_ARGS="$COOKIE_ARGS $PROXY_ARGS --sleep-requests 3 --min-sleep-interval 5 --max-sleep-interval 20 --extractor-args youtube:player_client=web_creator"
 
           # Quality format
           case "$QUALITY" in
@@ -146,7 +182,7 @@ jobs:
           echo ""
           echo "🔍 Scanning YouTube content..."
 
-          yt-dlp --flat-playlist -J $COOKIE_ARGS "$URL" 2>/dev/null > /tmp/yt_info.json || {
+          yt-dlp --flat-playlist -J $YTDLP_ARGS "$URL" 2>/dev/null > /tmp/yt_info.json || {
             echo "❌ Failed to fetch YouTube info"
             exit 1
           }
@@ -280,6 +316,10 @@ jobs:
               --retries 5 \
               --socket-timeout 30 \
               --no-playlist \
+              --sleep-requests 3 \
+              --min-sleep-interval 5 \
+              --max-sleep-interval 20 \
+              --extractor-args "youtube:player_client=web_creator" \
               $COOKIE_ARGS \
               "https://www.youtube.com/watch?v=${vid}" 2>&1; then
 
@@ -352,7 +392,7 @@ jobs:
               PLAYLIST_ARGS=""
               [[ -n "$MAX_VIDEOS" ]] && PLAYLIST_ARGS="--playlist-end $MAX_VIDEOS"
 
-              yt-dlp --flat-playlist -J $PLAYLIST_ARGS $COOKIE_ARGS "$purl" 2>/dev/null > /tmp/sub_playlist.json || {
+              yt-dlp --flat-playlist -J $PLAYLIST_ARGS $YTDLP_ARGS "$purl" 2>/dev/null > /tmp/sub_playlist.json || {
                 echo "  ⚠️ Could not fetch playlist — skipping"
                 continue
               }
