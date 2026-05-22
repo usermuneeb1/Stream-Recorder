@@ -301,9 +301,9 @@ notify_recording_complete() {
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
     # HD links (first entry or "HD" tagged)
-    local gofile_url="" dailymotion_url="" pixeldrain_url="" archive_url="" archive_id=""
+    local gofile_url="" dailymotion_url="" pixeldrain_url="" archive_url="" archive_id="" mega_url=""
     # Compressed links
-    local gofile_comp="" dailymotion_comp="" pixeldrain_comp="" archive_comp=""
+    local gofile_comp="" dailymotion_comp="" pixeldrain_comp="" archive_comp="" mega_comp=""
     
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
@@ -359,6 +359,19 @@ notify_recording_complete() {
             fi
         done
     fi
+    if [[ -n "${MEGA_LINKS:-}" ]]; then
+        IFS=';' read -ra _mega <<< "${MEGA_LINKS}"
+        for entry in "${_mega[@]}"; do
+            local _part _link
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            if [[ "$_part" == "Compressed" ]]; then
+                mega_comp="$_link"
+            elif [[ -z "$mega_url" ]]; then
+                mega_url="$_link"
+            fi
+        done
+    fi
 
 
 
@@ -374,6 +387,8 @@ notify_recording_complete() {
     upstatus+=$(if [[ -n "$pixeldrain_url" ]]; then echo "🟣 Pixeldrain ✅"; else echo "🟣 Pixeldrain ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
+    upstatus+=" · "
+    upstatus+=$(if [[ -n "$mega_url" ]]; then echo "🔴 MEGA ✅"; else echo "🔴 MEGA ❌"; fi)
     
     # Compressed info
     local comp_info="${COMPRESSED_SIZE_HUMAN:-}"
@@ -399,10 +414,12 @@ notify_recording_complete() {
         --arg pixeldrain_url   "$pixeldrain_url" \
         --arg archive_url      "$archive_url" \
         --arg archive_id       "$archive_id" \
+        --arg mega_url         "$mega_url" \
         --arg gofile_comp      "$gofile_comp" \
         --arg dailymotion_comp "$dailymotion_comp" \
         --arg pixeldrain_comp  "$pixeldrain_comp" \
         --arg archive_comp     "$archive_comp" \
+        --arg mega_comp        "$mega_comp" \
         --arg comp_info      "$comp_info" \
         --arg comp_reduction "$comp_reduction" \
         --arg chat_status    "$chat_status" \
@@ -452,6 +469,7 @@ notify_recording_complete() {
                         (if $dailymotion_url != "" then { name: "🔵  Dailymotion",    value: ("[▶️ Watch / ⬇️ Download](" + $dailymotion_url + ")"),    inline: true } else empty end),
                         (if $pixeldrain_url  != "" then { name: "🟣  Pixeldrain",     value: ("[⬇️ Download](" + $pixeldrain_url + ")"),                inline: true } else empty end),
                         (if $archive_url     != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
+                        (if $mega_url        != "" then { name: "🔴  MEGA.nz",      value: ("[⬇️ Download (Permanent)](" + $mega_url + ")"),               inline: true } else empty end),
                         
                         (if ($gofile_comp != "" or $dailymotion_comp != "" or $pixeldrain_comp != "" or $archive_comp != "") then
                             { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**480p** • Tiny file size • For storage", inline: false }
@@ -460,8 +478,9 @@ notify_recording_complete() {
                         (if $dailymotion_comp != "" then { name: "🔵  Dailymotion", value: ("[⬇️ Quick Download](" + $dailymotion_comp + ")"), inline: true } else empty end),
                         (if $pixeldrain_comp  != "" then { name: "🟣  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
                         (if $archive_comp     != "" then { name: "🏛️  Archive.org", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
+                        (if $mega_comp        != "" then { name: "🔴  MEGA.nz",     value: ("[⬇️ Download](" + $mega_comp + ")"),               inline: true } else empty end),
                         
-                        (if ($gofile_url == "" and $dailymotion_url == "" and $pixeldrain_url == "" and $archive_url == "") then
+                        (if ($gofile_url == "" and $dailymotion_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "") then
                             { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
                         else empty end),
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: "**📋  Additional Info**", inline: false },
@@ -494,6 +513,13 @@ notify_recording_complete() {
                     type: 1,
                     components: [
                         { type: 2, style: 5, label: "🏛️ Archive.org (Permanent)", url: $archive_url }
+                    ]
+                } else empty end),
+                (if $mega_url != "" then
+                {
+                    type: 1,
+                    components: [
+                        { type: 2, style: 5, label: "🔴 MEGA.nz (Permanent)", url: $mega_url }
                     ]
                 } else empty end)
             ]
