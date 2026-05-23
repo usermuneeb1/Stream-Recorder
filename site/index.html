@@ -1,344 +1,476 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="The Muslim Lantern — Official live stream archive" />
+  <meta name="description" content="The Muslim Lantern — Official live stream archive. Watch past live streams." />
   <title>The Muslim Lantern — Stream Archive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <style>
-    :root, [data-theme="light"] {
-      --bg: #f8f6f4;
-      --surface: #ffffff;
-      --surface2: #f3f0ee;
-      --text: #1c1917;
-      --muted: #78716c;
-      --accent: #b91c1c;
-      --accent-soft: #fef2f2;
-      --border: rgba(185, 28, 28, 0.12);
-      --shadow: 0 4px 24px rgba(28, 25, 23, 0.06);
-      --shadow-lg: 0 24px 64px rgba(185, 28, 28, 0.12);
-    }
-    [data-theme="dark"] {
-      --bg: #0c0a09;
-      --surface: #1c1917;
-      --surface2: #292524;
-      --text: #fafaf9;
-      --muted: #a8a29e;
-      --accent: #ef4444;
-      --accent-soft: rgba(239, 68, 68, 0.12);
-      --border: rgba(239, 68, 68, 0.2);
-      --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-      --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.5);
+    /* ═══════ YOUTUBE-STYLE DARK THEME ═══════ */
+    :root {
+      --bg: #0f0f0f;
+      --bg-secondary: #181818;
+      --bg-hover: #272727;
+      --bg-elevated: #212121;
+      --text-primary: #f1f1f1;
+      --text-secondary: #aaaaaa;
+      --text-muted: #717171;
+      --accent: #ff0000;
+      --accent-hover: #cc0000;
+      --blue: #3ea6ff;
+      --border: #303030;
+      --border-light: #3f3f3f;
+      --chip-bg: #263850;
+      --chip-active: #3ea6ff;
+      --overlay: rgba(0,0,0,0.85);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3);
+      --radius: 12px;
+      --radius-sm: 8px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      font-family: "Inter", system-ui, sans-serif;
+      font-family: 'Roboto', Arial, sans-serif;
       background: var(--bg);
-      color: var(--text);
+      color: var(--text-primary);
       min-height: 100vh;
-      transition: background 0.4s ease, color 0.4s ease;
+      overflow-x: hidden;
     }
-    .app { max-width: 1140px; margin: 0 auto; padding: 0 1.5rem 4rem; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; }
 
-    .topbar {
+    /* ═══════ HEADER (YouTube-style topbar) ═══════ */
+    .header {
+      position: sticky; top: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 1.25rem 0;
+      padding: 0 16px; height: 56px;
+      background: var(--bg);
       border-bottom: 1px solid var(--border);
-      animation: fadeIn 0.6s ease;
     }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 18px; font-weight: 700; letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px; background: var(--accent); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff; font-weight: 700;
+    }
+    .header-search {
+      display: flex; align-items: center; max-width: 520px; flex: 1; margin: 0 40px;
+    }
+    .header-search input {
+      flex: 1; height: 40px; padding: 0 16px;
+      background: var(--bg); color: var(--text-primary);
+      border: 1px solid var(--border-light); border-right: none;
+      border-radius: 20px 0 0 20px; font-size: 16px;
+      outline: none;
+    }
+    .header-search input:focus { border-color: var(--blue); }
+    .header-search input::placeholder { color: var(--text-muted); }
+    .search-btn {
+      height: 40px; width: 64px; border: 1px solid var(--border-light);
+      background: var(--bg-hover); border-radius: 0 20px 20px 0;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .search-btn svg { fill: var(--text-primary); }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .yt-badge {
+      background: var(--accent); color: #fff; padding: 6px 12px;
+      border-radius: 20px; font-size: 12px; font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+    @media (max-width: 700px) { .header-search { display: none; } }
 
-    .brand-block h1 {
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: 1.65rem; font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .brand-block h1 span { color: var(--accent); }
-    .brand-block p { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+    /* ═══════ MAIN LAYOUT ═══════ */
+    .main { display: flex; max-width: 1850px; margin: 0 auto; padding: 24px 24px 80px; gap: 24px; }
+    .main.browse-mode { flex-direction: column; }
+    .main.watch-mode { flex-direction: row; }
+    @media (max-width: 1000px) { .main.watch-mode { flex-direction: column; } }
 
-    .theme-btn {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.5rem 1rem; border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      font: inherit; font-size: 0.8rem; font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+    /* ═══════ BROWSE PAGE (Grid of videos) ═══════ */
+    .browse-page { width: 100%; }
+    .channel-banner {
+      display: flex; align-items: center; gap: 16px;
+      padding: 20px 0; border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
     }
-    .theme-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--accent); }
-    .theme-btn:active { transform: scale(0.97); }
-
-    .hero {
-      padding: 2rem 0 1.5rem;
-      animation: fadeIn 0.7s 0.1s ease both;
+    .channel-avatar {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, #1a6b3c, #2e8b57);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
     }
-    .hero h2 {
-      font-family: "Playfair Display", serif;
-      font-size: clamp(1.5rem, 3vw, 2rem);
-      font-weight: 600;
-      line-height: 1.25;
+    .channel-info h2 { font-size: 24px; font-weight: 700; }
+    .channel-info .subs { color: var(--text-secondary); font-size: 14px; margin-top: 2px; }
+    .channel-info .desc { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+    .subscribe-btn {
+      margin-left: auto; padding: 10px 20px;
+      background: #fff; color: #0f0f0f;
+      border: none; border-radius: 20px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s;
     }
-    .hero p { color: var(--muted); margin-top: 0.5rem; max-width: 520px; font-size: 0.95rem; }
-
-    .stats {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
-      margin-bottom: 2rem;
-    }
-    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
-    .stat {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.15rem 1.25rem;
-      box-shadow: var(--shadow);
-      opacity: 0;
-      animation: rise 0.5s ease forwards;
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
-    }
-    .stat:nth-child(1) { animation-delay: 0.12s; }
-    .stat:nth-child(2) { animation-delay: 0.18s; }
-    .stat:nth-child(3) { animation-delay: 0.24s; }
-    .stat:nth-child(4) { animation-delay: 0.3s; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-    .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
-    .stat .n { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
-    .stat .l { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem; font-weight: 600; }
-
-    .toolbar { margin-bottom: 1.25rem; animation: fadeIn 0.6s 0.25s ease both; }
-    .search {
-      width: 100%; padding: 0.85rem 1rem 0.85rem 2.75rem;
-      border-radius: 12px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--text);
-      font: inherit; transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-    .search-box { position: relative; }
-    .search-box::before {
-      content: ""; position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
-      width: 16px; height: 16px; border: 2px solid var(--muted); border-radius: 50%;
-    }
-    .search-box::after {
-      content: ""; position: absolute; left: 1.65rem; top: 58%;
-      width: 6px; height: 2px; background: var(--muted); transform: rotate(45deg);
+    .subscribe-btn:hover { opacity: 0.9; }
+    @media (max-width: 600px) {
+      .channel-avatar { width: 56px; height: 56px; font-size: 22px; }
+      .channel-info h2 { font-size: 18px; }
+      .subscribe-btn { padding: 8px 14px; font-size: 12px; }
     }
 
-    .grid {
+    .chips {
+      display: flex; gap: 8px; padding-bottom: 16px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip {
+      padding: 6px 14px; border-radius: 8px;
+      background: var(--bg-hover); color: var(--text-primary);
+      font-size: 14px; font-weight: 500; white-space: nowrap;
+      border: none; cursor: pointer; transition: background 0.2s, color 0.2s;
+    }
+    .chip:hover { background: var(--border-light); }
+    .chip.active { background: var(--text-primary); color: var(--bg); }
+
+    .video-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 16px;
     }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      cursor: pointer;
-      opacity: 0;
-      animation: rise 0.45s ease forwards;
-      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s, border-color 0.3s;
-    }
-    .card:hover {
-      transform: translateY(-6px);
-      box-shadow: var(--shadow-lg);
-      border-color: var(--accent);
-    }
-    .thumb { position: relative; aspect-ratio: 16/9; background: var(--surface2); overflow: hidden; }
-    .thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
-    .card:hover .thumb img { transform: scale(1.05); }
-    .thumb-fade {
-      position: absolute; inset: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%);
-      opacity: 0; transition: opacity 0.3s;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .card:hover .thumb-fade { opacity: 1; }
-    .play {
-      width: 52px; height: 52px; border-radius: 50%;
-      background: var(--surface); color: var(--accent);
-      display: flex; align-items: center; justify-content: center;
-      transform: scale(0.85); transition: transform 0.3s ease;
-      box-shadow: var(--shadow-lg);
-    }
-    .card:hover .play { transform: scale(1); }
-    .badge-dur {
-      position: absolute; top: 10px; right: 10px;
-      background: var(--accent); color: #fff;
-      font-size: 0.68rem; font-weight: 700;
-      padding: 0.25rem 0.5rem; border-radius: 6px;
-    }
-    .card-body { padding: 1rem 1.15rem; }
-    .card-body h3 { font-size: 0.92rem; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .card-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; }
-    .pills { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.55rem; }
-    .pill { font-size: 0.65rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 5px; background: var(--accent-soft); color: var(--accent); }
+    @media (max-width: 700px) { .video-grid { grid-template-columns: 1fr; } }
 
-    .empty {
-      grid-column: 1/-1; text-align: center; padding: 3rem;
-      background: var(--surface); border: 1px dashed var(--border); border-radius: 16px;
+    .video-card {
+      cursor: pointer; transition: transform 0.15s;
+      animation: fadeUp 0.3s ease both;
     }
+    .video-card:nth-child(n) { animation-delay: calc(var(--i, 0) * 0.04s); }
+    .video-card:hover { transform: scale(1.02); }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-    .modal {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(12, 10, 9, 0.7);
-      backdrop-filter: blur(10px);
-      display: flex; align-items: center; justify-content: center;
-      padding: 1rem;
-      opacity: 0; visibility: hidden;
-      transition: opacity 0.35s ease, visibility 0.35s;
-    }
-    .modal.show { opacity: 1; visibility: visible; }
-    .modal-panel {
-      width: 100%; max-width: 900px;
-      background: var(--surface);
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-lg);
-      overflow: hidden;
-      transform: scale(0.94) translateY(16px);
-      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-      max-height: 92vh;
-      display: flex; flex-direction: column;
-    }
-    .modal.show .modal-panel { transform: scale(1) translateY(0); }
-    .modal-top {
-      padding: 1rem 1.25rem;
-      background: var(--accent);
-      color: #fff;
-      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
-    }
-    .modal-top h2 { font-size: 0.95rem; font-weight: 600; line-height: 1.35; flex: 1; }
-    .modal-close {
-      border: none; background: rgba(255,255,255,0.15);
-      color: #fff; width: 36px; height: 36px; border-radius: 10px;
-      font-size: 1.25rem; cursor: pointer;
-      transition: background 0.2s, transform 0.2s;
-    }
-    .modal-close:hover { background: rgba(255,255,255,0.28); transform: rotate(90deg); }
-    .tabs {
-      display: flex; flex-wrap: wrap; gap: 0.35rem;
-      padding: 0.75rem 1rem;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-    }
-    .tab {
-      padding: 0.45rem 0.85rem; border: none; border-radius: 8px;
-      background: transparent; color: var(--muted);
-      font: inherit; font-size: 0.78rem; font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, color 0.2s, transform 0.15s;
-    }
-    .tab:hover { color: var(--accent); background: var(--accent-soft); }
-    .tab.on { background: var(--accent); color: #fff; }
-    .tab:active { transform: scale(0.96); }
-    .player-wrap {
+    .video-thumb {
       position: relative; aspect-ratio: 16/9;
-      background: #000; min-height: 260px;
+      border-radius: var(--radius); overflow: hidden;
+      background: var(--bg-secondary);
     }
-    .player-wrap iframe, .player-wrap video {
+    .video-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .video-thumb .dur {
+      position: absolute; bottom: 8px; right: 8px;
+      background: rgba(0,0,0,0.8); color: #fff;
+      padding: 2px 6px; border-radius: 4px;
+      font-size: 12px; font-weight: 500;
+    }
+    .video-thumb .live-badge {
+      position: absolute; bottom: 8px; left: 8px;
+      background: var(--accent); color: #fff;
+      padding: 3px 6px; border-radius: 3px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+    }
+    .video-meta {
+      display: flex; gap: 12px; padding: 12px 0 4px;
+    }
+    .video-meta .av {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, #1a6b3c, #2e8b57);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .video-meta-text h3 {
+      font-size: 14px; font-weight: 500; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .video-meta-text .ch { color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
+    .video-meta-text .ch:hover { color: var(--text-primary); }
+    .video-meta-text .views { color: var(--text-secondary); font-size: 12px; }
+
+    .empty-state {
+      grid-column: 1/-1; text-align: center; padding: 80px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-state h3 { font-size: 20px; color: var(--text-primary); margin-bottom: 8px; }
+
+    /* ═══════ WATCH PAGE ═══════ */
+    .watch-left { flex: 1; min-width: 0; }
+    .watch-right { width: 400px; flex-shrink: 0; }
+    @media (max-width: 1000px) { .watch-right { width: 100%; } }
+
+    /* Player */
+    .player-container {
+      position: relative; width: 100%; aspect-ratio: 16/9;
+      background: #000; border-radius: var(--radius); overflow: hidden;
+    }
+    .player-container iframe, .player-container video {
       position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
     }
-    .player-status {
+    .player-msg {
       position: absolute; inset: 0;
       display: none; align-items: center; justify-content: center;
-      padding: 2rem; text-align: center; color: #a8a29e; font-size: 0.88rem;
+      color: var(--text-secondary); font-size: 14px; text-align: center; padding: 20px;
     }
-    .player-status.on { display: flex; }
-    .loader {
+    .player-msg.show { display: flex; }
+    .player-loading {
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
     }
-    .loader.hide { display: none; }
-    .loader-ring {
-      width: 40px; height: 40px;
-      border: 3px solid rgba(255,255,255,0.2);
+    .player-loading.hide { display: none; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid rgba(255,255,255,0.15);
       border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    footer {
-      margin-top: 2.5rem; padding-top: 1.25rem;
-      border-top: 1px solid var(--border);
-      text-align: center; font-size: 0.78rem; color: var(--muted);
+    /* Video info below player */
+    .watch-title { font-size: 20px; font-weight: 700; margin-top: 12px; line-height: 1.3; }
+    .watch-actions {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      flex-wrap: wrap; gap: 12px;
     }
-    footer a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .watch-views { color: var(--text-secondary); font-size: 14px; }
+    .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .action-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 20px;
+      background: var(--bg-hover); color: var(--text-primary);
+      border: none; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .action-btn:hover { background: var(--border-light); }
+    .action-btn.active { background: var(--text-primary); color: var(--bg); }
+    .action-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+    /* Channel row below video */
+    .watch-channel {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 0; border-bottom: 1px solid var(--border);
+    }
+    .watch-channel .av {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, #1a6b3c, #2e8b57);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .watch-channel .info { flex: 1; }
+    .watch-channel .name { font-size: 16px; font-weight: 600; }
+    .watch-channel .subs { font-size: 12px; color: var(--text-secondary); }
+    .watch-channel .sub-btn {
+      padding: 8px 20px; background: #fff; color: #0f0f0f;
+      border: none; border-radius: 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Description box */
+    .description-box {
+      margin-top: 12px; padding: 12px 16px;
+      background: var(--bg-hover); border-radius: var(--radius);
+      font-size: 14px; line-height: 1.6; color: var(--text-secondary);
+    }
+    .description-box strong { color: var(--text-primary); }
+
+    /* Source tabs (replaces comments) */
+    .source-section { margin-top: 24px; }
+    .source-section h4 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .source-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .source-tab {
+      padding: 8px 16px; border-radius: 20px;
+      background: var(--bg-hover); color: var(--text-primary);
+      border: none; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .source-tab:hover { background: var(--border-light); }
+    .source-tab.active { background: var(--text-primary); color: var(--bg); }
+
+    /* Right sidebar — recommended videos */
+    .rec-list { display: flex; flex-direction: column; gap: 8px; }
+    .rec-header { font-size: 16px; font-weight: 700; margin-bottom: 8px; padding-top: 8px; }
+    .rec-card {
+      display: flex; gap: 8px; cursor: pointer;
+      padding: 4px; border-radius: var(--radius-sm);
+      transition: background 0.15s;
+    }
+    .rec-card:hover { background: var(--bg-hover); }
+    .rec-thumb {
+      width: 168px; min-width: 168px; aspect-ratio: 16/9;
+      border-radius: var(--radius-sm); overflow: hidden;
+      background: var(--bg-secondary); position: relative;
+    }
+    .rec-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .rec-thumb .dur {
+      position: absolute; bottom: 4px; right: 4px;
+      background: rgba(0,0,0,0.8); color: #fff;
+      padding: 1px 4px; border-radius: 3px; font-size: 11px;
+    }
+    .rec-meta h4 { font-size: 14px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .rec-meta .ch { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+    .rec-meta .views { font-size: 12px; color: var(--text-secondary); }
+    @media (max-width: 1000px) {
+      .rec-list { flex-direction: row; overflow-x: auto; padding-bottom: 8px; }
+      .rec-card { flex-direction: column; min-width: 200px; }
+      .rec-thumb { width: 100%; min-width: unset; }
+    }
+
+    /* ═══════ MOBILE SEARCH BAR (shown below header on mobile) ═══════ */
+    .mobile-search {
+      display: none; padding: 8px 16px;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+    }
+    .mobile-search input {
+      width: 100%; height: 40px; padding: 0 16px;
+      background: var(--bg-secondary); color: var(--text-primary);
+      border: 1px solid var(--border-light); border-radius: 20px;
+      font-size: 16px; outline: none;
+    }
+    .mobile-search input::placeholder { color: var(--text-muted); }
+    @media (max-width: 700px) { .mobile-search { display: block; } }
+
+    /* Back button */
+    .back-btn {
+      display: none; align-items: center; gap: 6px;
+      padding: 8px 0; margin-bottom: 8px;
+      background: none; border: none; color: var(--text-secondary);
+      font-size: 14px; cursor: pointer;
+    }
+    .back-btn:hover { color: var(--text-primary); }
+    .back-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    .watch-mode .back-btn { display: flex; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <div class="brand-block">
-        <h1>The <span>Muslim Lantern</span></h1>
-        <p>Official live stream archive</p>
+
+  <!-- ═══════ HEADER ═══════ -->
+  <header class="header">
+    <div class="header-left">
+      <a href="#" class="logo" id="logo-home">
+        <div class="logo-icon">☪</div>
+        <span>The Muslim Lantern</span>
+      </a>
+    </div>
+    <div class="header-search">
+      <input type="search" id="search" placeholder="Search recordings" autocomplete="off" />
+      <button class="search-btn" aria-label="Search">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      </button>
+    </div>
+    <div class="header-right">
+      <span class="yt-badge">ARCHIVE</span>
+    </div>
+  </header>
+
+  <div class="mobile-search">
+    <input type="search" id="search-mobile" placeholder="Search recordings" autocomplete="off" />
+  </div>
+
+  <!-- ═══════ MAIN CONTENT ═══════ -->
+  <div class="main browse-mode" id="main">
+
+    <!-- ═══ BROWSE PAGE ═══ -->
+    <div class="browse-page" id="browse-page">
+      <div class="channel-banner">
+        <div class="channel-avatar">☪</div>
+        <div class="channel-info">
+          <h2>The Muslim Lantern</h2>
+          <div class="subs" id="stats-line">Loading stats...</div>
+          <div class="desc">Official live stream archive — Every stream backed up permanently</div>
+        </div>
+        <a href="https://www.youtube.com/@TheMuslimLantern" target="_blank" rel="noopener" class="subscribe-btn">Visit Channel</a>
       </div>
-      <button type="button" class="theme-btn" id="theme-btn" aria-label="Toggle theme">Dark mode</button>
-    </header>
 
-    <section class="hero">
-      <h2>Your recorded streams</h2>
-      <p>Watch and download every live stream from The Muslim Lantern. Thumbnails are stored on MEGA and Archive.org so they stay visible when YouTube removes them.</p>
-    </section>
+      <div class="chips" id="chips">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="recent">Recent</button>
+        <button class="chip" data-filter="long">Long (2h+)</button>
+      </div>
 
-    <section class="stats" id="stats"></section>
+      <div class="video-grid" id="grid"></div>
+    </div>
 
-    <div class="toolbar">
-      <div class="search-box">
-        <input type="search" class="search" id="search" placeholder="Search recordings…" autocomplete="off" />
+    <!-- ═══ WATCH PAGE ═══ -->
+    <div class="watch-left" id="watch-left" style="display:none">
+      <button class="back-btn" id="back-btn">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        Back to videos
+      </button>
+
+      <div class="player-container" id="player">
+        <div class="player-loading" id="ploader"><div class="spinner"></div></div>
+        <div class="player-msg" id="pmsg"></div>
+      </div>
+
+      <h1 class="watch-title" id="watch-title"></h1>
+
+      <div class="watch-actions">
+        <div class="watch-views" id="watch-views"></div>
+        <div class="action-btns" id="action-btns"></div>
+      </div>
+
+      <div class="watch-channel">
+        <div class="av">☪</div>
+        <div class="info">
+          <div class="name">The Muslim Lantern</div>
+          <div class="subs">Live stream archive</div>
+        </div>
+        <a href="https://www.youtube.com/@TheMuslimLantern" target="_blank" rel="noopener" class="sub-btn">Visit Channel</a>
+      </div>
+
+      <div class="description-box" id="desc-box"></div>
+
+      <div class="source-section">
+        <h4>📡 Available Sources</h4>
+        <div class="source-tabs" id="source-tabs"></div>
       </div>
     </div>
 
-    <section class="grid" id="grid"></section>
-
-    <footer>
-      <p>Stream Recorder · <a href="https://github.com/usermuneeb1/Stream-Recorder" target="_blank" rel="noopener">GitHub</a></p>
-    </footer>
-  </div>
-
-  <div class="modal" id="modal">
-    <div class="modal-panel">
-      <div class="modal-top">
-        <h2 id="modal-title"></h2>
-        <button type="button" class="modal-close" id="modal-close" aria-label="Close">&times;</button>
-      </div>
-      <div class="tabs" id="tabs"></div>
-      <div class="player-wrap" id="player-wrap">
-        <div class="loader" id="loader"><div class="loader-ring"></div></div>
-        <div class="player-status" id="player-status"></div>
-      </div>
+    <div class="watch-right" id="watch-right" style="display:none">
+      <div class="rec-header">More recordings</div>
+      <div class="rec-list" id="rec-list"></div>
     </div>
   </div>
 
   <script>
     const RAW = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
-    const CHANNEL = 'the muslim lantern';
+    const CHANNEL_NAME = 'the muslim lantern';
 
     let streams = [];
     let current = null;
+    let currentSourceKey = null;
 
     const $ = id => document.getElementById(id);
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
 
-    function isTML(ch) { return (ch || '').toLowerCase().includes(CHANNEL); }
-    function ytId(u) { const m = (u || '').match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/); return m ? m[1] : ''; }
-    function archiveId(u) { const m = (u || '').match(/archive\.org\/details\/([^/?\s]+)/); return m ? m[1] : ''; }
-    function pixelId(u) { const m = (u || '').match(/pixeldrain\.com\/u\/([a-zA-Z0-9]+)/); return m ? m[1] : ''; }
-    function gofileCode(u) { const m = (u || '').match(/gofile\.io\/d\/([a-zA-Z0-9]+)/); return m ? m[1] : ''; }
-    function megaEmbed(u) {
-      const m = (u || '').match(/mega\.nz\/(?:file|folder)\/([^#]+)(?:#(.+))?/);
-      return m ? `https://mega.nz/embed/${m[2] ? m[1] + '#' + m[2] : m[1]}` : null;
-    }
-    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-    function isHotlink(url) {
-      return url && url.startsWith('http') && !url.includes('ytimg.com') && !url.includes('mega.nz');
+    function isTML(ch) { return (ch||'').toLowerCase().includes(CHANNEL_NAME); }
+    function ytId(u) { const m = (u||'').match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/); return m ? m[1] : ''; }
+    function archiveId(u) { const m = (u||'').match(/archive\.org\/details\/([^\/?#\s]+)/); return m ? m[1] : ''; }
+    function pixelId(u) { const m = (u||'').match(/pixeldrain\.com\/u\/([a-zA-Z0-9]+)/); return m ? m[1] : ''; }
+    function gofileCode(u) { const m = (u||'').match(/gofile\.io\/d\/([a-zA-Z0-9]+)/); return m ? m[1] : ''; }
+
+    function timeAgo(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      const now = new Date();
+      const days = Math.floor((now - d) / 86400000);
+      if (days < 1) return 'Today';
+      if (days === 1) return '1 day ago';
+      if (days < 7) return days + ' days ago';
+      if (days < 30) return Math.floor(days/7) + ' weeks ago';
+      if (days < 365) return Math.floor(days/30) + ' months ago';
+      return Math.floor(days/365) + ' years ago';
     }
 
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // ═══════ DATA LOADING ═══════
     function parseLinks(text) {
       const out = [];
       for (const block of text.split(/={10,}/)) {
@@ -350,34 +482,27 @@
         if (!url.includes('youtube')) continue;
         const links = {};
         for (const line of b.split('\n')) {
-          const lm = line.match(/^\[(\w+):([^\]]+)\]\s+(https?:\S+)/);
+          const lm = line.match(/^\[(\w+):([^\]]+)\]\s+(https?\S+)/);
           if (lm) links[`${lm[1]}_${lm[2]}`.toLowerCase()] = lm[3].replace(/\s+\(PERMANENT\)$/, '');
         }
         const vid = ytId(url);
-        const thumb = get('Thumbnail');
-        const thumbMega = get('ThumbnailMEGA');
-        const displayThumb = isHotlink(thumb) ? thumb : (thumbMega ? '' : `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`);
         out.push({
-          title: get('Title'), channel: get('Channel'), date: get('Date'), url, videoId: vid,
-          duration: get('Duration'), size: get('Size'),
-          thumbnail: displayThumb,
-          thumbnailMega: thumbMega || '',
-          sources: buildSources(url, vid, links)
+          title: get('Title'), channel: get('Channel'), date: get('Date'),
+          url, videoId: vid, duration: get('Duration'), size: get('Size'),
+          thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+          sources: buildSources(url, links)
         });
       }
       return out;
     }
 
-    function buildSources(url, vid, links) {
-      const s = { youtube: { type: 'youtube', label: 'YouTube', url } };
-      if (links.archive_hd) s.archive = { type: 'archive', label: 'Archive.org', url: links.archive_hd };
-      if (links.archive_compressed) s.archiveSmall = { type: 'archive', label: 'Archive (compressed)', url: links.archive_compressed };
-      if (links.gofile_hd) s.gofile = { type: 'gofile', label: 'Gofile', url: links.gofile_hd };
-      if (links.gofile_compressed) s.gofileSmall = { type: 'gofile', label: 'Gofile (small)', url: links.gofile_compressed };
-      if (links.pixeldrain_hd || links.pixeldrain_compressed)
-        s.pixel = { type: 'pixeldrain', label: 'Pixeldrain', url: links.pixeldrain_hd || links.pixeldrain_compressed };
-      if (links.mega_hd || links.mega_compressed)
-        s.mega = { type: 'mega', label: 'MEGA', url: links.mega_hd || links.mega_compressed };
+    function buildSources(url, links) {
+      const s = {};
+      if (links.archive_hd) s.archive = { label: '🏛️ Archive.org', url: links.archive_hd };
+      if (links.mega_hd || links.mega_compressed) s.mega = { label: '🔴 MEGA.nz', url: links.mega_hd || links.mega_compressed };
+      if (links.gofile_hd) s.gofile = { label: '🟠 Gofile', url: links.gofile_hd };
+      if (links.pixeldrain_hd || links.pixeldrain_compressed) s.pixel = { label: '🟣 Pixeldrain', url: links.pixeldrain_hd || links.pixeldrain_compressed };
+      if (links.archive_compressed) s.archiveSmall = { label: '📱 Archive (compressed)', url: links.archive_compressed };
       return s;
     }
 
@@ -388,186 +513,243 @@
         const id = r.video_id || ytId(r.video_url);
         if (!id) continue;
         let s = map[id] || {
-          title: r.title, channel: r.channel, date: r.date, url: r.video_url, videoId: id,
-          duration: r.duration_fmt, size: r.size_human,
-          thumbnail: isHotlink(r.thumbnail) ? r.thumbnail : `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-          thumbnailMega: r.thumbnail_mega || '',
-          sources: { youtube: { type: 'youtube', label: 'YouTube', url: r.video_url } }
+          title: r.title, channel: r.channel, date: r.date,
+          url: r.video_url, videoId: id, duration: r.duration_fmt, size: r.size_human,
+          thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+          sources: {}
         };
-        if (r.gofile_link) s.sources.gofile = { type: 'gofile', label: 'Gofile', url: r.gofile_link };
-        if (r.pixeldrain_link) s.sources.pixel = { type: 'pixeldrain', label: 'Pixeldrain', url: r.pixeldrain_link };
-        if (r.archive_link) s.sources.archive = { type: 'archive', label: 'Archive.org', url: r.archive_link };
-        if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { type: 'mega', label: 'MEGA', url: r.mega_link };
-        if (isHotlink(r.thumbnail)) s.thumbnail = r.thumbnail;
-        if (r.thumbnail_mega) s.thumbnailMega = r.thumbnail_mega;
+        if (r.gofile_link) s.sources.gofile = { label: '🟠 Gofile', url: r.gofile_link };
+        if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link };
+        if (r.archive_link) s.sources.archive = { label: '🏛️ Archive.org', url: r.archive_link };
+        if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link };
         map[id] = s;
       }
-      return Object.values(map).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      return Object.values(map).sort((a, b) => (b.date||'').localeCompare(a.date||''));
     }
 
-    function initTheme() {
-      const saved = localStorage.getItem('tml-theme') || 'light';
-      document.documentElement.dataset.theme = saved;
-      $('theme-btn').textContent = saved === 'dark' ? 'Light mode' : 'Dark mode';
-    }
-    $('theme-btn').addEventListener('click', () => {
-      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem('tml-theme', next);
-      $('theme-btn').textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
-    });
+    // ═══════ BROWSE VIEW ═══════
+    function renderGrid(filter) {
+      let list = streams;
+      const q = ($('search').value || $('search-mobile').value || '').toLowerCase().trim();
+      if (q) list = list.filter(s => s.title.toLowerCase().includes(q));
+      if (filter === 'recent') list = list.slice(0, 8);
+      if (filter === 'long') list = list.filter(s => {
+        const parts = (s.duration||'').split(':').map(Number);
+        const hrs = parts.length === 3 ? parts[0] : 0;
+        return hrs >= 2;
+      });
 
-    function renderStats(st) {
-      $('stats').innerHTML = `
-        <div class="stat"><div class="n">${st?.total_streams ?? 0}</div><div class="l">Streams</div></div>
-        <div class="stat"><div class="n">${Number(st?.total_hours ?? 0).toFixed(1)}h</div><div class="l">Hours</div></div>
-        <div class="stat"><div class="n">${Number(st?.total_gb ?? 0).toFixed(1)}</div><div class="l">Gigabytes</div></div>
-        <div class="stat"><div class="n" style="font-size:1rem">${esc((st?.last_stream?.date || '—').split(' ').slice(0,3).join(' '))}</div><div class="l">Latest</div></div>`;
-    }
-
-    function sourceList(s) { return Object.values(s.sources || {}).filter(Boolean); }
-
-    function renderGrid() {
-      const q = $('search').value.toLowerCase().trim();
-      const list = streams.filter(s => !q || s.title.toLowerCase().includes(q));
       const g = $('grid');
       if (!list.length) {
-        g.innerHTML = '<div class="empty"><p style="font-weight:600;color:var(--accent)">No recordings yet</p><p style="margin-top:0.5rem;color:var(--muted)">Only The Muslim Lantern streams appear here.</p></div>';
+        g.innerHTML = '<div class="empty-state"><h3>No recordings found</h3><p>Only The Muslim Lantern streams appear here.</p></div>';
         return;
       }
       g.innerHTML = list.map((s, i) => {
-        const pills = sourceList(s).map(x => `<span class="pill">${esc(x.label)}</span>`).join('');
-        const thumb = s.thumbnail || `https://i.ytimg.com/vi/${s.videoId}/hqdefault.jpg`;
-        return `<article class="card" style="animation-delay:${0.05 * i}s" data-i="${i}">
-          <div class="thumb">
-            <img src="${esc(thumb)}" alt="" loading="lazy" onerror="this.src='';this.style.background='var(--accent-soft)'" />
-            <span class="badge-dur">${esc(s.duration || '')}</span>
-            <div class="thumb-fade"><div class="play"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
+        const thumb = s.thumbnail || '';
+        return `<div class="video-card" style="--i:${i}" data-i="${i}" data-vid="${s.videoId}">
+          <div class="video-thumb">
+            <img src="${esc(thumb)}" alt="" loading="lazy" onerror="this.style.display='none'" />
+            <span class="dur">${esc(s.duration||'')}</span>
           </div>
-          <div class="card-body">
-            <h3>${esc(s.title)}</h3>
-            <div class="card-meta">${esc(s.date?.split(' ').slice(0,3).join(' ') || '')} · ${esc(s.size || '')}</div>
-            <div class="pills">${pills}</div>
+          <div class="video-meta">
+            <div class="av">☪</div>
+            <div class="video-meta-text">
+              <h3>${esc(s.title)}</h3>
+              <div class="ch">The Muslim Lantern</div>
+              <div class="views">${esc(s.size||'')} · ${timeAgo(s.date)}</div>
+            </div>
           </div>
-        </article>`;
+        </div>`;
       }).join('');
-      g.querySelectorAll('.card').forEach(c => {
-        c.addEventListener('click', () => openPlayer(list[+c.dataset.i]));
+
+      g.querySelectorAll('.video-card').forEach(c => {
+        c.addEventListener('click', () => {
+          const vid = c.dataset.vid;
+          const s = streams.find(x => x.videoId === vid);
+          if (s) openWatch(s);
+        });
       });
+    }
+
+    // ═══════ WATCH VIEW ═══════
+    function openWatch(s) {
+      current = s;
+      $('main').classList.remove('browse-mode');
+      $('main').classList.add('watch-mode');
+      $('browse-page').style.display = 'none';
+      $('watch-left').style.display = 'block';
+      $('watch-right').style.display = 'block';
+
+      $('watch-title').textContent = s.title;
+      $('watch-views').textContent = `${s.size || ''} · ${formatDate(s.date)}`;
+
+      // Description
+      $('desc-box').innerHTML = `
+        <strong>${esc(s.date||'')} · ${esc(s.duration||'')}</strong><br>
+        Recorded live stream from The Muslim Lantern.<br>
+        Original quality: ${esc(s.size||'Unknown')}
+      `;
+
+      // Download buttons
+      const srcEntries = Object.entries(s.sources).filter(([,v]) => v);
+      $('action-btns').innerHTML = srcEntries.map(([k, v]) =>
+        `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="action-btn">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          ${esc(v.label)}
+        </a>`
+      ).join('');
+
+      // Source tabs
+      $('source-tabs').innerHTML = srcEntries.map(([k, v], i) =>
+        `<button class="source-tab ${i===0?'active':''}" data-key="${k}">${esc(v.label)}</button>`
+      ).join('');
+      $('source-tabs').querySelectorAll('.source-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          $('source-tabs').querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+          btn.classList.add('active');
+          playSource(s.sources[btn.dataset.key]);
+        });
+      });
+
+      // Play first available source
+      if (srcEntries.length) {
+        playSource(srcEntries[0][1]);
+      } else {
+        clearPlayer();
+        $('pmsg').textContent = 'No playable sources available. Downloads may still work.';
+        $('pmsg').classList.add('show');
+      }
+
+      // Recommended videos
+      renderRecommended(s);
+      window.scrollTo(0, 0);
+    }
+
+    function goBack() {
+      current = null;
+      $('main').classList.add('browse-mode');
+      $('main').classList.remove('watch-mode');
+      $('browse-page').style.display = 'block';
+      $('watch-left').style.display = 'none';
+      $('watch-right').style.display = 'none';
+      clearPlayer();
     }
 
     function clearPlayer() {
-      $('player-wrap').querySelectorAll('iframe,video').forEach(n => n.remove());
-      $('player-status').classList.remove('on');
-    }
-
-    async function playGofile(url) {
-      const code = gofileCode(url);
-      if (!code) throw new Error('Invalid Gofile URL');
-      const res = await fetch(`https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6`);
-      const data = await res.json();
-      const file = data?.data?.children && Object.values(data.data.children).find(c =>
-        c.type === 'file' && /\.(mp4|mkv|webm|m4v)$/i.test(c.name || ''));
-      if (file?.link) {
-        clearPlayer();
-        const v = document.createElement('video');
-        v.controls = true; v.playsInline = true; v.src = file.link;
-        $('player-wrap').appendChild(v);
-        return;
-      }
-      throw new Error('Gofile blocks embedded pages. Direct stream unavailable — try Archive, MEGA, or YouTube.');
+      $('player').querySelectorAll('iframe,video').forEach(n => n.remove());
+      $('pmsg').classList.remove('show');
     }
 
     async function playSource(src) {
-      $('loader').classList.remove('hide');
-      $('player-status').classList.remove('on');
+      $('ploader').classList.remove('hide');
+      $('pmsg').classList.remove('show');
       clearPlayer();
-      await sleep(150);
+
       try {
-        if (src.type === 'youtube' && current?.videoId) {
-          clearPlayer();
-          const f = document.createElement('iframe');
-          f.allow = 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture';
-          f.allowFullscreen = true;
-          f.src = `https://www.youtube.com/embed/${current.videoId}?rel=0&autoplay=1`;
-          $('player-wrap').appendChild(f);
-        } else if (src.type === 'archive') {
-          const id = archiveId(src.url);
-          if (!id) throw new Error('Archive ID missing');
-          clearPlayer();
+        const url = src.url;
+        if (url.includes('archive.org')) {
+          const id = archiveId(url);
+          if (!id) throw new Error('Invalid Archive.org link');
           const f = document.createElement('iframe');
           f.allowFullscreen = true;
           f.src = `https://archive.org/embed/${id}`;
-          $('player-wrap').appendChild(f);
-        } else if (src.type === 'pixeldrain') {
-          const id = pixelId(src.url);
-          if (!id) throw new Error('Pixeldrain ID missing');
-          clearPlayer();
+          $('player').appendChild(f);
+        } else if (url.includes('pixeldrain.com')) {
+          const id = pixelId(url);
+          if (!id) throw new Error('Invalid Pixeldrain link');
           const v = document.createElement('video');
-          v.controls = true; v.playsInline = true;
+          v.controls = true; v.playsInline = true; v.autoplay = true;
           v.src = `https://pixeldrain.com/api/file/${id}/stream`;
-          $('player-wrap').appendChild(v);
-        } else if (src.type === 'gofile') {
-          await playGofile(src.url);
-        } else if (src.type === 'mega') {
-          const emb = megaEmbed(src.url);
-          if (!emb) throw new Error('MEGA link invalid');
-          clearPlayer();
+          $('player').appendChild(v);
+        } else if (url.includes('gofile.io')) {
+          const code = gofileCode(url);
+          if (!code) throw new Error('Invalid Gofile link');
+          try {
+            const res = await fetch(`https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6`);
+            const data = await res.json();
+            const file = data?.data?.children && Object.values(data.data.children).find(c =>
+              c.type === 'file' && /\.(mp4|mkv|webm|m4v)$/i.test(c.name || ''));
+            if (file?.link) {
+              const v = document.createElement('video');
+              v.controls = true; v.playsInline = true; v.autoplay = true; v.src = file.link;
+              $('player').appendChild(v);
+            } else {
+              throw new Error('Could not load Gofile video — try another source');
+            }
+          } catch(e) {
+            throw new Error('Gofile blocked — try Archive.org or MEGA');
+          }
+        } else if (url.includes('mega.nz')) {
+          const m = url.match(/mega\.nz\/(?:file|folder)\/([^#]+)(?:#(.+))?/);
+          if (!m) throw new Error('Invalid MEGA link');
+          const emb = `https://mega.nz/embed/${m[2] ? m[1] + '#' + m[2] : m[1]}`;
           const f = document.createElement('iframe');
           f.allowFullscreen = true;
           f.src = emb;
-          $('player-wrap').appendChild(f);
-        } else throw new Error('Unknown source');
-      } catch (e) {
-        clearPlayer();
-        $('player-status').textContent = e.message;
-        $('player-status').classList.add('on');
+          $('player').appendChild(f);
+        } else {
+          throw new Error('Unknown source type');
+        }
+      } catch(e) {
+        $('pmsg').textContent = e.message;
+        $('pmsg').classList.add('show');
       }
-      $('loader').classList.add('hide');
+      $('ploader').classList.add('hide');
     }
 
-    function openPlayer(s) {
-      current = s;
-      const entries = Object.entries(s.sources).filter(([, v]) => v);
-      if (!entries.length) return;
-      $('modal-title').textContent = s.title;
-      $('modal').classList.add('show');
-      document.body.style.overflow = 'hidden';
-      $('tabs').innerHTML = entries.map(([k, v], i) =>
-        `<button type="button" class="tab ${i === 0 ? 'on' : ''}" data-i="${i}">${esc(v.label)}</button>`
-      ).join('');
-      $('tabs').querySelectorAll('.tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          $('tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
-          btn.classList.add('on');
-          playSource(entries[+btn.dataset.i][1]);
+    function renderRecommended(current) {
+      const others = streams.filter(s => s.videoId !== current.videoId).slice(0, 15);
+      $('rec-list').innerHTML = others.map(s => `
+        <div class="rec-card" data-vid="${s.videoId}">
+          <div class="rec-thumb">
+            <img src="${esc(s.thumbnail||'')}" alt="" loading="lazy" onerror="this.style.display='none'" />
+            <span class="dur">${esc(s.duration||'')}</span>
+          </div>
+          <div class="rec-meta">
+            <h4>${esc(s.title)}</h4>
+            <div class="ch">The Muslim Lantern</div>
+            <div class="views">${esc(s.size||'')} · ${timeAgo(s.date)}</div>
+          </div>
+        </div>
+      `).join('');
+      $('rec-list').querySelectorAll('.rec-card').forEach(c => {
+        c.addEventListener('click', () => {
+          const s = streams.find(x => x.videoId === c.dataset.vid);
+          if (s) openWatch(s);
         });
       });
-      playSource(entries[0][1]);
     }
 
-    function closeModal() {
-      $('modal').classList.remove('show');
-      document.body.style.overflow = '';
-      clearPlayer();
-      $('loader').classList.remove('hide');
-      current = null;
-    }
+    // ═══════ EVENTS ═══════
+    $('back-btn').addEventListener('click', goBack);
+    $('logo-home').addEventListener('click', e => { e.preventDefault(); goBack(); });
+    $('search').addEventListener('input', () => renderGrid());
+    $('search-mobile').addEventListener('input', () => {
+      $('search').value = $('search-mobile').value;
+      renderGrid();
+    });
 
-    $('modal-close').addEventListener('click', closeModal);
-    $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-    $('search').addEventListener('input', renderGrid);
+    document.querySelectorAll('.chip').forEach(c => {
+      c.addEventListener('click', () => {
+        document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+        c.classList.add('active');
+        renderGrid(c.dataset.filter);
+      });
+    });
 
+    // ═══════ INIT ═══════
     async function init() {
-      initTheme();
-      try { renderStats(await (await fetch(`${RAW}/stats.json?t=${Date.now()}`)).json()); } catch { }
+      try {
+        const st = await (await fetch(`${RAW}/stats.json?t=${Date.now()}`)).json();
+        $('stats-line').textContent = `${st?.total_streams??0} streams · ${Number(st?.total_hours??0).toFixed(0)} hours archived · ${Number(st?.total_gb??0).toFixed(1)} GB`;
+      } catch { $('stats-line').textContent = 'Stream archive'; }
+
       let list = [];
-      try { list = parseLinks(await (await fetch(`${RAW}/links.txt?t=${Date.now()}`)).text()); } catch { }
+      try { list = parseLinks(await (await fetch(`${RAW}/links.txt?t=${Date.now()}`)).text()); } catch {}
       try {
         const rec = await (await fetch(`${RAW}/data/recordings.json?t=${Date.now()}`)).json();
         list = merge(list, rec);
-      } catch { }
+      } catch {}
       streams = list.filter(s => isTML(s.channel));
       renderGrid();
     }
