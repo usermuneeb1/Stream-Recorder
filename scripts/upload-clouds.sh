@@ -456,6 +456,81 @@ upload_to_archive() {
 }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  THUMBNAIL → CLOUD (for dashboard — survives private/deleted YouTube)
+#  Uploads the local JPEG to Pixeldrain, then Gofile, then MEGA. Not stored in git.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_thumbnail_to_cloud() {
+    local thumb_file="${1:-}"
+    [[ -z "$thumb_file" || ! -s "$thumb_file" ]] && thumb_file="${LOCAL_THUMBNAIL_PATH:-}"
+    [[ -z "$thumb_file" || ! -s "$thumb_file" ]] && thumb_file="${RECORD_DIR:-/tmp/stream-recorder}/stream_thumbnail.jpg"
+    if [[ ! -s "$thumb_file" ]]; then
+        log_warn "No local thumbnail to upload for dashboard"
+        return 1
+    fi
+
+    log_step "Uploading thumbnail to cloud for dashboard (${thumb_file})..."
+
+    local api_key="${PIXELDRAIN_API_KEY:-}"
+    local upload_response http_code json_body file_id
+    upload_response=$(curl -s --max-time 120 \
+        ${api_key:+-H "Authorization: Bearer ${api_key}"} \
+        -F "file=@${thumb_file};filename=stream_thumbnail.jpg" \
+        -w $'\n%{http_code}' \
+        "https://pixeldrain.com/api/file" 2>/dev/null) || true
+    http_code=$(echo "$upload_response" | tail -1)
+    json_body=$(echo "$upload_response" | head -n -1)
+    file_id=$(echo "$json_body" | jq -r '.id // empty' 2>/dev/null)
+    if [[ -n "$file_id" ]] && [[ "$http_code" =~ ^2 ]]; then
+        THUMBNAIL_CLOUD_URL="https://pixeldrain.com/api/file/${file_id}"
+        set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
+        set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
+        log_ok "Thumbnail on Pixeldrain → ${THUMBNAIL_CLOUD_URL}"
+        return 0
+    fi
+
+    log_warn "Pixeldrain thumbnail upload failed — trying Gofile..."
+    local gf_response gf_status gf_code gf_link
+    gf_response=$(curl -s --max-time 120 -F "file=@${thumb_file}" \
+        "https://upload.gofile.io/uploadfile" 2>/dev/null) || true
+    gf_status=$(echo "$gf_response" | jq -r '.status // empty' 2>/dev/null)
+    gf_code=$(echo "$gf_response" | jq -r '.data.code // .data.fileId // empty' 2>/dev/null)
+    if [[ "$gf_status" == "ok" && -n "$gf_code" ]]; then
+        local wt="4fd6sg89d7s6"
+        local contents
+        contents=$(curl -s --max-time 60 "https://api.gofile.io/contents/${gf_code}?wt=${wt}" 2>/dev/null) || true
+        gf_link=$(echo "$contents" | jq -r '(.data.children // {}) | to_entries[0].value.link // empty' 2>/dev/null)
+        if [[ -n "$gf_link" && "$gf_link" == http* ]]; then
+            THUMBNAIL_CLOUD_URL="$gf_link"
+            set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
+            set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
+            log_ok "Thumbnail on Gofile (direct) → ${THUMBNAIL_CLOUD_URL}"
+            return 0
+        fi
+    fi
+
+    if [[ -n "${MEGA_EMAIL:-}" && -n "${MEGA_PASSWORD:-}" ]] && command -v megaput &>/dev/null; then
+        log_warn "Trying MEGA for thumbnail..."
+        local mega_dest="/StreamRecorder/thumbnails"
+        megamkdir -u "$MEGA_EMAIL" -p "$MEGA_PASSWORD" "$mega_dest" 2>/dev/null || true
+        if megaput -u "$MEGA_EMAIL" -p "$MEGA_PASSWORD" --path "$mega_dest" "$thumb_file" 2>/dev/null; then
+            local mega_link
+            mega_link=$(megals -u "$MEGA_EMAIL" -p "$MEGA_PASSWORD" -e "${mega_dest}/$(basename "$thumb_file")" 2>/dev/null | head -1) || true
+            if [[ -n "$mega_link" && "$mega_link" == http* ]]; then
+                THUMBNAIL_CLOUD_URL="$mega_link"
+                set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
+                set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
+                log_ok "Thumbnail on MEGA → ${THUMBNAIL_CLOUD_URL}"
+                return 0
+            fi
+        fi
+    fi
+
+    log_warn "Could not upload thumbnail to any cloud — dashboard may use YouTube thumb until private"
+    return 1
+}
+
 upload_to_clouds() {
     log_header "☁️ MULTI-CLOUD REDUNDANCY UPLOAD"
 
@@ -599,6 +674,11 @@ upload_to_clouds() {
 
         UPLOAD_SUCCESS_COUNT=$(( UPLOAD_SUCCESS_COUNT + svc_success ))
     done
+
+    log_separator
+
+    # Dashboard thumbnail (cloud URL — not committed to repo)
+    upload_thumbnail_to_cloud || true
 
     log_separator
 

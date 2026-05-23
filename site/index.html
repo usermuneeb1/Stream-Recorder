@@ -423,6 +423,7 @@
           if (lm) links[`${lm[1]}_${lm[2]}`.toLowerCase()] = lm[3].replace(/\s+\(PERMANENT\)$/, '');
         }
         const vid = ytId(url);
+        const cloudThumb = get('Thumbnail');
         out.push({
           title: get('Title'),
           channel,
@@ -431,7 +432,7 @@
           videoId: vid,
           duration: get('Duration'),
           size: get('Size'),
-          thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+          thumbnail: (cloudThumb && cloudThumb.startsWith('http')) ? cloudThumb : `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
           sources: {
             youtube: { type: 'youtube', label: '▶ YouTube', url },
             archiveHd: links.archive_hd ? { type: 'archive', label: '🏛 Archive HD', url: links.archive_hd } : null,
@@ -464,6 +465,9 @@
         if (r.pixeldrain_link) base.sources.pixeldrain = { type: 'pixeldrain', label: '🟣 Pixeldrain', url: r.pixeldrain_link };
         if (r.archive_link) base.sources.archiveHd = { type: 'archive', label: '🏛 Archive HD', url: r.archive_link };
         if (r.mega_link) base.sources.mega = { type: 'mega', label: '🔴 MEGA', url: r.mega_link };
+        if (r.thumbnail && r.thumbnail.startsWith('http') && !r.thumbnail.includes('ytimg.com')) {
+          base.thumbnail = r.thumbnail;
+        }
         map[id] = base;
       }
       return Object.values(map).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -522,7 +526,7 @@
         return `
           <article class="card" style="animation-delay:${0.08 * i}s" data-i="${i}">
             <div class="thumb">
-              <img src="${s.thumbnail}" alt="" loading="lazy" />
+              <img src="${esc(s.thumbnail)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22480%22 height=%22270%22%3E%3Crect fill=%22%23ffe8ec%22 width=%22100%25%22 height=%22100%25%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23c41e3a%22 font-size=%2218%22 text-anchor=%22middle%22 dy=%22.3em%22%3EThe Muslim Lantern%3C/text%3E%3C/svg%3E'" />
               <span class="dur">${esc(s.duration || '')}</span>
               <div class="thumb-overlay"><div class="play-circle"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
             </div>
@@ -571,7 +575,7 @@
           }
         }
       } catch (e) { console.warn('Gofile API', e); }
-      setPlayerHTML(`<iframe allowfullscreen src="https://gofile.io/d/${code}" title="Gofile player"></iframe>`);
+      showPlayerError('Gofile cannot embed in the page (blocked by Gofile). Use Pixeldrain, Archive, MEGA, or YouTube tabs.');
     }
 
     async function renderPlayerSource(src) {

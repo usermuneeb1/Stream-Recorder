@@ -49,6 +49,9 @@ update_links() {
     entry+="Duration: ${duration_fmt}\n"
     entry+="Size:     ${size_human} (${size_gb} GB)\n"
     entry+="Uploads:  ${upload_count}/${upload_total}\n"
+    if [[ -n "${THUMBNAIL_CLOUD_URL:-}" ]]; then
+        entry+="Thumbnail: ${THUMBNAIL_CLOUD_URL}\n"
+    fi
     if [[ -n "${RECORD_DISCORD_MSG_ID:-}" ]]; then
         entry+="MsgID:    ${RECORD_DISCORD_MSG_ID}\n"
     fi
