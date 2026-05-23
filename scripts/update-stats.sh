@@ -172,6 +172,7 @@ update_recordings_json() {
         --arg channel "${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}" \
         --arg video_url "${STREAM_URL:-}" \
         --arg thumbnail "${THUMBNAIL_CLOUD_URL:-${STREAM_THUMBNAIL:-}}" \
+        --arg thumbnail_mega "${THUMBNAIL_MEGA_URL:-}" \
         --arg duration_sec "${RECORD_DURATION_SEC:-0}" \
         --arg duration_fmt "${RECORD_DURATION_FMT:-00:00:00}" \
         --arg size_bytes "${RECORD_SIZE_BYTES:-0}" \
@@ -191,6 +192,7 @@ update_recordings_json() {
             channel: $channel,
             video_url: $video_url,
             thumbnail: $thumbnail,
+            thumbnail_mega: $thumbnail_mega,
             duration_sec: ($duration_sec | tonumber? // 0),
             duration_fmt: $duration_fmt,
             size_bytes: ($size_bytes | tonumber? // 0),

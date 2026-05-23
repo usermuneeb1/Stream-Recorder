@@ -52,6 +52,9 @@ update_links() {
     if [[ -n "${THUMBNAIL_CLOUD_URL:-}" ]]; then
         entry+="Thumbnail: ${THUMBNAIL_CLOUD_URL}\n"
     fi
+    if [[ -n "${THUMBNAIL_MEGA_URL:-}" ]]; then
+        entry+="ThumbnailMEGA: ${THUMBNAIL_MEGA_URL}\n"
+    fi
     if [[ -n "${RECORD_DISCORD_MSG_ID:-}" ]]; then
         entry+="MsgID:    ${RECORD_DISCORD_MSG_ID}\n"
     fi

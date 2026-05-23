@@ -457,9 +457,88 @@ upload_to_archive() {
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  THUMBNAIL → CLOUD (for dashboard — survives private/deleted YouTube)
-#  Uploads the local JPEG to Pixeldrain, then Gofile, then MEGA. Not stored in git.
+#  THUMBNAIL → CLOUD (not stored in git repo)
+#  1) MEGA — permanent copy in YOUR account (/Root/TheMuslimLantern/thumbnails/)
+#  2) Archive.org image — hotlink URL for dashboard (works when YouTube thumb dies)
+#  3) Gofile direct — fallback display URL
+#  Pixeldrain skipped by default (GitHub Actions datacenter IPs are often blocked)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+upload_thumbnail_to_archive() {
+    local thumb_file="$1"
+    local access_key="${ARCHIVE_ACCESS_KEY:-}"
+    local secret_key="${ARCHIVE_SECRET_KEY:-}"
+    [[ -z "$access_key" || -z "$secret_key" ]] && return 1
+
+    local video_id="${STREAM_VIDEO_ID:-unknown}"
+    local identifier="tml-thumb-${video_id}"
+    identifier=$(echo "$identifier" | sed 's/[^a-zA-Z0-9_-]/-/g' | cut -c1-80)
+    local safe_name="thumbnail_${video_id}.jpg"
+
+    local http_code
+    http_code=$(curl -s --max-time 180 -o /dev/null -w '%{http_code}' \
+        -H "authorization: LOW ${access_key}:${secret_key}" \
+        -H "x-archive-auto-make-bucket: 1" \
+        -H "x-archive-meta-title: The Muslim Lantern Thumbnail ${video_id}" \
+        -H "x-archive-meta-mediatype: image" \
+        -H "x-archive-meta-collection: opensource_image" \
+        -H "Content-Type: image/jpeg" \
+        --upload-file "$thumb_file" \
+        "https://s3.us.archive.org/${identifier}/${safe_name}" 2>/dev/null) || http_code="000"
+
+    if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
+        THUMBNAIL_CLOUD_URL="https://archive.org/download/${identifier}/${safe_name}"
+        set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
+        set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
+        log_ok "Thumbnail on Archive.org (dashboard image) → ${THUMBNAIL_CLOUD_URL}"
+        return 0
+    fi
+    return 1
+}
+
+upload_thumbnail_to_mega() {
+    local thumb_file="$1"
+    local mega_email="${MEGA_EMAIL:-}"
+    local mega_pass="${MEGA_PASSWORD:-}"
+    [[ -z "$mega_email" || -z "$mega_pass" ]] && return 1
+
+    if ! command -v megaput &>/dev/null; then
+        sudo apt-get install -y -qq megatools 2>/dev/null || return 1
+    fi
+
+    local video_id="${STREAM_VIDEO_ID:-unknown}"
+    local mega_rc="/tmp/.megarc_thumb"
+    cat > "$mega_rc" << EOF
+[Login]
+Username = ${mega_email}
+Password = ${mega_pass}
+EOF
+    chmod 600 "$mega_rc"
+
+    local remote_dir="/Root/TheMuslimLantern/thumbnails"
+    local remote_name="tml_${video_id}.jpg"
+    megamkdir --config "$mega_rc" "$remote_dir" 2>/dev/null || true
+
+    local staged_thumb="/tmp/${remote_name}"
+    cp "$thumb_file" "$staged_thumb" 2>/dev/null || return 1
+    if megaput --config "$mega_rc" --path "${remote_dir}/" "$staged_thumb" 2>/dev/null; then
+        rm -f "$staged_thumb"
+        local export_output public_link
+        export_output=$(megals --config "$mega_rc" -e "${remote_dir}/${remote_name}" 2>/dev/null) || true
+        public_link=$(echo "$export_output" | grep -oP 'https://mega\.nz/\S+' | head -1)
+        rm -f "$mega_rc"
+        if [[ -n "$public_link" ]]; then
+            THUMBNAIL_MEGA_URL="$public_link"
+            set_env "THUMBNAIL_MEGA_URL" "$THUMBNAIL_MEGA_URL"
+            log_ok "Thumbnail saved on MEGA (your account) → ${THUMBNAIL_MEGA_URL}"
+            return 0
+        fi
+        log_ok "Thumbnail uploaded to MEGA at ${remote_dir}/${remote_name} (export link pending)"
+        return 0
+    fi
+    rm -f "$mega_rc"
+    return 1
+}
 
 upload_thumbnail_to_cloud() {
     local thumb_file="${1:-}"
@@ -470,64 +549,56 @@ upload_thumbnail_to_cloud() {
         return 1
     fi
 
-    log_step "Uploading thumbnail to cloud for dashboard (${thumb_file})..."
+    log_step "Uploading thumbnail to cloud (MEGA account + dashboard hotlink)..."
 
-    local api_key="${PIXELDRAIN_API_KEY:-}"
-    local upload_response http_code json_body file_id
-    upload_response=$(curl -s --max-time 120 \
-        ${api_key:+-H "Authorization: Bearer ${api_key}"} \
-        -F "file=@${thumb_file};filename=stream_thumbnail.jpg" \
-        -w $'\n%{http_code}' \
-        "https://pixeldrain.com/api/file" 2>/dev/null) || true
-    http_code=$(echo "$upload_response" | tail -1)
-    json_body=$(echo "$upload_response" | head -n -1)
-    file_id=$(echo "$json_body" | jq -r '.id // empty' 2>/dev/null)
-    if [[ -n "$file_id" ]] && [[ "$http_code" =~ ^2 ]]; then
-        THUMBNAIL_CLOUD_URL="https://pixeldrain.com/api/file/${file_id}"
-        set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
-        set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
-        log_ok "Thumbnail on Pixeldrain → ${THUMBNAIL_CLOUD_URL}"
-        return 0
-    fi
+    upload_thumbnail_to_mega "$thumb_file" || log_warn "MEGA thumbnail upload failed"
 
-    log_warn "Pixeldrain thumbnail upload failed — trying Gofile..."
-    local gf_response gf_status gf_code gf_link
-    gf_response=$(curl -s --max-time 120 -F "file=@${thumb_file}" \
-        "https://upload.gofile.io/uploadfile" 2>/dev/null) || true
-    gf_status=$(echo "$gf_response" | jq -r '.status // empty' 2>/dev/null)
-    gf_code=$(echo "$gf_response" | jq -r '.data.code // .data.fileId // empty' 2>/dev/null)
-    if [[ "$gf_status" == "ok" && -n "$gf_code" ]]; then
-        local wt="4fd6sg89d7s6"
-        local contents
-        contents=$(curl -s --max-time 60 "https://api.gofile.io/contents/${gf_code}?wt=${wt}" 2>/dev/null) || true
-        gf_link=$(echo "$contents" | jq -r '(.data.children // {}) | to_entries[0].value.link // empty' 2>/dev/null)
-        if [[ -n "$gf_link" && "$gf_link" == http* ]]; then
-            THUMBNAIL_CLOUD_URL="$gf_link"
-            set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
-            set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
-            log_ok "Thumbnail on Gofile (direct) → ${THUMBNAIL_CLOUD_URL}"
-            return 0
-        fi
-    fi
+    upload_thumbnail_to_archive "$thumb_file" || log_warn "Archive thumbnail upload failed — trying Gofile..."
 
-    if [[ -n "${MEGA_EMAIL:-}" && -n "${MEGA_PASSWORD:-}" ]] && command -v megaput &>/dev/null; then
-        log_warn "Trying MEGA for thumbnail..."
-        local mega_dest="/StreamRecorder/thumbnails"
-        megamkdir -u "$MEGA_EMAIL" -p "$MEGA_PASSWORD" "$mega_dest" 2>/dev/null || true
-        if megaput -u "$MEGA_EMAIL" -p "$MEGA_PASSWORD" --path "$mega_dest" "$thumb_file" 2>/dev/null; then
-            local mega_link
-            mega_link=$(megals -u "$MEGA_EMAIL" -p "$MEGA_PASSWORD" -e "${mega_dest}/$(basename "$thumb_file")" 2>/dev/null | head -1) || true
-            if [[ -n "$mega_link" && "$mega_link" == http* ]]; then
-                THUMBNAIL_CLOUD_URL="$mega_link"
+    if [[ -z "${THUMBNAIL_CLOUD_URL:-}" ]]; then
+        local gf_response gf_status gf_code gf_link
+        gf_response=$(curl -s --max-time 120 -F "file=@${thumb_file}" \
+            "https://upload.gofile.io/uploadfile" 2>/dev/null) || true
+        gf_status=$(echo "$gf_response" | jq -r '.status // empty' 2>/dev/null)
+        gf_code=$(echo "$gf_response" | jq -r '.data.code // .data.fileId // empty' 2>/dev/null)
+        if [[ "$gf_status" == "ok" && -n "$gf_code" ]]; then
+            contents=$(curl -s --max-time 60 "https://api.gofile.io/contents/${gf_code}?wt=4fd6sg89d7s6" 2>/dev/null) || true
+            gf_link=$(echo "$contents" | jq -r '(.data.children // {}) | to_entries[0].value.link // empty' 2>/dev/null)
+            if [[ -n "$gf_link" && "$gf_link" == http* ]]; then
+                THUMBNAIL_CLOUD_URL="$gf_link"
                 set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
                 set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
-                log_ok "Thumbnail on MEGA → ${THUMBNAIL_CLOUD_URL}"
-                return 0
+                log_ok "Thumbnail display URL (Gofile) → ${THUMBNAIL_CLOUD_URL}"
             fi
         fi
     fi
 
-    log_warn "Could not upload thumbnail to any cloud — dashboard may use YouTube thumb until private"
+    if [[ "${PIXELDRAIN_SKIP_THUMBNAIL:-true}" != "true" && -z "${THUMBNAIL_CLOUD_URL:-}" ]]; then
+        log_info "Trying Pixeldrain for thumbnail (may fail: datacenter IP block on GitHub Actions)..."
+        local api_key="${PIXELDRAIN_API_KEY:-}"
+        local upload_response http_code json_body file_id
+        upload_response=$(curl -s --max-time 120 \
+            ${api_key:+-H "Authorization: Bearer ${api_key}"} \
+            -F "file=@${thumb_file};filename=stream_thumbnail.jpg" \
+            -w $'\n%{http_code}' \
+            "https://pixeldrain.com/api/file" 2>/dev/null) || true
+        http_code=$(echo "$upload_response" | tail -1)
+        json_body=$(echo "$upload_response" | head -n -1)
+        file_id=$(echo "$json_body" | jq -r '.id // empty' 2>/dev/null)
+        if [[ -n "$file_id" ]] && [[ "$http_code" =~ ^2 ]]; then
+            THUMBNAIL_CLOUD_URL="https://pixeldrain.com/api/file/${file_id}"
+            set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
+            set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
+            log_ok "Thumbnail on Pixeldrain → ${THUMBNAIL_CLOUD_URL}"
+        else
+            log_warn "Pixeldrain blocked or failed (common on GitHub Actions IPs). Use MEGA + Archive."
+        fi
+    fi
+
+    if [[ -n "${THUMBNAIL_MEGA_URL:-}" || -n "${THUMBNAIL_CLOUD_URL:-}" ]]; then
+        return 0
+    fi
+    log_warn "Thumbnail cloud upload incomplete — dashboard may fall back to YouTube image"
     return 1
 }
 

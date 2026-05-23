@@ -73,6 +73,18 @@ When Discord shows a cookie warning:
 2. Export cookies (Netscape format)
 3. Update `YOUTUBE_COOKIES` secret
 
+## Thumbnails and Pixeldrain
+
+- After each stream, the **thumbnail JPEG** is uploaded to:
+  - **MEGA** — `/Root/TheMuslimLantern/thumbnails/tml_VIDEOID.jpg` (your account, permanent)
+  - **Archive.org** — hotlink URL for the dashboard image
+- **Not stored in the git repo.**
+- **Pixeldrain** often blocks **GitHub Actions datacenter IPs**. Thumbnail upload skips Pixeldrain by default (`PIXELDRAIN_SKIP_THUMBNAIL=true`). Video uploads may still use Pixeldrain if your IP is not blocked.
+
+## Resume chat
+
+If you lose your Cursor chat, paste the contents of **`RESUME-2026.md`** into a new conversation.
+
 ## 8. Push from local (if you edit locally)
 
 ```bash
