@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="The Muslim Lantern — Live stream archive dashboard" />
+  <title>The Muslim Lantern · Stream Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #06080d;
+      --bg2: #0c1018;
+      --card: rgba(18, 24, 36, 0.72);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #eef2f8;
+      --muted: #8b9cb8;
+      --accent: #57f2ad;
+      --accent2: #3dd4f0;
+      --gold: #e8c547;
+      --danger: #ff6b7a;
+      --radius: 16px;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    .bg-glow {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(87, 242, 173, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(61, 212, 240, 0.08), transparent),
+        radial-gradient(ellipse 50% 30% at 50% 100%, rgba(232, 197, 71, 0.06), transparent);
+    }
+    .wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+    header {
+      padding: 2rem 0 1.5rem;
+      display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.25rem;
+    }
+    .brand h1 {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+    }
+    .brand h1 span { color: var(--accent); }
+    .brand p { color: var(--muted); font-size: 0.95rem; margin-top: 0.35rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.35rem 0.75rem; border-radius: 999px;
+      background: rgba(87, 242, 173, 0.12); border: 1px solid rgba(87, 242, 173, 0.25);
+      font-size: 0.75rem; color: var(--accent); font-weight: 600;
+    }
+    .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat:hover { transform: translateY(-2px); border-color: rgba(87, 242, 173, 0.2); }
+    .stat .val {
+      font-size: 1.75rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat .lbl { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .search {
+      flex: 1; min-width: 200px;
+      padding: 0.75rem 1rem 0.75rem 2.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text);
+      font: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search:focus { border-color: rgba(87, 242, 173, 0.4); }
+    .search-wrap { position: relative; flex: 1; min-width: 200px; }
+    .search-wrap svg { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); opacity: 0.45; }
+    .chip {
+      padding: 0.55rem 1rem; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--bg2);
+      color: var(--muted); font: inherit; font-size: 0.85rem; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip.active, .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(87, 242, 173, 0.08); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform 0.25s, box-shadow 0.25s;
+      cursor: pointer;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+      border-color: rgba(87, 242, 173, 0.15);
+    }
+    .thumb {
+      position: relative; aspect-ratio: 16/9;
+      background: #111820;
+      overflow: hidden;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
+    .card:hover .thumb img { transform: scale(1.04); }
+    .thumb .play {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.35);
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .card:hover .thumb .play { opacity: 1; }
+    .play-btn {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: rgba(87, 242, 173, 0.95);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 32px rgba(87, 242, 173, 0.4);
+    }
+    .play-btn svg { margin-left: 3px; }
+    .dur {
+      position: absolute; bottom: 8px; right: 8px;
+      padding: 0.2rem 0.5rem; border-radius: 6px;
+      background: rgba(0,0,0,0.75); font-size: 0.72rem; font-weight: 600;
+    }
+    .card-body { padding: 1rem 1.1rem 1.15rem; }
+    .card-body h3 {
+      font-size: 0.95rem; font-weight: 600; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.65rem; }
+    .tag {
+      font-size: 0.68rem; padding: 0.2rem 0.45rem; border-radius: 6px;
+      background: rgba(255,255,255,0.06); color: var(--muted);
+    }
+    .tag.ok { color: var(--accent); background: rgba(87,242,173,0.1); }
+
+    .empty, .loading {
+      grid-column: 1 / -1; text-align: center; padding: 3rem;
+      color: var(--muted);
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #141c28 25%, #1e2838 50%, #141c28 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: var(--radius);
+      aspect-ratio: 16/10;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* Modal player */
+    .modal {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(4, 6, 10, 0.92);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .modal.open { display: flex; }
+    .modal-box {
+      width: 100%; max-width: 960px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      max-height: 95vh;
+      display: flex; flex-direction: column;
+    }
+    .modal-head {
+      padding: 1rem 1.25rem;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-head h2 { font-size: 1.05rem; font-weight: 600; line-height: 1.35; flex: 1; }
+    .close-btn {
+      background: rgba(255,255,255,0.06); border: none; color: var(--text);
+      width: 36px; height: 36px; border-radius: 10px; cursor: pointer; font-size: 1.25rem;
+    }
+    .close-btn:hover { background: rgba(255,255,255,0.12); }
+    .player-tabs {
+      display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 0.5rem 1rem; border: none; background: transparent;
+      color: var(--muted); font: inherit; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; border-radius: 8px 8px 0 0;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .player-area {
+      position: relative; aspect-ratio: 16/9;
+      background: #000;
+    }
+    .player-area iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .player-area .placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); padding: 2rem; text-align: center;
+    }
+    .modal-links {
+      padding: 1rem 1.25rem 1.25rem;
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+    }
+    .dl {
+      padding: 0.5rem 0.9rem; border-radius: 10px;
+      text-decoration: none; font-size: 0.8rem; font-weight: 600;
+      border: 1px solid var(--border);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .dl:hover { border-color: var(--accent); color: var(--accent); }
+    .dl.primary { background: rgba(87,242,173,0.15); border-color: rgba(87,242,173,0.35); color: var(--accent); }
+
+    footer {
+      margin-top: 3rem; padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem;
+      font-size: 0.8rem; color: var(--muted);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="badge">Live archive</div>
+        <h1>☪️ The <span>Muslim Lantern</span></h1>
+        <p>Every recorded stream — watch, download, and browse in one place.</p>
+      </div>
+    </header>
+
+    <section class="stats" id="stats">
+      <div class="stat skeleton" style="min-height:90px"></div>
+      <div class="stat skeleton" style="min-height:90px"></div>
+      <div class="stat skeleton" style="min-height:90px"></div>
+      <div class="stat skeleton" style="min-height:90px"></div>
+    </section>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="search" class="search" id="search" placeholder="Search streams by title…" autocomplete="off" />
+      </div>
+      <button type="button" class="chip active" data-filter="tml">The Muslim Lantern only</button>
+      <button type="button" class="chip" data-filter="all">All archived</button>
+    </div>
+
+    <section class="grid" id="grid"></section>
+
+    <footer>
+      <span>Stream Recorder · Automated GitHub Actions pipeline</span>
+      <span>
+        <a href="https://github.com/usermuneeb1/Stream-Recorder" target="_blank" rel="noopener">GitHub</a>
+        · Auto-updated from <code>links.txt</code>
+      </span>
+    </footer>
+  </div>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2 id="modal-title">Stream</h2>
+        <button type="button" class="close-btn" id="close-modal" aria-label="Close">×</button>
+      </div>
+      <div class="player-tabs" id="tabs"></div>
+      <div class="player-area" id="player"></div>
+      <div class="modal-links" id="modal-links"></div>
+    </div>
+  </div>
+
+  <script>
+    const REPO = 'usermuneeb1/Stream-Recorder';
+    const BRANCH = 'main';
+    const RAW = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
+    const CHANNEL = 'The Muslim Lantern';
+
+    let allStreams = [];
+    let filterMode = 'tml';
+    let activeStream = null;
+    let activeTab = 'youtube';
+
+    async function fetchText(path) {
+      const r = await fetch(`${RAW}/${path}?t=${Date.now()}`);
+      if (!r.ok) throw new Error(path);
+      return r.text();
+    }
+
+    async function fetchJson(path) {
+      const r = await fetch(`${RAW}/${path}?t=${Date.now()}`);
+      if (!r.ok) throw new Error(path);
+      return r.json();
+    }
+
+    function ytId(url) {
+      const m = (url || '').match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/);
+      return m ? m[1] : '';
+    }
+
+    function archiveId(url) {
+      const m = (url || '').match(/archive\.org\/details\/([^/?\s]+)/);
+      return m ? m[1] : '';
+    }
+
+    function parseLinksTxt(text) {
+      const blocks = text.split(/={10,}/).map(b => b.trim()).filter(Boolean);
+      const streams = [];
+      for (const block of blocks) {
+        if (block.startsWith('#')) continue;
+        const get = (key) => {
+          const re = new RegExp(`^${key}:\\s*(.+)$`, 'im');
+          const m = block.match(re);
+          return m ? m[1].trim() : '';
+        };
+        const title = get('Title');
+        const url = get('URL');
+        if (!title || !url || !url.includes('youtube')) continue;
+        const links = {};
+        for (const line of block.split('\n')) {
+          const lm = line.match(/^\[(\w+):([^\]]+)\]\s+(https?:\S+)/);
+          if (lm) {
+            const k = `${lm[1]}_${lm[2]}`.toLowerCase();
+            links[k] = lm[3].replace(/\s+\(PERMANENT\)$/, '');
+          }
+        }
+        streams.push({
+          title,
+          channel: get('Channel'),
+          date: get('Date'),
+          url,
+          videoId: ytId(url),
+          duration: get('Duration'),
+          size: get('Size'),
+          uploads: get('Uploads'),
+          thumbnail: `https://i.ytimg.com/vi/${ytId(url)}/hqdefault.jpg`,
+          links: {
+            gofileHd: links.gofile_hd || '',
+            gofileComp: links.gofile_compressed || '',
+            archiveHd: links.archive_hd || '',
+            archiveComp: links.archive_compressed || '',
+            pixeldrain: links.pixeldrain_hd || links.pixeldrain_compressed || '',
+            mega: links.mega_hd || links.mega_compressed || '',
+          }
+        });
+      }
+      return streams;
+    }
+
+    function mergeRecordings(streams, recordings) {
+      const byId = Object.fromEntries(streams.map(s => [s.videoId, s]));
+      for (const r of recordings || []) {
+        const id = r.video_id || ytId(r.video_url);
+        if (!id) continue;
+        if (!byId[id]) {
+          byId[id] = {
+            title: r.title,
+            channel: r.channel,
+            date: r.date,
+            url: r.video_url,
+            videoId: id,
+            duration: r.duration_fmt,
+            size: r.size_human,
+            thumbnail: r.thumbnail || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+            links: {
+              gofileHd: r.gofile_link || '',
+              pixeldrain: r.pixeldrain_link || '',
+              archiveHd: r.archive_link || '',
+              mega: r.mega_link || '',
+            }
+          };
+        } else {
+          const s = byId[id];
+          if (r.gofile_link) s.links.gofileHd = r.gofile_link;
+          if (r.pixeldrain_link) s.links.pixeldrain = r.pixeldrain_link;
+          if (r.archive_link) s.links.archiveHd = r.archive_link;
+          if (r.mega_link) s.links.mega = r.mega_link;
+        }
+      }
+      return Object.values(byId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+
+    function renderStats(stats) {
+      const ls = stats?.last_stream || {};
+      document.getElementById('stats').innerHTML = `
+        <div class="stat"><div class="val">${stats?.total_streams ?? '—'}</div><div class="lbl">Total streams</div></div>
+        <div class="stat"><div class="val">${Number(stats?.total_hours ?? 0).toFixed(1)}h</div><div class="lbl">Hours archived</div></div>
+        <div class="stat"><div class="val">${Number(stats?.total_gb ?? 0).toFixed(1)}</div><div class="lbl">Gigabytes saved</div></div>
+        <div class="stat"><div class="val" style="font-size:1rem">${ls.date?.split(' ').slice(0,3).join(' ') || '—'}</div><div class="lbl">Last recording</div></div>
+      `;
+    }
+
+    function filtered() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      return allStreams.filter(s => {
+        if (filterMode === 'tml' && s.channel && !s.channel.includes('Muslim Lantern')) return false;
+        if (q && !s.title.toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+
+    function renderGrid() {
+      const list = filtered();
+      const grid = document.getElementById('grid');
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty"><p>No streams match your filter.</p><p style="margin-top:0.5rem;font-size:0.85rem">Recordings appear here after the Stream Recorder workflow runs.</p></div>`;
+        return;
+      }
+      grid.innerHTML = list.map((s, i) => {
+        const tags = [];
+        if (s.links.archiveHd) tags.push('<span class="tag ok">Archive</span>');
+        if (s.links.gofileHd) tags.push('<span class="tag ok">Gofile</span>');
+        if (s.links.mega) tags.push('<span class="tag ok">MEGA</span>');
+        if (s.links.pixeldrain) tags.push('<span class="tag ok">Pixeldrain</span>');
+        return `
+          <article class="card" data-idx="${i}" tabindex="0">
+            <div class="thumb">
+              <img src="${s.thumbnail}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg'" />
+              <div class="play"><div class="play-btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="#06080d"><path d="M8 5v14l11-7z"/></svg></div></div>
+              ${s.duration ? `<span class="dur">${s.duration}</span>` : ''}
+            </div>
+            <div class="card-body">
+              <h3>${esc(s.title)}</h3>
+              <div class="meta">
+                <span>${esc(s.channel || CHANNEL)}</span>
+                <span>·</span>
+                <span>${esc(s.date?.split(' ').slice(0,3).join(' ') || '')}</span>
+                ${s.size ? `<span>· ${esc(s.size)}</span>` : ''}
+              </div>
+              <div class="tags">${tags.join('') || '<span class="tag">YouTube</span>'}</div>
+            </div>
+          </article>`;
+      }).join('');
+      grid.querySelectorAll('.card').forEach((el, i) => {
+        const open = () => openPlayer(list[i]);
+        el.addEventListener('click', open);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') open(); });
+      });
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    function openPlayer(stream) {
+      activeStream = stream;
+      activeTab = 'youtube';
+      document.getElementById('modal-title').textContent = stream.title;
+      document.getElementById('modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+      renderTabs();
+      renderPlayer();
+      renderModalLinks();
+    }
+
+    function closePlayer() {
+      document.getElementById('modal').classList.remove('open');
+      document.body.style.overflow = '';
+      document.getElementById('player').innerHTML = '';
+      activeStream = null;
+    }
+
+    function renderTabs() {
+      const s = activeStream;
+      const tabs = [{ id: 'youtube', label: '▶ YouTube' }];
+      if (archiveId(s.links.archiveHd)) tabs.push({ id: 'archive', label: '🏛 Archive.org' });
+      document.getElementById('tabs').innerHTML = tabs.map(t =>
+        `<button type="button" class="tab ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`
+      ).join('');
+      document.getElementById('tabs').querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeTab = btn.dataset.tab;
+          document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
+          renderPlayer();
+        });
+      });
+    }
+
+    function renderPlayer() {
+      const s = activeStream;
+      const area = document.getElementById('player');
+      if (activeTab === 'youtube' && s.videoId) {
+        area.innerHTML = `<iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen src="https://www.youtube.com/embed/${s.videoId}?rel=0&modestbranding=1"></iframe>`;
+        return;
+      }
+      if (activeTab === 'archive') {
+        const id = archiveId(s.links.archiveHd);
+        if (id) {
+          area.innerHTML = `<iframe allowfullscreen src="https://archive.org/embed/${id}"></iframe>`;
+          return;
+        }
+      }
+      area.innerHTML = `<div class="placeholder">No embedded player for this source. Use the download links below.</div>`;
+    }
+
+    function renderModalLinks() {
+      const s = activeStream;
+      const L = s.links || {};
+      const items = [
+        ['📺 YouTube', s.url, true],
+        ['🟠 Gofile HD', L.gofileHd],
+        ['🟠 Gofile (small)', L.gofileComp],
+        ['🟣 Pixeldrain', L.pixeldrain],
+        ['🏛 Archive.org', L.archiveHd],
+        ['🏛 Archive (compressed)', L.archiveComp],
+        ['🔴 MEGA.nz', L.mega],
+      ].filter(([, u]) => u);
+      document.getElementById('modal-links').innerHTML = items.map(([label, url, primary]) =>
+        `<a class="dl ${primary ? 'primary' : ''}" href="${url}" target="_blank" rel="noopener">${label}</a>`
+      ).join('');
+    }
+
+    document.getElementById('close-modal').addEventListener('click', closePlayer);
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closePlayer(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePlayer(); });
+
+    document.getElementById('search').addEventListener('input', renderGrid);
+    document.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filterMode = btn.dataset.filter;
+        renderGrid();
+      });
+    });
+
+    async function init() {
+      try {
+        const stats = await fetchJson('stats.json');
+        renderStats(stats);
+      } catch {
+        document.getElementById('stats').innerHTML = '<div class="stat"><div class="val">—</div><div class="lbl">Stats loading…</div></div>';
+      }
+      try {
+        let streams = [];
+        try {
+          const txt = await fetchText('links.txt');
+          streams = parseLinksTxt(txt);
+        } catch { /* links optional */ }
+        try {
+          const rec = await fetchJson('data/recordings.json');
+          streams = mergeRecordings(streams, rec);
+        } catch { /* recordings optional */ }
+        allStreams = streams.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        renderGrid();
+      } catch (e) {
+        document.getElementById('grid').innerHTML = `<div class="empty"><p>Could not load archive data.</p><p style="margin-top:0.5rem;font-size:0.85rem">${esc(e.message)}</p></div>`;
+      }
+    }
+    init();
+  </script>
+</body>
+</html>

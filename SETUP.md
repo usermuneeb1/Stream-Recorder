@@ -43,10 +43,13 @@ https://github.com/usermuneeb1/Stream-Recorder
 ## 4. Enable GitHub Pages (dashboard)
 
 1. **Settings → Pages**
-2. Source: **Deploy from branch** → `main` → `/ (root)`
-3. Dashboard: `https://<username>.github.io/Stream-Recorder/streams.html`
+2. **Build and deployment → Source:** choose **GitHub Actions** (not “Deploy from branch”)
+3. Push to `main` runs **🌐 Deploy Dashboard** automatically, or run that workflow manually once
+4. Your site: **https://usermuneeb1.github.io/Stream-Recorder/**
 
-Update `DASHBOARD_URL` in `scripts/config.env` if your Pages URL differs.
+If you see **404**, wait 2–5 minutes after the deploy workflow finishes, then hard-refresh (Ctrl+F5).
+
+Update `DASHBOARD_URL` in `scripts/config.env` if your username/repo differs.
 
 ## 5. Test the main recorder
 

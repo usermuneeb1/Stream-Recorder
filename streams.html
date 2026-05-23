@@ -2,84 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Muslim Lantern — Stream Archive</title>
-  <style>
-    :root { --bg: #0f1419; --card: #1a2332; --accent: #57f2ad; --text: #e8eef4; --muted: #8b9cb3; }
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 1.5rem; line-height: 1.5; }
-    h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-    .sub { color: var(--muted); margin-bottom: 1.5rem; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .stat { background: var(--card); padding: 1rem; border-radius: 10px; border: 1px solid #2a3a4f; }
-    .stat b { display: block; font-size: 1.4rem; color: var(--accent); }
-    .stat span { font-size: 0.85rem; color: var(--muted); }
-    .grid { display: grid; gap: 1rem; }
-    .card { background: var(--card); border-radius: 10px; padding: 1rem; border: 1px solid #2a3a4f; }
-    .card h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-    .card a { color: var(--accent); }
-    .links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
-    .links a { font-size: 0.8rem; padding: 0.25rem 0.5rem; background: #243044; border-radius: 6px; text-decoration: none; }
-    .err { color: #ff6b6b; }
-    footer { margin-top: 2rem; color: var(--muted); font-size: 0.8rem; }
-  </style>
+  <meta http-equiv="refresh" content="0; url=./" />
+  <title>Redirecting…</title>
+  <script>location.replace('https://usermuneeb1.github.io/Stream-Recorder/');</script>
 </head>
 <body>
-  <h1>☪️ The Muslim Lantern</h1>
-  <p class="sub">Automated live stream archive — single channel</p>
-  <div class="stats" id="stats"></div>
-  <div class="grid" id="recordings"></div>
-  <footer>Stream Recorder · <a href="https://github.com/usermuneeb1/Stream-Recorder">GitHub</a></footer>
-  <script>
-    const REPO = 'usermuneeb1/Stream-Recorder';
-    const BRANCH = 'main';
-    const base = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
-
-    async function loadJson(path) {
-      const r = await fetch(`${base}/${path}?t=${Date.now()}`);
-      if (!r.ok) throw new Error(path);
-      return r.json();
-    }
-
-    function el(id, html) { document.getElementById(id).innerHTML = html; }
-
-    async function init() {
-      try {
-        const stats = await loadJson('stats.json');
-        el('stats', `
-          <div class="stat"><b>${stats.total_streams ?? 0}</b><span>Streams</span></div>
-          <div class="stat"><b>${(stats.total_hours ?? 0).toFixed(1)}h</b><span>Total hours</span></div>
-          <div class="stat"><b>${(stats.total_gb ?? 0).toFixed(1)} GB</b><span>Archived</span></div>
-          <div class="stat"><b>${stats.last_stream?.date ?? '—'}</b><span>Last recording</span></div>
-        `);
-      } catch (e) {
-        el('stats', '<p class="err">Could not load stats.json</p>');
-      }
-
-      try {
-        const list = await loadJson('data/recordings.json');
-        if (!list.length) {
-          el('recordings', '<p class="sub">No recordings in dashboard feed yet.</p>');
-          return;
-        }
-        el('recordings', list.map(r => {
-          const links = [
-            r.gofile_link && ['Gofile', r.gofile_link],
-            r.pixeldrain_link && ['Pixeldrain', r.pixeldrain_link],
-            r.archive_link && ['Archive.org', r.archive_link],
-            r.mega_link && ['MEGA', r.mega_link],
-          ].filter(Boolean);
-          return `<article class="card">
-            <h3><a href="${r.video_url}">${r.title}</a></h3>
-            <div class="sub">${r.channel} · ${r.date} · ${r.duration_fmt} · ${r.size_human}</div>
-            <div class="links">${links.map(([n,u]) => `<a href="${u}" target="_blank">${n}</a>`).join('')}</div>
-          </article>`;
-        }).join(''));
-      } catch (e) {
-        el('recordings', '<p class="err">Could not load data/recordings.json</p>');
-      }
-    }
-    init();
-  </script>
+  <p><a href="https://usermuneeb1.github.io/Stream-Recorder/">Open dashboard</a></p>
 </body>
 </html>
