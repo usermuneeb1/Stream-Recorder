@@ -137,6 +137,11 @@ update_stats() {
 update_recordings_json() {
     local vid="${STREAM_VIDEO_ID:-}"
     [[ -z "$vid" ]] && return 0
+    local expected="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
+    if [[ -n "${STREAM_CHANNEL:-}" ]] && [[ "${STREAM_CHANNEL}" != *"Muslim Lantern"* ]]; then
+        log_warn "Skipping recordings.json — not ${expected}"
+        return 0
+    fi
 
     log_step "Updating data/recordings.json for dashboard..."
 

@@ -18,6 +18,11 @@ update_links() {
     
     local stream_title="${STREAM_TITLE:-Unknown Stream}"
     local stream_channel="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
+    local expected_channel="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
+    if [[ -n "${STREAM_CHANNEL:-}" ]] && [[ "${STREAM_CHANNEL}" != *"${expected_channel}"* ]] && [[ "${STREAM_CHANNEL}" != *"Muslim Lantern"* ]]; then
+        log_warn "Skipping links.txt update — channel '${STREAM_CHANNEL}' is not ${expected_channel}"
+        return 0
+    fi
     local stream_url="${STREAM_URL:-N/A}"
     local duration_fmt="${RECORD_DURATION_FMT:-00:00:00}"
     local size_human="${RECORD_SIZE_HUMAN:-0 B}"

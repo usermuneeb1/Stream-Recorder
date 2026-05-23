@@ -3,307 +3,357 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="The Muslim Lantern — Live stream archive dashboard" />
+  <meta name="description" content="The Muslim Lantern — Official stream archive" />
   <title>The Muslim Lantern · Stream Archive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #06080d;
-      --bg2: #0c1018;
-      --card: rgba(18, 24, 36, 0.72);
-      --border: rgba(255, 255, 255, 0.08);
-      --text: #eef2f8;
-      --muted: #8b9cb8;
-      --accent: #57f2ad;
-      --accent2: #3dd4f0;
-      --gold: #e8c547;
-      --danger: #ff6b7a;
-      --radius: 16px;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      --white: #fafafa;
+      --white2: #ffffff;
+      --red: #c41e3a;
+      --red-dark: #9b1830;
+      --red-light: #ffe8ec;
+      --red-glow: rgba(196, 30, 58, 0.35);
+      --text: #1a1a1f;
+      --muted: #6b7280;
+      --border: rgba(196, 30, 58, 0.15);
+      --shadow: 0 20px 60px rgba(196, 30, 58, 0.12);
+      --radius: 18px;
+      --ease: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      font-family: "DM Sans", system-ui, sans-serif;
-      background: var(--bg);
+      font-family: "Outfit", system-ui, sans-serif;
+      background: var(--white);
       color: var(--text);
       min-height: 100vh;
-      line-height: 1.5;
       overflow-x: hidden;
     }
-    .bg-glow {
+
+    /* Splash loader */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(145deg, var(--white2) 0%, var(--red-light) 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.6s ease, visibility 0.6s;
+    }
+    #splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    .splash-logo {
+      font-size: 3rem; font-weight: 800; color: var(--red);
+      animation: splashPop 0.8s var(--ease) both;
+    }
+    .splash-bar {
+      width: 200px; height: 4px; background: rgba(196,30,58,0.2);
+      border-radius: 4px; margin-top: 1.5rem; overflow: hidden;
+    }
+    .splash-bar::after {
+      content: ""; display: block; height: 100%; width: 40%;
+      background: var(--red); border-radius: 4px;
+      animation: splashLoad 1.2s ease-in-out infinite;
+    }
+    @keyframes splashPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes splashLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+
+    .bg-pattern {
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
       background:
-        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(87, 242, 173, 0.12), transparent),
-        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(61, 212, 240, 0.08), transparent),
-        radial-gradient(ellipse 50% 30% at 50% 100%, rgba(232, 197, 71, 0.06), transparent);
+        radial-gradient(circle at 10% 20%, rgba(196,30,58,0.06) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(196,30,58,0.08) 0%, transparent 35%);
     }
-    .wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+    .wrap { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 1.25rem 3rem; }
 
     header {
-      padding: 2rem 0 1.5rem;
-      display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.25rem;
+      padding: 1.75rem 0 1.25rem;
+      animation: fadeDown 0.7s ease both;
     }
-    .brand h1 {
-      font-family: "Instrument Serif", Georgia, serif;
-      font-size: clamp(1.75rem, 4vw, 2.5rem);
-      font-weight: 400;
-      letter-spacing: -0.02em;
+    @keyframes fadeDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: none; } }
+
+    .brand-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .logo-ring {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--red), var(--red-dark));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; color: white;
+      box-shadow: 0 8px 24px var(--red-glow);
+      animation: logoPulse 3s ease-in-out infinite;
     }
-    .brand h1 span { color: var(--accent); }
-    .brand p { color: var(--muted); font-size: 0.95rem; margin-top: 0.35rem; }
-    .badge {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.35rem 0.75rem; border-radius: 999px;
-      background: rgba(87, 242, 173, 0.12); border: 1px solid rgba(87, 242, 173, 0.25);
-      font-size: 0.75rem; color: var(--accent); font-weight: 600;
+    @keyframes logoPulse { 0%,100% { box-shadow: 0 8px 24px var(--red-glow); } 50% { box-shadow: 0 12px 36px rgba(196,30,58,0.5); } }
+
+    .brand h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 800; color: var(--text); }
+    .brand h1 em { color: var(--red); font-style: normal; }
+    .brand p { color: var(--muted); font-size: 0.9rem; margin-top: 0.2rem; }
+    .live-pill {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      margin-top: 0.5rem; padding: 0.3rem 0.75rem;
+      background: var(--red-light); color: var(--red);
+      border-radius: 999px; font-size: 0.75rem; font-weight: 700;
     }
-    .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .live-pill::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); animation: blink 1.5s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:.5; transform:scale(0.85)} }
 
     .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+      margin-bottom: 1.75rem;
     }
+    @media (max-width: 700px) { .stats { grid-template-columns: repeat(2, 1fr); } }
     .stat {
-      background: var(--card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
+      background: var(--white2);
+      border: 2px solid var(--border);
       border-radius: var(--radius);
-      padding: 1.25rem 1.35rem;
-      transition: transform 0.2s, border-color 0.2s;
+      padding: 1.1rem 1.2rem;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      animation: statIn 0.6s ease forwards;
+      transition: transform 0.3s var(--ease), border-color 0.3s, box-shadow 0.3s;
     }
-    .stat:hover { transform: translateY(-2px); border-color: rgba(87, 242, 173, 0.2); }
-    .stat .val {
-      font-size: 1.75rem; font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .stat .lbl { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat:nth-child(1){animation-delay:.15s}
+    .stat:nth-child(2){animation-delay:.25s}
+    .stat:nth-child(3){animation-delay:.35s}
+    .stat:nth-child(4){animation-delay:.45s}
+    @keyframes statIn { from { opacity:0; transform:translateY(16px) scale(0.95); } to { opacity:1; transform:none; } }
+    .stat:hover { transform: translateY(-4px) scale(1.02); border-color: var(--red); box-shadow: 0 16px 40px var(--red-glow); }
+    .stat .val { font-size: 1.65rem; font-weight: 800; color: var(--red); }
+    .stat .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.15rem; font-weight: 600; }
 
     .toolbar {
-      display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
-      margin-bottom: 1.5rem;
+      display: flex; gap: 0.75rem; margin-bottom: 1.5rem;
+      animation: fadeDown 0.7s 0.2s ease both;
     }
+    .search-wrap { flex: 1; position: relative; }
+    .search-wrap svg { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--red); opacity: 0.6; }
     .search {
-      flex: 1; min-width: 200px;
-      padding: 0.75rem 1rem 0.75rem 2.5rem;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--bg2);
-      color: var(--text);
-      font: inherit;
-      outline: none;
-      transition: border-color 0.2s;
+      width: 100%; padding: 0.85rem 1rem 0.85rem 2.75rem;
+      border: 2px solid var(--border); border-radius: 14px;
+      background: var(--white2); font: inherit; font-size: 0.95rem;
+      transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
     }
-    .search:focus { border-color: rgba(87, 242, 173, 0.4); }
-    .search-wrap { position: relative; flex: 1; min-width: 200px; }
-    .search-wrap svg { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); opacity: 0.45; }
-    .chip {
-      padding: 0.55rem 1rem; border-radius: 10px;
-      border: 1px solid var(--border); background: var(--bg2);
-      color: var(--muted); font: inherit; font-size: 0.85rem; cursor: pointer;
-      transition: all 0.2s;
+    .search:focus {
+      outline: none; border-color: var(--red);
+      box-shadow: 0 0 0 4px var(--red-light); transform: scale(1.01);
     }
-    .chip.active, .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(87, 242, 173, 0.08); }
+
+    .section-title {
+      font-size: 1rem; font-weight: 700; color: var(--red);
+      margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
+      animation: fadeDown 0.6s 0.35s ease both;
+    }
+    .section-title::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, var(--red), transparent); }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 1.25rem;
     }
     .card {
-      background: var(--card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
+      background: var(--white2);
+      border: 2px solid var(--border);
       border-radius: var(--radius);
       overflow: hidden;
-      transition: transform 0.25s, box-shadow 0.25s;
       cursor: pointer;
+      opacity: 0;
+      transform: translateY(24px);
+      animation: cardIn 0.55s var(--ease) forwards;
+      transition: transform 0.35s var(--ease), box-shadow 0.35s, border-color 0.35s;
     }
+    @keyframes cardIn { to { opacity: 1; transform: none; } }
     .card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow);
-      border-color: rgba(87, 242, 173, 0.15);
+      transform: translateY(-8px) scale(1.02);
+      border-color: var(--red);
+      box-shadow: 0 20px 50px var(--red-glow);
     }
-    .thumb {
-      position: relative; aspect-ratio: 16/9;
-      background: #111820;
-      overflow: hidden;
-    }
-    .thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
-    .card:hover .thumb img { transform: scale(1.04); }
-    .thumb .play {
+    .card:active { transform: translateY(-4px) scale(0.98); }
+    .thumb { position: relative; aspect-ratio: 16/9; overflow: hidden; background: var(--red-light); }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s var(--ease); }
+    .card:hover .thumb img { transform: scale(1.08); }
+    .thumb-overlay {
       position: absolute; inset: 0;
+      background: linear-gradient(transparent 40%, rgba(155,24,48,0.75));
       display: flex; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.35);
-      opacity: 0; transition: opacity 0.25s;
+      opacity: 0; transition: opacity 0.35s;
     }
-    .card:hover .thumb .play { opacity: 1; }
-    .play-btn {
-      width: 56px; height: 56px; border-radius: 50%;
-      background: rgba(87, 242, 173, 0.95);
+    .card:hover .thumb-overlay { opacity: 1; }
+    .play-circle {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--white2); color: var(--red);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 8px 32px rgba(87, 242, 173, 0.4);
+      transform: scale(0.6); transition: transform 0.35s var(--ease);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
     }
-    .play-btn svg { margin-left: 3px; }
+    .card:hover .play-circle { transform: scale(1); }
     .dur {
-      position: absolute; bottom: 8px; right: 8px;
-      padding: 0.2rem 0.5rem; border-radius: 6px;
-      background: rgba(0,0,0,0.75); font-size: 0.72rem; font-weight: 600;
+      position: absolute; top: 10px; right: 10px;
+      background: var(--red); color: white;
+      padding: 0.25rem 0.55rem; border-radius: 8px;
+      font-size: 0.7rem; font-weight: 700;
     }
     .card-body { padding: 1rem 1.1rem 1.15rem; }
     .card-body h3 {
-      font-size: 0.95rem; font-weight: 600; line-height: 1.35;
+      font-size: 0.92rem; font-weight: 700; line-height: 1.35;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
-    .meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.65rem; }
-    .tag {
-      font-size: 0.68rem; padding: 0.2rem 0.45rem; border-radius: 6px;
-      background: rgba(255,255,255,0.06); color: var(--muted);
+    .meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.45rem; }
+    .sources { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
+    .src {
+      font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.5rem;
+      border-radius: 6px; background: var(--red-light); color: var(--red);
     }
-    .tag.ok { color: var(--accent); background: rgba(87,242,173,0.1); }
 
-    .empty, .loading {
-      grid-column: 1 / -1; text-align: center; padding: 3rem;
-      color: var(--muted);
+    .empty {
+      grid-column: 1/-1; text-align: center; padding: 3rem;
+      background: var(--white2); border: 2px dashed var(--border);
+      border-radius: var(--radius); color: var(--muted);
     }
-    .skeleton {
-      background: linear-gradient(90deg, #141c28 25%, #1e2838 50%, #141c28 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.2s infinite;
-      border-radius: var(--radius);
-      aspect-ratio: 16/10;
-    }
-    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-    /* Modal player */
+    /* Modal */
     .modal {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(4, 6, 10, 0.92);
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(26,26,31,0.65);
       backdrop-filter: blur(8px);
-      display: none; align-items: center; justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       padding: 1rem;
+      opacity: 0; visibility: hidden;
+      transition: opacity 0.35s, visibility 0.35s;
     }
-    .modal.open { display: flex; }
+    .modal.open { opacity: 1; visibility: visible; }
     .modal-box {
-      width: 100%; max-width: 960px;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 20px;
+      width: 100%; max-width: 920px;
+      background: var(--white2);
+      border-radius: 22px;
+      border: 3px solid var(--red);
+      box-shadow: 0 30px 80px rgba(196,30,58,0.25);
       overflow: hidden;
-      box-shadow: var(--shadow);
-      max-height: 95vh;
+      transform: scale(0.85) translateY(30px);
+      transition: transform 0.45s var(--ease);
+      max-height: 92vh;
       display: flex; flex-direction: column;
     }
+    .modal.open .modal-box { transform: scale(1) translateY(0); }
     .modal-head {
       padding: 1rem 1.25rem;
+      background: linear-gradient(90deg, var(--red), var(--red-dark));
+      color: white;
       display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
-      border-bottom: 1px solid var(--border);
     }
-    .modal-head h2 { font-size: 1.05rem; font-weight: 600; line-height: 1.35; flex: 1; }
+    .modal-head h2 { font-size: 1rem; font-weight: 700; line-height: 1.35; flex: 1; }
     .close-btn {
-      background: rgba(255,255,255,0.06); border: none; color: var(--text);
-      width: 36px; height: 36px; border-radius: 10px; cursor: pointer; font-size: 1.25rem;
+      width: 40px; height: 40px; border: none; border-radius: 12px;
+      background: rgba(255,255,255,0.2); color: white; font-size: 1.4rem;
+      cursor: pointer; transition: background 0.2s, transform 0.2s;
     }
-    .close-btn:hover { background: rgba(255,255,255,0.12); }
+    .close-btn:hover { background: rgba(255,255,255,0.35); transform: rotate(90deg); }
+
     .player-tabs {
-      display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem 0;
-      border-bottom: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      padding: 0.75rem 1rem;
+      background: var(--red-light);
+      border-bottom: 2px solid var(--border);
     }
     .tab {
-      padding: 0.5rem 1rem; border: none; background: transparent;
-      color: var(--muted); font: inherit; font-size: 0.85rem; font-weight: 600;
-      cursor: pointer; border-radius: 8px 8px 0 0;
-      border-bottom: 2px solid transparent;
+      padding: 0.5rem 0.9rem; border: none; border-radius: 10px;
+      background: transparent; color: var(--muted);
+      font: inherit; font-size: 0.8rem; font-weight: 700;
+      cursor: pointer; transition: all 0.25s var(--ease);
+      position: relative;
     }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover { color: var(--red); background: rgba(255,255,255,0.7); transform: translateY(-2px); }
+    .tab.active {
+      background: var(--red); color: white;
+      box-shadow: 0 4px 14px var(--red-glow);
+      transform: translateY(-2px);
+    }
     .player-area {
       position: relative; aspect-ratio: 16/9;
-      background: #000;
+      background: #111;
+      min-height: 280px;
     }
-    .player-area iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-    .player-area .placeholder {
+    .player-area iframe,
+    .player-area video {
+      position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+    }
+    .player-loading {
       position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--muted); padding: 2rem; text-align: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: white; gap: 0.75rem;
     }
-    .modal-links {
-      padding: 1rem 1.25rem 1.25rem;
-      display: flex; flex-wrap: wrap; gap: 0.5rem;
+    .spinner {
+      width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: var(--red); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
     }
-    .dl {
-      padding: 0.5rem 0.9rem; border-radius: 10px;
-      text-decoration: none; font-size: 0.8rem; font-weight: 600;
-      border: 1px solid var(--border);
-      color: var(--text);
-      transition: all 0.2s;
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .player-msg {
+      position: absolute; inset: 0;
+      display: none; align-items: center; justify-content: center;
+      padding: 2rem; text-align: center; color: #ccc; font-size: 0.9rem;
     }
-    .dl:hover { border-color: var(--accent); color: var(--accent); }
-    .dl.primary { background: rgba(87,242,173,0.15); border-color: rgba(87,242,173,0.35); color: var(--accent); }
+    .player-msg.show { display: flex; }
 
     footer {
-      margin-top: 3rem; padding-top: 1.5rem;
-      border-top: 1px solid var(--border);
-      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem;
-      font-size: 0.8rem; color: var(--muted);
+      margin-top: 2.5rem; padding-top: 1.25rem;
+      border-top: 2px solid var(--border);
+      text-align: center; font-size: 0.8rem; color: var(--muted);
+      animation: fadeDown 0.6s 0.5s ease both;
     }
-    footer a { color: var(--accent); text-decoration: none; }
+    footer a { color: var(--red); font-weight: 600; text-decoration: none; }
   </style>
 </head>
 <body>
-  <div class="bg-glow"></div>
+  <div id="splash">
+    <div class="splash-logo">☪️ TML</div>
+    <p style="margin-top:0.5rem;color:var(--red-dark);font-weight:600">Loading archive…</p>
+    <div class="splash-bar"></div>
+  </div>
+
+  <div class="bg-pattern"></div>
   <div class="wrap">
     <header>
-      <div class="brand">
-        <div class="badge">Live archive</div>
-        <h1>☪️ The <span>Muslim Lantern</span></h1>
-        <p>Every recorded stream — watch, download, and browse in one place.</p>
+      <div class="brand-row">
+        <div class="logo-ring">☪️</div>
+        <div class="brand">
+          <h1>The <em>Muslim Lantern</em></h1>
+          <p>Official stream archive — watch every recording here</p>
+          <span class="live-pill">Single channel only</span>
+        </div>
       </div>
     </header>
 
-    <section class="stats" id="stats">
-      <div class="stat skeleton" style="min-height:90px"></div>
-      <div class="stat skeleton" style="min-height:90px"></div>
-      <div class="stat skeleton" style="min-height:90px"></div>
-      <div class="stat skeleton" style="min-height:90px"></div>
-    </section>
+    <section class="stats" id="stats"></section>
 
     <div class="toolbar">
       <div class="search-wrap">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="search" class="search" id="search" placeholder="Search streams by title…" autocomplete="off" />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="search" class="search" id="search" placeholder="Search your streams…" autocomplete="off" />
       </div>
-      <button type="button" class="chip active" data-filter="tml">The Muslim Lantern only</button>
-      <button type="button" class="chip" data-filter="all">All archived</button>
     </div>
 
+    <h2 class="section-title">Your recordings</h2>
     <section class="grid" id="grid"></section>
 
     <footer>
-      <span>Stream Recorder · Automated GitHub Actions pipeline</span>
-      <span>
-        <a href="https://github.com/usermuneeb1/Stream-Recorder" target="_blank" rel="noopener">GitHub</a>
-        · Auto-updated from <code>links.txt</code>
-      </span>
+      <p>© The Muslim Lantern · <a href="https://github.com/usermuneeb1/Stream-Recorder" target="_blank" rel="noopener">Stream Recorder</a></p>
     </footer>
   </div>
 
-  <div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
     <div class="modal-box">
       <div class="modal-head">
         <h2 id="modal-title">Stream</h2>
         <button type="button" class="close-btn" id="close-modal" aria-label="Close">×</button>
       </div>
       <div class="player-tabs" id="tabs"></div>
-      <div class="player-area" id="player"></div>
-      <div class="modal-links" id="modal-links"></div>
+      <div class="player-area" id="player-area">
+        <div class="player-loading" id="player-loading">
+          <div class="spinner"></div>
+          <span>Loading player…</span>
+        </div>
+        <div class="player-msg" id="player-msg"></div>
+      </div>
     </div>
   </div>
 
@@ -311,19 +361,23 @@
     const REPO = 'usermuneeb1/Stream-Recorder';
     const BRANCH = 'main';
     const RAW = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
-    const CHANNEL = 'The Muslim Lantern';
+    const CHANNEL_ONLY = 'the muslim lantern';
 
-    let allStreams = [];
-    let filterMode = 'tml';
-    let activeStream = null;
-    let activeTab = 'youtube';
+    let streams = [];
+    let current = null;
+    let activeTab = null;
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    function isTML(channel) {
+      return (channel || '').toLowerCase().trim().includes(CHANNEL_ONLY);
+    }
 
     async function fetchText(path) {
       const r = await fetch(`${RAW}/${path}?t=${Date.now()}`);
       if (!r.ok) throw new Error(path);
       return r.text();
     }
-
     async function fetchJson(path) {
       const r = await fetch(`${RAW}/${path}?t=${Date.now()}`);
       if (!r.ok) throw new Error(path);
@@ -334,145 +388,85 @@
       const m = (url || '').match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/);
       return m ? m[1] : '';
     }
-
     function archiveId(url) {
       const m = (url || '').match(/archive\.org\/details\/([^/?\s]+)/);
       return m ? m[1] : '';
     }
+    function pixeldrainId(url) {
+      const m = (url || '').match(/pixeldrain\.com\/u\/([a-zA-Z0-9]+)/);
+      return m ? m[1] : '';
+    }
+    function gofileCode(url) {
+      const m = (url || '').match(/gofile\.io\/d\/([a-zA-Z0-9]+)/);
+      return m ? m[1] : '';
+    }
+    function megaEmbed(url) {
+      const m = (url || '').match(/mega\.nz\/(?:file|folder)\/([^#]+)(?:#(.+))?/);
+      if (!m) return null;
+      const path = m[2] ? `${m[1]}#${m[2]}` : m[1];
+      return `https://mega.nz/embed/${path}`;
+    }
 
     function parseLinksTxt(text) {
-      const blocks = text.split(/={10,}/).map(b => b.trim()).filter(Boolean);
-      const streams = [];
-      for (const block of blocks) {
-        if (block.startsWith('#')) continue;
-        const get = (key) => {
-          const re = new RegExp(`^${key}:\\s*(.+)$`, 'im');
-          const m = block.match(re);
-          return m ? m[1].trim() : '';
-        };
-        const title = get('Title');
+      const out = [];
+      for (const block of text.split(/={10,}/)) {
+        const b = block.trim();
+        if (!b || b.startsWith('#')) continue;
+        const get = k => { const m = b.match(new RegExp(`^${k}:\\s*(.+)$`, 'im')); return m ? m[1].trim() : ''; };
+        const channel = get('Channel');
+        if (!isTML(channel)) continue;
         const url = get('URL');
-        if (!title || !url || !url.includes('youtube')) continue;
+        if (!url.includes('youtube')) continue;
         const links = {};
-        for (const line of block.split('\n')) {
+        for (const line of b.split('\n')) {
           const lm = line.match(/^\[(\w+):([^\]]+)\]\s+(https?:\S+)/);
-          if (lm) {
-            const k = `${lm[1]}_${lm[2]}`.toLowerCase();
-            links[k] = lm[3].replace(/\s+\(PERMANENT\)$/, '');
-          }
+          if (lm) links[`${lm[1]}_${lm[2]}`.toLowerCase()] = lm[3].replace(/\s+\(PERMANENT\)$/, '');
         }
-        streams.push({
-          title,
-          channel: get('Channel'),
+        const vid = ytId(url);
+        out.push({
+          title: get('Title'),
+          channel,
           date: get('Date'),
           url,
-          videoId: ytId(url),
+          videoId: vid,
           duration: get('Duration'),
           size: get('Size'),
-          uploads: get('Uploads'),
-          thumbnail: `https://i.ytimg.com/vi/${ytId(url)}/hqdefault.jpg`,
-          links: {
-            gofileHd: links.gofile_hd || '',
-            gofileComp: links.gofile_compressed || '',
-            archiveHd: links.archive_hd || '',
-            archiveComp: links.archive_compressed || '',
-            pixeldrain: links.pixeldrain_hd || links.pixeldrain_compressed || '',
-            mega: links.mega_hd || links.mega_compressed || '',
+          thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+          sources: {
+            youtube: { type: 'youtube', label: '▶ YouTube', url },
+            archiveHd: links.archive_hd ? { type: 'archive', label: '🏛 Archive HD', url: links.archive_hd } : null,
+            archiveComp: links.archive_compressed ? { type: 'archive', label: '🏛 Archive (small)', url: links.archive_compressed } : null,
+            gofileHd: links.gofile_hd ? { type: 'gofile', label: '🟠 Gofile HD', url: links.gofile_hd } : null,
+            gofileComp: links.gofile_compressed ? { type: 'gofile', label: '🟠 Gofile (small)', url: links.gofile_compressed } : null,
+            pixeldrain: links.pixeldrain_hd || links.pixeldrain_compressed
+              ? { type: 'pixeldrain', label: '🟣 Pixeldrain', url: links.pixeldrain_hd || links.pixeldrain_compressed } : null,
+            mega: links.mega_hd || links.mega_compressed
+              ? { type: 'mega', label: '🔴 MEGA', url: links.mega_hd || links.mega_compressed } : null,
           }
         });
       }
-      return streams;
+      return out;
     }
 
-    function mergeRecordings(streams, recordings) {
-      const byId = Object.fromEntries(streams.map(s => [s.videoId, s]));
-      for (const r of recordings || []) {
+    function mergeRecordings(list, recs) {
+      const map = Object.fromEntries(list.map(s => [s.videoId, s]));
+      for (const r of recs || []) {
+        if (!isTML(r.channel)) continue;
         const id = r.video_id || ytId(r.video_url);
         if (!id) continue;
-        if (!byId[id]) {
-          byId[id] = {
-            title: r.title,
-            channel: r.channel,
-            date: r.date,
-            url: r.video_url,
-            videoId: id,
-            duration: r.duration_fmt,
-            size: r.size_human,
-            thumbnail: r.thumbnail || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-            links: {
-              gofileHd: r.gofile_link || '',
-              pixeldrain: r.pixeldrain_link || '',
-              archiveHd: r.archive_link || '',
-              mega: r.mega_link || '',
-            }
-          };
-        } else {
-          const s = byId[id];
-          if (r.gofile_link) s.links.gofileHd = r.gofile_link;
-          if (r.pixeldrain_link) s.links.pixeldrain = r.pixeldrain_link;
-          if (r.archive_link) s.links.archiveHd = r.archive_link;
-          if (r.mega_link) s.links.mega = r.mega_link;
-        }
+        const base = map[id] || {
+          title: r.title, channel: r.channel, date: r.date, url: r.video_url,
+          videoId: id, duration: r.duration_fmt, size: r.size_human,
+          thumbnail: r.thumbnail || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+          sources: { youtube: { type: 'youtube', label: '▶ YouTube', url: r.video_url } }
+        };
+        if (r.gofile_link) base.sources.gofileHd = { type: 'gofile', label: '🟠 Gofile HD', url: r.gofile_link };
+        if (r.pixeldrain_link) base.sources.pixeldrain = { type: 'pixeldrain', label: '🟣 Pixeldrain', url: r.pixeldrain_link };
+        if (r.archive_link) base.sources.archiveHd = { type: 'archive', label: '🏛 Archive HD', url: r.archive_link };
+        if (r.mega_link) base.sources.mega = { type: 'mega', label: '🔴 MEGA', url: r.mega_link };
+        map[id] = base;
       }
-      return Object.values(byId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    }
-
-    function renderStats(stats) {
-      const ls = stats?.last_stream || {};
-      document.getElementById('stats').innerHTML = `
-        <div class="stat"><div class="val">${stats?.total_streams ?? '—'}</div><div class="lbl">Total streams</div></div>
-        <div class="stat"><div class="val">${Number(stats?.total_hours ?? 0).toFixed(1)}h</div><div class="lbl">Hours archived</div></div>
-        <div class="stat"><div class="val">${Number(stats?.total_gb ?? 0).toFixed(1)}</div><div class="lbl">Gigabytes saved</div></div>
-        <div class="stat"><div class="val" style="font-size:1rem">${ls.date?.split(' ').slice(0,3).join(' ') || '—'}</div><div class="lbl">Last recording</div></div>
-      `;
-    }
-
-    function filtered() {
-      const q = document.getElementById('search').value.toLowerCase().trim();
-      return allStreams.filter(s => {
-        if (filterMode === 'tml' && s.channel && !s.channel.includes('Muslim Lantern')) return false;
-        if (q && !s.title.toLowerCase().includes(q)) return false;
-        return true;
-      });
-    }
-
-    function renderGrid() {
-      const list = filtered();
-      const grid = document.getElementById('grid');
-      if (!list.length) {
-        grid.innerHTML = `<div class="empty"><p>No streams match your filter.</p><p style="margin-top:0.5rem;font-size:0.85rem">Recordings appear here after the Stream Recorder workflow runs.</p></div>`;
-        return;
-      }
-      grid.innerHTML = list.map((s, i) => {
-        const tags = [];
-        if (s.links.archiveHd) tags.push('<span class="tag ok">Archive</span>');
-        if (s.links.gofileHd) tags.push('<span class="tag ok">Gofile</span>');
-        if (s.links.mega) tags.push('<span class="tag ok">MEGA</span>');
-        if (s.links.pixeldrain) tags.push('<span class="tag ok">Pixeldrain</span>');
-        return `
-          <article class="card" data-idx="${i}" tabindex="0">
-            <div class="thumb">
-              <img src="${s.thumbnail}" alt="" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/${s.videoId}/mqdefault.jpg'" />
-              <div class="play"><div class="play-btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="#06080d"><path d="M8 5v14l11-7z"/></svg></div></div>
-              ${s.duration ? `<span class="dur">${s.duration}</span>` : ''}
-            </div>
-            <div class="card-body">
-              <h3>${esc(s.title)}</h3>
-              <div class="meta">
-                <span>${esc(s.channel || CHANNEL)}</span>
-                <span>·</span>
-                <span>${esc(s.date?.split(' ').slice(0,3).join(' ') || '')}</span>
-                ${s.size ? `<span>· ${esc(s.size)}</span>` : ''}
-              </div>
-              <div class="tags">${tags.join('') || '<span class="tag">YouTube</span>'}</div>
-            </div>
-          </article>`;
-      }).join('');
-      grid.querySelectorAll('.card').forEach((el, i) => {
-        const open = () => openPlayer(list[i]);
-        el.addEventListener('click', open);
-        el.addEventListener('keydown', e => { if (e.key === 'Enter') open(); });
-      });
+      return Object.values(map).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     }
 
     function esc(s) {
@@ -481,111 +475,211 @@
       return d.innerHTML;
     }
 
+    function animateValue(el, end, suffix = '', decimals = 0) {
+      const start = 0;
+      const dur = 1200;
+      const t0 = performance.now();
+      function step(t) {
+        const p = Math.min((t - t0) / dur, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        const v = start + (end - start) * ease;
+        el.textContent = (decimals ? v.toFixed(decimals) : Math.round(v)) + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function renderStats(stats) {
+      const el = document.getElementById('stats');
+      el.innerHTML = `
+        <div class="stat"><div class="val" data-v="${stats?.total_streams ?? 0}">0</div><div class="lbl">Streams</div></div>
+        <div class="stat"><div class="val" data-v="${stats?.total_hours ?? 0}" data-dec="1" data-suf="h">0</div><div class="lbl">Hours</div></div>
+        <div class="stat"><div class="val" data-v="${stats?.total_gb ?? 0}" data-dec="1" data-suf=" GB">0</div><div class="lbl">Saved</div></div>
+        <div class="stat"><div class="val" style="font-size:1rem">${esc((stats?.last_stream?.date || '—').split(' ').slice(0,3).join(' '))}</div><div class="lbl">Latest</div></div>
+      `;
+      el.querySelectorAll('.val[data-v]').forEach(node => {
+        const v = parseFloat(node.dataset.v) || 0;
+        const dec = parseInt(node.dataset.dec || '0', 10);
+        const suf = node.dataset.suf || '';
+        animateValue(node, v, suf, dec);
+      });
+    }
+
+    function getSources(s) {
+      return Object.values(s.sources || {}).filter(Boolean);
+    }
+
+    function renderGrid() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      const list = streams.filter(s => !q || s.title.toLowerCase().includes(q));
+      const grid = document.getElementById('grid');
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty"><p style="font-size:1.1rem;font-weight:700;color:var(--red)">No streams yet</p><p style="margin-top:0.5rem">Only <strong>The Muslim Lantern</strong> recordings appear here.</p></div>`;
+        return;
+      }
+      grid.innerHTML = list.map((s, i) => {
+        const srcs = getSources(s);
+        return `
+          <article class="card" style="animation-delay:${0.08 * i}s" data-i="${i}">
+            <div class="thumb">
+              <img src="${s.thumbnail}" alt="" loading="lazy" />
+              <span class="dur">${esc(s.duration || '')}</span>
+              <div class="thumb-overlay"><div class="play-circle"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div></div>
+            </div>
+            <div class="card-body">
+              <h3>${esc(s.title)}</h3>
+              <div class="meta">${esc(s.date?.split(' ').slice(0,3).join(' ') || '')} · ${esc(s.size || '')}</div>
+              <div class="sources">${srcs.map(x => `<span class="src">${esc(x.label.replace(/^.\s/, ''))}</span>`).join('')}</div>
+            </div>
+          </article>`;
+      }).join('');
+      grid.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('click', () => openPlayer(list[+card.dataset.i]));
+      });
+    }
+
+    function setPlayerHTML(html) {
+      const area = document.getElementById('player-area');
+      const loading = document.getElementById('player-loading');
+      const msg = document.getElementById('player-msg');
+      loading.style.display = 'none';
+      msg.classList.remove('show');
+      [...area.querySelectorAll('iframe,video')].forEach(n => n.remove());
+      if (html) area.insertAdjacentHTML('beforeend', html);
+    }
+
+    function showPlayerError(text) {
+      document.getElementById('player-loading').style.display = 'none';
+      const msg = document.getElementById('player-msg');
+      msg.textContent = text;
+      msg.classList.add('show');
+      [...document.getElementById('player-area').querySelectorAll('iframe,video')].forEach(n => n.remove());
+    }
+
+    async function loadGofile(url) {
+      const code = gofileCode(url);
+      if (!code) throw new Error('Invalid Gofile link');
+      try {
+        const wt = '4fd6sg89d7s6';
+        const res = await fetch(`https://api.gofile.io/contents/${code}?wt=${wt}`);
+        const data = await res.json();
+        if (data.status === 'ok' && data.data?.children) {
+          const file = Object.values(data.data.children).find(c => c.type === 'file' && (c.name || '').match(/\.(mp4|mkv|webm)$/i));
+          if (file?.link) {
+            setPlayerHTML(`<video controls playsinline src="${file.link}"></video>`);
+            return;
+          }
+        }
+      } catch (e) { console.warn('Gofile API', e); }
+      setPlayerHTML(`<iframe allowfullscreen src="https://gofile.io/d/${code}" title="Gofile player"></iframe>`);
+    }
+
+    async function renderPlayerSource(src) {
+      document.getElementById('player-loading').style.display = 'flex';
+      document.getElementById('player-msg').classList.remove('show');
+      await sleep(200);
+
+      if (!src) { showPlayerError('No source selected.'); return; }
+
+      try {
+        if (src.type === 'youtube' && current.videoId) {
+          setPlayerHTML(`<iframe allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen src="https://www.youtube.com/embed/${current.videoId}?rel=0&autoplay=1"></iframe>`);
+          return;
+        }
+        if (src.type === 'archive') {
+          const id = archiveId(src.url);
+          if (id) {
+            setPlayerHTML(`<iframe allowfullscreen src="https://archive.org/embed/${id}"></iframe>`);
+            return;
+          }
+        }
+        if (src.type === 'pixeldrain') {
+          const id = pixeldrainId(src.url);
+          if (id) {
+            setPlayerHTML(`<video controls playsinline src="https://pixeldrain.com/api/file/${id}/stream"></video>`);
+            return;
+          }
+        }
+        if (src.type === 'gofile') {
+          await loadGofile(src.url);
+          return;
+        }
+        if (src.type === 'mega') {
+          const embed = megaEmbed(src.url);
+          if (embed) {
+            setPlayerHTML(`<iframe allowfullscreen src="${embed}" title="MEGA player"></iframe>`);
+            return;
+          }
+        }
+        showPlayerError('Could not load this player. Try another tab above.');
+      } catch (e) {
+        showPlayerError('Player error: ' + e.message);
+      }
+    }
+
     function openPlayer(stream) {
-      activeStream = stream;
-      activeTab = 'youtube';
+      current = stream;
+      const entries = Object.entries(stream.sources || {}).filter(([, v]) => v);
+      if (!entries.length) return;
+
       document.getElementById('modal-title').textContent = stream.title;
       document.getElementById('modal').classList.add('open');
       document.body.style.overflow = 'hidden';
-      renderTabs();
-      renderPlayer();
-      renderModalLinks();
+
+      document.getElementById('tabs').innerHTML = entries.map(([key, s], i) =>
+        `<button type="button" class="tab ${i === 0 ? 'active' : ''}" data-idx="${i}">${s.label}</button>`
+      ).join('');
+
+      document.getElementById('tabs').querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          btn.classList.add('active');
+          const [, src] = entries[+btn.dataset.idx];
+          renderPlayerSource(src);
+        });
+      });
+
+      renderPlayerSource(entries[0][1]);
     }
 
     function closePlayer() {
       document.getElementById('modal').classList.remove('open');
       document.body.style.overflow = '';
-      document.getElementById('player').innerHTML = '';
-      activeStream = null;
-    }
-
-    function renderTabs() {
-      const s = activeStream;
-      const tabs = [{ id: 'youtube', label: '▶ YouTube' }];
-      if (archiveId(s.links.archiveHd)) tabs.push({ id: 'archive', label: '🏛 Archive.org' });
-      document.getElementById('tabs').innerHTML = tabs.map(t =>
-        `<button type="button" class="tab ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`
-      ).join('');
-      document.getElementById('tabs').querySelectorAll('.tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeTab = btn.dataset.tab;
-          document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
-          renderPlayer();
-        });
-      });
-    }
-
-    function renderPlayer() {
-      const s = activeStream;
-      const area = document.getElementById('player');
-      if (activeTab === 'youtube' && s.videoId) {
-        area.innerHTML = `<iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen src="https://www.youtube.com/embed/${s.videoId}?rel=0&modestbranding=1"></iframe>`;
-        return;
-      }
-      if (activeTab === 'archive') {
-        const id = archiveId(s.links.archiveHd);
-        if (id) {
-          area.innerHTML = `<iframe allowfullscreen src="https://archive.org/embed/${id}"></iframe>`;
-          return;
-        }
-      }
-      area.innerHTML = `<div class="placeholder">No embedded player for this source. Use the download links below.</div>`;
-    }
-
-    function renderModalLinks() {
-      const s = activeStream;
-      const L = s.links || {};
-      const items = [
-        ['📺 YouTube', s.url, true],
-        ['🟠 Gofile HD', L.gofileHd],
-        ['🟠 Gofile (small)', L.gofileComp],
-        ['🟣 Pixeldrain', L.pixeldrain],
-        ['🏛 Archive.org', L.archiveHd],
-        ['🏛 Archive (compressed)', L.archiveComp],
-        ['🔴 MEGA.nz', L.mega],
-      ].filter(([, u]) => u);
-      document.getElementById('modal-links').innerHTML = items.map(([label, url, primary]) =>
-        `<a class="dl ${primary ? 'primary' : ''}" href="${url}" target="_blank" rel="noopener">${label}</a>`
-      ).join('');
+      setPlayerHTML('');
+      document.getElementById('player-loading').style.display = 'flex';
+      current = null;
     }
 
     document.getElementById('close-modal').addEventListener('click', closePlayer);
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closePlayer(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closePlayer(); });
-
     document.getElementById('search').addEventListener('input', renderGrid);
-    document.querySelectorAll('.chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        filterMode = btn.dataset.filter;
-        renderGrid();
-      });
-    });
 
     async function init() {
       try {
         const stats = await fetchJson('stats.json');
         renderStats(stats);
       } catch {
-        document.getElementById('stats').innerHTML = '<div class="stat"><div class="val">—</div><div class="lbl">Stats loading…</div></div>';
+        document.getElementById('stats').innerHTML = '<div class="stat"><div class="val">—</div><div class="lbl">Stats</div></div>';
       }
+
+      let list = [];
       try {
-        let streams = [];
-        try {
-          const txt = await fetchText('links.txt');
-          streams = parseLinksTxt(txt);
-        } catch { /* links optional */ }
-        try {
-          const rec = await fetchJson('data/recordings.json');
-          streams = mergeRecordings(streams, rec);
-        } catch { /* recordings optional */ }
-        allStreams = streams.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        renderGrid();
-      } catch (e) {
-        document.getElementById('grid').innerHTML = `<div class="empty"><p>Could not load archive data.</p><p style="margin-top:0.5rem;font-size:0.85rem">${esc(e.message)}</p></div>`;
-      }
+        const txt = await fetchText('links.txt');
+        list = parseLinksTxt(txt);
+      } catch { /* optional */ }
+      try {
+        const rec = await fetchJson('data/recordings.json');
+        list = mergeRecordings(list, rec);
+      } catch { /* optional */ }
+
+      streams = list.filter(s => isTML(s.channel));
+      renderGrid();
+
+      await sleep(900);
+      document.getElementById('splash').classList.add('hide');
     }
+
     init();
   </script>
 </body>
