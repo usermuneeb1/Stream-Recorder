@@ -54,6 +54,8 @@ jobs:
           chmod +x scripts/*.sh
 
       - name: "🔄 Refresh Links"
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: bash scripts/refresh-links.sh
 
       - name: "📢 Send Discord Notification"

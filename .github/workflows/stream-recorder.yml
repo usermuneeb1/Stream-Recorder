@@ -186,10 +186,19 @@ jobs:
           if ! check_disk_space 3; then
             log_error "Insufficient disk space — aborting"
             echo "disk_ok=false" >> $GITHUB_OUTPUT
+            echo "DISK_LOW=true" >> $GITHUB_ENV
             exit 0
           fi
           
           echo "disk_ok=true" >> $GITHUB_OUTPUT
+
+      - name: "⚠️ Notify — Low Disk Space"
+        if: steps.disk_check.outputs.disk_ok != 'true'
+        continue-on-error: true
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_system_health "disk_low" "Runner has less than ${MIN_DISK_SPACE_GB:-3} GB free — recording skipped."
 
       # ─── 5. PREPARE COOKIES ──────────────────────────────────────────────
       - name: "🍪 Prepare Cookies"
@@ -251,6 +260,7 @@ jobs:
         if: steps.disk_check.outputs.disk_ok == 'true'
         timeout-minutes: 310
         run: |
+          export FORCE_RECORD="${{ github.event.inputs.force_record }}"
           WAIT_MODE="${{ github.event.inputs.wait_for_live }}"
           MAX_H="${{ github.event.inputs.wait_max_hours }}"
           MAX_H="${MAX_H:-5}"
@@ -310,13 +320,13 @@ jobs:
       # ─── 10. UPLOAD TO CLOUDS ───────────────────────────────────────────
       - name: "☁️ Upload to Clouds"
         id: upload
-        if: steps.record.outputs.recording_success == 'true'
+        if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
 
       # ─── 11. SEND COMPLETE NOTIFICATION ─────────────────────────────────
       - name: "✅ Notify — Recording Complete"
-        if: steps.record.outputs.recording_success == 'true'
+        if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         run: |
           source scripts/utils.sh
           source scripts/discord-notify.sh
@@ -324,13 +334,13 @@ jobs:
 
       # ─── 12. UPDATE STATISTICS ──────────────────────────────────────────
       - name: "📊 Update Statistics"
-        if: steps.record.outputs.recording_success == 'true'
+        if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/update-stats.sh
 
       # ─── 13. ARCHIVE LINKS ──────────────────────────────────────────────
       - name: "🔗 Archive Links"
-        if: steps.record.outputs.recording_success == 'true'
+        if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: |
           SAVE_LINKS="${{ github.event.inputs.save_test_links }}"

@@ -28,7 +28,7 @@ get_webhook_url() {
     case "$type" in
         alerts)      url="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}" ;;
         recordings)  url="${DISCORD_WEBHOOK_RECORDINGS:-${DISCORD_WEBHOOK_URL:-}}" ;;
-        refresh)     url="${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}" ;;
+        refresh)     url="${DISCORD_WEBHOOK_REFRESH:-${DISCORD_WEBHOOK_LINKS:-${DISCORD_WEBHOOK_URL:-}}}" ;;
         reports)     url="${DISCORD_WEBHOOK_REPORTS:-${DISCORD_WEBHOOK_URL:-}}" ;;
         *)           url="${DISCORD_WEBHOOK_URL:-}" ;;
     esac
@@ -59,8 +59,10 @@ send_discord_webhook() {
     payload_tmp=$(mktemp)
     out_tmp=$(mktemp)
     
-    # Inject @everyone mention into every notification
-    payload=$(echo "$payload" | jq '. + {content: "@everyone"}')
+    # Ping @everyone only for live alerts and recording complete/failed
+    if [[ "$channel_type" == "alerts" || "$channel_type" == "recordings" ]]; then
+        payload=$(echo "$payload" | jq '. + {content: "@everyone"}')
+    fi
     
     printf '%s' "$payload" > "$payload_tmp"
 
@@ -301,9 +303,9 @@ notify_recording_complete() {
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
     # HD links (first entry or "HD" tagged)
-    local gofile_url="" dailymotion_url="" pixeldrain_url="" archive_url="" archive_id="" mega_url=""
+    local gofile_url="" pixeldrain_url="" archive_url="" archive_id="" mega_url=""
     # Compressed links
-    local gofile_comp="" dailymotion_comp="" pixeldrain_comp="" archive_comp="" mega_comp=""
+    local gofile_comp="" pixeldrain_comp="" archive_comp="" mega_comp=""
     
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
@@ -315,19 +317,6 @@ notify_recording_complete() {
                 gofile_comp="$_link"
             elif [[ -z "$gofile_url" ]]; then
                 gofile_url="$_link"
-            fi
-        done
-    fi
-    if [[ -n "${DAILYMOTION_LINKS:-}" ]]; then
-        IFS=';' read -ra _dm <<< "${DAILYMOTION_LINKS}"
-        for entry in "${_dm[@]}"; do
-            local _part _link
-            _part=$(echo "$entry" | cut -d'|' -f1)
-            _link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ "$_part" == "Compressed" ]]; then
-                dailymotion_comp="$_link"
-            elif [[ -z "$dailymotion_url" ]]; then
-                dailymotion_url="$_link"
             fi
         done
     fi
@@ -382,8 +371,6 @@ notify_recording_complete() {
     local upstatus=""
     upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "🟠 Gofile ✅"; else echo "🟠 Gofile ❌"; fi)
     upstatus+=" · "
-    upstatus+=$(if [[ -n "$dailymotion_url" ]]; then echo "🔵 Dailymotion ✅"; else echo "🔵 Dailymotion ❌"; fi)
-    upstatus+=" · "
     upstatus+=$(if [[ -n "$pixeldrain_url" ]]; then echo "🟣 Pixeldrain ✅"; else echo "🟣 Pixeldrain ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
@@ -410,13 +397,11 @@ notify_recording_complete() {
         --arg uploads        "${upload_count}/${upload_total}" \
         --arg upstatus       "$upstatus" \
         --arg gofile_url       "$gofile_url" \
-        --arg dailymotion_url  "$dailymotion_url" \
         --arg pixeldrain_url   "$pixeldrain_url" \
         --arg archive_url      "$archive_url" \
         --arg archive_id       "$archive_id" \
         --arg mega_url         "$mega_url" \
         --arg gofile_comp      "$gofile_comp" \
-        --arg dailymotion_comp "$dailymotion_comp" \
         --arg pixeldrain_comp  "$pixeldrain_comp" \
         --arg archive_comp     "$archive_comp" \
         --arg mega_comp        "$mega_comp" \
@@ -462,25 +447,23 @@ notify_recording_complete() {
                     [
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: ("**☁️  Upload Status**\n" + $upstatus), inline: false },
                         
-                        (if ($gofile_url != "" or $dailymotion_url != "" or $pixeldrain_url != "" or $archive_url != "") then
+                        (if ($gofile_url != "" or $pixeldrain_url != "" or $archive_url != "" or $mega_url != "") then
                             { name: "╔══  📀 HD  ══════════════════════╗", value: ("**Original quality** • " + $size), inline: false }
                         else empty end),
                         (if $gofile_url      != "" then { name: "🟠  Gofile",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: true } else empty end),
-                        (if $dailymotion_url != "" then { name: "🔵  Dailymotion",    value: ("[▶️ Watch / ⬇️ Download](" + $dailymotion_url + ")"),    inline: true } else empty end),
                         (if $pixeldrain_url  != "" then { name: "🟣  Pixeldrain",     value: ("[⬇️ Download](" + $pixeldrain_url + ")"),                inline: true } else empty end),
                         (if $archive_url     != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         (if $mega_url        != "" then { name: "🔴  MEGA.nz",      value: ("[⬇️ Download (Permanent)](" + $mega_url + ")"),               inline: true } else empty end),
                         
-                        (if ($gofile_comp != "" or $dailymotion_comp != "" or $pixeldrain_comp != "" or $archive_comp != "") then
+                        (if ($gofile_comp != "" or $pixeldrain_comp != "" or $archive_comp != "" or $mega_comp != "") then
                             { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**480p** • Tiny file size • For storage", inline: false }
                         else empty end),
                         (if $gofile_comp      != "" then { name: "🟠  Gofile",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: true } else empty end),
-                        (if $dailymotion_comp != "" then { name: "🔵  Dailymotion", value: ("[⬇️ Quick Download](" + $dailymotion_comp + ")"), inline: true } else empty end),
                         (if $pixeldrain_comp  != "" then { name: "🟣  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
                         (if $archive_comp     != "" then { name: "🏛️  Archive.org", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
                         (if $mega_comp        != "" then { name: "🔴  MEGA.nz",     value: ("[⬇️ Download](" + $mega_comp + ")"),               inline: true } else empty end),
                         
-                        (if ($gofile_url == "" and $dailymotion_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "") then
+                        (if ($gofile_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "") then
                             { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
                         else empty end),
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: "**📋  Additional Info**", inline: false },
@@ -500,7 +483,6 @@ notify_recording_complete() {
                     type: 1,
                     components: (
                         [
-                            (if $dailymotion_url != "" then { type: 2, style: 5, label: "📀 Dailymotion HD", url: $dailymotion_url } else empty end),
                             (if $pixeldrain_url != "" then { type: 2, style: 5, label: "🟣 Pixeldrain", url: $pixeldrain_url } else empty end),
                             (if $gofile_url != "" then { type: 2, style: 5, label: "🟠 Gofile", url: $gofile_url } else empty end),
                             { type: 2, style: 5, label: "📺 Watch Original", url: $video_url },
@@ -633,10 +615,11 @@ notify_weekly_summary() {
     local total_streams="${LIFETIME_TOTAL_STREAMS:-0}"
     local total_hours="${LIFETIME_TOTAL_HOURS:-0}"
     local total_gb="${LIFETIME_TOTAL_GB:-0}"
-    local week_streams="${WEEK_STREAMS:-0}"
-    local week_hours="${WEEK_HOURS:-0}"
-    local week_gb="${WEEK_GB:-0}"
-    local avg_duration="${LIFETIME_AVG_DURATION:-0}"
+    local week_streams="${WEEK_STREAMS:-${WEEKLY_TOTAL_STREAMS:-0}}"
+    local week_hours="${WEEK_HOURS:-${WEEKLY_TOTAL_HOURS:-0}}"
+    local week_gb="${WEEK_GB:-${WEEKLY_TOTAL_GB:-0}}"
+    local avg_duration="${WEEKLY_AVG_DURATION:-${LIFETIME_AVG_DURATION:-0}}"
+    local streams_list="${WEEKLY_STREAMS_LIST:-*No streams this week*}"
     local avatar="${AVATAR_URL:-}"
     local timestamp
     timestamp=$(now_utc_iso)
@@ -652,6 +635,9 @@ notify_weekly_summary() {
     if [[ "$week_streams" != "0" ]]; then
         greeting="🎉 Great Week"
         status="${week_streams} streams successfully archived."
+    fi
+    if [[ -n "$streams_list" && "$streams_list" != *"No streams"* ]]; then
+        status="${streams_list}"
     fi
 
     local payload
@@ -669,7 +655,7 @@ notify_weekly_summary() {
         --arg greeting       "$greeting" \
         --arg status         "$status" \
         --arg timestamp      "$timestamp" \
-        --arg bot_ver        "${RECORDER_VERSION:-2.2.0}" \
+        --arg bot_ver        "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
         '{
             username:   $username,
@@ -777,10 +763,47 @@ notify_links_refreshed() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 6: 🟢 SYSTEM HEALTH
+#  NOTIFICATION 6a: ⚠️ DISK / SYSTEM ALERT (alerts channel)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_system_health() {
+    local alert_type="${1:-health}"
+    local alert_msg="${2:-}"
+
+    if [[ "$alert_type" == "disk_low" && -n "$alert_msg" ]]; then
+        log_step "Sending DISK LOW alert..."
+        local avatar="${AVATAR_URL:-}"
+        local timestamp
+        timestamp=$(now_utc_iso)
+        local payload
+        payload=$(jq -n \
+            --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+            --arg avatar "$avatar" \
+            --arg msg "$alert_msg" \
+            --arg time "$(now_pkt)" \
+            --arg timestamp "$timestamp" \
+            --arg bot_ver "${RECORDER_VERSION:-3.0.0}" \
+            --arg bot_name "${RECORDER_NAME:-The Muslim Lantern}" \
+            '{
+                username: $username,
+                avatar_url: $avatar,
+                embeds: [{
+                    title: "⚠️ Disk Space Too Low",
+                    description: $msg,
+                    color: 15105570,
+                    fields: [{ name: "⏰ Time", value: $time, inline: true }],
+                    footer: { text: ("☪️ " + $bot_name + " v" + $bot_ver) },
+                    timestamp: $timestamp
+                }]
+            }')
+        send_discord_webhook "$payload" "alerts"
+        return 0
+    fi
+
+    _notify_system_health_check
+}
+
+_notify_system_health_check() {
     log_step "Sending SYSTEM HEALTH notification..."
 
     local disk_space="${DISK_SPACE_GB:-N/A}"

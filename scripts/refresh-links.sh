@@ -268,6 +268,14 @@ mark_dead_in_links_txt() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 refresh_links() {
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log_warn "DRY_RUN=true — link refresh skipped (check-only mode not yet implemented)"
+        set_env "REFRESH_TOTAL_CHECKED" "0"
+        set_env "REFRESH_TOTAL_ALIVE" "0"
+        set_env "REFRESH_TOTAL_REFRESHED" "0"
+        set_env "REFRESH_TOTAL_DEAD" "0"
+        return 0
+    fi
     log_header "🔄 CLOUD LINK PRESERVATION v2.0"
     
     local refresh_start

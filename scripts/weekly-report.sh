@@ -51,13 +51,14 @@ generate_weekly_report() {
     local weekly_gb=0
     local streams_list=""
     local in_entry=false
-    local entry_date="" entry_title="" entry_duration="" entry_size=""
+    local entry_date="" entry_title="" entry_duration="" entry_size="" entry_channel=""
+    local channel_filter="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
     
     while IFS= read -r line; do
         # Start of entry
         if [[ "$line" == "========================================"* ]] && [[ "$in_entry" == "false" ]]; then
             in_entry=true
-            entry_date="" entry_title="" entry_duration="" entry_size=""
+            entry_date="" entry_title="" entry_duration="" entry_size="" entry_channel=""
             continue
         fi
         
@@ -65,8 +66,8 @@ generate_weekly_report() {
         if [[ "$line" == "========================================"* ]] && [[ "$in_entry" == "true" ]]; then
             in_entry=false
             
-            # Check if this entry is from this week
-            if [[ -n "$entry_date" ]]; then
+            # Check if this entry is from this week (single channel only)
+            if [[ -n "$entry_date" ]] && [[ -z "$entry_channel" || "$entry_channel" == *"$channel_filter"* ]]; then
                 local entry_ymd
                 entry_ymd=$(echo "$entry_date" | grep -oP '\d{4}-\d{2}-\d{2}' | head -1)
                 
@@ -105,6 +106,7 @@ generate_weekly_report() {
         if [[ "$in_entry" == "true" ]]; then
             [[ "$line" =~ ^Date:\ *(.+)$ ]] && entry_date="${BASH_REMATCH[1]}"
             [[ "$line" =~ ^Title:\ *(.+)$ ]] && entry_title="${BASH_REMATCH[1]}"
+            [[ "$line" =~ ^Channel:\ *(.+)$ ]] && entry_channel="${BASH_REMATCH[1]}"
             [[ "$line" =~ ^Duration:\ *(.+)$ ]] && entry_duration="${BASH_REMATCH[1]}"
             [[ "$line" =~ ^Size:\ *(.+)$ ]] && entry_size="${BASH_REMATCH[1]}"
         fi
@@ -130,9 +132,14 @@ generate_weekly_report() {
     set_env "WEEKLY_TOTAL_GB" "$weekly_gb"
     set_env "WEEKLY_AVG_DURATION" "$weekly_avg"
     set_env "WEEKLY_STREAMS_LIST" "$streams_list"
+    # Aliases read by discord-notify.sh
+    set_env "WEEK_STREAMS" "$weekly_streams"
+    set_env "WEEK_HOURS" "$weekly_hours"
+    set_env "WEEK_GB" "$weekly_gb"
     set_env "LIFETIME_TOTAL_STREAMS" "$lifetime_streams"
     set_env "LIFETIME_TOTAL_HOURS" "$lifetime_hours"
     set_env "LIFETIME_TOTAL_GB" "$lifetime_gb"
+    set_env "LIFETIME_AVG_DURATION" "$lifetime_avg"
     
     # ── Send Discord notification ────────────────────────────────────────────
     source "$SCRIPT_DIR/discord-notify.sh"

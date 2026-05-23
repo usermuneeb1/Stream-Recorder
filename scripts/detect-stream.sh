@@ -68,6 +68,40 @@ get_streams_url() {
     echo "https://www.youtube.com/${channel_handle}/streams"
 }
 
+get_videos_url() {
+    local live_url
+    live_url=$(get_live_url)
+    echo "${live_url%/live}/videos"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  FORCE RECORD — latest channel video when not live (manual testing)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+detect_force_record() {
+    log_warn "FORCE_RECORD enabled — targeting latest channel video"
+    local videos_url
+    videos_url=$(get_videos_url)
+    local cookies_arg=""
+    [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+
+    DETECTED_VIDEO_ID=$(yt-dlp $cookies_arg --flat-playlist --playlist-end 1 \
+        --print "%(id)s" "$videos_url" 2>/dev/null | head -1) || true
+
+    if [[ -z "$DETECTED_VIDEO_ID" ]]; then
+        log_error "FORCE_RECORD: could not resolve a video from ${videos_url}"
+        return 1
+    fi
+
+    DETECTED_URL="https://www.youtube.com/watch?v=${DETECTED_VIDEO_ID}"
+    DETECTED_TITLE=$(yt-dlp $cookies_arg --print "%(title)s" "$DETECTED_URL" 2>/dev/null | head -1) || DETECTED_TITLE="Forced Recording"
+    DETECTED_CHANNEL="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
+    DETECTED_THUMBNAIL="https://i.ytimg.com/vi/${DETECTED_VIDEO_ID}/maxresdefault.jpg"
+    DETECTED_METHOD="force_record"
+    log_ok "FORCE_RECORD target: ${DETECTED_VIDEO_ID} — ${DETECTED_TITLE}"
+    return 0
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  METHOD 1: /live Redirect Check (Fastest — 1-2 seconds)
 #  Checks if youtube.com/@channel/live redirects to a video page
@@ -350,9 +384,17 @@ detect_live_stream() {
     log_header "🔍 LIVE STREAM DETECTION"
     
     local channel="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
-    log_info "Monitoring channel: ${channel}"
+    log_info "Monitoring channel: ${channel} (${CHANNEL_DISPLAY_NAME:-single channel})"
     log_info "Detection started at: $(now_pkt)"
     log_separator
+
+    if [[ "${FORCE_RECORD:-false}" == "true" ]]; then
+        if detect_force_record; then
+            _export_detection_results || return 1
+            return 0
+        fi
+        log_warn "FORCE_RECORD failed — falling back to normal live detection"
+    fi
     
     # ── Method 1: Redirect Check (fastest) ───────────────────────────────────
     if detect_method_1_redirect; then
@@ -441,7 +483,7 @@ _export_detection_results() {
     DETECTED_TITLE="${clean_title} ${today_date}"
     
     set_env "STREAM_TITLE" "$DETECTED_TITLE"
-    set_env "STREAM_CHANNEL" "$DETECTED_CHANNEL"
+    set_env "STREAM_CHANNEL" "${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-$DETECTED_CHANNEL}}"
     set_env "STREAM_THUMBNAIL" "$DETECTED_THUMBNAIL"
     set_env "STREAM_URL" "$DETECTED_URL"
     set_env "STREAM_DETECTION_METHOD" "$DETECTED_METHOD"

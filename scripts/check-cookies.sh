@@ -155,9 +155,13 @@ check_cookie_health() {
             
             if (( age_days >= warn_days )); then
                 log_warn "Cookies are ${age_days} days old — consider refreshing soon"
-                
-                source "$SCRIPT_DIR/discord-notify.sh"
-                notify_cookie_warning "expiring_soon" "$age_days"
+                local last_age_warn
+                last_age_warn=$(github_api_read_content "cookie_age_warning_sent.txt" 2>/dev/null) || last_age_warn=0
+                if (( now_ts - last_age_warn > 86400 )); then
+                    source "$SCRIPT_DIR/discord-notify.sh"
+                    notify_cookie_warning "warning" "$age_days"
+                    github_api_write "cookie_age_warning_sent.txt" "$now_ts" "Lock: Cookie age warning sent" >/dev/null 2>&1 || true
+                fi
             fi
         fi
     fi

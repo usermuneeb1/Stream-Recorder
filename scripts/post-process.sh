@@ -457,6 +457,7 @@ post_process() {
     set_env "PROCESSED_FILES_COUNT" "${#PROCESSED_FILES[@]}"
     set_env "PROCESSING_TIME_SEC" "$process_elapsed"
     set_env "PROCESSING_TIME_FMT" "$(format_duration_human "$process_elapsed")"
+    set_env "PROCESS_ELAPSED" "$(format_duration_human "$process_elapsed")"
     set_env "TOTAL_OUTPUT_SIZE" "$total_output_size"
     set_env "TOTAL_OUTPUT_SIZE_HUMAN" "$(format_size "$total_output_size")"
     

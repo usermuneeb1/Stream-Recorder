@@ -626,6 +626,7 @@ upload_to_clouds() {
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"
 
     local upload_elapsed=$(( $(now_epoch) - UPLOAD_START_TIME ))
+    set_env "UPLOAD_ELAPSED_HUMAN" "$(format_duration_human "$upload_elapsed")"
 
     log_separator
     log_ok "═══ UPLOAD SUMMARY ═══"

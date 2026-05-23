@@ -1,0 +1,37 @@
+# One-click validation that all required GitHub secrets are configured.
+name: "🔧 Setup Check"
+
+on:
+  workflow_dispatch:
+
+env:
+  YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+  YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
+  DISCORD_WEBHOOK_LINKS: ${{ secrets.DISCORD_WEBHOOK_LINKS }}
+  DISCORD_WEBHOOK_REFRESH: ${{ secrets.DISCORD_WEBHOOK_REFRESH }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
+  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
+  MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+  MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  GH_PAT: ${{ secrets.GH_PAT }}
+  WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  check:
+    name: "Validate Secrets"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: "🔧 Run Setup Check"
+        run: |
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
+          bash scripts/setup-check.sh

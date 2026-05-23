@@ -17,7 +17,7 @@ update_links() {
     log_header "🔗 UPDATING LINKS ARCHIVE"
     
     local stream_title="${STREAM_TITLE:-Unknown Stream}"
-    local stream_channel="${STREAM_CHANNEL:-Unknown Channel}"
+    local stream_channel="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
     local stream_url="${STREAM_URL:-N/A}"
     local duration_fmt="${RECORD_DURATION_FMT:-00:00:00}"
     local size_human="${RECORD_SIZE_HUMAN:-0 B}"
@@ -26,7 +26,7 @@ update_links() {
     local current_date
     current_date=$(now_pkt)
     local upload_count="${UPLOAD_SUCCESS_COUNT:-0}"
-    local upload_total="${UPLOAD_TOTAL_SERVICES:-3}"
+    local upload_total="${UPLOAD_EXPECTED_COUNT:-${UPLOAD_TOTAL_SERVICES:-4}}"
     
     # ── Build new entry ──────────────────────────────────────────────────────
     log_step "Building links entry..."
@@ -57,17 +57,6 @@ update_links() {
             g_part=$(echo "$g_entry" | cut -d'|' -f1)
             g_link=$(echo "$g_entry" | cut -d'|' -f2)
             [[ -n "$g_link" ]] && entry+="[gofile:${g_part}] ${g_link}\n"
-        done
-    fi
-    
-    # Add Dailymotion links
-    if [[ -n "${DAILYMOTION_LINKS:-}" ]]; then
-        IFS=';' read -ra dm_entries <<< "$DAILYMOTION_LINKS"
-        for dm_entry in "${dm_entries[@]}"; do
-            local dm_part dm_link
-            dm_part=$(echo "$dm_entry" | cut -d'|' -f1)
-            dm_link=$(echo "$dm_entry" | cut -d'|' -f2)
-            [[ -n "$dm_link" ]] && entry+="[dailymotion:${dm_part}] ${dm_link} (PERMANENT)\n"
         done
     fi
     

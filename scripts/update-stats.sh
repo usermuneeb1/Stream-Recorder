@@ -127,8 +127,84 @@ update_stats() {
     if [[ -n "${STREAM_VIDEO_ID:-}" ]]; then
         github_api_write "last_video_id.txt" "$STREAM_VIDEO_ID" "📝 Record last video ID: ${STREAM_VIDEO_ID}" >/dev/null 2>&1 || true
     fi
+
+    # ── Update dashboard feed (data/recordings.json) ───────────────────────
+    update_recordings_json || true
     
     return 0
+}
+
+update_recordings_json() {
+    local vid="${STREAM_VIDEO_ID:-}"
+    [[ -z "$vid" ]] && return 0
+
+    log_step "Updating data/recordings.json for dashboard..."
+
+    local gofile_link="" pixeldrain_link="" archive_link="" mega_link=""
+    if [[ -n "${GOFILE_LINKS:-}" ]]; then
+        gofile_link=$(echo "${GOFILE_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${PIXELDRAIN_LINKS:-}" ]]; then
+        pixeldrain_link=$(echo "${PIXELDRAIN_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${ARCHIVE_LINKS:-}" ]]; then
+        archive_link=$(echo "${ARCHIVE_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${MEGA_LINKS:-}" ]]; then
+        mega_link=$(echo "${MEGA_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
+    fi
+
+    local existing
+    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing='[]'
+    [[ -z "$existing" || "$existing" != "["* ]] && existing='[]'
+
+    local month
+    month=$(TZ='Asia/Karachi' date '+%Y-%m')
+    local entry
+    entry=$(jq -n \
+        --arg video_id "$vid" \
+        --arg title "${STREAM_TITLE:-Unknown}" \
+        --arg channel "${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}" \
+        --arg video_url "${STREAM_URL:-}" \
+        --arg thumbnail "${STREAM_THUMBNAIL:-}" \
+        --arg duration_sec "${RECORD_DURATION_SEC:-0}" \
+        --arg duration_fmt "${RECORD_DURATION_FMT:-00:00:00}" \
+        --arg size_bytes "${RECORD_SIZE_BYTES:-0}" \
+        --arg size_human "${RECORD_SIZE_HUMAN:-0 B}" \
+        --arg size_gb "${RECORD_SIZE_GB:-0}" \
+        --arg resolution "${RECORD_RESOLUTION:-N/A}" \
+        --arg date "$(TZ='Asia/Karachi' date '+%Y-%m-%d')" \
+        --arg month "$month" \
+        --arg gofile_link "$gofile_link" \
+        --arg pixeldrain_link "$pixeldrain_link" \
+        --arg archive_link "$archive_link" \
+        --arg mega_link "$mega_link" \
+        --arg recorded_at "$(now_utc_iso)" \
+        '{
+            video_id: $video_id,
+            title: $title,
+            channel: $channel,
+            video_url: $video_url,
+            thumbnail: $thumbnail,
+            duration_sec: ($duration_sec | tonumber? // 0),
+            duration_fmt: $duration_fmt,
+            size_bytes: ($size_bytes | tonumber? // 0),
+            size_human: $size_human,
+            size_gb: ($size_gb | tonumber? // 0),
+            resolution: $resolution,
+            date: $date,
+            month: $month,
+            gofile_link: $gofile_link,
+            pixeldrain_link: $pixeldrain_link,
+            archive_link: $archive_link,
+            mega_link: $mega_link,
+            chat_url: "",
+            recorded_at: $recorded_at
+        }')
+
+    local merged
+    merged=$(echo "$existing" | jq --argjson e "$entry" '[ $e ] + . | unique_by(.video_id)' 2>/dev/null) || merged="[$entry]"
+    github_api_write "data/recordings.json" "$merged" "📊 Dashboard: ${STREAM_TITLE:-recording}" >/dev/null 2>&1 || true
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
