@@ -85,17 +85,9 @@ export default function Watch() {
       const aId = source.url.split('/details/')[1]?.split('/')[0];
       return `https://archive.org/embed/${aId}`;
     }
-    if (source.type === 'youtube') {
-      const yId = source.url.split('v=')[1]?.split('&')[0] || source.url.split('/').pop();
-      return `https://www.youtube-nocookie.com/embed/${yId}`;
-    }
     if (source.type === 'odysee') {
       // Odysee embeds use /$/embed/
       return source.url.replace('odysee.com/', 'odysee.com/$/embed/');
-    }
-    if (source.type === 'peertube') {
-      // PeerTube embeds use /videos/embed/ instead of /w/
-      return source.url.replace('/w/', '/videos/embed/');
     }
     if (source.type === 'rumble') {
       // Rumble embeds use /embed/v

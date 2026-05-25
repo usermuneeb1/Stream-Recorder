@@ -28,6 +28,17 @@ export default function Gallery() {
     show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, stream: StreamData) => {
+    const target = e.target as HTMLImageElement;
+    if (stream.archiveId && !target.src.includes('archive.org')) {
+      target.src = `https://archive.org/services/img/${stream.archiveId}`;
+    } else if (!target.src.includes('default-thumb')) {
+      // Create a nice fallback with inline SVG or placeholder if everything fails
+      target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNDUwIiBmaWxsPSIjMWYyOTM3Ij48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjQ1MCIgZmlsbD0iIzFmMjkzNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iIzRmNDZlNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlZpZGVvIFVuYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==';
+      target.id = 'default-thumb';
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 relative">
       <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -75,6 +86,7 @@ export default function Gallery() {
                   <img 
                     src={stream.thumbnail} 
                     alt={stream.title}
+                    onError={(e) => handleImageError(e, stream)}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">

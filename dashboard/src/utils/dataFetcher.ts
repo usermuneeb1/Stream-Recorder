@@ -1,7 +1,7 @@
 export interface StreamSource {
   label: string;
   url: string;
-  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'youtube' | 'odysee' | 'peertube' | 'rumble';
+  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'odysee' | 'rumble';
 }
 
 export interface StreamData {
@@ -13,6 +13,7 @@ export interface StreamData {
   duration: string;
   size: string;
   thumbnail: string;
+  archiveId?: string; // Add archiveId for thumbnail fallback
   sources: Record<string, StreamSource>;
 }
 
@@ -43,7 +44,6 @@ function buildSources(links: any) {
   
   // Permanent Web3 / Decentralized / Alternative Providers
   if (links.odysee_hd || links.odysee_compressed) s.odysee = { label: '🪐 Odysee (Permanent)', url: links.odysee_hd || links.odysee_compressed, type: 'odysee' };
-  if (links.peertube_hd || links.peertube_compressed) s.peertube = { label: '🌐 PeerTube (Permanent)', url: links.peertube_hd || links.peertube_compressed, type: 'peertube' };
   if (links.rumble_hd || links.rumble_compressed) s.rumble = { label: '🟢 Rumble', url: links.rumble_hd || links.rumble_compressed, type: 'rumble' };
   
   return s;
@@ -69,6 +69,12 @@ function parseLinks(text: string): StreamData[] {
     const vid = ytId(url);
     
     const sources = buildSources(links);
+    
+    const archiveUrl = links.archive_hd || links.archive_compressed;
+    let archiveId = undefined;
+    if (archiveUrl) {
+      archiveId = archiveUrl.split('/details/')[1]?.split('/')[0];
+    }
 
     out.push({
       videoId: vid,
@@ -79,6 +85,7 @@ function parseLinks(text: string): StreamData[] {
       duration: formatDuration(get('Duration')),
       size: formatSize(get('Size')),
       thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+      archiveId: archiveId,
       sources: sources
     });
   }
@@ -134,11 +141,15 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
       duration: formatDuration(r.duration_fmt),
       size: formatSize(r.size_human),
       thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      archiveId: undefined,
       sources: {}
     };
 
     if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link, type: 'pixeldrain' };
-    if (r.archive_link) s.sources.archive = { label: '🏛️ Archive.org', url: r.archive_link, type: 'archive' };
+    if (r.archive_link) {
+      s.sources.archive = { label: '🏛️ Archive.org', url: r.archive_link, type: 'archive' };
+      if (!s.archiveId) s.archiveId = r.archive_link.split('/details/')[1]?.split('/')[0];
+    }
     if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link, type: 'mega' };
     if (r.gofile_link) s.sources.gofile = { label: '📁 Gofile', url: r.gofile_link, type: 'gofile' };
     
