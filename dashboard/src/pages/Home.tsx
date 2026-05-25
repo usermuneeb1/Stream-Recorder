@@ -88,24 +88,24 @@ export default function Home() {
 
         {/* Floating Logo Column */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.8, rotateY: 15 }}
-          animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+          initial={{ opacity: 0, scale: 0.8, y: 30 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 1, type: "spring", stiffness: 100 }}
-          className="hidden lg:flex justify-center relative perspective-1000"
+          className="hidden lg:flex justify-center relative items-center"
         >
           {/* Animated Glow Behind Logo */}
           <motion.div 
-            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+            animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-            className="absolute inset-0 bg-brand-500/20 blur-[80px] rounded-full"
+            className="absolute inset-0 bg-brand-500/30 blur-[60px] rounded-full max-w-[280px] mx-auto"
           />
           
           <motion.img 
             src="/Stream-Recorder/logo-vertical.pn.jpg"
             alt="The Muslim Lantern"
-            animate={{ y: [-15, 15, -15], rotateZ: [-1, 1, -1] }}
-            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-            className="w-full max-w-sm object-contain drop-shadow-[0_20px_30px_rgba(239,68,68,0.2)] z-10 relative"
+            animate={{ y: [-10, 10, -10] }}
+            transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+            className="w-full max-w-[240px] xl:max-w-[280px] object-contain rounded-full shadow-[0_0_50px_rgba(239,68,68,0.3)] z-10 relative bg-white border-4 border-brand-500/20"
           />
         </motion.div>
       </div>
