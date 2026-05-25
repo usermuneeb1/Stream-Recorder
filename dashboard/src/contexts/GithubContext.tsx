@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 interface GithubContextType {
   pat: string;
   setPat: (newPat: string) => Promise<boolean>;
-  dispatchWorkflow: (workflowId: string, inputs: Record<string, string>) => Promise<boolean>;
+  dispatchWorkflow: (workflowId: string, inputs: Record<string, string>) => Promise<{success: boolean, error?: string}>;
   getWorkflowRuns: (workflowId?: string) => Promise<any[]>;
   addManualEntry: (entry: any) => Promise<boolean>;
 }
@@ -11,7 +11,7 @@ interface GithubContextType {
 const GithubContext = createContext<GithubContextType>({
   pat: '',
   setPat: async () => false,
-  dispatchWorkflow: async () => false,
+  dispatchWorkflow: async () => ({ success: false }),
   getWorkflowRuns: async () => [],
   addManualEntry: async () => false,
 });
@@ -52,8 +52,8 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const dispatchWorkflow = async (workflowId: string, inputs: Record<string, string>) => {
-    if (!pat) throw new Error('GitHub PAT not set');
+  const dispatchWorkflow = async (workflowId: string, inputs: Record<string, string>): Promise<{success: boolean, error?: string}> => {
+    if (!pat) return { success: false, error: 'GitHub PAT not set' };
     try {
       const response = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${workflowId}/dispatches`, {
         method: 'POST',
@@ -68,10 +68,15 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           inputs: inputs
         })
       });
-      return response.ok;
-    } catch (error) {
+      if (response.ok) {
+        return { success: true };
+      } else {
+        const err = await response.json();
+        return { success: false, error: err.message || response.statusText };
+      }
+    } catch (error: any) {
       console.error(error);
-      return false;
+      return { success: false, error: error.message };
     }
   };
 

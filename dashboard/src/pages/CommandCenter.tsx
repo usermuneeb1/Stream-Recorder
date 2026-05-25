@@ -105,12 +105,12 @@ export default function CommandCenter() {
     }
     if (activeTab === 'account-keepalive.yml') inputs = {};
 
-    const success = await dispatchWorkflow(activeTab, inputs);
+    const { success, error } = await dispatchWorkflow(activeTab, inputs);
     if (success) {
-      alert('Workflow dispatched successfully on main branch!');
+      alert('Workflow dispatched successfully on master branch!');
       setTimeout(fetchRuns, 2000);
     } else {
-      alert('Failed to dispatch workflow. Check PAT or inputs.');
+      alert(`Failed to dispatch workflow: ${error || 'Unknown API Error'}`);
     }
   };
 
@@ -155,7 +155,7 @@ export default function CommandCenter() {
           <img 
             src="/Stream-Recorder/logo-vertical.pn.jpg" 
             alt="The Muslim Lantern" 
-            className="h-16 w-auto object-contain drop-shadow-lg hidden md:block"
+            className="h-14 md:h-16 w-auto object-contain drop-shadow-lg"
           />
           <div>
             <h1 className="text-3xl font-bold font-display mb-2">Command Center</h1>
