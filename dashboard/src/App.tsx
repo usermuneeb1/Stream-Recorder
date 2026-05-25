@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Shield } from 'lucide-react';
+import { CommandPalette } from './components/CommandPalette';
 
 import Home from './pages/Home';
 import Gallery from './pages/Gallery';
@@ -64,6 +65,7 @@ function App() {
 
   return (
     <Layout>
+      <CommandPalette />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/gallery" element={<Gallery />} />
