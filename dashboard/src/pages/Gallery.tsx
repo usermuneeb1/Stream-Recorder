@@ -38,6 +38,15 @@ export default function Gallery() {
     }
   };
 
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>, stream: StreamData) => {
+    const target = e.target as HTMLImageElement;
+    // YouTube's "Video Unavailable" placeholder is a valid image but is exactly 120px wide (120x90).
+    // A real hqdefault thumbnail is 480x360.
+    if (target.src.includes('ytimg.com') && target.naturalWidth <= 120) {
+      handleImageError(e, stream);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 relative">
       <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -86,6 +95,7 @@ export default function Gallery() {
                     src={stream.thumbnail} 
                     alt={stream.title}
                     onError={(e) => handleImageError(e, stream)}
+                    onLoad={(e) => handleImageLoad(e, stream)}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
