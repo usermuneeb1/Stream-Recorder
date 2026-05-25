@@ -55,11 +55,11 @@ export const SnakeGame: React.FC = () => {
         {/* Iframe Container */}
         <div className={`flex-1 bg-dark-100 dark:bg-dark-900 relative ${isFullscreen ? 'w-full h-full' : 'rounded-xl overflow-hidden border border-dark-200 dark:border-dark-800'}`}>
           <iframe 
-            src="https://gamesnacks.com/embed/games/omnomrun" 
+            src="https://gamesnacks.com/embed/games/stackbounce" 
             className="w-full h-full absolute inset-0"
             frameBorder="0"
             scrolling="no"
-            allow="fullscreen; autoplay; encrypted-media"
+            allow="fullscreen"
             title="Mini Games Provider"
           />
         </div>
