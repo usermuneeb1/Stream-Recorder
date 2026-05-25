@@ -59,9 +59,11 @@ export default function CommandCenter() {
 
     if (activeTab === 'manual-entry') {
       const vUrl = formData.get('video_url') as string || '';
-      let vId = vUrl;
-      const ytMatch = vUrl.match(/(?:v=|youtu\.be\/|embed\/)([^&?]+)/);
-      if (ytMatch) vId = ytMatch[1];
+      let vId = `manual-${Date.now()}`;
+      if (vUrl) {
+        const ytMatch = vUrl.match(/(?:v=|youtu\.be\/|embed\/)([^&?]+)/);
+        if (ytMatch) vId = ytMatch[1];
+      }
 
       const entry = {
         video_id: vId,
@@ -207,8 +209,8 @@ export default function CommandCenter() {
                       <input type="text" name="title" required placeholder="My Awesome Stream" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1.5">Original URL (or custom ID)</label>
-                      <input type="text" name="video_url" required placeholder="https://youtube.com/watch?v=..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                      <label className="block text-sm font-medium mb-1.5">Original YT URL (Optional)</label>
+                      <input type="text" name="video_url" placeholder="https://youtube.com/watch?v=..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
