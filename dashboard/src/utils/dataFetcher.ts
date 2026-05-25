@@ -68,9 +68,7 @@ function parseLinks(text: string): StreamData[] {
     }
     const vid = ytId(url);
     
-    // Auto-add YouTube as a source since we have the URL
     const sources = buildSources(links);
-    sources.youtube = { label: '▶️ YouTube (Original)', url: url, type: 'youtube' };
 
     out.push({
       videoId: vid,
