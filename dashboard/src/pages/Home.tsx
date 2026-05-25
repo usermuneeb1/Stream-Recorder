@@ -3,6 +3,7 @@ import { motion, Variants } from 'framer-motion';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
 import { Database, Film, HardDrive, Shield, Globe, Zap } from 'lucide-react';
+import { SnakeGame } from '../components/SnakeGame';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -145,6 +146,17 @@ export default function Home() {
             {sources.gofile > 0 && <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-sm font-medium">Gofile ({sources.gofile})</span>}
           </div>
         </motion.div>
+      </motion.div>
+
+      {/* Mini Game Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+        className="mt-20 relative z-10"
+      >
+        <SnakeGame />
       </motion.div>
     </div>
   );

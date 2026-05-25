@@ -64,7 +64,7 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          ref: 'master', // Repo default branch
+          ref: 'main', // Repo default branch
           inputs: inputs
         })
       });
