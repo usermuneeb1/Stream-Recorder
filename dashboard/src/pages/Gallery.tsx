@@ -32,9 +32,9 @@ export default function Gallery() {
     const target = e.target as HTMLImageElement;
     if (stream.archiveId && !target.src.includes('archive.org')) {
       target.src = `https://archive.org/services/img/${stream.archiveId}`;
-    } else if (!target.src.includes('default-thumb.jpg')) {
+    } else if (!target.src.includes('thumbnail.jpg')) {
       // Use the standard Muslim Lantern Q&A thumbnail as the ultimate fallback
-      target.src = '/default-thumb.jpg';
+      target.src = '/thumbnail.jpg';
     }
   };
 
