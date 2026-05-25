@@ -187,19 +187,22 @@ export const SnakeGame: React.FC = () => {
 
             {/* Food */}
             <div 
-              className="z-10 animate-pulse flex items-center justify-center text-xl drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]"
+              className="z-10 animate-pulse flex items-center justify-center"
               style={{
                 gridColumnStart: food.x + 1,
                 gridRowStart: food.y + 1,
                 transform: 'scale(1.2)'
               }}
             >
-              🍎
+              <div className="w-4 h-4 bg-pink-500 rounded-sm shadow-[0_0_20px_rgba(236,72,153,1)] relative">
+                <div className="absolute inset-1 bg-white/50 rounded-sm" />
+              </div>
             </div>
 
             {/* Snake */}
             {snake.map((segment, index) => {
               const isHead = index === 0;
+              const opacity = Math.max(0.2, 1 - (index / snake.length));
               
               return (
                 <div 
@@ -208,22 +211,20 @@ export const SnakeGame: React.FC = () => {
                   style={{
                     gridColumnStart: segment.x + 1,
                     gridRowStart: segment.y + 1,
-                    transform: isHead ? 'scale(1.4)' : 'scale(1)',
+                    transform: isHead ? 'scale(1.15)' : 'scale(0.9)',
+                    opacity: isHead ? 1 : opacity,
                     transition: 'all 0.1s linear'
                   }}
                 >
-                  {isHead ? (
-                    <span 
-                      className="text-2xl drop-shadow-[0_0_10px_rgba(99,102,241,0.8)] z-20"
-                      style={{
-                        transform: `rotate(${direction.x === 1 ? '90deg' : direction.x === -1 ? '-90deg' : direction.y === 1 ? '180deg' : '0deg'})`
-                      }}
-                    >
-                      🐍
-                    </span>
-                  ) : (
-                    <div className="w-full h-full bg-green-500 rounded-sm opacity-80 shadow-inner" style={{ transform: 'scale(0.85)' }} />
-                  )}
+                  <div 
+                    className={`w-full h-full rounded-sm ${isHead ? 'bg-cyan-400 shadow-[0_0_25px_rgba(34,211,238,0.8)]' : 'bg-cyan-600/80 shadow-[0_0_10px_rgba(8,145,178,0.5)]'} border ${isHead ? 'border-cyan-300' : 'border-cyan-500/30'}`}
+                  >
+                    {isHead && (
+                      <div className="w-full h-full relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/30" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

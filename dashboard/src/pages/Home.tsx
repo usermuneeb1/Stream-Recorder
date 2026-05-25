@@ -68,47 +68,51 @@ export default function Home() {
             <Zap size={14} /> Ultra-Premium Infrastructure
           </motion.div>
           
-          <motion.h1 
-            variants={itemVariants}
-            className="text-5xl md:text-7xl font-bold font-display tracking-tight mb-6 leading-tight"
-          >
-            Preserving the Legacy of <br className="hidden md:block"/>
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 via-indigo-400 to-purple-500">
-              The Muslim Lantern
-            </span>
-          </motion.h1>
-          
-          <motion.p 
-            variants={itemVariants}
-            className="text-lg md:text-2xl text-dark-500 max-w-3xl lg:max-w-none mx-auto lg:mx-0 mb-8 leading-relaxed font-light"
-          >
-            A state-of-the-art cinematic archive. Every live session, debate, and lecture is permanently preserved and distributed across a decentralized multi-cloud architecture.
-          </motion.p>
-        </motion.div>
-
-        {/* Floating Logo Column */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8, y: 30 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 1, type: "spring", stiffness: 100 }}
-          className="hidden lg:flex justify-center relative items-center"
+        <motion.h1 
+          variants={itemVariants}
+          className="text-5xl md:text-6xl lg:text-7xl font-bold font-display tracking-tight mb-6 leading-tight"
         >
-          {/* Animated Glow Behind Logo */}
-          <motion.div 
-            animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.4, 0.2] }}
-            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-            className="absolute inset-0 bg-brand-500/30 blur-[60px] rounded-full max-w-[280px] mx-auto"
-          />
-          
-          <motion.img 
+          Preserving the Legacy of{' '}
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 via-indigo-400 to-purple-500">
+            The Muslim Lantern
+          </span>
+        </motion.h1>
+        
+        <motion.p 
+          variants={itemVariants}
+          className="text-lg md:text-2xl text-dark-500 max-w-3xl lg:max-w-none mx-auto lg:mx-0 mb-8 leading-relaxed font-light"
+        >
+          A state-of-the-art cinematic archive. Every live session, debate, and lecture is permanently preserved and distributed across a decentralized multi-cloud architecture.
+        </motion.p>
+      </motion.div>
+
+      {/* Floating Logo Column */}
+      <motion.div
+        initial={{ opacity: 0, filter: 'blur(20px)' }}
+        animate={{ opacity: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
+        className="hidden lg:flex justify-end relative items-center pr-8"
+      >
+        {/* Premium Breathing Glow */}
+        <motion.div 
+          animate={{ scale: [1, 1.05, 1], opacity: [0.15, 0.25, 0.15] }}
+          transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+          className="absolute inset-0 bg-brand-500/30 blur-[80px] rounded-full max-w-[320px] ml-auto"
+        />
+        
+        <motion.div
+          whileHover={{ scale: 1.05, rotateY: -10, rotateX: 5 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="relative z-10 perspective-1000"
+        >
+          <img 
             src="/Stream-Recorder/logo-vertical.pn.jpg"
             alt="The Muslim Lantern"
-            animate={{ y: [-10, 10, -10] }}
-            transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-            className="w-full max-w-[240px] xl:max-w-[280px] object-contain rounded-full shadow-[0_0_50px_rgba(239,68,68,0.3)] z-10 relative bg-white border-4 border-brand-500/20"
+            className="w-full max-w-[280px] xl:max-w-[320px] object-contain rounded-full shadow-[0_0_80px_rgba(239,68,68,0.15)] bg-white/5 border border-white/10 backdrop-blur-sm"
           />
         </motion.div>
-      </div>
+      </motion.div>
+    </div>
 
       {/* Metrics Grid */}
       <motion.div 

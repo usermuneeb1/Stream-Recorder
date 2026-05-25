@@ -12,7 +12,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     <div className="min-h-screen flex flex-col bg-dark-50 dark:bg-[#09090b] text-dark-900 dark:text-dark-50 transition-colors duration-300">
       <nav className="sticky top-0 z-50 glass-panel border-b border-dark-200 dark:border-dark-800">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <NavLink to="/" className="flex items-center group -ml-8 md:-ml-12 lg:-ml-16 overflow-visible">
+          <NavLink to="/" className="flex items-center group -translate-x-4 md:-translate-x-6 lg:-translate-x-12 overflow-visible">
             <img 
               src="/Stream-Recorder/logo.png" 
               alt="The Muslim Lantern" 
