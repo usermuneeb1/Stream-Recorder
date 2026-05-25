@@ -110,12 +110,30 @@ export default function Watch() {
           {/* Player Container */}
           <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
             {currentSource ? (
-              <iframe
-                ref={iframeRef}
-                src={generateEmbedUrl(currentSource)}
-                className="w-full h-full border-0"
-                allowFullScreen
-              />
+              currentSource.type === 'gofile' ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-dark-900 text-center p-6">
+                  <ExternalLink size={48} className="text-brand-500 mb-4 opacity-80" />
+                  <h3 className="text-xl font-bold mb-2">Embedded Playback Unavailable</h3>
+                  <p className="text-dark-400 mb-6 max-w-md">
+                    Gofile is a secure file-sharing service that does not support website embedding. You must open this link directly to view or download the video.
+                  </p>
+                  <a 
+                    href={currentSource.url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <ExternalLink size={18} /> Open in Gofile
+                  </a>
+                </div>
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  src={generateEmbedUrl(currentSource)}
+                  className="w-full h-full border-0"
+                  allowFullScreen
+                />
+              )
             ) : (
               <div className="flex items-center justify-center h-full text-dark-400">
                 No embeddable source available
