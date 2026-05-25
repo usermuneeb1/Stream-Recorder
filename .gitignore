@@ -7,6 +7,7 @@
 *.webm
 *.mkv
 *.ts
+!dashboard/**/*.ts
 *.m4a
 *.flv
 *.part
