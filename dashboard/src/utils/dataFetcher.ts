@@ -1,7 +1,7 @@
 export interface StreamSource {
   label: string;
   url: string;
-  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile';
+  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'youtube' | 'odysee' | 'peertube' | 'rumble';
 }
 
 export interface StreamData {
@@ -40,6 +40,12 @@ function buildSources(links: any) {
   if (links.mega_hd || links.mega_compressed) s.mega = { label: '🔴 MEGA.nz', url: links.mega_hd || links.mega_compressed, type: 'mega' };
   if (links.pixeldrain_hd || links.pixeldrain_compressed) s.pixel = { label: '🟣 Pixeldrain', url: links.pixeldrain_hd || links.pixeldrain_compressed, type: 'pixeldrain' };
   if (links.archive_compressed) s.archiveSmall = { label: '📱 Archive (small)', url: links.archive_compressed, type: 'archive' };
+  
+  // Permanent Web3 / Decentralized / Alternative Providers
+  if (links.odysee_hd || links.odysee_compressed) s.odysee = { label: '🪐 Odysee (Permanent)', url: links.odysee_hd || links.odysee_compressed, type: 'odysee' };
+  if (links.peertube_hd || links.peertube_compressed) s.peertube = { label: '🌐 PeerTube (Permanent)', url: links.peertube_hd || links.peertube_compressed, type: 'peertube' };
+  if (links.rumble_hd || links.rumble_compressed) s.rumble = { label: '🟢 Rumble', url: links.rumble_hd || links.rumble_compressed, type: 'rumble' };
+  
   return s;
 }
 
@@ -61,6 +67,11 @@ function parseLinks(text: string): StreamData[] {
       if (lm) links[`${lm[1]}_${lm[2]}`.toLowerCase()] = lm[3].replace(/\s+\(PERMANENT\)$/, '');
     }
     const vid = ytId(url);
+    
+    // Auto-add YouTube as a source since we have the URL
+    const sources = buildSources(links);
+    sources.youtube = { label: '▶️ YouTube (Original)', url: url, type: 'youtube' };
+
     out.push({
       videoId: vid,
       title: get('Title'),
@@ -70,7 +81,7 @@ function parseLinks(text: string): StreamData[] {
       duration: formatDuration(get('Duration')),
       size: formatSize(get('Size')),
       thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
-      sources: buildSources(links)
+      sources: sources
     });
   }
   return out;
