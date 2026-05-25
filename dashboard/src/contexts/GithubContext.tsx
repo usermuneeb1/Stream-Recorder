@@ -5,6 +5,7 @@ interface GithubContextType {
   setPat: (newPat: string) => Promise<boolean>;
   dispatchWorkflow: (workflowId: string, inputs: Record<string, string>) => Promise<boolean>;
   getWorkflowRuns: (workflowId?: string) => Promise<any[]>;
+  addManualEntry: (entry: any) => Promise<boolean>;
 }
 
 const GithubContext = createContext<GithubContextType>({
@@ -12,6 +13,7 @@ const GithubContext = createContext<GithubContextType>({
   setPat: async () => false,
   dispatchWorkflow: async () => false,
   getWorkflowRuns: async () => [],
+  addManualEntry: async () => false,
 });
 
 const OWNER = 'usermuneeb1';
@@ -98,8 +100,51 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const addManualEntry = async (entry: any): Promise<boolean> => {
+    try {
+      // 1. Fetch current recordings.json
+      const getRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/data/recordings.json`, {
+        headers: {
+          Authorization: `Bearer ${pat}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (!getRes.ok) return false;
+      const getJson = await getRes.json();
+      
+      // decode base64 utf-8 safely
+      const text = decodeURIComponent(escape(atob(getJson.content)));
+      const recordings = JSON.parse(text);
+
+      // 2. Prepend or Append new entry
+      recordings.unshift(entry);
+
+      // 3. Encode and Update
+      // encode safely for utf-8
+      const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(recordings, null, 2))));
+      const putRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/data/recordings.json`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${pat}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: '📝 Manual Cloud Link Entry from Dashboard',
+          content: newContent,
+          sha: getJson.sha,
+        }),
+      });
+
+      return putRes.ok;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  };
+
   return (
-    <GithubContext.Provider value={{ pat, setPat, dispatchWorkflow, getWorkflowRuns }}>
+    <GithubContext.Provider value={{ pat, setPat, dispatchWorkflow, getWorkflowRuns, addManualEntry }}>
       {children}
     </GithubContext.Provider>
   );

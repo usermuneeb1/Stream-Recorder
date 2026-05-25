@@ -1,24 +1,42 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { motion, Variants } from 'framer-motion';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
+import { Database, Film, HardDrive, Shield, Globe, Zap } from 'lucide-react';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 30 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 
 export default function Home() {
   const [stats, setStats] = useState({ total_streams: 0, total_hours: 0, total_gb: 0 });
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [pieData, setPieData] = useState<any[]>([]);
+  const [sources, setSources] = useState({ mega: 0, archive: 0, pixel: 0, gofile: 0 });
   
   useEffect(() => {
     fetchStreams().then(streams => {
       let hours = 0;
       let gb = 0;
+      let m = 0, a = 0, p = 0, g = 0;
       
       streams.forEach(s => {
         const hMatch = s.duration?.match(/(\d+)h/);
         if (hMatch) hours += parseInt(hMatch[1]);
         if (s.size?.includes('GB')) gb += parseFloat(s.size);
         if (s.size?.includes('MB')) gb += parseFloat(s.size) / 1024;
+
+        if (s.sources.mega) m++;
+        if (s.sources.archive) a++;
+        if (s.sources.pixel) p++;
+        if (s.sources.gofile) g++;
       });
 
       setStats({
@@ -27,155 +45,107 @@ export default function Home() {
         total_gb: Math.round(gb * 10) / 10
       });
 
-      // Mock historical growth based on stream dates for area chart
-      const sorted = [...streams].reverse();
-      let accStreams = 0;
-      let accHours = 0;
-      const history = sorted.map(s => {
-        accStreams++;
-        const hMatch = s.duration?.match(/(\d+)h/);
-        const hrs = hMatch ? parseInt(hMatch[1]) : 2;
-        accHours += hrs;
-        return {
-          date: s.date,
-          streams: accStreams,
-          hours: accHours
-        };
-      });
-      // sample every N to avoid clutter
-      setChartData(history.filter((_, i) => i % Math.max(1, Math.floor(history.length / 10)) === 0));
-
-      // Build pie data based on actual stream sources
-      let m = 0, a = 0, p = 0;
-      streams.forEach(s => {
-        if (s.sources.mega) m++;
-        if (s.sources.archive) a++;
-        if (s.sources.pixel) p++;
-      });
-      setPieData([
-        { name: 'MEGA.nz', value: m, color: '#dc2626' },
-        { name: 'Archive.org', value: a, color: '#6366f1' },
-        { name: 'Pixeldrain', value: p, color: '#a855f7' },
-      ].filter(x => x.value > 0));
+      setSources({ mega: m, archive: a, pixel: p, gofile: g });
     });
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-12 relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
       {/* Hero Section */}
-      <div className="mb-16">
+      <motion.div 
+        className="mb-20 text-center md:text-left relative z-10"
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-medium mb-6 border border-brand-500/20">
+          <Zap size={14} /> Ultra-Premium Infrastructure
+        </motion.div>
+        
         <motion.h1 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight mb-6"
+          variants={itemVariants}
+          className="text-5xl md:text-7xl font-bold font-display tracking-tight mb-6 leading-tight"
         >
           Preserving the Legacy of <br className="hidden md:block"/>
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-red-400">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 via-indigo-400 to-purple-500">
             The Muslim Lantern
           </span>
         </motion.h1>
         
         <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-lg md:text-xl text-dark-500 max-w-2xl mb-8 leading-relaxed"
+          variants={itemVariants}
+          className="text-lg md:text-2xl text-dark-500 max-w-3xl mb-8 leading-relaxed font-light"
         >
-          A state-of-the-art cinematic archive. Every live session, debate, and lecture is carefully preserved and distributed across a decentralized multi-cloud architecture to ensure permanent access for generations to come.
+          A state-of-the-art cinematic archive. Every live session, debate, and lecture is permanently preserved and distributed across a decentralized multi-cloud architecture.
         </motion.p>
-      </div>
+      </motion.div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20 relative z-10"
+      >
         {[
-          { label: 'Total Streams', value: stats.total_streams, delay: 0.2 },
-          { label: 'Hours Archived', value: stats.total_hours, suffix: '+', delay: 0.3 },
-          { label: 'Storage Used', value: stats.total_gb, suffix: ' GB', delay: 0.4 },
+          { label: 'Total Streams', value: stats.total_streams, icon: <Film className="text-blue-500" /> },
+          { label: 'Hours Archived', value: stats.total_hours, suffix: '+', icon: <Database className="text-purple-500" /> },
+          { label: 'Storage Used', value: stats.total_gb, suffix: ' GB', icon: <HardDrive className="text-brand-500" /> },
         ].map((metric, i) => (
           <motion.div 
             key={metric.label}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: metric.delay, type: 'spring' }}
-            className="glass-panel p-6 rounded-2xl relative overflow-hidden group"
+            variants={itemVariants}
+            whileHover={{ y: -5, scale: 1.02 }}
+            className="glass-panel p-8 rounded-3xl relative overflow-hidden group cursor-default shadow-xl shadow-black/5 dark:shadow-none border border-white/20 dark:border-white/5"
           >
-            <div className="absolute -inset-0.5 bg-gradient-to-br from-brand-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <h3 className="text-dark-500 dark:text-dark-400 font-medium mb-2">{metric.label}</h3>
-            <div className="text-4xl font-display font-bold text-dark-900 dark:text-white">
-              <AnimatedCounter value={metric.value} suffix={metric.suffix} delay={metric.delay} />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-dark-500 dark:text-dark-400 font-medium text-lg">{metric.label}</h3>
+              <div className="p-3 bg-dark-100 dark:bg-dark-800 rounded-xl">
+                {metric.icon}
+              </div>
+            </div>
+            <div className="text-5xl font-display font-bold text-dark-900 dark:text-white tracking-tight">
+              <AnimatedCounter value={metric.value} suffix={metric.suffix} delay={0.2 + (i * 0.1)} />
             </div>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="lg:col-span-2 glass-panel p-6 rounded-2xl"
-        >
-          <h3 className="text-lg font-bold mb-6">Archive Growth (Hours)</h3>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: 'none', borderRadius: '8px', color: '#fff' }}
-                />
-                <Area type="monotone" dataKey="hours" stroke="#dc2626" strokeWidth={3} fillOpacity={1} fill="url(#colorHours)" />
-              </AreaChart>
-            </ResponsiveContainer>
+      {/* Features Showcase */}
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-100px" }}
+        className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10"
+      >
+        <motion.div variants={itemVariants} className="glass-panel p-10 rounded-3xl bg-gradient-to-br from-dark-50 to-white dark:from-[#0f0f13] dark:to-[#09090b] border border-dark-200 dark:border-dark-800">
+          <Shield className="w-12 h-12 text-green-500 mb-6" />
+          <h3 className="text-2xl font-bold font-display mb-4">Immutable Preservation</h3>
+          <p className="text-dark-500 leading-relaxed">
+            Recordings are instantly mirrored to Archive.org, ensuring they are permanently written to the historical record, immune to takedowns or platform restrictions.
+          </p>
+        </motion.div>
+        
+        <motion.div variants={itemVariants} className="glass-panel p-10 rounded-3xl bg-gradient-to-bl from-dark-50 to-white dark:from-[#0f0f13] dark:to-[#09090b] border border-dark-200 dark:border-dark-800">
+          <Globe className="w-12 h-12 text-blue-500 mb-6" />
+          <h3 className="text-2xl font-bold font-display mb-4">Decentralized Delivery</h3>
+          <p className="text-dark-500 leading-relaxed mb-6">
+            Leveraging a multi-provider edge network for lightning-fast playback across the globe.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {sources.archive > 0 && <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-sm font-medium">Archive.org ({sources.archive})</span>}
+            {sources.mega > 0 && <span className="px-3 py-1 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium">MEGA ({sources.mega})</span>}
+            {sources.pixel > 0 && <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-sm font-medium">Pixeldrain ({sources.pixel})</span>}
+            {sources.gofile > 0 && <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-sm font-medium">Gofile ({sources.gofile})</span>}
           </div>
         </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="glass-panel p-6 rounded-2xl flex flex-col items-center justify-center"
-        >
-          <h3 className="text-lg font-bold mb-2 self-start w-full">Cloud Distribution</h3>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', border: 'none', borderRadius: '8px', color: '#fff' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
-            {pieData.map((entry) => (
-              <div key={entry.name} className="flex items-center gap-2 text-sm">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                <span>{entry.name}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+      </motion.div>
     </div>
   );
 }

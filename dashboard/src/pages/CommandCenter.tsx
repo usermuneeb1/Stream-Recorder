@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Cloud, Film, Database, HardDrive, RefreshCcw, Play, CheckCircle2, XCircle, Clock, Link, ServerCrash, Video } from 'lucide-react';
+import { Lock, Cloud, Film, Database, HardDrive, RefreshCcw, Play, CheckCircle2, XCircle, Clock, Link, ServerCrash, Video, Edit3 } from 'lucide-react';
 import { useGithub } from '../contexts/GithubContext';
 
 const WORKFLOWS = [
+  { id: 'manual-entry', name: 'Manual Link Entry', icon: <Edit3 /> },
   { id: 'stream-recorder.yml', name: 'Stream Recorder', icon: <Video /> },
   { id: 'url-to-cloud.yml', name: 'URL to Cloud', icon: <Cloud /> },
   { id: 'youtube-to-archive.yml', name: 'YouTube Archiver', icon: <Film /> },
@@ -14,7 +15,7 @@ const WORKFLOWS = [
 ];
 
 export default function CommandCenter() {
-  const { pat, setPat, dispatchWorkflow, getWorkflowRuns } = useGithub();
+  const { pat, setPat, dispatchWorkflow, getWorkflowRuns, addManualEntry } = useGithub();
   const [inputPat, setInputPat] = useState(pat);
   const [activeTab, setActiveTab] = useState(WORKFLOWS[0].id);
   const [runs, setRuns] = useState<any[]>([]);
@@ -54,9 +55,33 @@ export default function CommandCenter() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let inputs: any = {};
     const formData = new FormData(e.target as HTMLFormElement);
 
+    if (activeTab === 'manual-entry') {
+      const entry = {
+        video_id: formData.get('video_id'),
+        title: formData.get('title'),
+        channel: 'The Muslim Lantern',
+        video_url: formData.get('video_url'),
+        duration_fmt: formData.get('duration_fmt'),
+        size_human: formData.get('size_human'),
+        date: formData.get('date'),
+        archive_link: formData.get('archive_link'),
+        mega_link: formData.get('mega_link'),
+        pixeldrain_link: formData.get('pixeldrain_link'),
+        gofile_link: formData.get('gofile_link'),
+      };
+      
+      const success = await addManualEntry(entry);
+      if (success) {
+        alert('Manual entry added to database successfully!');
+      } else {
+        alert('Failed to add entry. Check PAT or network.');
+      }
+      return;
+    }
+
+    let inputs: any = {};
     if (activeTab === 'stream-recorder.yml') {
       inputs = {
         force_record: formData.get('force_record'),
@@ -162,6 +187,53 @@ export default function CommandCenter() {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-5">
+              {activeTab === 'manual-entry' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Video Title</label>
+                      <input type="text" name="title" required placeholder="My Awesome Stream" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Original URL (or custom ID)</label>
+                      <input type="text" name="video_url" required placeholder="https://youtube.com/watch?v=..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Date (YYYY-MM-DD)</label>
+                      <input type="text" name="date" required placeholder="2026-05-17" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Duration</label>
+                      <input type="text" name="duration_fmt" placeholder="03:07:45 or 3h 7m" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Size</label>
+                      <input type="text" name="size_human" placeholder="603 MB" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Archive.org Link</label>
+                      <input type="text" name="archive_link" placeholder="https://archive.org/details/..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">MEGA Link</label>
+                      <input type="text" name="mega_link" placeholder="https://mega.nz/file/..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Pixeldrain Link</label>
+                      <input type="text" name="pixeldrain_link" placeholder="https://pixeldrain.com/u/..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Gofile Link</label>
+                      <input type="text" name="gofile_link" placeholder="https://gofile.io/d/..." className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                  </div>
+                </>
+              )}
+
               {activeTab === 'stream-recorder.yml' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">

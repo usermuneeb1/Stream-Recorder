@@ -30,9 +30,11 @@ function LockScreen() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-panel p-8 rounded-3xl max-w-sm w-full text-center"
       >
-        <div className="w-20 h-20 bg-brand-500/10 text-brand-600 dark:text-brand-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-brand-500/20">
-          <Shield size={40} />
-        </div>
+        <img 
+          src="/Stream-Recorder/logo-vertical.pn.jpg" 
+          alt="The Muslim Lantern" 
+          className="h-24 w-auto object-contain mx-auto mb-6"
+        />
         <h2 className="text-2xl font-bold font-display mb-2">Restricted Access</h2>
         <p className="text-dark-500 mb-8 text-sm">Enter the passphrase to unlock the archives.</p>
         

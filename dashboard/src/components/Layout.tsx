@@ -12,12 +12,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     <div className="min-h-screen flex flex-col bg-dark-50 dark:bg-[#09090b] text-dark-900 dark:text-dark-50 transition-colors duration-300">
       <nav className="sticky top-0 z-50 glass-panel border-b border-dark-200 dark:border-dark-800">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-              T
-            </div>
-            <span className="font-display font-bold text-lg hidden sm:block">Archive</span>
-          </div>
+          <NavLink to="/" className="flex items-center gap-3 group">
+            <img 
+              src="/Stream-Recorder/logo.png" 
+              alt="The Muslim Lantern" 
+              className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+          </NavLink>
 
           <div className="flex items-center gap-1 sm:gap-2">
             <NavLink to="/" className={({isActive}) => `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-500' : 'hover:bg-dark-100 dark:hover:bg-dark-800'}`}>

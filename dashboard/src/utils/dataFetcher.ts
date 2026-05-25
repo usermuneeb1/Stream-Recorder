@@ -65,10 +65,10 @@ function parseLinks(text: string): StreamData[] {
       videoId: vid,
       title: get('Title'),
       channel: get('Channel'),
-      date: get('Date'),
+      date: formatDate(get('Date')),
       url,
-      duration: get('Duration'),
-      size: get('Size'),
+      duration: formatDuration(get('Duration')),
+      size: formatSize(get('Size')),
       thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
       sources: buildSources(links)
     });
