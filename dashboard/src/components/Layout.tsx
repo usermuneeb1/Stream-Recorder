@@ -67,7 +67,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
       </motion.nav>
 
-      <main className="flex-1 relative">
+      <main className="flex-1 relative pt-16">
         {children}
       </main>
 

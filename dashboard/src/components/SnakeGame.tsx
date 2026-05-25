@@ -16,13 +16,13 @@ export const SnakeGame: React.FC = () => {
             </div>
             <div>
               <h3 className="font-semibold text-lg">Game Center</h3>
-              <p className="text-xs text-dark-400">Powered by Gamezop • 100+ Free Games</p>
+              <p className="text-xs text-dark-400">Powered by GameSnacks</p>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
             <a 
-              href="https://play.gamezop.com/" 
+              href="https://gamesnacks.com/" 
               target="_blank" 
               rel="noreferrer"
               className="p-2 text-dark-400 hover:text-brand-500 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-lg transition-colors tooltip-trigger"
@@ -43,10 +43,10 @@ export const SnakeGame: React.FC = () => {
         {/* Iframe Container */}
         <div className="flex-1 bg-dark-100 dark:bg-dark-900 rounded-xl overflow-hidden border border-dark-200 dark:border-dark-800 relative">
           <iframe 
-            src="https://play.gamezop.com/?id=pe" 
+            src="https://gamesnacks.com/embed/games/omnomrun" 
             className="w-full h-full absolute inset-0"
             frameBorder="0"
-            scrolling="yes"
+            scrolling="no"
             allow="fullscreen; autoplay; encrypted-media"
             title="Mini Games Provider"
           />
@@ -76,7 +76,7 @@ export const SnakeGame: React.FC = () => {
             </div>
             <div className="flex-1 w-full h-full">
               <iframe 
-                src="https://play.gamezop.com/?id=pe" 
+                src="https://gamesnacks.com/embed/games/omnomrun" 
                 className="w-full h-full"
                 frameBorder="0"
                 allow="fullscreen; autoplay; encrypted-media"
