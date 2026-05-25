@@ -37,7 +37,7 @@ export const CommandPalette: React.FC = () => {
   }, [isOpen]);
 
   const filteredStreams = query 
-    ? streams.filter(s => s.title.toLowerCase().includes(query.toLowerCase()) || s.video_id.includes(query))
+    ? streams.filter(s => s.title.toLowerCase().includes(query.toLowerCase()) || s.videoId.includes(query))
     : [];
 
   const handleNavigate = (path: string) => {
@@ -118,8 +118,8 @@ export const CommandPalette: React.FC = () => {
                       </div>
                       {filteredStreams.map(stream => (
                         <button 
-                          key={stream.video_id}
-                          onClick={() => handleNavigate(`/watch/${stream.video_id}`)} 
+                          key={stream.videoId}
+                          onClick={() => handleNavigate(`/watch/${stream.videoId}`)} 
                           className="w-full text-left flex items-center px-3 py-3 rounded-xl hover:bg-dark-50 dark:hover:bg-dark-800 group transition-colors"
                         >
                           <Video size={18} className="text-brand-500 mr-3 flex-shrink-0" />
