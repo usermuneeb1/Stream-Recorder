@@ -16,7 +16,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <img 
               src="/Stream-Recorder/logo.png" 
               alt="The Muslim Lantern" 
-              className="h-8 md:h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              className="h-10 md:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-md"
             />
           </NavLink>
 

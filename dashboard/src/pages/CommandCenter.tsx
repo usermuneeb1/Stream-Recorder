@@ -58,8 +58,13 @@ export default function CommandCenter() {
     const formData = new FormData(e.target as HTMLFormElement);
 
     if (activeTab === 'manual-entry') {
+      const vUrl = formData.get('video_url') as string || '';
+      let vId = vUrl;
+      const ytMatch = vUrl.match(/(?:v=|youtu\.be\/|embed\/)([^&?]+)/);
+      if (ytMatch) vId = ytMatch[1];
+
       const entry = {
-        video_id: formData.get('video_id'),
+        video_id: vId,
         title: formData.get('title'),
         channel: 'The Muslim Lantern',
         video_url: formData.get('video_url'),
@@ -146,12 +151,19 @@ export default function CommandCenter() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-display mb-2">Command Center</h1>
-          <p className="text-dark-500">Orchestrate GitHub Actions workflows directly from the dashboard.</p>
+        <div className="flex items-center gap-4">
+          <img 
+            src="/Stream-Recorder/logo-vertical.pn.jpg" 
+            alt="The Muslim Lantern" 
+            className="h-16 w-auto object-contain drop-shadow-lg hidden md:block"
+          />
+          <div>
+            <h1 className="text-3xl font-bold font-display mb-2">Command Center</h1>
+            <p className="text-dark-500">Orchestrate GitHub Actions workflows directly from the dashboard.</p>
+          </div>
         </div>
-        <button onClick={() => setPat('')} className="text-sm text-brand-600 hover:underline">
-          Lock & Remove Token
+        <button onClick={() => setPat('')} className="text-sm text-brand-600 hover:underline px-4 py-2 bg-brand-500/10 rounded-lg font-medium">
+          Lock Dashboard
         </button>
       </div>
 
