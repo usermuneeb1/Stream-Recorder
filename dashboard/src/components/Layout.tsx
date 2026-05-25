@@ -1,23 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, LayoutGrid, Terminal, LogOut, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
   const { role, logout } = useAuth();
+  const { scrollY } = useScroll();
+  const [hidden, setHidden] = useState(false);
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    const previous = scrollY.getPrevious() ?? 0;
+    if (latest > previous && latest > 150) {
+      setHidden(true);
+    } else {
+      setHidden(false);
+    }
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-dark-50 dark:bg-[#09090b] text-dark-900 dark:text-dark-50 transition-colors duration-300">
-      <nav className="sticky top-0 z-50 glass-panel border-b border-dark-200 dark:border-dark-800">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <NavLink to="/" className="flex items-center group -ml-6 sm:-ml-10 md:-ml-16 lg:-ml-24 focus:outline-none outline-none">
-            <img 
-              src="/Stream-Recorder/logo.png" 
-              alt="The Muslim Lantern" 
-              className="h-10 md:h-14 w-auto object-contain transition-all duration-500 group-hover:drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]"
-            />
+      <motion.nav 
+        variants={{ visible: { y: 0 }, hidden: { y: "-100%" } }}
+        animate={hidden ? "hidden" : "visible"}
+        transition={{ duration: 0.35, ease: "easeInOut" }}
+        className="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-dark-200 dark:border-dark-800"
+      >
+        <div className="w-full px-4 md:px-8 lg:px-12 h-16 flex items-center justify-between">
+          <NavLink to="/" className="flex items-center group -ml-2 focus:outline-none outline-none">
+            <motion.div
+              animate={{ filter: ["drop-shadow(0 0 0px rgba(239,68,68,0))", "drop-shadow(0 0 10px rgba(239,68,68,0.3))", "drop-shadow(0 0 0px rgba(239,68,68,0))"] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <img 
+                src="/Stream-Recorder/logo.png" 
+                alt="The Muslim Lantern" 
+                className="h-10 md:h-12 lg:h-14 w-auto object-contain transition-all duration-700 group-hover:drop-shadow-[0_0_25px_rgba(239,68,68,0.8)] group-hover:scale-105"
+              />
+            </motion.div>
           </NavLink>
 
           <div className="flex items-center gap-1 sm:gap-2">
@@ -43,9 +65,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </button>
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
-      <main className="flex-1">
+      <main className="flex-1 relative">
         {children}
       </main>
 

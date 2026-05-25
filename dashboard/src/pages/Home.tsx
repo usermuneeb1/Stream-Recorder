@@ -101,8 +101,17 @@ export default function Home() {
         />
         
         <motion.div
-          whileHover={{ scale: 1.05, rotateY: -15, rotateX: 10 }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          animate={{ 
+            y: [-8, 8, -8],
+            rotateZ: [-2, 2, -2],
+            rotateX: [5, -5, 5],
+            rotateY: [-5, 5, -5]
+          }}
+          transition={{ 
+            repeat: Infinity, 
+            duration: 8, 
+            ease: "easeInOut" 
+          }}
           className="relative z-10 perspective-1000"
         >
           <img 
