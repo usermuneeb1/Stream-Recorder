@@ -7,7 +7,7 @@ export const SnakeGame: React.FC = () => {
 
   return (
     <>
-      <div className={`glass-panel rounded-2xl relative overflow-hidden group border border-dark-200 dark:border-dark-800 transition-colors flex flex-col ${isFullscreen ? 'fixed inset-0 z-[100] bg-dark-50 dark:bg-[#09090b] rounded-none border-none' : 'h-[400px] p-6'}`}>
+      <div className={`glass-panel rounded-2xl relative overflow-hidden group border border-dark-200 dark:border-dark-800 transition-colors flex flex-col ${isFullscreen ? 'fixed inset-0 z-[100] bg-dark-50 dark:bg-[#09090b] rounded-none border-none' : 'h-[600px] lg:h-[700px] p-6'}`}>
         {/* Header */}
         <div className={`flex items-center justify-between ${isFullscreen ? 'p-4 border-b border-dark-200 dark:border-dark-800' : 'mb-4'}`}>
           <div className="flex items-center gap-3">
