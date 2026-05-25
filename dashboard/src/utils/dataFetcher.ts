@@ -76,6 +76,37 @@ function parseLinks(text: string): StreamData[] {
   return out;
 }
 
+function formatDuration(fmt: string): string {
+  if (!fmt) return '';
+  const parts = fmt.split(':');
+  if (parts.length === 3) {
+    const [h, m] = parts;
+    return `${parseInt(h)}h ${parseInt(m)}m`;
+  }
+  return fmt;
+}
+
+function formatSize(size: string): string {
+  if (!size) return '';
+  // Convert "603.53 MB (.58 GB)" to "603 MB"
+  const mbMatch = size.match(/([\d.]+)\s*MB/i);
+  if (mbMatch) {
+    return `${Math.round(parseFloat(mbMatch[1]))} MB`;
+  }
+  // Convert "1.24 GB (1.24 GB)" to "1.2 GB"
+  const gbMatch = size.match(/([\d.]+)\s*GB/i);
+  if (gbMatch) {
+    return `${parseFloat(gbMatch[1]).toFixed(1)} GB`;
+  }
+  return size;
+}
+
+function formatDate(date: string): string {
+  if (!date) return '';
+  // Split at space to remove time/PKT if it exists
+  return date.split(' ')[0];
+}
+
 function mergeData(list: StreamData[], recs: any[]): StreamData[] {
   const map: Record<string, StreamData> = {};
   list.forEach(s => { map[s.videoId] = s; });
@@ -89,10 +120,10 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
       videoId: id,
       title: r.title,
       channel: r.channel,
-      date: r.date,
+      date: formatDate(r.date),
       url: r.video_url,
-      duration: r.duration_fmt,
-      size: r.size_human,
+      duration: formatDuration(r.duration_fmt),
+      size: formatSize(r.size_human),
       thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
       sources: {}
     };
@@ -100,23 +131,16 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link, type: 'pixeldrain' };
     if (r.archive_link) s.sources.archive = { label: '🏛️ Archive.org', url: r.archive_link, type: 'archive' };
     if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link, type: 'mega' };
+    if (r.gofile_link) s.sources.gofile = { label: '📁 Gofile', url: r.gofile_link, type: 'gofile' };
     
-    if (!s.size && r.size_human) s.size = r.size_human;
-    if (!s.duration && r.duration_fmt) s.duration = r.duration_fmt;
+    if (!s.size && r.size_human) s.size = formatSize(r.size_human);
+    if (!s.duration && r.duration_fmt) s.duration = formatDuration(r.duration_fmt);
+    if (!s.date && r.date) s.date = formatDate(r.date);
     
     map[id] = s;
   }
   
   return Object.values(map).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-}
-
-export async function fetchStats(): Promise<StatsData> {
-  try {
-    const res = await fetch(`${RAW_URL}/stats.json?t=${Date.now()}`);
-    return await res.json();
-  } catch (e) {
-    return { total_streams: 0, total_hours: 0, total_gb: 0 };
-  }
 }
 
 export async function fetchStreams(): Promise<StreamData[]> {

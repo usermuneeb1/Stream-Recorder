@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Cloud, Film, Database, HardDrive, RefreshCcw, Play, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Lock, Cloud, Film, Database, HardDrive, RefreshCcw, Play, CheckCircle2, XCircle, Clock, Link, ServerCrash, Video } from 'lucide-react';
 import { useGithub } from '../contexts/GithubContext';
 
 const WORKFLOWS = [
+  { id: 'stream-recorder.yml', name: 'Stream Recorder', icon: <Video /> },
   { id: 'url-to-cloud.yml', name: 'URL to Cloud', icon: <Cloud /> },
   { id: 'youtube-to-archive.yml', name: 'YouTube Archiver', icon: <Film /> },
   { id: 'archive-to-mega.yml', name: 'Archive to MEGA', icon: <Database /> },
   { id: 'mega-account-manager.yml', name: 'MEGA Manager', icon: <HardDrive /> },
+  { id: 'cloud-refresh.yml', name: 'Cloud Refresh', icon: <Link /> },
+  { id: 'account-keepalive.yml', name: 'Account Keep-Alive', icon: <ServerCrash /> },
 ];
 
 export default function CommandCenter() {
@@ -34,18 +37,43 @@ export default function CommandCenter() {
     if (pat) fetchRuns();
   }, [pat]);
 
-  const handleSavePat = (e: React.FormEvent) => {
+  const [patError, setPatError] = useState(false);
+  const [patLoading, setPatLoading] = useState(false);
+
+  const handleSavePat = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPat(inputPat);
+    setPatLoading(true);
+    setPatError(false);
+    const success = await setPat(inputPat);
+    setPatLoading(false);
+    if (!success) {
+      setPatError(true);
+      setTimeout(() => setPatError(false), 3000);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let inputs: any = {};
+    const formData = new FormData(e.target as HTMLFormElement);
+
+    if (activeTab === 'stream-recorder.yml') {
+      inputs = {
+        force_record: formData.get('force_record'),
+        wait_for_live: formData.get('wait_for_live'),
+        wait_max_hours: formData.get('wait_max_hours'),
+        custom_duration_minutes: formData.get('custom_duration_minutes'),
+        save_test_links: formData.get('save_test_links'),
+      };
+    }
     if (activeTab === 'url-to-cloud.yml') inputs = urlData;
     if (activeTab === 'youtube-to-archive.yml') inputs = ytData;
     if (activeTab === 'archive-to-mega.yml') inputs = arcData;
     if (activeTab === 'mega-account-manager.yml') inputs = megaData;
+    if (activeTab === 'cloud-refresh.yml') {
+      inputs = { dry_run: formData.get('dry_run') };
+    }
+    if (activeTab === 'account-keepalive.yml') inputs = {};
 
     const success = await dispatchWorkflow(activeTab, inputs);
     if (success) {
@@ -76,10 +104,14 @@ export default function CommandCenter() {
               value={inputPat}
               onChange={(e) => setInputPat(e.target.value)}
               placeholder="ghp_xxxxxxxxxxxx"
-              className="w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700 focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4 transition-all"
+              className={`w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-900 border ${patError ? 'border-red-500' : 'border-dark-200 dark:border-dark-700'} focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4 transition-all`}
               required
+              disabled={patLoading}
             />
-            <button type="submit" className="w-full btn-primary py-3 text-base">Unlock Command Center</button>
+            {patError && <p className="text-red-500 text-sm mb-4">Invalid PAT or GitHub API Error.</p>}
+            <button type="submit" disabled={patLoading} className="w-full btn-primary py-3 text-base">
+              {patLoading ? 'Validating...' : 'Unlock Command Center'}
+            </button>
           </form>
         </motion.div>
       </div>
@@ -130,6 +162,44 @@ export default function CommandCenter() {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-5">
+              {activeTab === 'stream-recorder.yml' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Force Record</label>
+                      <select name="force_record" defaultValue="false" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700">
+                        <option value="false">False (Live Only)</option>
+                        <option value="true">True (Bypass Live Check)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Wait For Live</label>
+                      <select name="wait_for_live" defaultValue="false" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700">
+                        <option value="false">False</option>
+                        <option value="true">True</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Max Wait Hours</label>
+                      <input type="number" name="wait_max_hours" defaultValue="5" min="1" max="5" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5">Custom Duration (Mins)</label>
+                      <input type="number" name="custom_duration_minutes" defaultValue="0" min="0" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Save Test Links</label>
+                    <select name="save_test_links" defaultValue="true" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700">
+                      <option value="true">True</option>
+                      <option value="false">False</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
               {activeTab === 'url-to-cloud.yml' && (
                 <>
                   <div>
@@ -204,6 +274,29 @@ export default function CommandCenter() {
                       <option value="generate">Generate Only</option>
                       <option value="signin">Sign-in Only (Keep-alive)</option>
                     </select>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'cloud-refresh.yml' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Refresh Mode</label>
+                    <select defaultValue="false" name="dry_run" className="w-full px-4 py-2.5 rounded-lg bg-dark-50 dark:bg-dark-900 border border-dark-200 dark:border-dark-700">
+                      <option value="false">Full Refresh (Ping APIs to extend life)</option>
+                      <option value="true">Dry Run (Check for dead links only)</option>
+                    </select>
+                    <p className="text-xs text-dark-500 mt-2">This workflow automatically scans all Gofile and Pixeldrain links in your archive and pings them to reset their expiration timers.</p>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'account-keepalive.yml' && (
+                <>
+                  <div className="p-4 bg-brand-50 dark:bg-brand-500/10 rounded-xl border border-brand-200 dark:border-brand-500/20">
+                    <p className="text-sm text-brand-600 dark:text-brand-400">
+                      This workflow runs automatically to keep your MEGA accounts from expiring due to inactivity. You can trigger it manually to force a keep-alive event right now. No inputs required.
+                    </p>
                   </div>
                 </>
               )}

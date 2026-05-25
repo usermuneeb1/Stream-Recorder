@@ -2,23 +2,37 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { AnimatedCounter } from '../components/AnimatedCounter';
-import { fetchStats, fetchStreams, StatsData } from '../utils/dataFetcher';
+import { fetchStreams, StreamData } from '../utils/dataFetcher';
 
 export default function Home() {
-  const [stats, setStats] = useState<StatsData>({ total_streams: 0, total_hours: 0, total_gb: 0 });
+  const [stats, setStats] = useState({ total_streams: 0, total_hours: 0, total_gb: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
   const [pieData, setPieData] = useState<any[]>([]);
   
   useEffect(() => {
-    fetchStats().then(setStats);
     fetchStreams().then(streams => {
+      let hours = 0;
+      let gb = 0;
+      
+      streams.forEach(s => {
+        const hMatch = s.duration?.match(/(\d+)h/);
+        if (hMatch) hours += parseInt(hMatch[1]);
+        if (s.size?.includes('GB')) gb += parseFloat(s.size);
+        if (s.size?.includes('MB')) gb += parseFloat(s.size) / 1024;
+      });
+
+      setStats({
+        total_streams: streams.length,
+        total_hours: Math.round(hours),
+        total_gb: Math.round(gb * 10) / 10
+      });
+
       // Mock historical growth based on stream dates for area chart
       const sorted = [...streams].reverse();
       let accStreams = 0;
       let accHours = 0;
       const history = sorted.map(s => {
         accStreams++;
-        // Very basic mock hours assuming average 2h per stream if no exact duration
         const hMatch = s.duration?.match(/(\d+)h/);
         const hrs = hMatch ? parseInt(hMatch[1]) : 2;
         accHours += hrs;
@@ -49,21 +63,25 @@ export default function Home() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Hero Section */}
-      <div className="mb-12">
+      <div className="mb-16">
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent"
+          className="text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight mb-6"
         >
-          Archive Command Center
+          Preserving the Legacy of <br className="hidden md:block"/>
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-red-400">
+            The Muslim Lantern
+          </span>
         </motion.h1>
+        
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="text-xl text-dark-600 dark:text-dark-400"
+          className="text-lg md:text-xl text-dark-500 max-w-2xl mb-8 leading-relaxed"
         >
-          Real-time metrics and orchestration for the automated stream archival system.
+          A state-of-the-art cinematic archive. Every live session, debate, and lecture is carefully preserved and distributed across a decentralized multi-cloud architecture to ensure permanent access for generations to come.
         </motion.p>
       </div>
 

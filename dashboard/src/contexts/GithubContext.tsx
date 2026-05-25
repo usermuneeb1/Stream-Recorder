@@ -2,12 +2,17 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface GithubContextType {
   pat: string;
-  setPat: (pat: string) => void;
+  setPat: (newPat: string) => Promise<boolean>;
   dispatchWorkflow: (workflowId: string, inputs: Record<string, string>) => Promise<boolean>;
   getWorkflowRuns: (workflowId?: string) => Promise<any[]>;
 }
 
-const GithubContext = createContext<GithubContextType | undefined>(undefined);
+const GithubContext = createContext<GithubContextType>({
+  pat: '',
+  setPat: async () => false,
+  dispatchWorkflow: async () => false,
+  getWorkflowRuns: async () => [],
+});
 
 const OWNER = 'usermuneeb1';
 const REPO = 'Stream-Recorder';
@@ -17,12 +22,31 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return localStorage.getItem('gh_pat') || '';
   });
 
-  const setPat = (newPat: string) => {
-    setPatState(newPat);
-    if (newPat) {
-      localStorage.setItem('gh_pat', newPat);
-    } else {
+  const setPat = async (newPat: string): Promise<boolean> => {
+    if (!newPat) {
+      setPatState('');
       localStorage.removeItem('gh_pat');
+      return true;
+    }
+
+    try {
+      // Validate PAT
+      const res = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${newPat}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+
+      if (res.ok) {
+        setPatState(newPat);
+        localStorage.setItem('gh_pat', newPat);
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      return false;
     }
   };
 

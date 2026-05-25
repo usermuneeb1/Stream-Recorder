@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Bookmark, Share2, ArrowLeft, ExternalLink, HardDrive, Clock, X } from 'lucide-react';
+import { Download, Bookmark, Share2, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare } from 'lucide-react';
 import { StreamData, fetchStreams } from '../utils/dataFetcher';
 
 export default function Watch() {
@@ -180,6 +180,16 @@ export default function Watch() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Live Chat Placeholder */}
+          <div className="glass-panel p-5 rounded-2xl">
+            <h3 className="font-bold mb-4 text-lg flex items-center gap-2">
+              <MessageSquare size={18} /> Live Chat
+            </h3>
+            <div className="h-48 flex items-center justify-center border-2 border-dashed border-dark-200 dark:border-dark-700 rounded-xl text-dark-400">
+              Chat coming soon
+            </div>
           </div>
         </div>
       </div>
