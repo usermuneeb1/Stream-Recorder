@@ -32,10 +32,9 @@ export default function Gallery() {
     const target = e.target as HTMLImageElement;
     if (stream.archiveId && !target.src.includes('archive.org')) {
       target.src = `https://archive.org/services/img/${stream.archiveId}`;
-    } else if (!target.src.includes('default-thumb')) {
-      // Create a nice fallback with inline SVG or placeholder if everything fails
-      target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNDUwIiBmaWxsPSIjMWYyOTM3Ij48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjQ1MCIgZmlsbD0iIzFmMjkzNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSI0OCIgZmlsbD0iIzRmNDZlNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlZpZGVvIFVuYXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg==';
-      target.id = 'default-thumb';
+    } else if (!target.src.includes('default-thumb.jpg')) {
+      // Use the standard Muslim Lantern Q&A thumbnail as the ultimate fallback
+      target.src = '/default-thumb.jpg';
     }
   };
 

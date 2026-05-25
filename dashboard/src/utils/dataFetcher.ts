@@ -75,6 +75,8 @@ function parseLinks(text: string): StreamData[] {
     if (archiveUrl) {
       archiveId = archiveUrl.split('/details/')[1]?.split('/')[0];
     }
+    
+    const customThumb = get('Thumbnail');
 
     out.push({
       videoId: vid,
@@ -84,7 +86,7 @@ function parseLinks(text: string): StreamData[] {
       url,
       duration: formatDuration(get('Duration')),
       size: formatSize(get('Size')),
-      thumbnail: `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+      thumbnail: customThumb || `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
       archiveId: archiveId,
       sources: sources
     });
