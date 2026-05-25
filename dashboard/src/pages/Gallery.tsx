@@ -34,7 +34,7 @@ export default function Gallery() {
       target.src = `https://archive.org/services/img/${stream.archiveId}`;
     } else if (!target.src.includes('thumbnail.jpg')) {
       // Use the standard Muslim Lantern Q&A thumbnail as the ultimate fallback
-      target.src = '/thumbnail.jpg';
+      target.src = `${import.meta.env.BASE_URL}thumbnail.jpg`;
     }
   };
 
