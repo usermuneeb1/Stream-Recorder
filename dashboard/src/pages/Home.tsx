@@ -57,33 +57,58 @@ export default function Home() {
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Hero Section */}
-      <motion.div 
-        className="mb-20 text-center md:text-left relative z-10"
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-      >
-        <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-medium mb-6 border border-brand-500/20">
-          <Zap size={14} /> Ultra-Premium Infrastructure
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20 relative z-10">
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="text-center lg:text-left"
+        >
+          <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-medium mb-6 border border-brand-500/20">
+            <Zap size={14} /> Ultra-Premium Infrastructure
+          </motion.div>
+          
+          <motion.h1 
+            variants={itemVariants}
+            className="text-5xl md:text-7xl font-bold font-display tracking-tight mb-6 leading-tight"
+          >
+            Preserving the Legacy of <br className="hidden md:block"/>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 via-indigo-400 to-purple-500">
+              The Muslim Lantern
+            </span>
+          </motion.h1>
+          
+          <motion.p 
+            variants={itemVariants}
+            className="text-lg md:text-2xl text-dark-500 max-w-3xl lg:max-w-none mx-auto lg:mx-0 mb-8 leading-relaxed font-light"
+          >
+            A state-of-the-art cinematic archive. Every live session, debate, and lecture is permanently preserved and distributed across a decentralized multi-cloud architecture.
+          </motion.p>
         </motion.div>
-        
-        <motion.h1 
-          variants={itemVariants}
-          className="text-5xl md:text-7xl font-bold font-display tracking-tight mb-6 leading-tight"
+
+        {/* Floating Logo Column */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, rotateY: 15 }}
+          animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+          transition={{ duration: 1, type: "spring", stiffness: 100 }}
+          className="hidden lg:flex justify-center relative perspective-1000"
         >
-          Preserving the Legacy of <br className="hidden md:block"/>
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-500 via-indigo-400 to-purple-500">
-            The Muslim Lantern
-          </span>
-        </motion.h1>
-        
-        <motion.p 
-          variants={itemVariants}
-          className="text-lg md:text-2xl text-dark-500 max-w-3xl mb-8 leading-relaxed font-light"
-        >
-          A state-of-the-art cinematic archive. Every live session, debate, and lecture is permanently preserved and distributed across a decentralized multi-cloud architecture.
-        </motion.p>
-      </motion.div>
+          {/* Animated Glow Behind Logo */}
+          <motion.div 
+            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+            className="absolute inset-0 bg-brand-500/20 blur-[80px] rounded-full"
+          />
+          
+          <motion.img 
+            src="/Stream-Recorder/logo-vertical.pn.jpg"
+            alt="The Muslim Lantern"
+            animate={{ y: [-15, 15, -15], rotateZ: [-1, 1, -1] }}
+            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+            className="w-full max-w-sm object-contain drop-shadow-[0_20px_30px_rgba(239,68,68,0.2)] z-10 relative"
+          />
+        </motion.div>
+      </div>
 
       {/* Metrics Grid */}
       <motion.div 

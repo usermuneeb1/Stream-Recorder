@@ -187,32 +187,45 @@ export const SnakeGame: React.FC = () => {
 
             {/* Food */}
             <div 
-              className="bg-brand-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)] z-10 animate-pulse"
+              className="z-10 animate-pulse flex items-center justify-center"
               style={{
                 gridColumnStart: food.x + 1,
                 gridRowStart: food.y + 1,
-                transform: 'scale(0.8)'
+                transform: 'scale(1.2)'
               }}
-            />
+            >
+              <div className="w-4 h-4 bg-red-500 rounded-full shadow-[0_0_15px_rgba(239,68,68,1)] relative">
+                <div className="absolute -top-1 right-1 w-1 h-2 bg-green-500 rounded-full rotate-45" />
+              </div>
+            </div>
 
             {/* Snake */}
             {snake.map((segment, index) => {
               const isHead = index === 0;
+              const opacity = Math.max(0.3, 1 - (index / snake.length));
+              
               return (
                 <div 
                   key={index}
-                  className={`${isHead ? 'bg-indigo-500 z-10' : 'bg-indigo-400/80'} rounded-sm`}
+                  className={`${isHead ? 'bg-indigo-500 z-10' : 'bg-indigo-400'} rounded-md`}
                   style={{
                     gridColumnStart: segment.x + 1,
                     gridRowStart: segment.y + 1,
-                    transform: isHead ? 'scale(1.1)' : 'scale(0.95)',
+                    transform: isHead ? 'scale(1.15)' : 'scale(0.9)',
+                    opacity: isHead ? 1 : opacity,
+                    boxShadow: isHead ? '0 0 15px rgba(99,102,241,0.8)' : 'none',
                     transition: 'all 0.1s linear'
                   }}
                 >
                   {isHead && (
                     <div className="w-full h-full relative">
-                      <div className={`absolute w-1.5 h-1.5 bg-white rounded-full ${direction.x === 1 ? 'right-1 top-1' : direction.x === -1 ? 'left-1 top-1' : direction.y === 1 ? 'bottom-1 right-1' : 'top-1 right-1'}`}/>
-                      <div className={`absolute w-1.5 h-1.5 bg-white rounded-full ${direction.x === 1 ? 'right-1 bottom-1' : direction.x === -1 ? 'left-1 bottom-1' : direction.y === 1 ? 'bottom-1 left-1' : 'top-1 left-1'}`}/>
+                      {/* Snake Eyes */}
+                      <div className={`absolute w-1.5 h-1.5 bg-white rounded-full ${direction.x === 1 ? 'right-0.5 top-0.5' : direction.x === -1 ? 'left-0.5 top-0.5' : direction.y === 1 ? 'bottom-0.5 right-0.5' : 'top-0.5 right-0.5'}`}>
+                        <div className="absolute inset-0.5 bg-black rounded-full" />
+                      </div>
+                      <div className={`absolute w-1.5 h-1.5 bg-white rounded-full ${direction.x === 1 ? 'right-0.5 bottom-0.5' : direction.x === -1 ? 'left-0.5 bottom-0.5' : direction.y === 1 ? 'bottom-0.5 left-0.5' : 'top-0.5 left-0.5'}`}>
+                        <div className="absolute inset-0.5 bg-black rounded-full" />
+                      </div>
                     </div>
                   )}
                 </div>
