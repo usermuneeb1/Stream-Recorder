@@ -166,11 +166,11 @@ jobs:
           # Anti-bot: sleep between requests + use web_creator client
           YTDLP_ARGS="$COOKIE_ARGS $PROXY_ARGS --sleep-requests 3 --min-sleep-interval 5 --max-sleep-interval 20 --extractor-args youtube:player_client=web_creator"
 
-          # Quality format — enforce minimum 480p to prevent 360p fallback
+          # Quality format — enforce minimum 720p
           case "$QUALITY" in
-            "1080p") FORMAT="bestvideo[height<=1080][height>=480]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height>=480]/best" ;;
-            "720p")  FORMAT="bestvideo[height<=720][height>=480]+bestaudio/bestvideo[height<=720]+bestaudio/best[height>=480]/best" ;;
-            "480p")  FORMAT="bestvideo[height<=480][height>=480]+bestaudio/bestvideo[height<=480]+bestaudio/best[height>=480]/best" ;;
+            "1080p") FORMAT="bestvideo[height<=1080][height>=720]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height>=720]" ;;
+            "720p")  FORMAT="bestvideo[height<=720][height>=720]+bestaudio/bestvideo[height<=720]+bestaudio/best[height>=720]" ;;
+            "480p")  FORMAT="bestvideo[height<=480][height>=480]+bestaudio/bestvideo[height<=480]+bestaudio/best[height>=480]" ;;
             *)       FORMAT="bestvideo+bestaudio/best" ;;
           esac
 
@@ -207,8 +207,10 @@ jobs:
 
           [[ -z "$CHANNEL" ]] && CHANNEL="$YT_UPLOADER"
           [[ -z "$CHANNEL" ]] && CHANNEL="$YT_TITLE"
-
-          SAFE_CHANNEL=$(echo "$CHANNEL" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-30)
+          archive_prefix="${CHANNEL}-${YT_TITLE}"
+          archive_prefix=$(echo "$archive_prefix" | sed 's/[^a-zA-Z0-9_-]/-/g')
+          # Append -HD to create a completely fresh Archive.org folder for the re-downloads
+          archive_prefix=$(echo "${archive_prefix}-HD" | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-30)
 
           echo ""
           echo "📺 Channel: $CHANNEL"
