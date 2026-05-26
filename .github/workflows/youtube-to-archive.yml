@@ -370,7 +370,7 @@ jobs:
 
                 echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
 
-                HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+                HTTP_CODE=$(curl -g -s -o /dev/null -w '%{http_code}' \
                   --max-time 7200 \
                   -H "authorization: LOW ${ACCESS}:${SECRET}" \
                   -H "x-archive-auto-make-bucket: 1" \
@@ -384,7 +384,7 @@ jobs:
                   -H "x-archive-meta-language: eng" \
                   -H "Content-Type: video/mp4" \
                   --upload-file "$FILE" \
-                  "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}")
+                  "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}" || echo "000")
 
                 if [[ "$HTTP_CODE" =~ ^2 ]]; then
                   echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
