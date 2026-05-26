@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { Home, LayoutGrid, Terminal, LogOut, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -72,8 +72,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       <footer className="py-8 text-center text-dark-500 text-sm mt-12 border-t border-dark-200 dark:border-dark-800">
-        <p>All rights reserved to Muneeb Ahmad.</p>
-        <p className="mt-1">Made by Muneeb Ahmad with ❤️ est. May 2026.</p>
+        <p className="font-medium">☪️ Preserving Islamic Knowledge for Future Generations</p>
+        <p className="mt-2 text-dark-400">Built with ❤️ by Muneeb Ahmad • est. May 2026</p>
       </footer>
     </div>
   );

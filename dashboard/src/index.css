@@ -27,11 +27,11 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 transition-all active:scale-95;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 transition-all active:scale-95;
   }
   
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full bg-dark-100 px-6 py-2.5 text-sm font-semibold text-dark-900 hover:bg-dark-200 transition-all active:scale-95;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-dark-100 px-6 py-2.5 text-sm font-semibold text-dark-900 hover:bg-dark-200 transition-all active:scale-95;
   }
   
   .dark .btn-secondary {
@@ -39,23 +39,64 @@
   }
 }
 
-/* Custom Scrollbar for heavy-duty feel */
+/* Premium Shimmer Animation for Loading Skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Premium Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-dark-200 rounded-full;
+  @apply bg-dark-300 rounded-full;
 }
 .dark ::-webkit-scrollbar-thumb {
   @apply bg-dark-700;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-dark-300;
+  @apply bg-dark-400;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
   @apply bg-dark-600;
+}
+
+/* Selection Color */
+::selection {
+  @apply bg-brand-500/30 text-brand-900;
+}
+
+.dark ::selection {
+  @apply bg-brand-500/40 text-white;
 }

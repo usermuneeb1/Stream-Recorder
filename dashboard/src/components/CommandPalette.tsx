@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Command, Home, LayoutGrid, Terminal, Video, ExternalLink } from 'lucide-react';
+import { Search, Home, LayoutGrid, Terminal, Video, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchStreams } from '../utils/dataFetcher';
+import { useAuth } from '../contexts/AuthContext';
 
 export const CommandPalette: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +11,7 @@ export const CommandPalette: React.FC = () => {
   const [streams, setStreams] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { role } = useAuth();
 
   useEffect(() => {
     fetchStreams().then(setStreams);
@@ -47,7 +49,6 @@ export const CommandPalette: React.FC = () => {
 
   return (
     <>
-      {/* Keyboard Shortcut Hint for Desktop */}
       <div className="fixed bottom-6 right-6 hidden md:flex items-center gap-2 px-4 py-2 glass-panel rounded-full text-xs text-dark-500 z-40 border border-dark-200 dark:border-dark-800 shadow-xl cursor-pointer hover:bg-dark-100 dark:hover:bg-dark-800 transition-colors" onClick={() => setIsOpen(true)}>
         <Search size={14} />
         <span>Search</span>
@@ -104,10 +105,12 @@ export const CommandPalette: React.FC = () => {
                         <LayoutGrid size={18} className="text-dark-400 group-hover:text-purple-500 mr-3" />
                         <span className="flex-1 text-sm font-medium">Video Gallery</span>
                       </button>
-                      <button onClick={() => handleNavigate('/command-center')} className="w-full text-left flex items-center px-3 py-3 rounded-xl hover:bg-dark-50 dark:hover:bg-dark-800 group transition-colors">
-                        <Terminal size={18} className="text-dark-400 group-hover:text-green-500 mr-3" />
-                        <span className="flex-1 text-sm font-medium">Command Center</span>
-                      </button>
+                      {role === 'admin' && (
+                        <button onClick={() => handleNavigate('/command-center')} className="w-full text-left flex items-center px-3 py-3 rounded-xl hover:bg-dark-50 dark:hover:bg-dark-800 group transition-colors">
+                          <Terminal size={18} className="text-dark-400 group-hover:text-green-500 mr-3" />
+                          <span className="flex-1 text-sm font-medium">Command Center</span>
+                        </button>
+                      )}
                     </div>
                   )}
 

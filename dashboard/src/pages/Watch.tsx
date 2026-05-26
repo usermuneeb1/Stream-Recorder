@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Bookmark, Share2, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare } from 'lucide-react';
+import { Download, Bookmark, Share2, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check } from 'lucide-react';
 import { StreamData, fetchStreams } from '../utils/dataFetcher';
 
 export default function Watch() {
@@ -9,10 +9,12 @@ export default function Watch() {
   const location = useLocation();
   const navigate = useNavigate();
   const [stream, setStream] = useState<StreamData | null>(location.state?.stream || null);
+  const [notFound, setNotFound] = useState(false);
   
-  const [activeSource, setActiveSource] = useState<string>('pixel'); // default to pixeldrain if available
+  const [activeSource, setActiveSource] = useState<string>('pixel');
   const [showDownloads, setShowDownloads] = useState(false);
   const [bookmarks, setBookmarks] = useState<{time: number, note: string}[]>([]);
+  const [copied, setCopied] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -21,13 +23,15 @@ export default function Watch() {
         const found = data.find(s => s.videoId === id);
         if (found) {
           setStream(found);
-          // Set initial active source based on availability
           const srcKeys = Object.keys(found.sources);
           if (srcKeys.length > 0) {
             if (found.sources.pixel) setActiveSource('pixel');
             else if (found.sources.mega) setActiveSource('mega');
+            else if (found.sources.archive) setActiveSource('archive');
             else setActiveSource(srcKeys[0]);
           }
+        } else {
+          setNotFound(true);
         }
       });
     } else {
@@ -35,10 +39,11 @@ export default function Watch() {
       if (srcKeys.length > 0 && !stream.sources[activeSource]) {
         if (stream.sources.pixel) setActiveSource('pixel');
         else if (stream.sources.mega) setActiveSource('mega');
+        else if (stream.sources.archive) setActiveSource('archive');
         else setActiveSource(srcKeys[0]);
       }
     }
-  }, [id, stream]);
+  }, [id]);
 
   // Load Bookmarks
   useEffect(() => {
@@ -50,10 +55,43 @@ export default function Watch() {
     }
   }, [id]);
 
+  // Not Found State
+  if (notFound) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md"
+        >
+          <div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle size={44} className="text-red-500" />
+          </div>
+          <h2 className="text-3xl font-bold font-display mb-3">Video Not Found</h2>
+          <p className="text-dark-500 mb-8">
+            The recording with ID <code className="px-2 py-0.5 bg-dark-100 dark:bg-dark-800 rounded text-sm font-mono">{id}</code> doesn't exist in the archive.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => navigate(-1)} className="btn-secondary flex items-center gap-2">
+              <ArrowLeft size={16} /> Go Back
+            </button>
+            <button onClick={() => navigate('/gallery')} className="btn-primary">
+              Browse Gallery
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Loading State
   if (!stream) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-dark-500 text-sm font-medium animate-pulse">Loading recording...</p>
+        </div>
       </div>
     );
   }
@@ -62,14 +100,23 @@ export default function Watch() {
   const currentSource = stream.sources[activeSource];
 
   const handleAddBookmark = () => {
-    // In a real embed we can't easily get the current time without postMessage API, 
-    // but for UX we can prompt the user to enter the timestamp they want to save, 
-    // or just mock it for the demo
     const timeStr = prompt("Enter timestamp to bookmark (e.g., 01:23:45):");
     if (timeStr) {
       const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }];
       setBookmarks(newBms);
       localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms));
+    }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+      prompt('Copy this link:', shareUrl);
     }
   };
 
@@ -86,36 +133,42 @@ export default function Watch() {
       return `https://archive.org/embed/${aId}`;
     }
     if (source.type === 'odysee') {
-      // Odysee embeds use /$/embed/
       return source.url.replace('odysee.com/', 'odysee.com/$/embed/');
     }
     if (source.type === 'rumble') {
-      // Rumble embeds use /embed/v
       return source.url.replace('/v', '/embed/v');
     }
     return source.url;
   };
 
+  const isUnembeddable = currentSource?.type === 'gofile';
+
   return (
     <div className="max-w-[1600px] mx-auto px-4 py-6">
       <button 
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-dark-500 hover:text-brand-600 mb-4 transition-colors font-medium"
+        className="flex items-center gap-2 text-dark-500 hover:text-brand-600 mb-4 transition-colors font-medium group"
       >
-        <ArrowLeft size={18} /> Back to Gallery
+        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> Back to Gallery
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-6">
           {/* Player Container */}
-          <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10"
+          >
             {currentSource ? (
-              currentSource.type === 'gofile' ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-dark-900 text-center p-6">
-                  <ExternalLink size={48} className="text-brand-500 mb-4 opacity-80" />
+              isUnembeddable ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-dark-900 to-dark-800 text-center p-6">
+                  <div className="w-20 h-20 rounded-full bg-brand-500/10 flex items-center justify-center mb-6">
+                    <ExternalLink size={36} className="text-brand-500" />
+                  </div>
                   <h3 className="text-xl font-bold mb-2">Embedded Playback Unavailable</h3>
                   <p className="text-dark-400 mb-6 max-w-md">
-                    Gofile is a secure file-sharing service that does not support website embedding. You must open this link directly to view or download the video.
+                    This provider doesn't support website embedding. Click below to open the video directly.
                   </p>
                   <a 
                     href={currentSource.url} 
@@ -123,7 +176,7 @@ export default function Watch() {
                     rel="noreferrer"
                     className="btn-primary flex items-center gap-2"
                   >
-                    <ExternalLink size={18} /> Open in Gofile
+                    <ExternalLink size={18} /> Open in {currentSource.label.replace(/[^\w\s.]/g, '').trim()}
                   </a>
                 </div>
               ) : (
@@ -139,7 +192,7 @@ export default function Watch() {
                 No embeddable source available
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Details */}
           <div>
@@ -154,13 +207,20 @@ export default function Watch() {
             <div className="flex flex-wrap items-center gap-3 mt-6 pb-6 border-b border-dark-200 dark:border-dark-800">
               <button 
                 onClick={handleAddBookmark}
-                className="btn-secondary"
+                className="btn-secondary flex items-center gap-2"
               >
                 <Bookmark size={18} /> Add Bookmark
               </button>
               <button 
+                onClick={handleShare}
+                className="btn-secondary flex items-center gap-2"
+              >
+                {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+                {copied ? 'Copied!' : 'Share Link'}
+              </button>
+              <button 
                 onClick={() => setShowDownloads(true)}
-                className="btn-primary"
+                className="btn-primary flex items-center gap-2"
               >
                 <Download size={18} /> Download Options
               </button>
@@ -206,16 +266,6 @@ export default function Watch() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Live Chat Placeholder */}
-          <div className="glass-panel p-5 rounded-2xl">
-            <h3 className="font-bold mb-4 text-lg flex items-center gap-2">
-              <MessageSquare size={18} /> Live Chat
-            </h3>
-            <div className="h-48 flex items-center justify-center border-2 border-dashed border-dark-200 dark:border-dark-700 rounded-xl text-dark-400">
-              Chat coming soon
-            </div>
           </div>
         </div>
       </div>

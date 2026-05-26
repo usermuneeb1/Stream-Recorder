@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { useAuth } from './contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Shield } from 'lucide-react';
+import { Shield, Home as HomeIcon } from 'lucide-react';
 import { CommandPalette } from './components/CommandPalette';
 
 import Home from './pages/Home';
@@ -56,6 +56,24 @@ function LockScreen() {
   );
 }
 
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+      >
+        <div className="text-8xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-indigo-500 mb-4">404</div>
+        <h2 className="text-2xl font-bold font-display mb-3">Page Not Found</h2>
+        <p className="text-dark-500 mb-8 max-w-md">The page you're looking for doesn't exist or has been moved.</p>
+        <Link to="/" className="btn-primary inline-flex items-center gap-2">
+          <HomeIcon size={18} /> Back to Home
+        </Link>
+      </motion.div>
+    </div>
+  );
+}
+
 function App() {
   const { role } = useAuth();
 
@@ -71,6 +89,7 @@ function App() {
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/watch/:id" element={<Watch />} />
         {role === 'admin' && <Route path="/command-center" element={<CommandCenter />} />}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
   );

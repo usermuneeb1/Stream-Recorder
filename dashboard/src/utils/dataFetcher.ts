@@ -13,7 +13,7 @@ export interface StreamData {
   duration: string;
   size: string;
   thumbnail: string;
-  archiveId?: string; // Add archiveId for thumbnail fallback
+  archiveId?: string;
   sources: Record<string, StreamSource>;
 }
 
@@ -25,6 +25,11 @@ export interface StatsData {
 
 const RAW_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
 const CHANNEL = 'the muslim lantern';
+
+// ── In-memory cache to prevent redundant network requests ──
+let _cache: StreamData[] | null = null;
+let _cacheTime = 0;
+const CACHE_TTL = 60_000; // 1 minute
 
 function isTML(ch?: string) {
   return (ch || '').toLowerCase().includes(CHANNEL);
@@ -80,7 +85,7 @@ function parseLinks(text: string): StreamData[] {
 
     out.push({
       videoId: vid,
-      title: get('Title'),
+      title: get('Title').trim(),
       channel: get('Channel'),
       date: formatDate(get('Date')),
       url,
@@ -106,13 +111,13 @@ function formatDuration(fmt: string): string {
 
 function formatSize(size: string): string {
   if (!size) return '';
-  // Convert "603.53 MB (.58 GB)" to "603 MB"
-  const mbMatch = size.match(/([\d.]+)\s*MB/i);
+  // Match "461.5M", "461.5 M", "461.5MB", "461.5 MB" etc.
+  const mbMatch = size.match(/([\d.]+)\s*M(?:B)?/i);
   if (mbMatch) {
     return `${Math.round(parseFloat(mbMatch[1]))} MB`;
   }
-  // Convert "1.24 GB (1.24 GB)" to "1.2 GB"
-  const gbMatch = size.match(/([\d.]+)\s*GB/i);
+  // Match "1.24G", "1.24 G", "1.24GB", "1.24 GB" etc.
+  const gbMatch = size.match(/([\d.]+)\s*G(?:B)?/i);
   if (gbMatch) {
     return `${parseFloat(gbMatch[1]).toFixed(1)} GB`;
   }
@@ -121,8 +126,30 @@ function formatSize(size: string): string {
 
 function formatDate(date: string): string {
   if (!date) return '';
-  // Split at space to remove time/PKT if it exists
-  return date.split(' ')[0];
+  
+  // Handle ISO format: "2026-05-17" or "2026-05-17 04:45:53 AM PKT"
+  const isoMatch = date.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) {
+    return isoMatch[1];
+  }
+  
+  // Handle human format: "April 25, 2026" or "May 11, 2026"
+  const humanMatch = date.match(/^([A-Za-z]+\s+\d{1,2},?\s+\d{4})/);
+  if (humanMatch) {
+    // Normalize to YYYY-MM-DD for consistent sorting
+    try {
+      const d = new Date(humanMatch[1]);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    } catch {
+      // fallback
+    }
+    return humanMatch[1];
+  }
+  
+  // Fallback: return as-is
+  return date.trim();
 }
 
 function mergeData(list: StreamData[], recs: any[]): StreamData[] {
@@ -134,9 +161,14 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     const id = r.video_id || ytId(r.video_url);
     if (!id) continue;
     
+    // Skip exact duplicates (same archive link already seen)
+    if (map[id] && r.archive_link && map[id].sources.archive?.url === r.archive_link) {
+      continue;
+    }
+    
     const s = map[id] || {
       videoId: id,
-      title: r.title,
+      title: (r.title || '').trim(),
       channel: r.channel,
       date: formatDate(r.date),
       url: r.video_url,
@@ -146,6 +178,9 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
       archiveId: undefined,
       sources: {}
     };
+
+    // Trim titles on merge too
+    if (s.title) s.title = s.title.trim();
 
     if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link, type: 'pixeldrain' };
     if (r.archive_link) {
@@ -166,6 +201,11 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
 }
 
 export async function fetchStreams(): Promise<StreamData[]> {
+  // Return cached data if still fresh
+  if (_cache && Date.now() - _cacheTime < CACHE_TTL) {
+    return _cache;
+  }
+
   let list: StreamData[] = [];
   try {
     const res = await fetch(`${RAW_URL}/links.txt?t=${Date.now()}`);
@@ -183,5 +223,11 @@ export async function fetchStreams(): Promise<StreamData[]> {
     console.warn('Could not parse recordings.json');
   }
 
-  return list.filter(s => isTML(s.channel));
+  const result = list.filter(s => isTML(s.channel));
+  
+  // Cache the result
+  _cache = result;
+  _cacheTime = Date.now();
+  
+  return result;
 }
