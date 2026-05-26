@@ -365,7 +365,7 @@ jobs:
               else
                 FILESIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
                 SIZE_MB=$((FILESIZE / 1024 / 1024))
-                SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._\[\]-]/-/g')
+                SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._-]/-/g')
                 DATE_STR=$(date '+%Y-%m-%d')
 
                 echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
@@ -384,7 +384,7 @@ jobs:
                   -H "x-archive-meta-language: eng" \
                   -H "Content-Type: video/mp4" \
                   --upload-file "$FILE" \
-                  "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}" || echo "000")
+                  "https://s3.us.archive.org/${ITEM_ID}/${SAFE_FILENAME}" || true)
 
                 if [[ "$HTTP_CODE" =~ ^2 ]]; then
                   echo "  ✅ Archived: https://archive.org/details/${ITEM_ID}"
