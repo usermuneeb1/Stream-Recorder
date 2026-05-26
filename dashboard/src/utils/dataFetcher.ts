@@ -45,6 +45,7 @@ function buildSources(links: any) {
   if (links.archive_hd) s.archive = { label: '🏛️ Archive.org', url: links.archive_hd, type: 'archive' };
   if (links.mega_hd || links.mega_compressed) s.mega = { label: '🔴 MEGA.nz', url: links.mega_hd || links.mega_compressed, type: 'mega' };
   if (links.pixeldrain_hd || links.pixeldrain_compressed) s.pixel = { label: '🟣 Pixeldrain', url: links.pixeldrain_hd || links.pixeldrain_compressed, type: 'pixeldrain' };
+  if (links.gofile_hd || links.gofile_compressed) s.gofile = { label: '📁 Gofile', url: links.gofile_hd || links.gofile_compressed, type: 'gofile' };
   if (links.archive_compressed) s.archiveSmall = { label: '📱 Archive (small)', url: links.archive_compressed, type: 'archive' };
   
   // Permanent Web3 / Decentralized / Alternative Providers
