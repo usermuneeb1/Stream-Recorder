@@ -237,8 +237,10 @@ jobs:
                   print(f"VIDEO\t{vid_id}\t{title}\t{playlist_title}\t{duration}")
           PYEOF
 
-          VIDEO_COUNT=$(grep -c "^VIDEO" /tmp/video_list.tsv 2>/dev/null || echo "0")
-          PLAYLIST_COUNT=$(grep -c "^PLAYLIST" /tmp/video_list.tsv 2>/dev/null || echo "0")
+          VIDEO_COUNT=$(grep -c "^VIDEO" /tmp/video_list.tsv 2>/dev/null || true)
+          [[ -z "$VIDEO_COUNT" ]] && VIDEO_COUNT=0
+          PLAYLIST_COUNT=$(grep -c "^PLAYLIST" /tmp/video_list.tsv 2>/dev/null || true)
+          [[ -z "$PLAYLIST_COUNT" ]] && PLAYLIST_COUNT=0
 
           echo "📊 Found: $VIDEO_COUNT videos, $PLAYLIST_COUNT sub-playlists"
 
