@@ -310,17 +310,18 @@ jobs:
               return
             fi
 
-            ITEM_ID="${archive_prefix}-${vid}"
+            # Group all videos from this playlist into a single Archive.org "folder" (item)
+            ITEM_ID="${archive_prefix}"
 
-            # Check if already on Archive.org (with ACTUAL file verification)
+            # Check if this specific video is already inside the Archive.org item
             if [[ "$SKIP_EXISTING" == "true" ]]; then
-              HAS_VIDEO=$(curl -s --max-time 15 "https://archive.org/metadata/$ITEM_ID" 2>/dev/null | python3 -c "import sys, json; print('yes' if any(f.get('name','').endswith(('.mp4','.mkv','.webm')) or f.get('format','').lower() in ['h.264', 'mpeg4', 'ogg video', 'webm', 'matroska', 'iso image', '512kb mpeg4', 'mpeg-4 media file'] for f in json.load(sys.stdin).get('files',[])) else 'no')" 2>/dev/null || echo "no")
+              HAS_VIDEO=$(curl -s --max-time 15 "https://archive.org/metadata/$ITEM_ID" 2>/dev/null | python3 -c "import sys, json; print('yes' if any('${vid}' in f.get('name','') for f in json.load(sys.stdin).get('files',[])) else 'no')" 2>/dev/null || echo "no")
               if [[ "$HAS_VIDEO" == "yes" ]]; then
-                echo "  ⏭️ Already on Archive.org (verified: has video files) — skipping"
+                echo "  ⏭️ Already in Archive.org item ${ITEM_ID} — skipping"
                 SKIPPED=$((SKIPPED + 1))
                 return
               else
-                echo "  🔄 Item exists on Archive.org but has NO video files — will re-upload"
+                echo "  🔄 Video not in Archive.org item ${ITEM_ID} yet — will upload"
               fi
             fi
 
