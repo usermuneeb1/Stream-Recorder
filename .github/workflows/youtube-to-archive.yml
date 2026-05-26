@@ -168,9 +168,9 @@ jobs:
 
           # Quality format — enforce minimum 480p to prevent 360p fallback
           case "$QUALITY" in
-            "1080p") FORMAT="bestvideo[height<=1080][height>=480]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height>=480]/best" ;;
-            "720p")  FORMAT="bestvideo[height<=720][height>=480]+bestaudio/bestvideo[height<=720]+bestaudio/best[height>=480]/best" ;;
-            "480p")  FORMAT="bestvideo[height<=480][height>=480]+bestaudio/bestvideo[height<=480]+bestaudio/best[height>=480]/best" ;;
+            "1080p") FORMAT="bestvideo[height<=1080][height>=480]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height>=480]" ;;
+            "720p")  FORMAT="bestvideo[height<=720][height>=480]+bestaudio/bestvideo[height<=720]+bestaudio/best[height>=480]" ;;
+            "480p")  FORMAT="bestvideo[height<=480][height>=480]+bestaudio/bestvideo[height<=480]+bestaudio/best[height>=480]" ;;
             *)       FORMAT="bestvideo+bestaudio/best" ;;
           esac
 
