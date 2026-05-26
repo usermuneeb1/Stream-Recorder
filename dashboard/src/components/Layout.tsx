@@ -71,9 +71,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         {children}
       </main>
 
-      <footer className="py-8 text-center text-dark-500 text-sm mt-12 border-t border-dark-200 dark:border-dark-800">
-        <p className="font-medium">☪️ Preserving Islamic Knowledge for Future Generations</p>
-        <p className="mt-2 text-dark-400">Built with ❤️ by Muneeb Ahmad • est. May 2026</p>
+      <footer className="py-8 text-center text-dark-400 text-sm mt-12 border-t border-dark-200 dark:border-dark-800">
+        <p>Built with ❤️ by Muneeb Ahmad • est. May 2026</p>
       </footer>
     </div>
   );

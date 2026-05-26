@@ -273,21 +273,11 @@ export default function Watch() {
             <h3 className="font-bold mb-4 text-lg flex items-center gap-2">
               <MessageSquare size={18} /> Live Chat Replay
             </h3>
-            {stream.url && stream.url.includes('youtube.com') ? (
-              <div className="rounded-xl overflow-hidden border border-dark-200 dark:border-dark-700">
-                <iframe
-                  src={`https://www.youtube.com/live_chat_replay?continuation=&v=${stream.videoId}&embed_domain=${window.location.hostname}`}
-                  className="w-full h-[400px] border-0 bg-dark-900"
-                  title="Live Chat Replay"
-                />
-              </div>
-            ) : (
-              <div className="h-48 flex flex-col items-center justify-center border-2 border-dashed border-dark-200 dark:border-dark-700 rounded-xl text-dark-400 text-center p-4">
-                <MessageSquare size={24} className="mb-2 opacity-50" />
-                <p className="text-sm">Chat replay is available for YouTube streams.</p>
-                <p className="text-xs mt-1 opacity-70">This recording doesn't have a linked YouTube URL.</p>
-              </div>
-            )}
+            <div className="h-48 flex flex-col items-center justify-center border-2 border-dashed border-dark-200 dark:border-dark-700 rounded-xl text-dark-400 text-center p-4">
+              <MessageSquare size={24} className="mb-2 opacity-50" />
+              <p className="text-sm font-medium">Chat replay unavailable</p>
+              <p className="text-xs mt-1 opacity-70">YouTube videos are private. Chat data must be saved during recording to view here.</p>
+            </div>
           </div>
         </div>
       </div>
