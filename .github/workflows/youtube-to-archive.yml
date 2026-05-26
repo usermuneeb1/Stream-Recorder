@@ -310,13 +310,26 @@ jobs:
 
             ITEM_ID="${archive_prefix}-${vid}"
 
-            # Check if already on Archive.org
+            # Check if already on Archive.org (with ACTUAL file verification)
             if [[ "$SKIP_EXISTING" == "true" ]]; then
-              EXISTS=$(curl -s -o /dev/null -w '%{http_code}' "https://archive.org/metadata/$ITEM_ID" 2>/dev/null)
-              if [[ "$EXISTS" == "200" ]]; then
-                echo "  ⏭️ Already on Archive.org — skipping"
+              METADATA=$(curl -s --max-time 15 "https://archive.org/metadata/$ITEM_ID" 2>/dev/null)
+              HAS_VIDEO=$(echo "$METADATA" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    video_formats = ['h.264', 'mpeg4', 'ogg video', 'webm', 'matroska', 'iso image', '512kb mpeg4', 'mpeg-4 media file']
+    files = d.get('files', [])
+    has_vid = any(f.get('format','').lower() in video_formats or f.get('name','').endswith(('.mp4','.mkv','.webm')) for f in files)
+    print('yes' if has_vid else 'no')
+except:
+    print('no')
+" 2>/dev/null || echo "no")
+              if [[ "$HAS_VIDEO" == "yes" ]]; then
+                echo "  ⏭️ Already on Archive.org (verified: has video files) — skipping"
                 SKIPPED=$((SKIPPED + 1))
                 return
+              else
+                echo "  🔄 Item exists on Archive.org but has NO video files — will re-upload"
               fi
             fi
 
