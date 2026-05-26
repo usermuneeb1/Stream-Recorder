@@ -312,18 +312,7 @@ jobs:
 
             # Check if already on Archive.org (with ACTUAL file verification)
             if [[ "$SKIP_EXISTING" == "true" ]]; then
-              METADATA=$(curl -s --max-time 15 "https://archive.org/metadata/$ITEM_ID" 2>/dev/null)
-              HAS_VIDEO=$(echo "$METADATA" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    video_formats = ['h.264', 'mpeg4', 'ogg video', 'webm', 'matroska', 'iso image', '512kb mpeg4', 'mpeg-4 media file']
-    files = d.get('files', [])
-    has_vid = any(f.get('format','').lower() in video_formats or f.get('name','').endswith(('.mp4','.mkv','.webm')) for f in files)
-    print('yes' if has_vid else 'no')
-except:
-    print('no')
-" 2>/dev/null || echo "no")
+              HAS_VIDEO=$(curl -s --max-time 15 "https://archive.org/metadata/$ITEM_ID" 2>/dev/null | python3 -c "import sys, json; print('yes' if any(f.get('name','').endswith(('.mp4','.mkv','.webm')) or f.get('format','').lower() in ['h.264', 'mpeg4', 'ogg video', 'webm', 'matroska', 'iso image', '512kb mpeg4', 'mpeg-4 media file'] for f in json.load(sys.stdin).get('files',[])) else 'no')" 2>/dev/null || echo "no")
               if [[ "$HAS_VIDEO" == "yes" ]]; then
                 echo "  ⏭️ Already on Archive.org (verified: has video files) — skipping"
                 SKIPPED=$((SKIPPED + 1))
