@@ -210,7 +210,7 @@ jobs:
           archive_prefix="${CHANNEL}-${YT_TITLE}"
           archive_prefix=$(echo "$archive_prefix" | sed 's/[^a-zA-Z0-9_-]/-/g')
           # Append -HD to create a completely fresh Archive.org folder for the re-downloads
-          archive_prefix=$(echo "${archive_prefix}-HD" | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-30)
+          archive_prefix=$(echo "${archive_prefix}-HD" | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-80)
 
           echo ""
           echo "📺 Channel: $CHANNEL"
@@ -437,7 +437,7 @@ jobs:
             echo ""
             echo "📂 Processing $PLAYLIST_COUNT playlists..."
 
-            grep "^PLAYLIST" /tmp/video_list.tsv | while IFS=$'\t' read -r _ pid ptitle purl; do
+            while IFS=$'\t' read -r _ pid ptitle purl; do
               echo ""
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               echo "📁 Playlist: $ptitle"
@@ -482,7 +482,7 @@ jobs:
 
               done < /tmp/sub_videos.tsv
 
-            done
+            done < <(grep "^PLAYLIST" /tmp/video_list.tsv)
           fi
 
           # ─── Process direct videos (playlist URL) ───
@@ -494,7 +494,7 @@ jobs:
             ARCHIVE_PREFIX="${archive_prefix}-${SAFE_PLAYLIST}"
 
             VCOUNT=0
-            grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vplaylist vdur; do
+            while IFS=$'\t' read -r _ vid vtitle vplaylist vdur; do
               [[ -z "$vid" ]] && continue
               [[ "$ABORT" == "true" ]] && break
               VCOUNT=$((VCOUNT + 1))
@@ -509,7 +509,7 @@ jobs:
 
               process_video "$vid" "$vtitle" "$vplaylist" "$ARCHIVE_PREFIX"
 
-            done
+            done < <(grep "^VIDEO" /tmp/video_list.tsv)
           fi
 
           echo ""

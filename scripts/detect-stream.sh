@@ -207,7 +207,7 @@ detect_method_2_ytdlp() {
     local cookies_arg=""
     
     # Use cookies if available and not explicitly expired
-    if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]] && [[ "$COOKIE_STATUS" != "expired" ]]; then
+    if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]] && [[ "${COOKIE_STATUS:-}" != "expired" ]]; then
         cookies_arg="--cookies cookies.txt"
     fi
     

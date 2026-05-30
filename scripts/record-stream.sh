@@ -402,7 +402,7 @@ attempt_recording() {
         "A: Cookies+web_creator"
         "B: Cookies+tv_embedded"
         "E: Mobile Web"
-        "C: iOS (anonymous)"
+        "C: mediaconnect (anonymous)"
         "F: Streamlink (HLS)"
     )
     
