@@ -216,7 +216,7 @@ jobs:
           echo "📺 Channel: $CHANNEL"
           echo "📋 Type: $YT_TYPE"
           echo "📊 Entries: $ENTRY_COUNT"
-          echo "🏷️ Archive prefix: $SAFE_CHANNEL"
+          echo "🏷️ Archive prefix: $archive_prefix"
 
           # ─── Step 2: Extract video list ───
           python3 << 'PYEOF' > /tmp/video_list.tsv
@@ -466,7 +466,7 @@ jobs:
               echo "  📊 $SUB_COUNT videos in playlist"
 
               SAFE_PLAYLIST=$(echo "$ptitle" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
-              ARCHIVE_PREFIX="${SAFE_CHANNEL}-${SAFE_PLAYLIST}"
+              ARCHIVE_PREFIX="${archive_prefix}-${SAFE_PLAYLIST}"
 
               VCOUNT=0
               while IFS=$'\t' read -r vid vtitle vplaylist vdur; do
@@ -491,7 +491,7 @@ jobs:
             echo "🎬 Processing $VIDEO_COUNT videos..."
 
             SAFE_PLAYLIST=$(echo "$YT_TITLE" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
-            ARCHIVE_PREFIX="${SAFE_CHANNEL}-${SAFE_PLAYLIST}"
+            ARCHIVE_PREFIX="${archive_prefix}-${SAFE_PLAYLIST}"
 
             VCOUNT=0
             grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vplaylist vdur; do
