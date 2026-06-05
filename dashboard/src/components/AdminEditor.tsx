@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Trash2, Plus, Clock, HardDrive, FileVideo, Link2, AlertTriangle, Check, Edit3 } from 'lucide-react';
+import { X, Save, Trash2, Plus, Clock, HardDrive, FileVideo, Link2, Check, Edit3 } from 'lucide-react';
 import { StreamData, StreamSource } from '../utils/dataFetcher';
 
 interface AdminEditorProps {
@@ -19,11 +19,18 @@ export function AdminEditor({ stream, isOpen, onClose, onSave }: AdminEditorProp
     if (isOpen) {
       setForm({ ...stream });
       setSaved(false);
+      setActiveTab('details');
     }
   }, [isOpen, stream]);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [isOpen]);
+
   const handleSave = () => {
-    // Save to localStorage as override
     const overrides = JSON.parse(localStorage.getItem('admin_overrides') || '{}');
     overrides[form.videoId] = {
       title: form.title,
@@ -37,27 +44,21 @@ export function AdminEditor({ stream, isOpen, onClose, onSave }: AdminEditorProp
     localStorage.setItem('admin_overrides', JSON.stringify(overrides));
     onSave(form);
     setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-      onClose();
-    }, 1200);
+    setTimeout(() => { setSaved(false); onClose(); }, 1000);
   };
 
   const handleSourceChange = (key: string, field: keyof StreamSource, value: string) => {
     setForm(prev => ({
       ...prev,
-      sources: {
-        ...prev.sources,
-        [key]: { ...prev.sources[key], [field]: value }
-      }
+      sources: { ...prev.sources, [key]: { ...prev.sources[key], [field]: value } }
     }));
   };
 
   const handleRemoveSource = (key: string) => {
     setForm(prev => {
-      const newSources = { ...prev.sources };
-      delete newSources[key];
-      return { ...prev, sources: newSources };
+      const s = { ...prev.sources };
+      delete s[key];
+      return { ...prev, sources: s };
     });
   };
 
@@ -65,245 +66,171 @@ export function AdminEditor({ stream, isOpen, onClose, onSave }: AdminEditorProp
     const key = `custom_${Date.now()}`;
     setForm(prev => ({
       ...prev,
-      sources: {
-        ...prev.sources,
-        [key]: { label: 'New Source', url: '', type: 'archive' as const }
-      }
+      sources: { ...prev.sources, [key]: { label: 'New Source', url: '', type: 'archive' as const } }
     }));
   };
 
-  const tabs = [
-    { key: 'details' as const, label: 'Details', icon: <Edit3 size={14} /> },
-    { key: 'sources' as const, label: 'Sources', icon: <Link2 size={14} /> },
-  ];
+  const inputCls = "w-full px-3 py-2.5 rounded-xl text-sm bg-white dark:bg-[#1a1a1f] border border-gray-200 dark:border-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500/30 focus:outline-none transition-all placeholder-gray-400";
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        /* ── Full-screen centering wrapper ── */
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
           />
 
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xl max-h-[85vh] overflow-y-auto glass-panel rounded-3xl z-50 shadow-2xl border border-dark-200 dark:border-dark-800"
+            initial={{ opacity: 0, scale: 0.9, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 30 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            className="relative w-full max-w-lg max-h-[85vh] flex flex-col bg-white dark:bg-[#111114] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden"
           >
-            {/* Header */}
-            <div className="sticky top-0 bg-white/80 dark:bg-dark-900/80 backdrop-blur-xl p-6 pb-4 border-b border-dark-200 dark:border-dark-800 rounded-t-3xl z-10">
-              <div className="flex items-center justify-between mb-4">
+            {/* ── Header ── */}
+            <div className="flex-shrink-0 p-5 pb-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center">
-                    <Edit3 size={20} className="text-brand-500" />
+                  <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <Edit3 size={18} className="text-red-500" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold font-display">Edit Recording</h2>
-                    <p className="text-xs text-dark-400">ID: {stream.videoId}</p>
+                    <h2 className="text-base font-bold">Edit Recording</h2>
+                    <p className="text-[11px] text-gray-400 font-mono">{stream.videoId}</p>
                   </div>
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
-                  <X size={18} />
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                  <X size={16} />
                 </button>
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-1 bg-dark-100 dark:bg-dark-800 rounded-xl p-1">
-                {tabs.map(tab => (
+              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800/50 rounded-lg p-0.5">
+                {(['details', 'sources'] as const).map(tab => (
                   <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                      activeTab === tab.key
-                        ? 'bg-white dark:bg-dark-700 shadow-sm text-dark-900 dark:text-white'
-                        : 'text-dark-400 hover:text-dark-600 dark:hover:text-dark-300'
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-2 px-3 rounded-md text-xs font-semibold transition-all ${
+                      activeTab === tab
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-400 hover:text-gray-600'
                     }`}
                   >
-                    {tab.icon} {tab.label}
+                    {tab === 'details' ? '📝 Details' : '🔗 Sources'}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="p-6 space-y-5">
-              {/* ─── Details Tab ────────────────────────────────────── */}
+            {/* ── Body (scrollable) ── */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {activeTab === 'details' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <>
                   {/* Thumbnail Preview */}
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-dark-200 dark:bg-dark-800 mb-4">
+                  <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
                     <img
                       src={form.thumbnail}
                       alt="Preview"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`;
-                      }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`; }}
                     />
-                    <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs font-semibold px-2 py-1 rounded-md">
-                      {form.duration || 'No duration'}
+                    <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                      {form.duration || '—'}
                     </div>
                   </div>
 
-                  {/* Title */}
                   <div>
-                    <label className="block text-xs font-semibold text-dark-500 uppercase tracking-wider mb-1.5">Title</label>
-                    <input
-                      type="text"
-                      value={form.title}
-                      onChange={e => setForm({ ...form, title: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-800 border border-dark-200 dark:border-dark-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all text-sm"
-                    />
+                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Title</label>
+                    <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className={inputCls} />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Date */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-dark-500 uppercase tracking-wider mb-1.5">
-                        <Clock size={12} className="inline mr-1" /> Date
+                      <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                        <Clock size={10} className="inline mr-1" />Date
                       </label>
-                      <input
-                        type="text"
-                        value={form.date}
-                        onChange={e => setForm({ ...form, date: e.target.value })}
-                        placeholder="YYYY-MM-DD"
-                        className="w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-800 border border-dark-200 dark:border-dark-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all text-sm"
-                      />
+                      <input type="text" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} placeholder="2026-01-15" className={inputCls} />
                     </div>
-
-                    {/* Duration */}
                     <div>
-                      <label className="block text-xs font-semibold text-dark-500 uppercase tracking-wider mb-1.5">
-                        <FileVideo size={12} className="inline mr-1" /> Duration
+                      <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                        <FileVideo size={10} className="inline mr-1" />Duration
                       </label>
-                      <input
-                        type="text"
-                        value={form.duration}
-                        onChange={e => setForm({ ...form, duration: e.target.value })}
-                        placeholder="2h 30m"
-                        className="w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-800 border border-dark-200 dark:border-dark-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all text-sm"
-                      />
+                      <input type="text" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} placeholder="2h 30m" className={inputCls} />
                     </div>
                   </div>
 
-                  {/* File Size */}
                   <div>
-                    <label className="block text-xs font-semibold text-dark-500 uppercase tracking-wider mb-1.5">
-                      <HardDrive size={12} className="inline mr-1" /> File Size
+                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      <HardDrive size={10} className="inline mr-1" />File Size
                     </label>
-                    <input
-                      type="text"
-                      value={form.size}
-                      onChange={e => setForm({ ...form, size: e.target.value })}
-                      placeholder="4.2 GB"
-                      className="w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-800 border border-dark-200 dark:border-dark-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all text-sm"
-                    />
+                    <input type="text" value={form.size} onChange={e => setForm({ ...form, size: e.target.value })} placeholder="4.2 GB" className={inputCls} />
                   </div>
 
-                  {/* Thumbnail URL */}
                   <div>
-                    <label className="block text-xs font-semibold text-dark-500 uppercase tracking-wider mb-1.5">Thumbnail URL</label>
-                    <input
-                      type="text"
-                      value={form.thumbnail}
-                      onChange={e => setForm({ ...form, thumbnail: e.target.value })}
-                      placeholder="https://..."
-                      className="w-full px-4 py-3 rounded-xl bg-dark-50 dark:bg-dark-800 border border-dark-200 dark:border-dark-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all text-sm font-mono text-xs"
-                    />
+                    <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Thumbnail URL</label>
+                    <input type="text" value={form.thumbnail} onChange={e => setForm({ ...form, thumbnail: e.target.value })} placeholder="https://..." className={`${inputCls} font-mono text-xs`} />
                   </div>
-                </motion.div>
+                </>
               )}
 
-              {/* ─── Sources Tab ────────────────────────────────────── */}
               {activeTab === 'sources' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                <>
                   {Object.entries(form.sources).map(([key, source]) => (
-                    <div key={key} className="p-4 bg-dark-50 dark:bg-dark-800 rounded-xl border border-dark-200 dark:border-dark-700 space-y-3">
+                    <div key={key} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-dark-400">{key}</span>
-                        <button
-                          onClick={() => handleRemoveSource(key)}
-                          className="p-1.5 text-dark-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={14} />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{key}</span>
+                        <button onClick={() => handleRemoveSource(key)} className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors">
+                          <Trash2 size={12} />
                         </button>
                       </div>
-                      <input
-                        type="text"
-                        value={source.label}
-                        onChange={e => handleSourceChange(key, 'label', e.target.value)}
-                        placeholder="Label"
-                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-dark-900 border border-dark-200 dark:border-dark-700 text-sm focus:border-brand-500 focus:outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={source.url}
-                        onChange={e => handleSourceChange(key, 'url', e.target.value)}
-                        placeholder="URL"
-                        className="w-full px-3 py-2 rounded-lg bg-white dark:bg-dark-900 border border-dark-200 dark:border-dark-700 text-xs font-mono focus:border-brand-500 focus:outline-none"
-                      />
+                      <input type="text" value={source.label} onChange={e => handleSourceChange(key, 'label', e.target.value)} placeholder="Label" className={inputCls} />
+                      <input type="text" value={source.url} onChange={e => handleSourceChange(key, 'url', e.target.value)} placeholder="https://..." className={`${inputCls} font-mono text-xs`} />
                     </div>
                   ))}
-
-                  <button
-                    onClick={handleAddSource}
-                    className="w-full py-3 rounded-xl border-2 border-dashed border-dark-300 dark:border-dark-600 text-dark-400 hover:border-brand-500 hover:text-brand-500 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-                  >
-                    <Plus size={16} /> Add Source
+                  <button onClick={handleAddSource} className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-400 hover:border-red-500 hover:text-red-500 transition-colors flex items-center justify-center gap-2 text-xs font-semibold">
+                    <Plus size={14} /> Add Source
                   </button>
-                </motion.div>
+                </>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-white/80 dark:bg-dark-900/80 backdrop-blur-xl p-6 pt-4 border-t border-dark-200 dark:border-dark-800 rounded-b-3xl flex gap-3">
-              <button onClick={onClose} className="btn-secondary flex-1 py-3">Cancel</button>
+            {/* ── Footer ── */}
+            <div className="flex-shrink-0 p-4 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                Cancel
+              </button>
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={handleSave}
                 disabled={saved}
-                className={`flex-1 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
-                  saved
-                    ? 'bg-green-500 text-white'
-                    : 'btn-primary'
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
+                  saved ? 'bg-green-500 text-white' : 'bg-red-500 hover:bg-red-600 text-white'
                 }`}
               >
-                {saved ? <><Check size={18} /> Saved!</> : <><Save size={18} /> Save Changes</>}
+                {saved ? <><Check size={16} /> Saved!</> : <><Save size={16} /> Save</>}
               </motion.button>
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );
 }
 
-// ─── Helper: Apply admin overrides to stream data ────────────────────
 export function applyAdminOverrides(streams: StreamData[]): StreamData[] {
   try {
     const overrides = JSON.parse(localStorage.getItem('admin_overrides') || '{}');
     return streams.map(stream => {
-      const override = overrides[stream.videoId];
-      if (!override) return stream;
-      return {
-        ...stream,
-        title: override.title || stream.title,
-        date: override.date || stream.date,
-        duration: override.duration || stream.duration,
-        size: override.size || stream.size,
-        thumbnail: override.thumbnail || stream.thumbnail,
-        sources: override.customSources || stream.sources,
-      };
+      const o = overrides[stream.videoId];
+      if (!o) return stream;
+      return { ...stream, title: o.title || stream.title, date: o.date || stream.date, duration: o.duration || stream.duration, size: o.size || stream.size, thumbnail: o.thumbnail || stream.thumbnail, sources: o.customSources || stream.sources };
     });
-  } catch {
-    return streams;
-  }
+  } catch { return streams; }
 }
