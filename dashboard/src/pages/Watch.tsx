@@ -292,8 +292,31 @@ export default function Watch() {
                     state={{ stream: rs }}
                     className="group"
                   >
-                    <div className="relative aspect-video rounded-xl overflow-hidden bg-dark-900 mb-2 border border-dark-200 dark:border-dark-800">
-                      <img src={rs.thumbnail} alt={rs.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" />
+                    <div className="relative aspect-video rounded-xl overflow-hidden bg-dark-200 dark:bg-dark-800 mb-2 border border-dark-200 dark:border-dark-800">
+                      <img
+                        src={rs.thumbnail}
+                        alt={rs.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (rs.archiveId && !target.src.includes('archive.org')) {
+                            target.src = `https://archive.org/services/img/${rs.archiveId}`;
+                          } else if (!target.src.includes('thumbnail.jpg')) {
+                            target.src = `${import.meta.env.BASE_URL}thumbnail.jpg`;
+                          }
+                        }}
+                        onLoad={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (target.src.includes('ytimg.com') && target.naturalWidth <= 120) {
+                            if (rs.archiveId) {
+                              target.src = `https://archive.org/services/img/${rs.archiveId}`;
+                            } else {
+                              target.src = `${import.meta.env.BASE_URL}thumbnail.jpg`;
+                            }
+                          }
+                        }}
+                      />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                         <Play size={24} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
