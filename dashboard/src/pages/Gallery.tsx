@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, Variants, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, RefreshCcw, LayoutGrid, List, X, Filter } from 'lucide-react';
+import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, RefreshCcw, LayoutGrid, List, X, Filter, Edit3 } from 'lucide-react';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
+import { AdminEditor, applyAdminOverrides } from '../components/AdminEditor';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── 3D Tilt Card Wrapper ────────────────────────────────────────
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -53,6 +55,8 @@ const FILTERS = [
 type FilterKey = typeof FILTERS[number]['key'];
 
 export default function Gallery() {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [streams, setStreams] = useState<StreamData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,13 +65,14 @@ export default function Gallery() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [editingStream, setEditingStream] = useState<StreamData | null>(null);
 
   const loadStreams = () => {
     setLoading(true);
     setError(null);
     fetchStreams()
       .then(data => {
-        setStreams(data);
+        setStreams(applyAdminOverrides(data));
         setLoading(false);
       })
       .catch(err => {
@@ -150,7 +155,7 @@ export default function Gallery() {
     rumble: 'bg-emerald-500',
   };
 
-  return (
+  const galleryContent = (
     <div className="max-w-7xl mx-auto px-4 py-8 relative">
       {/* Ambient glow effects */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -392,9 +397,20 @@ export default function Gallery() {
                   </Link>
 
                   <div className="flex flex-col px-1">
-                    <h3 className="font-bold text-[15px] leading-snug line-clamp-2 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors duration-300">
-                      {stream.title}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-[15px] leading-snug line-clamp-2 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors duration-300">
+                        {stream.title}
+                      </h3>
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingStream(stream); }}
+                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-900/30 text-dark-400 hover:text-brand-500 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Edit details"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 mt-2.5 text-xs text-dark-500 dark:text-dark-400 font-medium">
                       <span className="flex items-center gap-1.5 bg-dark-100 dark:bg-dark-800 px-2 py-1 rounded-md">
                         <Clock size={12} className="text-brand-500" /> {stream.date}
@@ -478,5 +494,23 @@ export default function Gallery() {
         </motion.div>
       )}
     </div>
+  );
+
+  return (
+    <>
+      {galleryContent}
+
+      {/* Admin Editor Modal */}
+      {editingStream && (
+        <AdminEditor
+          stream={editingStream}
+          isOpen={!!editingStream}
+          onClose={() => setEditingStream(null)}
+          onSave={(updated) => {
+            setStreams(prev => prev.map(s => s.videoId === updated.videoId ? updated : s));
+          }}
+        />
+      )}
+    </>
   );
 }
