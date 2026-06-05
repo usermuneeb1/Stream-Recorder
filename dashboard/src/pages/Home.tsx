@@ -189,11 +189,8 @@ export default function Home() {
 
           {/* Title */}
           <motion.div variants={itemVariants}>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.5rem] font-bold font-display tracking-tight mb-6 leading-[1.1]">
-              Preserving the Legacy of
-              <span className="text-gradient-animated block">
-                The Muslim Lantern
-              </span>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight mb-6 leading-[1.15]">
+              Preserving the Legacy of <span className="text-gradient-animated">The Muslim Lantern</span>
             </h1>
           </motion.div>
 
