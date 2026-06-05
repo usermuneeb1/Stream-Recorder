@@ -155,7 +155,7 @@ export default function CommandCenter() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-4">
           <img 
-            src="/Stream-Recorder/logo-vertical.pn.jpg" 
+            src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} 
             alt="The Muslim Lantern" 
             className="h-14 md:h-16 w-auto object-contain drop-shadow-lg"
           />

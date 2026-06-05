@@ -64,7 +64,7 @@ function LockScreen() {
                 className="absolute inset-0 bg-brand-500/30 rounded-full blur-2xl -m-4"
               />
               <img
-                src="/Stream-Recorder/logo-vertical.pn.jpg"
+                src={`${import.meta.env.BASE_URL}logo.png`}
                 alt="The Muslim Lantern"
                 className="h-28 w-auto object-contain mx-auto relative z-10 rounded-full"
               />

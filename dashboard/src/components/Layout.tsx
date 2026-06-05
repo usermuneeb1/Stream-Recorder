@@ -83,7 +83,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 className="absolute inset-0 bg-brand-500/20 rounded-full blur-xl pointer-events-none"
               />
               <img
-                src="/Stream-Recorder/logo.png"
+                src={`${import.meta.env.BASE_URL}logo.png`}
                 alt="The Muslim Lantern"
                 className="h-10 md:h-12 lg:h-14 w-auto object-contain relative z-10 transition-all duration-500"
               />
@@ -175,7 +175,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           >
             {/* Logo */}
             <img
-              src="/Stream-Recorder/logo.png"
+              src={`${import.meta.env.BASE_URL}logo.png`}
               alt="The Muslim Lantern"
               className="h-8 w-auto object-contain mx-auto mb-4 opacity-40"
             />

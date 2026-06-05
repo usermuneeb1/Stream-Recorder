@@ -126,7 +126,7 @@ export const YouTubeStats: React.FC = () => {
             style={{ animation: 'avatar-glow 3s ease-in-out infinite' }}
           >
             <img
-              src="/Stream-Recorder/logo-vertical.pn.jpg"
+              src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`}
               alt="The Muslim Lantern"
               className="w-full h-full object-cover rounded-full"
               loading="lazy"

@@ -251,7 +251,7 @@ export default function Home() {
               transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
             >
               <img
-                src="/Stream-Recorder/logo-vertical.pn.jpg"
+                src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`}
                 alt="The Muslim Lantern"
                 className="w-full max-w-[220px] object-contain rounded-full shadow-[0_0_80px_rgba(239,68,68,0.2)] bg-white/5 border border-white/10 backdrop-blur-md"
               />
