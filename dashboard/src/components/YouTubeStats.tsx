@@ -92,7 +92,7 @@ export const YouTubeStats: React.FC = () => {
             <h3 className="text-lg font-bold text-dark-900 dark:text-white font-display truncate">
               The Muslim Lantern
             </h3>
-            <p className="text-sm text-dark-400 dark:text-dark-500">YouTube Channel</p>
+            <p className="text-sm text-dark-400 dark:text-dark-500">YouTube Channel • Joined Mar 3, 2021</p>
           </div>
         </div>
 
@@ -101,21 +101,21 @@ export const YouTubeStats: React.FC = () => {
           <StatItem
             icon={<Users size={16} />}
             label="Subscribers"
-            value={365}
+            value={633}
             suffix="K"
             delay={0.2}
           />
           <StatItem
             icon={<Eye size={16} />}
             label="Total Views"
-            value={45}
+            value={183}
             suffix="M"
             delay={0.4}
           />
           <StatItem
             icon={<Video size={16} />}
             label="Videos"
-            value={647}
+            value={651}
             suffix=""
             delay={0.6}
           />

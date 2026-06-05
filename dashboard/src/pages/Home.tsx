@@ -50,6 +50,37 @@ function useTilt() {
   return { ref, rotateX, rotateY, handleMouse, handleLeave };
 }
 
+// ── StatCard Component (hooks called at component level, not in .map) ──
+function StatCard({ metric, index }: { metric: { label: string; value: number; suffix?: string; icon: React.ReactElement<any>; color: string; bg: string }; index: number }) {
+  const tilt = useTilt();
+  return (
+    <motion.div
+      variants={itemVariants}
+      ref={tilt.ref}
+      onMouseMove={tilt.handleMouse}
+      onMouseLeave={tilt.handleLeave}
+      style={{ rotateX: tilt.rotateX, rotateY: tilt.rotateY, transformPerspective: 1000 }}
+      className="glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden group cursor-default card-hover-glow border border-white/20 dark:border-white/5 transition-shadow duration-500 hover:shadow-xl hover:shadow-brand-500/5"
+    >
+      <div className={`absolute inset-0 bg-gradient-to-br ${metric.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-dark-500 dark:text-dark-400 font-medium text-sm md:text-base">{metric.label}</h3>
+          <div className={`p-2.5 bg-dark-100 dark:bg-dark-800 rounded-xl ${metric.color} relative`}>
+            {React.cloneElement(metric.icon, { size: 20 })}
+            <div className="absolute inset-0 animate-orbit opacity-50">
+              <div className={`w-1.5 h-1.5 rounded-full ${metric.color.replace('text-', 'bg-')}`} style={{ transform: 'translateX(14px)' }} />
+            </div>
+          </div>
+        </div>
+        <div className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-dark-900 dark:text-white tracking-tight">
+          <AnimatedCounter value={metric.value} suffix={metric.suffix} delay={0.3 + (index * 0.1)} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Home() {
   const [stats, setStats] = useState({ total_streams: 0, total_hours: 0, total_gb: 0 });
   const [sources, setSources] = useState({ mega: 0, archive: 0, pixel: 0, gofile: 0 });
@@ -159,7 +190,7 @@ export default function Home() {
           {/* Title */}
           <motion.div variants={itemVariants}>
             <h1 className="text-5xl md:text-6xl lg:text-[4.5rem] font-bold font-display tracking-tight mb-6 leading-[1.1]">
-              Preserving the Legacy of <br />
+              Preserving the Legacy of{' '}
               <span className="text-gradient-animated">
                 The Muslim Lantern
               </span>
@@ -246,39 +277,9 @@ export default function Home() {
         viewport={{ once: true, margin: "-50px" }}
         className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-24 relative z-10"
       >
-        {statCards.map((metric, i) => {
-          const tilt = useTilt();
-          return (
-            <motion.div
-              key={metric.label}
-              variants={itemVariants}
-              ref={tilt.ref}
-              onMouseMove={tilt.handleMouse}
-              onMouseLeave={tilt.handleLeave}
-              style={{ rotateX: tilt.rotateX, rotateY: tilt.rotateY, transformPerspective: 1000 }}
-              className={`glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden group cursor-default card-hover-glow border border-white/20 dark:border-white/5 transition-shadow duration-500 hover:shadow-xl hover:shadow-brand-500/5`}
-            >
-              {/* Gradient background */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${metric.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-700`} />
-
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-dark-500 dark:text-dark-400 font-medium text-sm md:text-base">{metric.label}</h3>
-                  <div className={`p-2.5 bg-dark-100 dark:bg-dark-800 rounded-xl ${metric.color} relative`}>
-                    {React.cloneElement(metric.icon, { size: 20 })}
-                    {/* Orbiting particle */}
-                    <div className="absolute inset-0 animate-orbit opacity-50">
-                      <div className={`w-1.5 h-1.5 rounded-full ${metric.color.replace('text-', 'bg-')}`} style={{ transform: 'translateX(14px)' }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-dark-900 dark:text-white tracking-tight">
-                  <AnimatedCounter value={metric.value} suffix={metric.suffix} delay={0.3 + (i * 0.1)} />
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+        {statCards.map((metric, i) => (
+          <StatCard key={metric.label} metric={metric} index={i} />
+        ))}
       </motion.div>
 
       {/* ═══ YOUTUBE STATS + RECENT STREAMS ════════════════════════ */}
@@ -331,11 +332,32 @@ export default function Home() {
                     state={{ stream }}
                     className="flex gap-3 p-2 rounded-xl hover:bg-dark-100 dark:hover:bg-dark-800/50 transition-colors group"
                   >
-                    <img
-                      src={stream.thumbnail}
-                      alt={stream.title}
-                      className="w-24 h-14 object-cover rounded-lg border border-dark-200 dark:border-dark-700 group-hover:border-brand-500/30 transition-colors"
-                    />
+                    <div className="w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-dark-200 dark:bg-dark-800 border border-dark-200 dark:border-dark-700 group-hover:border-brand-500/30 transition-colors">
+                      <img
+                        src={stream.thumbnail}
+                        alt={stream.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (stream.archiveId && !target.src.includes('archive.org')) {
+                            target.src = `https://archive.org/services/img/${stream.archiveId}`;
+                          } else {
+                            target.src = `${import.meta.env.BASE_URL}thumbnail.jpg`;
+                          }
+                        }}
+                        onLoad={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (target.src.includes('ytimg.com') && target.naturalWidth <= 120) {
+                            if (stream.archiveId) {
+                              target.src = `https://archive.org/services/img/${stream.archiveId}`;
+                            } else {
+                              target.src = `${import.meta.env.BASE_URL}thumbnail.jpg`;
+                            }
+                          }
+                        }}
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-semibold truncate group-hover:text-brand-500 transition-colors">{stream.title}</h4>
                       <div className="flex items-center gap-3 mt-1 text-xs text-dark-400">
