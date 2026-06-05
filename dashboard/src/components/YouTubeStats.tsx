@@ -1,8 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Eye, Video, ExternalLink } from 'lucide-react';
+import { Users, Eye, Video, ExternalLink, Calendar } from 'lucide-react';
 import { AnimatedCounter } from './AnimatedCounter';
 import { MagneticButton } from './MagneticButton';
+
+// ─── Types ───────────────────────────────────────────────────────────
+interface YouTubeStatsData {
+  subscribers: number;
+  subscribersSuffix: string;
+  totalViews: number;
+  viewsSuffix: string;
+  videoCount: number;
+  joinedDate: string;
+}
+
+// ─── Defaults (used while loading / if fetch fails) ──────────────────
+const DEFAULTS: YouTubeStatsData = {
+  subscribers: 633,
+  subscribersSuffix: 'K',
+  totalViews: 183,
+  viewsSuffix: 'M',
+  videoCount: 651,
+  joinedDate: 'Mar 3, 2021',
+};
+
+const RAW_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
 
 // ─── Stat item sub-component ────────────────────────────────────────
 interface StatItemProps {
@@ -49,11 +71,34 @@ if (typeof document !== 'undefined' && !document.getElementById(GLOW_KEYFRAMES_I
 }
 
 /**
- * YouTubeStats — Premium card showing YouTube channel statistics
- * for "The Muslim Lantern" with glass-panel styling, animated
- * avatar glow ring, and counters that spring into view.
+ * YouTubeStats — Premium card showing YouTube channel statistics.
+ * Fetches live data from stats.json (updated by GitHub Actions workflow),
+ * falls back to hardcoded defaults if fetch fails.
  */
 export const YouTubeStats: React.FC = () => {
+  const [stats, setStats] = useState<YouTubeStatsData>(DEFAULTS);
+
+  useEffect(() => {
+    // Try to fetch live YouTube stats from stats.json
+    fetch(`${RAW_URL}/data/youtube-stats.json?t=${Date.now()}`)
+      .then(res => res.json())
+      .then((data: any) => {
+        if (data && data.subscribers) {
+          setStats({
+            subscribers: data.subscribers || DEFAULTS.subscribers,
+            subscribersSuffix: data.subscribers_suffix || DEFAULTS.subscribersSuffix,
+            totalViews: data.total_views || DEFAULTS.totalViews,
+            viewsSuffix: data.views_suffix || DEFAULTS.viewsSuffix,
+            videoCount: data.video_count || DEFAULTS.videoCount,
+            joinedDate: data.joined_date || DEFAULTS.joinedDate,
+          });
+        }
+      })
+      .catch(() => {
+        // Silently use defaults
+      });
+  }, []);
+
   return (
     <motion.div
       className="glass-panel rounded-2xl overflow-hidden relative"
@@ -85,6 +130,10 @@ export const YouTubeStats: React.FC = () => {
               alt="The Muslim Lantern"
               className="w-full h-full object-cover rounded-full"
               loading="lazy"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = '/logo-vertical.pn.jpg';
+              }}
             />
           </div>
 
@@ -92,7 +141,9 @@ export const YouTubeStats: React.FC = () => {
             <h3 className="text-lg font-bold text-dark-900 dark:text-white font-display truncate">
               The Muslim Lantern
             </h3>
-            <p className="text-sm text-dark-400 dark:text-dark-500">YouTube Channel • Joined Mar 3, 2021</p>
+            <p className="text-sm text-dark-400 dark:text-dark-500 flex items-center gap-1">
+              <Calendar size={12} /> Joined {stats.joinedDate}
+            </p>
           </div>
         </div>
 
@@ -101,21 +152,21 @@ export const YouTubeStats: React.FC = () => {
           <StatItem
             icon={<Users size={16} />}
             label="Subscribers"
-            value={633}
-            suffix="K"
+            value={stats.subscribers}
+            suffix={stats.subscribersSuffix}
             delay={0.2}
           />
           <StatItem
             icon={<Eye size={16} />}
             label="Total Views"
-            value={183}
-            suffix="M"
+            value={stats.totalViews}
+            suffix={stats.viewsSuffix}
             delay={0.4}
           />
           <StatItem
             icon={<Video size={16} />}
             label="Videos"
-            value={651}
+            value={stats.videoCount}
             suffix=""
             delay={0.6}
           />

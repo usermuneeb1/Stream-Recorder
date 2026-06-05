@@ -1,0 +1,116 @@
+name: Update YouTube Stats
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch YouTube channel stats
+        run: |
+          # Fetch channel page and extract stats using yt-dlp
+          echo "📊 Fetching YouTube stats for @TheMuslimLantern..."
+          
+          # Install yt-dlp
+          pip install -q yt-dlp
+          
+          # Get channel info as JSON
+          CHANNEL_JSON=$(yt-dlp --dump-json --playlist-items 0 --flat-playlist "https://www.youtube.com/@TheMuslimLantern" 2>/dev/null || echo "")
+          
+          if [ -z "$CHANNEL_JSON" ]; then
+            echo "⚠️ Could not fetch channel data via yt-dlp, trying alternative method..."
+            
+            # Alternative: scrape the channel page
+            PAGE=$(curl -sL "https://www.youtube.com/@TheMuslimLantern" \
+              -H "Accept-Language: en" \
+              -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            
+            # Extract subscriber count
+            SUBS_RAW=$(echo "$PAGE" | grep -oP '"subscriberCountText":\{"simpleText":"[^"]*"' | head -1 | grep -oP '"simpleText":"[^"]*"' | sed 's/"simpleText":"//;s/"//')
+            
+            if [ -z "$SUBS_RAW" ]; then
+              echo "❌ Could not extract stats, keeping existing file"
+              exit 0
+            fi
+            
+            # Parse subscriber count (e.g., "633K subscribers" -> 633, "K")
+            SUBS_NUM=$(echo "$SUBS_RAW" | grep -oP '[\d.]+')
+            SUBS_SUFFIX=$(echo "$SUBS_RAW" | grep -oP '[KMB]' | head -1)
+            [ -z "$SUBS_SUFFIX" ] && SUBS_SUFFIX=""
+          fi
+          
+          # Get video count from channel videos page
+          VIDEOS_PAGE=$(curl -sL "https://www.youtube.com/@TheMuslimLantern/videos" \
+            -H "Accept-Language: en" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+          
+          VIDEO_COUNT=$(echo "$VIDEOS_PAGE" | grep -oP '"videosCountText":\{"runs":\[\{"text":"[\d,]+"' | grep -oP '[\d,]+' | head -1 | tr -d ',')
+          
+          # Get view count
+          VIEWS_RAW=$(echo "$PAGE" | grep -oP '"viewCountText":\{"simpleText":"[^"]*"' | head -1 | grep -oP '"simpleText":"[^"]*"' | sed 's/"simpleText":"//;s/"//')
+          
+          # Calculate views in millions
+          VIEWS_FULL=$(echo "$VIEWS_RAW" | grep -oP '[\d,]+' | tr -d ',')
+          
+          # Set defaults if extraction failed
+          [ -z "$SUBS_NUM" ] && SUBS_NUM=$(jq -r '.subscribers' data/youtube-stats.json)
+          [ -z "$SUBS_SUFFIX" ] && SUBS_SUFFIX=$(jq -r '.subscribers_suffix' data/youtube-stats.json)
+          [ -z "$VIDEO_COUNT" ] && VIDEO_COUNT=$(jq -r '.video_count' data/youtube-stats.json)
+          
+          # Calculate views suffix
+          if [ -n "$VIEWS_FULL" ] && [ "$VIEWS_FULL" -gt 0 ] 2>/dev/null; then
+            VIEWS_M=$(echo "scale=0; $VIEWS_FULL / 1000000" | bc)
+            VIEWS_SUFFIX="M"
+          else
+            VIEWS_M=$(jq -r '.total_views' data/youtube-stats.json)
+            VIEWS_SUFFIX=$(jq -r '.views_suffix' data/youtube-stats.json)
+          fi
+          
+          JOINED_DATE=$(jq -r '.joined_date' data/youtube-stats.json)
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          echo "📈 Subscribers: ${SUBS_NUM}${SUBS_SUFFIX}"
+          echo "👁️ Views: ${VIEWS_M}${VIEWS_SUFFIX}"
+          echo "🎬 Videos: ${VIDEO_COUNT}"
+          
+          # Write updated stats
+          cat > data/youtube-stats.json << EOF
+          {
+            "subscribers": ${SUBS_NUM},
+            "subscribers_suffix": "${SUBS_SUFFIX}",
+            "total_views": ${VIEWS_M},
+            "views_suffix": "${VIEWS_SUFFIX}",
+            "video_count": ${VIDEO_COUNT},
+            "joined_date": "${JOINED_DATE}",
+            "last_updated": "${NOW}"
+          }
+          EOF
+          
+          # Clean up indentation
+          python3 -c "
+          import json
+          with open('data/youtube-stats.json') as f:
+              data = json.load(f)
+          with open('data/youtube-stats.json', 'w') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+          "
+          
+          echo "✅ Stats updated!"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/youtube-stats.json
+          git diff --staged --quiet || git commit -m "📊 Auto-update YouTube stats [skip ci]"
+          git push
