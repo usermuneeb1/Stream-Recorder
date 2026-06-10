@@ -19,13 +19,24 @@ check_link_alive() {
     local url="$1"
     local timeout="${REFRESH_CHECK_TIMEOUT:-30}"
     
+    if [[ "$url" =~ pixeldrain\.com/u/([a-zA-Z0-9_-]+) ]]; then
+        local file_id="${BASH_REMATCH[1]}"
+        local info success message
+        info=$(curl -s --max-time "$timeout" "https://pixeldrain.com/api/file/${file_id}/info" 2>/dev/null) || return 1
+        success=$(echo "$info" | jq -r '.success // true' 2>/dev/null)
+        message=$(echo "$info" | jq -r '.message // .value // empty' 2>/dev/null)
+        [[ "$success" == "false" ]] && { log_debug "    Pixeldrain API says dead: ${message:-unknown}"; return 1; }
+        return 0
+    fi
+    
     local http_code
     http_code=$(curl -s -o /dev/null -w '%{http_code}' \
         --max-time "$timeout" \
+        --range 0-1023 \
         -L "$url" 2>/dev/null) || return 1
     
-    # 200, 302, 301 = alive
-    if [[ "$http_code" =~ ^(200|301|302)$ ]]; then
+    # 2xx/3xx = alive. Some providers use redirects before the final download.
+    if [[ "$http_code" =~ ^(2|3)[0-9]{2}$ ]]; then
         return 0
     fi
     
@@ -268,13 +279,9 @@ mark_dead_in_links_txt() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 refresh_links() {
-    if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log_warn "DRY_RUN=true — link refresh skipped (check-only mode not yet implemented)"
-        set_env "REFRESH_TOTAL_CHECKED" "0"
-        set_env "REFRESH_TOTAL_ALIVE" "0"
-        set_env "REFRESH_TOTAL_REFRESHED" "0"
-        set_env "REFRESH_TOTAL_DEAD" "0"
-        return 0
+    local dry_run="${DRY_RUN:-false}"
+    if [[ "$dry_run" == "true" ]]; then
+        log_warn "DRY_RUN=true — checking link health without refresh/download or git mutation"
     fi
     log_header "🔄 CLOUD LINK PRESERVATION v2.0"
     
@@ -353,7 +360,9 @@ refresh_links() {
             
             if check_link_alive "$url"; then
                 (( total_alive++ ))
-                if refresh_gofile "$url"; then
+                if [[ "$dry_run" == "true" ]]; then
+                    log_ok "    ✅ Alive — dry run, no refresh ping"
+                elif refresh_gofile "$url"; then
                     (( total_refreshed++ ))
                     log_ok "    ✅ Alive — timer reset (1KB)"
                 else
@@ -386,7 +395,9 @@ refresh_links() {
             
             if check_link_alive "$url"; then
                 (( total_alive++ ))
-                if refresh_pixeldrain "$url"; then
+                if [[ "$dry_run" == "true" ]]; then
+                    log_ok "    ✅ Alive — dry run, no refresh download"
+                elif refresh_pixeldrain "$url"; then
                     (( total_refreshed++ ))
                     log_ok "    ✅ Alive — timer reset (10% downloaded)"
                 else
@@ -404,7 +415,7 @@ refresh_links() {
     fi
     
     # ── Edit Discord messages for entries with dead links ─────────────────────
-    if (( total_dead > 0 )); then
+    if (( total_dead > 0 )) && [[ "$dry_run" != "true" ]]; then
         log_separator
         log_step "Editing Discord messages for dead links..."
         
@@ -472,7 +483,7 @@ refresh_links() {
     fi
     
     # ── Save updated links.txt if any links died ─────────────────────────────
-    if [[ "$updated_links" != "$links_content" ]]; then
+    if [[ "$updated_links" != "$links_content" ]] && [[ "$dry_run" != "true" ]]; then
         log_step "Saving updated links.txt (marking expired links)..."
         
         if github_api_write "links.txt" "$updated_links" "🔄 Link refresh: ${total_dead} expired links marked [$(now_pkt)]"; then
@@ -500,6 +511,7 @@ refresh_links() {
     set_env "REFRESH_TOTAL_REFRESHED" "$total_refreshed"
     set_env "REFRESH_TOTAL_DEAD" "$total_dead"
     set_env "REFRESH_TOTAL_RESTORED" "$total_edited"
+    set_env "REFRESH_DRY_RUN" "$dry_run"
     set_env "REFRESH_TIME_FMT" "$(format_duration_human "$refresh_elapsed")"
     
     # Also set the vars that notify_links_refreshed expects

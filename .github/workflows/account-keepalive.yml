@@ -43,7 +43,8 @@ jobs:
           echo "🔴 MEGA.nz Keep-Alive"
           echo "═══════════════════════════════════════"
 
-          sudo apt-get install -y -qq megatools python3 2>/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq megatools python3 python3-pip jq 2>/dev/null
 
           MEGA_OK=0
           MEGA_TOTAL=0
