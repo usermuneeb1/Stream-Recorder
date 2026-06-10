@@ -887,12 +887,26 @@ notify_cookie_warning() {
     warn_time=$(now_pkt)
 
     local warn_title="Cookies Expired — Action Required"
-    local warn_desc="Your YouTube cookies have **expired**. Recording will fail until they are renewed."
+    local warn_desc="Your YouTube cookies have **expired or failed verification**. Live recording may fail until they are renewed."
     local warn_color=15158332
+    local field_label="📅  Cookie Age"
+    local field_value="${days_old} days"
     if [[ "$status" == "warning" ]]; then
-        warn_title="Cookie Expiry Warning — Update Soon"
+        warn_title="Cookie Age Warning — Update Soon"
         warn_desc="Your YouTube cookies are getting old (**${days_old} days**). They may expire soon. Update them proactively to avoid missed recordings."
         warn_color=16744448
+    elif [[ "$status" == "expiring" ]]; then
+        warn_title="Cookie Expiry Warning — Update Soon"
+        warn_desc="Your YouTube cookies are close to their browser expiry (**${days_old}**). Refresh them now to avoid missing a live stream."
+        warn_color=16744448
+        field_label="⏳  Expires In"
+        field_value="$days_old"
+    elif [[ "$status" == "unverified" ]]; then
+        warn_title="Cookie Verification Warning"
+        warn_desc="The cookie file exists, but GitHub Actions could not verify a logged-in YouTube session. Recording will continue, but you should refresh cookies if detection fails."
+        warn_color=16744448
+        field_label="⚠️  Verification"
+        field_value="$days_old"
     fi
 
     local payload
@@ -903,6 +917,8 @@ notify_cookie_warning() {
         --arg warn_desc   "$warn_desc" \
         --arg status      "$status" \
         --arg days_old    "$days_old" \
+        --arg field_label "$field_label" \
+        --arg field_value "$field_value" \
         --arg warn_time   "$warn_time" \
         --arg timestamp   "$timestamp" \
         --arg bot_ver     "${RECORDER_VERSION:-3.0.0}" \
@@ -920,7 +936,7 @@ notify_cookie_warning() {
                 description: $warn_desc,
                 color: ($color | tonumber),
                 fields: [
-                    { name: "📅  Cookie Age",    value: ("`" + $days_old + " days`"),  inline: true  },
+                    { name: $field_label,        value: ("`" + $field_value + "`"),   inline: true  },
                     { name: "⚠️  Status",        value: ("`" + $status + "`"),         inline: true  },
                     { name: "🕐  Alert At",       value: $warn_time,                   inline: true  },
                     {
@@ -942,7 +958,8 @@ notify_cookie_warning() {
             }]
         }')
 
-    send_discord_webhook "$payload" "reports"
+    # Cookie failures can cause missed live streams, so route them to alerts.
+    send_discord_webhook "$payload" "alerts"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

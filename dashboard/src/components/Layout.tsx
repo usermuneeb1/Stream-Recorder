@@ -131,16 +131,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               </AnimatePresence>
             </motion.button>
 
-            {/* Logout */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={logout}
-              title="Lock Archives"
-              className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-            >
-              <LogOut size={18} />
-            </motion.button>
+            {/* Admin logout — hidden for public viewers */}
+            {role === 'admin' && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={logout}
+                title="Lock Admin Tools"
+                className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              >
+                <LogOut size={18} />
+              </motion.button>
+            )}
           </div>
         </div>
       </motion.nav>

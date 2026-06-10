@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type Role = 'admin' | 'viewer' | null;
+type Role = 'admin' | null;
 
 interface AuthContextType {
   role: Role;
@@ -21,8 +21,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const saved = localStorage.getItem('app_auth_role') as Role;
-    if (saved === 'admin' || saved === 'viewer') {
+    if (saved === 'admin') {
       setRole(saved);
+    } else {
+      localStorage.removeItem('app_auth_role');
     }
   }, []);
 
@@ -31,10 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRole('admin');
       localStorage.setItem('app_auth_role', 'admin');
       return true;
-    } else if (password === 'd3xture2') {
-      setRole('viewer');
-      localStorage.setItem('app_auth_role', 'viewer');
-      return true;
     }
     return false;
   };
@@ -42,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setRole(null);
     localStorage.removeItem('app_auth_role');
+    localStorage.removeItem('gh_pat');
   };
 
   return (
