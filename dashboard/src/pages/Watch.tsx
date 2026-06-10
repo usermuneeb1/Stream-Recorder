@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Bookmark, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check, Keyboard, ChevronRight, Play } from 'lucide-react';
+import { Bookmark, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check, Keyboard, ChevronRight, Play } from 'lucide-react';
 import { StreamData, fetchStreams } from '../utils/dataFetcher';
 
 export default function Watch() {
@@ -13,7 +13,6 @@ export default function Watch() {
   const [allStreams, setAllStreams] = useState<StreamData[]>([]);
 
   const [activeSource, setActiveSource] = useState<string>('pixel');
-  const [showDownloads, setShowDownloads] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [bookmarks, setBookmarks] = useState<{time: number, note: string}[]>([]);
   const [copied, setCopied] = useState(false);
@@ -74,8 +73,7 @@ export default function Watch() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       switch (e.key.toLowerCase()) {
         case 'd':
-          e.preventDefault();
-          setShowDownloads(prev => !prev);
+          // Direct cloud download links are intentionally not exposed on the public site.
           break;
         case 's':
           e.preventDefault();
@@ -92,7 +90,6 @@ export default function Watch() {
           setShowShortcuts(prev => !prev);
           break;
         case 'escape':
-          setShowDownloads(false);
           setShowShortcuts(false);
           break;
       }
@@ -102,11 +99,11 @@ export default function Watch() {
   }, [stream, activeSource, switchSource]);
 
   useEffect(() => {
-    if (!showDownloads && !showShortcuts) return;
+    if (!showShortcuts) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previous; };
-  }, [showDownloads, showShortcuts]);
+  }, [showShortcuts]);
 
   // Not Found
   if (notFound) {
@@ -190,26 +187,12 @@ export default function Watch() {
   // Related streams (exclude current, take 4)
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
 
-  const sourceIcons: Record<string, string> = {
-    archive: '🏛️', mega: '🔴', pixel: '🟣', gofile: '📁',
-    archiveSmall: '📱', odysee: '🪐', rumble: '🟢'
-  };
-
-  const sourceMeta: Record<string, { tone: string; badge: string; description: string }> = {
-    archive: { tone: 'bg-blue-500/10 text-blue-600 dark:text-blue-300 border-blue-500/20', badge: 'Permanent', description: 'Permanent Archive.org preservation copy' },
-    archiveSmall: { tone: 'bg-blue-500/10 text-blue-600 dark:text-blue-300 border-blue-500/20', badge: 'Mobile', description: 'Smaller Archive.org playback copy' },
-    mega: { tone: 'bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/20', badge: 'Encrypted', description: 'Encrypted MEGA mirror' },
-    pixel: { tone: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20', badge: 'Fast CDN', description: 'High-speed Pixeldrain mirror' },
-    gofile: { tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20', badge: 'Mirror', description: 'Gofile mirror; opens externally' },
-    odysee: { tone: 'bg-teal-500/10 text-teal-600 dark:text-teal-300 border-teal-500/20', badge: 'Web3', description: 'Decentralized Odysee mirror' },
-    rumble: { tone: 'bg-green-500/10 text-green-600 dark:text-green-300 border-green-500/20', badge: 'Mirror', description: 'Rumble mirror' },
-  };
+  const publicSourceLabel = (index: number) => index === 0 ? 'Primary Player' : `Backup Player ${index}`;
 
   const shortcutItems = [
-    { key: 'S', desc: 'Cycle playback source', hint: 'Quickly rotate through available mirrors' },
-    { key: 'D', desc: 'Toggle download hub', hint: 'Open all direct cloud links' },
+    { key: 'S', desc: 'Cycle playback source', hint: 'Quickly rotate through available playback options' },
     { key: '?', desc: 'Toggle shortcuts panel', hint: 'Show or hide this help overlay' },
-    { key: 'Esc', desc: 'Close overlays', hint: 'Dismiss downloads and shortcuts' },
+    { key: 'Esc', desc: 'Close overlays', hint: 'Dismiss shortcuts and panels' },
   ];
 
   return (
@@ -254,11 +237,16 @@ export default function Watch() {
                       >
                         <ExternalLink size={36} className="text-brand-500" />
                       </motion.div>
-                      <h3 className="text-xl font-bold mb-2">Embedded Playback Unavailable</h3>
-                      <p className="text-dark-400 mb-6 max-w-md">This provider doesn't support website embedding.</p>
-                      <a href={currentSource.url} target="_blank" rel="noreferrer" className="btn-primary flex items-center gap-2">
-                        <ExternalLink size={18} /> Open in {currentSource.label.replace(/[^\w\s.]/g, '').trim()}
-                      </a>
+                      <h3 className="text-xl font-bold mb-2">Playback Option Unavailable</h3>
+                      <p className="text-dark-400 mb-6 max-w-md">This backup source cannot be embedded directly. Please try another playback option.</p>
+                      {sources.length > 1 && (
+                        <button onClick={() => {
+                          const keys = Object.keys(stream.sources).filter(k => k !== activeSource);
+                          if (keys[0]) switchSource(keys[0]);
+                        }} className="btn-primary flex items-center gap-2">
+                          <Play size={18} /> Try Another Source
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <iframe
@@ -290,9 +278,6 @@ export default function Watch() {
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleShare} className="btn-secondary flex items-center gap-2">
                 {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
                 {copied ? 'Copied!' : 'Share'}
-              </motion.button>
-              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => setShowDownloads(true)} className="btn-primary flex items-center gap-2">
-                <Download size={18} /> Download
               </motion.button>
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => setShowShortcuts(true)} className="btn-secondary flex items-center gap-2 ml-auto">
                 <Keyboard size={16} /> <span className="hidden sm:block">Shortcuts</span>
@@ -362,11 +347,11 @@ export default function Watch() {
           {/* Source Switcher */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="glass-panel p-5 rounded-2xl border border-dark-200 dark:border-dark-800">
             <h3 className="font-bold mb-4 text-base flex items-center gap-2">
-              Playback Source
+              Playback Options
               <span className="text-xs text-dark-400 font-normal ml-auto">Press S</span>
             </h3>
             <div className="space-y-2">
-              {sources.map(([key, source]) => (
+              {sources.map(([key], index) => (
                 <motion.button
                   key={key}
                   whileHover={{ x: 3 }}
@@ -379,8 +364,8 @@ export default function Watch() {
                   }`}
                 >
                   <span className="font-medium text-sm flex items-center gap-2">
-                    <span>{sourceIcons[key] || '🔗'}</span>
-                    {source.label.replace(/[^\w\s.]/g, '').trim()}
+                    <span>{index === 0 ? '▶' : '↻'}</span>
+                    {publicSourceLabel(index)}
                   </span>
                   {activeSource === key && (
                     <motion.div
@@ -438,82 +423,6 @@ export default function Watch() {
         </div>
       </div>
 
-      {/* ═══ DOWNLOAD MODAL ═══════════════════════════════════════════ */}
-      <AnimatePresence>
-        {showDownloads && (
-          <motion.div
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <button
-              type="button"
-              aria-label="Close downloads"
-              onClick={() => setShowDownloads(false)}
-              className="absolute inset-0 bg-black/70 backdrop-blur-md"
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="download-hub-title"
-              initial={{ opacity: 0, y: 60, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 60, scale: 0.96 }}
-              transition={{ type: "spring", stiffness: 340, damping: 32 }}
-              className="relative w-full max-w-xl max-h-[88vh] overflow-hidden glass-panel rounded-t-3xl sm:rounded-3xl z-[101] shadow-2xl border border-white/20 dark:border-white/10"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-orange-500 to-yellow-400" />
-              <div className="p-6 border-b border-dark-200/70 dark:border-dark-800/80">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.25em] text-brand-500 font-bold mb-2">Cloud Mirrors</p>
-                    <h2 id="download-hub-title" className="text-2xl font-bold font-display">Download Hub</h2>
-                    <p className="text-sm text-dark-500 dark:text-dark-400 mt-1">Choose any available provider. Archive.org is the permanent preservation copy.</p>
-                  </div>
-                  <button onClick={() => setShowDownloads(false)} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 space-y-3 overflow-y-auto max-h-[65vh]">
-                {sources.map(([key, source], i) => {
-                  const meta = sourceMeta[key] || { tone: 'bg-dark-100 dark:bg-dark-800 text-dark-500 border-dark-200 dark:border-dark-700', badge: 'Source', description: 'Direct file access' };
-                  return (
-                    <motion.a
-                      key={key}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.06 }}
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between gap-4 p-4 bg-white/70 dark:bg-dark-800/80 rounded-2xl hover:bg-white dark:hover:bg-dark-700 transition-all group border border-dark-200/80 dark:border-dark-700/80 hover:border-brand-500/30 hover:shadow-lg hover:shadow-brand-500/10"
-                    >
-                      <div className="min-w-0 flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-dark-100 dark:bg-dark-900 flex items-center justify-center text-lg shadow-inner">
-                          {sourceIcons[key] || '🔗'}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold truncate">{source.label.replace(/[^\w\s.]/g, '').trim()}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${meta.tone}`}>{meta.badge}</span>
-                          </div>
-                          <span className="text-xs text-dark-400 font-medium line-clamp-1">{meta.description}</span>
-                        </div>
-                      </div>
-                      <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
-                        <ExternalLink size={18} />
-                      </div>
-                    </motion.a>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ═══ KEYBOARD SHORTCUTS MODAL ═════════════════════════════════ */}
       <AnimatePresence>
         {showShortcuts && (
@@ -548,7 +457,7 @@ export default function Watch() {
                       <Keyboard size={14} /> Watch Controls
                     </div>
                     <h2 id="keyboard-shortcuts-title" className="text-2xl font-bold font-display">Keyboard Shortcuts</h2>
-                    <p className="text-sm text-dark-500 dark:text-dark-400 mt-1">Fast controls for playback sources, downloads, and overlays.</p>
+                    <p className="text-sm text-dark-500 dark:text-dark-400 mt-1">Fast controls for playback options and overlays.</p>
                   </div>
                   <button onClick={() => setShowShortcuts(false)} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
                     <X size={18} />
