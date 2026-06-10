@@ -14,6 +14,7 @@ export interface StreamData {
   size: string;
   thumbnail: string;
   archiveId?: string;
+  chatUrl?: string;
   sources: Record<string, StreamSource>;
 }
 
@@ -114,6 +115,7 @@ function parseLinks(text: string): StreamData[] {
       size: formatSize(get('Size')),
       thumbnail: fallbackThumbnail(vid, customThumb),
       archiveId: archiveId,
+      chatUrl: '',
       sources: sources
     });
   }
@@ -197,6 +199,7 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
       size: formatSize(r.size_human),
       thumbnail: fallbackThumbnail(id, r.thumbnail),
       archiveId: undefined,
+      chatUrl: r.chat_url || '',
       sources: {}
     };
 
@@ -211,6 +214,7 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link, type: 'mega' };
     if (r.gofile_link) s.sources.gofile = { label: '📁 Gofile', url: r.gofile_link, type: 'gofile' };
     
+    if (r.chat_url && !s.chatUrl) s.chatUrl = r.chat_url;
     if (!s.size && r.size_human) s.size = formatSize(r.size_human);
     if (!s.duration && r.duration_fmt) s.duration = formatDuration(r.duration_fmt);
     if (!s.date && r.date) s.date = formatDate(r.date);

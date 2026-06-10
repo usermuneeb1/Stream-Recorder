@@ -202,6 +202,7 @@ update_recordings_json() {
         --arg pixeldrain_link "$pixeldrain_link" \
         --arg archive_link "$archive_link" \
         --arg mega_link "$mega_link" \
+        --arg chat_url "${RECORD_CHAT_URL:-}" \
         --arg recorded_at "$(now_utc_iso)" \
         '{
             video_id: $video_id,
@@ -222,7 +223,7 @@ update_recordings_json() {
             pixeldrain_link: $pixeldrain_link,
             archive_link: $archive_link,
             mega_link: $mega_link,
-            chat_url: "",
+            chat_url: $chat_url,
             recorded_at: $recorded_at
         }')
 

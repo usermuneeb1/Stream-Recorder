@@ -992,3 +992,23 @@
 .flame-particle.p1 { --spark-x: -11px; animation-delay: 0s; }
 .flame-particle.p2 { --spark-x: 9px; animation-delay: .45s; width: 2.5px; height: 2.5px; }
 .flame-particle.p3 { --spark-x: 2px; animation-delay: .9s; width: 2px; height: 2px; }
+
+/* Premium custom video player */
+.player-btn {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.34);
+  color: white;
+  backdrop-filter: blur(14px);
+  transition: transform .2s ease, background .2s ease, border-color .2s ease;
+}
+.player-btn:hover { transform: scale(1.06); background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.24); }
+.premium-video-range,
+.premium-volume-range { accent-color: rgb(239 68 68); }
+.premium-video-range { height: 6px; cursor: pointer; }
+.chat-replay-scroll { scrollbar-width: thin; }
