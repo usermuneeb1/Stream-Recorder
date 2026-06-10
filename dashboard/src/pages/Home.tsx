@@ -59,7 +59,7 @@ interface ArchiveStatsFile {
 }
 
 // ── StatCard Component (hooks called at component level, not in .map) ──
-function StatCard({ metric, index }: { metric: { label: string; value: number; suffix?: string; icon: React.ReactElement<any>; color: string; bg: string }; index: number }) {
+function StatCard({ metric, index }: { metric: { label: string; value: number; display?: string; suffix?: string; icon: React.ReactElement<any>; color: string; bg: string }; index: number }) {
   const tilt = useTilt();
   return (
     <motion.div
@@ -82,7 +82,7 @@ function StatCard({ metric, index }: { metric: { label: string; value: number; s
           </div>
         </div>
         <div className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-dark-900 dark:text-white tracking-tight">
-          <AnimatedCounter value={metric.value} suffix={metric.suffix} delay={0.3 + (index * 0.1)} />
+          {metric.display ? metric.display : <AnimatedCounter value={metric.value} suffix={metric.suffix} delay={0.3 + (index * 0.1)} />}
         </div>
       </div>
     </motion.div>
@@ -144,9 +144,9 @@ export default function Home() {
 
   const statCards = [
     { label: 'Recordings', value: stats.total_streams, icon: <Film />, color: 'text-blue-500', bg: 'from-blue-500/10 to-blue-500/5' },
-    { label: 'Hours Preserved', value: stats.total_hours, suffix: '+', icon: <Clock3 />, color: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5' },
-    { label: 'Archive Size', value: stats.total_gb, suffix: ' GB', icon: <HardDrive />, color: 'text-brand-500', bg: 'from-brand-500/10 to-brand-500/5' },
-    { label: 'Archive Access', value: stats.total_streams > 0 ? 1 : 0, suffix: stats.total_streams > 0 ? ' Ready' : ' Soon', icon: <HeartHandshake />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
+    { label: 'Hours Preserved', value: stats.total_hours, display: `${stats.total_hours}+`, icon: <Clock3 />, color: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5' },
+    { label: 'Archive Size', value: stats.total_gb, display: `${stats.total_gb.toFixed(1)} GB`, icon: <HardDrive />, color: 'text-brand-500', bg: 'from-brand-500/10 to-brand-500/5' },
+    { label: 'Archive Access', value: 1, display: stats.total_streams > 0 ? 'Ready' : 'Soon', icon: <HeartHandshake />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
   ];
 
   const features = [
@@ -186,7 +186,7 @@ export default function Home() {
       <ParticleField count={20} />
 
       {/* ═══ HERO SECTION ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-24 relative z-10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start mb-16 lg:mb-20 relative z-10 pt-10 lg:pt-14">
         <motion.div
           variants={containerVariants}
           initial="hidden"

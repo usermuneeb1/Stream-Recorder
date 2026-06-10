@@ -15,7 +15,7 @@ export const PremiumHangingLantern: React.FC = () => {
       initial={{ opacity: 0, y: 22, scale: 0.97, filter: 'blur(12px)' }}
       animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
       transition={{ duration: 1.05, ease: [0.16, 1, 0.3, 1], delay: 0.22 }}
-      className="hidden lg:flex justify-center relative items-start min-h-[545px] overflow-visible select-none"
+      className="hidden lg:flex justify-center relative items-start min-h-[500px] overflow-visible select-none"
       aria-hidden="true"
     >
       {/* premium ceiling glint */}
@@ -26,12 +26,12 @@ export const PremiumHangingLantern: React.FC = () => {
       <motion.div
         animate={reduceMotion ? undefined : { scale: [1, 1.11, 1], opacity: [0.13, 0.26, 0.13] }}
         transition={{ duration: 5.4, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute top-32 h-[360px] w-[360px] rounded-full bg-amber-500/20 blur-[100px]"
+        className="absolute top-28 h-[390px] w-[390px] rounded-full bg-amber-500/20 blur-[100px]"
       />
       <motion.div
         animate={reduceMotion ? undefined : { scale: [1.08, 1, 1.08], opacity: [0.045, 0.12, 0.045] }}
         transition={{ duration: 8.2, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute top-24 h-[480px] w-[480px] rounded-full bg-brand-500/10 blur-[130px]"
+        className="absolute top-20 h-[500px] w-[500px] rounded-full bg-brand-500/10 blur-[130px]"
       />
 
       <motion.div
@@ -43,15 +43,15 @@ export const PremiumHangingLantern: React.FC = () => {
         <img
           src={`${import.meta.env.BASE_URL}lantern-chain.webp`}
           alt=""
-          className="absolute top-0 left-1/2 z-20 h-[155px] w-auto -translate-x-1/2 object-contain object-top drop-shadow-[0_0_12px_rgba(251,191,36,0.42)]"
+          className="absolute top-0 left-1/2 z-20 h-[118px] w-auto -translate-x-1/2 object-contain object-top drop-shadow-[0_0_12px_rgba(251,191,36,0.42)]"
           draggable={false}
         />
 
         {/* connector glow */}
-        <div className="absolute top-[140px] left-1/2 z-10 h-12 w-12 -translate-x-1/2 rounded-full bg-amber-400/16 blur-xl" />
+        <div className="absolute top-[104px] left-1/2 z-10 h-12 w-12 -translate-x-1/2 rounded-full bg-amber-400/16 blur-xl" />
 
         {/* lantern image */}
-        <div className="relative mt-[132px] w-[318px] xl:w-[365px]">
+        <div className="relative mt-[98px] w-[350px] xl:w-[405px]">
           {/* warm light inside the glass */}
           <motion.div
             animate={reduceMotion ? undefined : { opacity: [0.24, 0.48, 0.32, 0.44, 0.24], scale: [0.96, 1.08, 1.0, 1.06, 0.96] }}
