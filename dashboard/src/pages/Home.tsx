@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, Variants, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
-import { BookOpenText, Clock3, Film, HardDrive, HeartHandshake, Search, Shield, ExternalLink, Play, ChevronRight } from 'lucide-react';
+import { BookOpenText, Clock3, Film, HardDrive, HeartHandshake, ExternalLink, Play, ChevronRight, Sparkles } from 'lucide-react';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
@@ -149,36 +149,6 @@ export default function Home() {
     { label: 'Archive Access', value: 1, display: stats.total_streams > 0 ? 'Ready' : 'Soon', icon: <HeartHandshake />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
   ];
 
-  const features = [
-    {
-      icon: <Shield className="w-10 h-10" />,
-      color: 'text-green-500',
-      bg: 'bg-green-500/10',
-      title: 'Preserved with Care',
-      desc: 'Important conversations are organized in a clean archive so viewers can revisit beneficial content whenever they need it.'
-    },
-    {
-      icon: <Search className="w-10 h-10" />,
-      color: 'text-blue-500',
-      bg: 'bg-blue-500/10',
-      title: 'Easy to Explore',
-      desc: 'Search, sort, filter, and jump into recordings quickly with a calm interface built for long-form watching.'
-    },
-    {
-      icon: <BookOpenText className="w-10 h-10" />,
-      color: 'text-violet-500',
-      bg: 'bg-violet-500/10',
-      title: 'Focused Learning',
-      desc: 'The design keeps attention on the lectures, debates, and live discussions instead of distracting technical clutter.'
-    },
-    {
-      icon: <HeartHandshake className="w-10 h-10" />,
-      color: 'text-amber-500',
-      bg: 'bg-amber-500/10',
-      title: 'Built for the Ummah',
-      desc: 'A respectful viewing space for preserving and revisiting dawah material with clarity, polish, and long-term care.'
-    },
-  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 relative overflow-hidden">
@@ -245,12 +215,62 @@ export default function Home() {
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: "-50px" }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-24 relative z-10"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12 lg:mb-16 relative z-10"
       >
         {statCards.map((metric, i) => (
           <StatCard key={metric.label} metric={metric} index={i} />
         ))}
       </motion.div>
+
+      {/* ═══ FEATURED LATEST RECORDING ════════════════════════════ */}
+      {recentStreams[0] && (
+        <motion.div
+          initial={{ opacity: 0, y: 28 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ type: "spring", stiffness: 190, damping: 24 }}
+          className="relative z-10 mb-16"
+        >
+          <Link
+            to={`/watch/${recentStreams[0].videoId}`}
+            state={{ stream: recentStreams[0] }}
+            className="group block overflow-hidden rounded-[2rem] border border-white/70 dark:border-white/10 bg-white/80 dark:bg-dark-900/60 shadow-2xl shadow-dark-900/5 dark:shadow-black/30 backdrop-blur-xl"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-5">
+              <div className="relative lg:col-span-2 aspect-video lg:aspect-auto min-h-[260px] overflow-hidden bg-dark-900">
+                <img
+                  src={recentStreams[0].thumbnail}
+                  alt={recentStreams[0].title}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`; }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <div className="absolute bottom-4 left-4 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur-md border border-white/20">
+                  Latest preserved recording
+                </div>
+              </div>
+              <div className="relative lg:col-span-3 p-7 md:p-9 flex flex-col justify-center">
+                <div className="absolute right-8 top-8 hidden md:flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 border border-brand-500/20">
+                  <Sparkles size={24} />
+                </div>
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-500 mb-3">Watch latest</p>
+                <h2 className="text-2xl md:text-4xl font-black font-display leading-tight max-w-2xl group-hover:text-brand-500 transition-colors">
+                  {recentStreams[0].title}
+                </h2>
+                <div className="mt-4 flex flex-wrap gap-3 text-sm text-dark-500 dark:text-dark-400 font-medium">
+                  <span>{recentStreams[0].date}</span>
+                  {recentStreams[0].duration && <span>• {recentStreams[0].duration}</span>}
+                  {recentStreams[0].size && <span>• {recentStreams[0].size}</span>}
+                </div>
+                <div className="mt-7 inline-flex w-fit items-center gap-2 rounded-full bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-brand-500/25 group-hover:bg-brand-500 transition-colors">
+                  <Play size={17} fill="currentColor" /> Watch Now
+                </div>
+              </div>
+            </div>
+          </Link>
+        </motion.div>
+      )}
 
       {/* ═══ PREMIUM PUBLIC ARCHIVE EXPERIENCE ════════════════════ */}
       <ArchiveExperience
@@ -260,7 +280,7 @@ export default function Home() {
       />
 
       {/* ═══ YOUTUBE STATS + RECENT STREAMS ════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-24 relative z-10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16 relative z-10">
         {/* YouTube Stats Card */}
         <motion.div
           initial={{ opacity: 0, x: -40 }}
@@ -349,46 +369,6 @@ export default function Home() {
           </div>
         </motion.div>
       </div>
-
-      {/* ═══ FEATURES SHOWCASE ═══════════════════════════════════════ */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "-100px" }}
-        className="mb-24 relative z-10"
-      >
-        <motion.div variants={itemVariants} className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-            Designed for <span className="text-gradient-animated">Beneficial Access</span>
-          </h2>
-          <p className="text-dark-500 dark:text-dark-400 max-w-2xl mx-auto text-lg">
-            A calm, organized archive experience focused on helping viewers find and revisit meaningful content.
-          </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {features.map((feature) => (
-            <motion.div
-              key={feature.title}
-              variants={itemVariants}
-              whileHover={{ y: -5 }}
-              className="holographic-card p-8 rounded-3xl card-hover-glow group transition-all duration-500 hover:shadow-xl hover:shadow-brand-500/10"
-            >
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                className={`w-14 h-14 ${feature.bg} rounded-2xl flex items-center justify-center ${feature.color} mb-5`}
-              >
-                {feature.icon}
-              </motion.div>
-              <h3 className="text-xl font-bold font-display mb-3 group-hover:text-brand-500 transition-colors">{feature.title}</h3>
-              <p className="text-dark-500 dark:text-dark-400 leading-relaxed">{feature.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-
-
-      </motion.div>
 
       {/* ═══ SYSTEM HEALTH ════════════════════════════════════════════ */}
       <motion.div

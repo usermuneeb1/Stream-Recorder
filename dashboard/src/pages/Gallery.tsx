@@ -173,27 +173,32 @@ export default function Gallery() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8 relative z-10"
+        className="mb-8 relative z-10 overflow-hidden rounded-[2rem] border border-white/70 dark:border-white/10 bg-white/75 dark:bg-dark-900/55 p-6 md:p-8 shadow-2xl shadow-dark-900/5 dark:shadow-black/25 backdrop-blur-xl"
       >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-500/10 blur-3xl" />
+        <div className="absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold font-display tracking-tight">
+            <div className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-brand-500 border border-brand-500/20 mb-3">
+              Archive Library
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black font-display tracking-tight">
               Recordings <span className="text-gradient-animated">Gallery</span>
             </h1>
-            <p className="text-dark-500 dark:text-dark-400 mt-2 text-sm">Every preserved stream, debate, and lecture.</p>
+            <p className="text-dark-500 dark:text-dark-400 mt-2 text-sm md:text-base max-w-2xl">Browse preserved streams, debates, and lectures in a clean long-form viewing library.</p>
           </div>
           <motion.div
             key={filtered.length}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-sm text-dark-500 font-semibold bg-dark-100 dark:bg-dark-800 px-5 py-2.5 rounded-full border border-dark-200 dark:border-dark-700 shadow-sm"
+            className="text-sm text-dark-600 dark:text-dark-300 font-bold bg-white/80 dark:bg-dark-800/80 px-5 py-2.5 rounded-full border border-dark-200/80 dark:border-dark-700 shadow-sm"
           >
-            {filtered.length} {filtered.length === 1 ? 'Video' : 'Videos'}
+            {filtered.length} {filtered.length === 1 ? 'Recording' : 'Recordings'}
           </motion.div>
         </div>
 
         {/* ── Search & Controls ─────────────────────────────────────── */}
-        <div className="flex flex-col gap-4">
+        <div className="relative flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
             <motion.div
@@ -209,7 +214,7 @@ export default function Gallery() {
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
                 placeholder="Search by title, date, or video ID..."
-                className={`w-full pl-11 pr-10 py-3 rounded-2xl bg-white dark:bg-dark-800 border transition-all duration-300 text-sm placeholder-dark-400 focus:outline-none ${
+                className={`w-full pl-11 pr-10 py-3 rounded-2xl bg-white/85 dark:bg-dark-800/85 border transition-all backdrop-blur-xl duration-300 text-sm placeholder-dark-400 focus:outline-none ${
                   searchFocused
                     ? 'border-brand-500/50 ring-2 ring-brand-500/20 shadow-lg shadow-brand-500/5'
                     : 'border-dark-200 dark:border-dark-700'
@@ -234,7 +239,7 @@ export default function Gallery() {
             <div className="flex gap-2">
               <button
                 onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white dark:bg-dark-800 border border-dark-200 dark:border-dark-700 hover:border-brand-500/30 transition-all text-sm font-medium whitespace-nowrap"
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/85 dark:bg-dark-800/85 border border-dark-200 dark:border-dark-700 backdrop-blur-xl hover:border-brand-500/30 transition-all text-sm font-medium whitespace-nowrap"
               >
                 <SlidersHorizontal size={16} />
                 {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
@@ -243,13 +248,13 @@ export default function Gallery() {
               <div className="flex rounded-2xl overflow-hidden border border-dark-200 dark:border-dark-700">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-3 transition-colors ${viewMode === 'grid' ? 'bg-brand-500 text-white' : 'bg-white dark:bg-dark-800 hover:bg-dark-100 dark:hover:bg-dark-700'}`}
+                  className={`p-3 transition-colors ${viewMode === 'grid' ? 'bg-brand-500 text-white' : 'bg-white/85 dark:bg-dark-800/85 hover:bg-dark-100 dark:hover:bg-dark-700'}`}
                 >
                   <LayoutGrid size={16} />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-3 transition-colors ${viewMode === 'list' ? 'bg-brand-500 text-white' : 'bg-white dark:bg-dark-800 hover:bg-dark-100 dark:hover:bg-dark-700'}`}
+                  className={`p-3 transition-colors ${viewMode === 'list' ? 'bg-brand-500 text-white' : 'bg-white/85 dark:bg-dark-800/85 hover:bg-dark-100 dark:hover:bg-dark-700'}`}
                 >
                   <List size={16} />
                 </button>
@@ -352,7 +357,7 @@ export default function Gallery() {
                   <Link
                     to={`/watch/${stream.videoId}`}
                     state={{ stream }}
-                    className="premium-link-card relative aspect-video rounded-2xl overflow-hidden bg-dark-900 shadow-lg border border-dark-200 dark:border-dark-800 hover:shadow-2xl hover:shadow-brand-500/20 transition-all duration-500"
+                    className="premium-link-card relative aspect-video rounded-2xl overflow-hidden bg-dark-900 shadow-xl shadow-dark-900/5 dark:shadow-black/25 border border-white/70 dark:border-dark-800 hover:border-brand-500/30 hover:shadow-2xl hover:shadow-brand-500/15 transition-all duration-500"
                   >
                     <div className="absolute inset-0 z-[1] bg-[radial-gradient(circle_at_var(--glow-x,50%)_var(--glow-y,50%),rgba(239,68,68,0.20),transparent_34%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <img
@@ -404,7 +409,7 @@ export default function Gallery() {
 
                   <div className="flex flex-col px-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-bold text-[15px] leading-snug line-clamp-2 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors duration-300">
+                      <h3 className="font-black text-[15px] leading-snug line-clamp-2 group-hover:text-brand-500 dark:group-hover:text-brand-400 transition-colors duration-300">
                         {stream.title}
                       </h3>
                       {isAdmin && (

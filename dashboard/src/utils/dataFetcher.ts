@@ -53,6 +53,13 @@ function fallbackThumbnail(id: string, customThumb?: string) {
   return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 }
 
+function cleanTitle(title: string): string {
+  return (title || '')
+    .replace(/\s+\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\s*$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function buildSources(links: any) {
   const s: Record<string, StreamSource> = {};
   if (links.archive_hd) s.archive = { label: '🏛️ Archive.org', url: links.archive_hd, type: 'archive' };
@@ -99,7 +106,7 @@ function parseLinks(text: string): StreamData[] {
 
     out.push({
       videoId: vid,
-      title: get('Title').trim(),
+      title: cleanTitle(get('Title')),
       channel: get('Channel'),
       date: formatDate(get('Date')),
       url,
@@ -182,7 +189,7 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     
     const s = map[id] || {
       videoId: id,
-      title: (r.title || '').trim(),
+      title: cleanTitle(r.title || ''),
       channel: r.channel,
       date: formatDate(r.date),
       url: r.video_url,
@@ -194,7 +201,7 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     };
 
     // Trim titles on merge too
-    if (s.title) s.title = s.title.trim();
+    if (s.title) s.title = cleanTitle(s.title);
 
     if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link, type: 'pixeldrain' };
     if (r.archive_link) {
