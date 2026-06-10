@@ -101,6 +101,13 @@ export default function Watch() {
     return () => window.removeEventListener('keydown', handler);
   }, [stream, activeSource, switchSource]);
 
+  useEffect(() => {
+    if (!showDownloads && !showShortcuts) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, [showDownloads, showShortcuts]);
+
   // Not Found
   if (notFound) {
     return (
@@ -187,6 +194,23 @@ export default function Watch() {
     archive: '🏛️', mega: '🔴', pixel: '🟣', gofile: '📁',
     archiveSmall: '📱', odysee: '🪐', rumble: '🟢'
   };
+
+  const sourceMeta: Record<string, { tone: string; badge: string; description: string }> = {
+    archive: { tone: 'bg-blue-500/10 text-blue-600 dark:text-blue-300 border-blue-500/20', badge: 'Permanent', description: 'Permanent Archive.org preservation copy' },
+    archiveSmall: { tone: 'bg-blue-500/10 text-blue-600 dark:text-blue-300 border-blue-500/20', badge: 'Mobile', description: 'Smaller Archive.org playback copy' },
+    mega: { tone: 'bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/20', badge: 'Encrypted', description: 'Encrypted MEGA mirror' },
+    pixel: { tone: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20', badge: 'Fast CDN', description: 'High-speed Pixeldrain mirror' },
+    gofile: { tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20', badge: 'Mirror', description: 'Gofile mirror; opens externally' },
+    odysee: { tone: 'bg-teal-500/10 text-teal-600 dark:text-teal-300 border-teal-500/20', badge: 'Web3', description: 'Decentralized Odysee mirror' },
+    rumble: { tone: 'bg-green-500/10 text-green-600 dark:text-green-300 border-green-500/20', badge: 'Mirror', description: 'Rumble mirror' },
+  };
+
+  const shortcutItems = [
+    { key: 'S', desc: 'Cycle playback source', hint: 'Quickly rotate through available mirrors' },
+    { key: 'D', desc: 'Toggle download hub', hint: 'Open all direct cloud links' },
+    { key: '?', desc: 'Toggle shortcuts panel', hint: 'Show or hide this help overlay' },
+    { key: 'Esc', desc: 'Close overlays', hint: 'Dismiss downloads and shortcuts' },
+  ];
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 py-6">
@@ -417,92 +441,144 @@ export default function Watch() {
       {/* ═══ DOWNLOAD MODAL ═══════════════════════════════════════════ */}
       <AnimatePresence>
         {showDownloads && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              type="button"
+              aria-label="Close downloads"
               onClick={() => setShowDownloads(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              className="absolute inset-0 bg-black/70 backdrop-blur-md"
             />
             <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed left-1/2 bottom-0 sm:bottom-auto sm:top-1/2 -translate-x-1/2 sm:-translate-y-1/2 w-full max-w-lg glass-panel p-6 rounded-t-3xl sm:rounded-3xl z-50 shadow-2xl border border-dark-200 dark:border-dark-800"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="download-hub-title"
+              initial={{ opacity: 0, y: 60, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 60, scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 340, damping: 32 }}
+              className="relative w-full max-w-xl max-h-[88vh] overflow-hidden glass-panel rounded-t-3xl sm:rounded-3xl z-[101] shadow-2xl border border-white/20 dark:border-white/10"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold font-display">Download Hub</h2>
-                <button onClick={() => setShowDownloads(false)} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-orange-500 to-yellow-400" />
+              <div className="p-6 border-b border-dark-200/70 dark:border-dark-800/80">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.25em] text-brand-500 font-bold mb-2">Cloud Mirrors</p>
+                    <h2 id="download-hub-title" className="text-2xl font-bold font-display">Download Hub</h2>
+                    <p className="text-sm text-dark-500 dark:text-dark-400 mt-1">Choose any available provider. Archive.org is the permanent preservation copy.</p>
+                  </div>
+                  <button onClick={() => setShowDownloads(false)} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
-              <div className="space-y-3">
-                {sources.map(([key, source], i) => (
-                  <motion.a
-                    key={key}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.08 }}
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-4 bg-dark-50 dark:bg-dark-800 rounded-2xl hover:bg-dark-100 dark:hover:bg-dark-700 transition-all group border border-transparent hover:border-dark-200 dark:hover:border-dark-600"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{source.label}</span>
-                      <span className="text-xs text-dark-400 font-medium">Direct File Access</span>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <ExternalLink size={18} />
-                    </div>
-                  </motion.a>
-                ))}
+              <div className="p-6 space-y-3 overflow-y-auto max-h-[65vh]">
+                {sources.map(([key, source], i) => {
+                  const meta = sourceMeta[key] || { tone: 'bg-dark-100 dark:bg-dark-800 text-dark-500 border-dark-200 dark:border-dark-700', badge: 'Source', description: 'Direct file access' };
+                  return (
+                    <motion.a
+                      key={key}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06 }}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between gap-4 p-4 bg-white/70 dark:bg-dark-800/80 rounded-2xl hover:bg-white dark:hover:bg-dark-700 transition-all group border border-dark-200/80 dark:border-dark-700/80 hover:border-brand-500/30 hover:shadow-lg hover:shadow-brand-500/10"
+                    >
+                      <div className="min-w-0 flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-dark-100 dark:bg-dark-900 flex items-center justify-center text-lg shadow-inner">
+                          {sourceIcons[key] || '🔗'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold truncate">{source.label.replace(/[^\w\s.]/g, '').trim()}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${meta.tone}`}>{meta.badge}</span>
+                          </div>
+                          <span className="text-xs text-dark-400 font-medium line-clamp-1">{meta.description}</span>
+                        </div>
+                      </div>
+                      <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                        <ExternalLink size={18} />
+                      </div>
+                    </motion.a>
+                  );
+                })}
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
 
       {/* ═══ KEYBOARD SHORTCUTS MODAL ═════════════════════════════════ */}
       <AnimatePresence>
         {showShortcuts && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+          <motion.div
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              type="button"
+              aria-label="Close keyboard shortcuts"
               onClick={() => setShowShortcuts(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              className="absolute inset-0 bg-black/70 backdrop-blur-md"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md glass-panel p-6 rounded-3xl z-50 shadow-2xl border border-dark-200 dark:border-dark-800"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="keyboard-shortcuts-title"
+              initial={{ opacity: 0, y: 24, scale: 0.94, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: 24, scale: 0.94, filter: 'blur(8px)' }}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              className="relative w-full max-w-lg glass-panel rounded-3xl z-[111] shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold font-display flex items-center gap-2"><Keyboard size={20} /> Keyboard Shortcuts</h2>
-                <button onClick={() => setShowShortcuts(false)} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { key: 'S', desc: 'Cycle playback source' },
-                  { key: 'D', desc: 'Toggle download modal' },
-                  { key: '?', desc: 'Toggle shortcuts panel' },
-                  { key: 'Esc', desc: 'Close modals' },
-                ].map(s => (
-                  <div key={s.key} className="flex items-center justify-between p-3 bg-dark-50 dark:bg-dark-800 rounded-xl">
-                    <span className="text-sm text-dark-600 dark:text-dark-300">{s.desc}</span>
-                    <kbd className="px-3 py-1 rounded-lg bg-dark-200 dark:bg-dark-700 text-xs font-mono font-bold">{s.key}</kbd>
+              <div className="absolute -top-24 -right-24 w-56 h-56 bg-brand-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -left-24 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative p-6 border-b border-dark-200/70 dark:border-dark-800/80">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-xs font-bold mb-3 border border-brand-500/20">
+                      <Keyboard size={14} /> Watch Controls
+                    </div>
+                    <h2 id="keyboard-shortcuts-title" className="text-2xl font-bold font-display">Keyboard Shortcuts</h2>
+                    <p className="text-sm text-dark-500 dark:text-dark-400 mt-1">Fast controls for playback sources, downloads, and overlays.</p>
                   </div>
+                  <button onClick={() => setShowShortcuts(false)} className="p-2 hover:bg-dark-100 dark:hover:bg-dark-800 rounded-full transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="relative p-6 space-y-3">
+                {shortcutItems.map((shortcut, i) => (
+                  <motion.div
+                    key={shortcut.key}
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.06 * i }}
+                    className="flex items-center justify-between gap-4 p-4 bg-white/70 dark:bg-dark-800/80 rounded-2xl border border-dark-200/80 dark:border-dark-700/80"
+                  >
+                    <div className="min-w-0">
+                      <span className="block text-sm font-semibold text-dark-800 dark:text-dark-100">{shortcut.desc}</span>
+                      <span className="block text-xs text-dark-400 mt-0.5">{shortcut.hint}</span>
+                    </div>
+                    <kbd className="min-w-12 text-center px-3 py-2 rounded-xl bg-dark-900 text-white dark:bg-white dark:text-dark-900 text-xs font-mono font-black shadow-lg shadow-black/10 border border-white/10">
+                      {shortcut.key}
+                    </kbd>
+                  </motion.div>
                 ))}
+                <div className="pt-2 text-center text-[11px] text-dark-400">
+                  Tip: shortcuts are ignored while typing inside input fields.
+                </div>
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
