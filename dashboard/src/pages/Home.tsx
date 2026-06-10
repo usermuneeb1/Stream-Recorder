@@ -102,17 +102,6 @@ export default function Home() {
   const [sources, setSources] = useState({ mega: 0, archive: 0, pixel: 0, gofile: 0 });
   const [recentStreams, setRecentStreams] = useState<StreamData[]>([]);
 
-  // Parallax logo
-  const logoX = useMotionValue(0);
-  const logoY = useMotionValue(0);
-  const logoRotateX = useSpring(useTransform(logoY, [-200, 200], [10, -10]), { stiffness: 100, damping: 30 });
-  const logoRotateY = useSpring(useTransform(logoX, [-200, 200], [-10, 10]), { stiffness: 100, damping: 30 });
-
-  const handleHeroMouse = useCallback((e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    logoX.set(e.clientX - rect.left - rect.width / 2);
-    logoY.set(e.clientY - rect.top - rect.height / 2);
-  }, [logoX, logoY]);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,7 +210,7 @@ export default function Home() {
       <ParticleField count={20} />
 
       {/* ═══ HERO SECTION ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-24 relative z-10" onMouseMove={handleHeroMouse}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-24 relative z-10">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -271,7 +260,7 @@ export default function Home() {
         </motion.div>
 
         {/* Premium Hanging Lantern */}
-        <PremiumHangingLantern rotateX={logoRotateX} rotateY={logoRotateY} />
+        <PremiumHangingLantern />
       </div>
 
       {/* ═══ STATS GRID ═════════════════════════════════════════════ */}
