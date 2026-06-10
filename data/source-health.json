@@ -1,0 +1,22 @@
+{
+  "updated_at": "2026-06-10T10:06:11.000Z",
+  "dry_run": false,
+  "totals": {
+    "checked": 4,
+    "alive": 4,
+    "refreshed": 4,
+    "dead": 0,
+    "discord_messages_edited": 0
+  },
+  "providers": {
+    "gofile": {
+      "total": 4
+    },
+    "pixeldrain": {
+      "total": 0
+    },
+    "archive": {
+      "permanent": true
+    }
+  }
+}
