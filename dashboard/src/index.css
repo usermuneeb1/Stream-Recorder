@@ -427,7 +427,7 @@
 @keyframes spark-rise {
   0% { opacity: 0; transform: translate3d(0, 18px, 0) scale(.55); }
   18% { opacity: .9; }
-  100% { opacity: 0; transform: translate3d(var(--spark-x), -64px, 0) scale(.12); }
+  100% { opacity: 0; transform: translate3d(var(--spark-x), -36px, 0) scale(.12); }
 }
 
 .animate-lantern-breathe {
@@ -453,32 +453,32 @@
 .premium-flame {
   position: absolute;
   left: 50%;
-  bottom: 6px;
+  bottom: 4px;
   transform-origin: 50% 90%;
   filter: blur(.2px) drop-shadow(0 0 16px rgba(251,191,36,.95));
 }
 
 .premium-flame-outer {
-  width: 58px;
-  height: 94px;
+  width: 30px;
+  height: 48px;
   background: radial-gradient(circle at 50% 78%, #fff7ad 0 10%, #facc15 18%, #fb923c 42%, #ef4444 66%, rgba(239,68,68,0) 78%);
   animation: flame-dance .92s ease-in-out infinite;
   opacity: .95;
 }
 
 .premium-flame-mid {
-  width: 38px;
-  height: 72px;
-  bottom: 10px;
+  width: 19px;
+  height: 36px;
+  bottom: 7px;
   background: radial-gradient(circle at 50% 76%, #ffffff 0 12%, #fde68a 24%, #f59e0b 52%, rgba(245,158,11,0) 76%);
   animation: flame-dance .72s ease-in-out infinite reverse;
   opacity: .96;
 }
 
 .premium-flame-core {
-  width: 20px;
-  height: 44px;
-  bottom: 18px;
+  width: 9px;
+  height: 21px;
+  bottom: 13px;
   background: radial-gradient(circle at 50% 80%, #fff 0 22%, #fef3c7 42%, rgba(254,243,199,0) 76%);
   animation: flame-core .62s ease-in-out infinite;
   opacity: .92;
@@ -487,18 +487,18 @@
 .premium-flame-spark {
   position: absolute;
   left: 50%;
-  bottom: 42px;
-  width: 5px;
-  height: 5px;
+  bottom: 28px;
+  width: 3px;
+  height: 3px;
   border-radius: 9999px;
   background: #fde68a;
   box-shadow: 0 0 12px rgba(251,191,36,.9);
   animation: spark-rise 1.7s ease-out infinite;
 }
 
-.spark-a { --spark-x: -22px; animation-delay: 0s; }
-.spark-b { --spark-x: 18px; animation-delay: .48s; width: 4px; height: 4px; }
-.spark-c { --spark-x: 4px; animation-delay: .96s; width: 3px; height: 3px; }
+.spark-a { --spark-x: -11px; animation-delay: 0s; }
+.spark-b { --spark-x: 9px; animation-delay: .48s; width: 2.5px; height: 2.5px; }
+.spark-c { --spark-x: 2px; animation-delay: .96s; width: 2px; height: 2px; }
 
 /* ═══════════════════════════════════════════════════════════════════
    PREMIUM VISUAL SYSTEM — cinematic mesh, holographic cards, scanlines
