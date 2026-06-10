@@ -1,5 +1,5 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { motion, useSpring, useTransform, MotionValue } from 'framer-motion';
+import React, { useRef, useCallback } from 'react';
+import { motion, useSpring } from 'framer-motion';
 
 // ─── Types ──────────────────────────────────────────────────────────
 interface MagneticButtonProps {
@@ -28,8 +28,6 @@ export const MagneticButton: React.FC<MagneticButtonProps> = ({
   href,
 }) => {
   const ref = useRef<HTMLButtonElement | HTMLAnchorElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
-
   // Spring-driven x/y offsets
   const x = useSpring(0, SPRING_CONFIG);
   const y = useSpring(0, SPRING_CONFIG);
@@ -57,12 +55,7 @@ export const MagneticButton: React.FC<MagneticButtonProps> = ({
   const handleMouseLeave = useCallback(() => {
     x.set(0);
     y.set(0);
-    setIsHovered(false);
   }, [x, y]);
-
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-  }, []);
 
   // Shared motion style
   const motionStyle = { x, y };
@@ -73,7 +66,6 @@ export const MagneticButton: React.FC<MagneticButtonProps> = ({
     className: `inline-block cursor-pointer ${className}`,
     onMouseMove: handleMouseMove,
     onMouseLeave: handleMouseLeave,
-    onMouseEnter: handleMouseEnter,
     style: motionStyle,
   };
 

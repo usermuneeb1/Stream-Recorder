@@ -122,7 +122,8 @@ jobs:
       - name: "🍪 Setup YouTube Cookies"
         run: |
           if [[ -n "$YOUTUBE_COOKIES" ]]; then
-            echo "$YOUTUBE_COOKIES" > /tmp/cookies.txt
+            printf '%s\n' "$YOUTUBE_COOKIES" > /tmp/cookies.txt
+            chmod 600 /tmp/cookies.txt
             echo "✅ YouTube cookies loaded ($(wc -l < /tmp/cookies.txt) lines)"
           else
             echo "⚠️ No YOUTUBE_COOKIES secret — YouTube may block downloads"

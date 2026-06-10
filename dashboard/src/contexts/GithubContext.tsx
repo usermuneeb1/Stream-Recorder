@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 interface GithubContextType {
   pat: string;
@@ -47,7 +47,7 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } else {
         return false;
       }
-    } catch (e) {
+    } catch {
       return false;
     }
   };

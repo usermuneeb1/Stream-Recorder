@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { Lock, Cloud, Film, Database, HardDrive, RefreshCcw, Play, CheckCircle2, XCircle, Clock, Link, ServerCrash, Video, Edit3 } from 'lucide-react';
 import { useGithub } from '../contexts/GithubContext';
 
@@ -27,16 +27,16 @@ export default function CommandCenter() {
   const [arcData, setArcData] = useState({ mega_email: '', mega_password: '', archive_query: 'identifier:tml-2026-*' });
   const [megaData, setMegaData] = useState({ action: 'both' });
 
-  const fetchRuns = async () => {
+  const fetchRuns = useCallback(async () => {
     setRefreshing(true);
     const data = await getWorkflowRuns();
     setRuns(data.slice(0, 5)); // Top 5 recent runs
     setRefreshing(false);
-  };
+  }, [getWorkflowRuns]);
 
   useEffect(() => {
     if (pat) fetchRuns();
-  }, [pat]);
+  }, [pat, fetchRuns]);
 
   const [patError, setPatError] = useState(false);
   const [patLoading, setPatLoading] = useState(false);

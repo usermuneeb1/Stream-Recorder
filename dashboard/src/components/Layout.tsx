@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, LayoutGrid, Terminal, LogOut, Sun, Moon, Gamepad2 } from 'lucide-react';
+import { Home, LayoutGrid, Terminal, LogOut, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion';

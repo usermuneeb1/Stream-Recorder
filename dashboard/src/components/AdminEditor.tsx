@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Trash2, Plus, Clock, HardDrive, FileVideo, Link2, Check, Edit3 } from 'lucide-react';
+import { X, Save, Trash2, Plus, Clock, HardDrive, FileVideo, Check, Edit3 } from 'lucide-react';
 import { StreamData, StreamSource } from '../utils/dataFetcher';
 
 interface AdminEditorProps {

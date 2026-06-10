@@ -82,10 +82,10 @@ detect_force_record() {
     log_warn "FORCE_RECORD enabled — targeting latest channel video"
     local videos_url
     videos_url=$(get_videos_url)
-    local cookies_arg=""
-    [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+    local -a cookies_args=()
+    [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
 
-    DETECTED_VIDEO_ID=$(yt-dlp $cookies_arg --flat-playlist --playlist-end 1 \
+    DETECTED_VIDEO_ID=$(yt-dlp "${cookies_args[@]}" --flat-playlist --playlist-end 1 \
         --print "%(id)s" "$videos_url" 2>/dev/null | head -1) || true
 
     if [[ -z "$DETECTED_VIDEO_ID" ]]; then
@@ -94,7 +94,7 @@ detect_force_record() {
     fi
 
     DETECTED_URL="https://www.youtube.com/watch?v=${DETECTED_VIDEO_ID}"
-    DETECTED_TITLE=$(yt-dlp $cookies_arg --print "%(title)s" "$DETECTED_URL" 2>/dev/null | head -1) || DETECTED_TITLE="Forced Recording"
+    DETECTED_TITLE=$(yt-dlp "${cookies_args[@]}" --print "%(title)s" "$DETECTED_URL" 2>/dev/null | head -1) || DETECTED_TITLE="Forced Recording"
     DETECTED_CHANNEL="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
     DETECTED_THUMBNAIL="https://i.ytimg.com/vi/${DETECTED_VIDEO_ID}/maxresdefault.jpg"
     DETECTED_METHOD="force_record"
@@ -204,11 +204,11 @@ detect_method_2_ytdlp() {
     
     local live_url
     live_url=$(get_live_url)
-    local cookies_arg=""
+    local -a cookies_args=()
     
     # Use cookies if available and not explicitly expired
     if [[ -f "cookies.txt" ]] && [[ -s "cookies.txt" ]] && [[ "${COOKIE_STATUS:-}" != "expired" ]]; then
-        cookies_arg="--cookies cookies.txt"
+        cookies_args=(--cookies cookies.txt)
     fi
     
     local user_agent
@@ -226,14 +226,14 @@ detect_method_2_ytdlp() {
         --ignore-no-formats-error \
         --user-agent "$user_agent" \
         --extractor-args "youtube:player_client=web" \
-        $cookies_arg \
+        "${cookies_args[@]}" \
         "$live_url" 2>"$ytdlp_err") || {
         local err_msg
-        err_msg=$(cat "$ytdlp_err" 2>/dev/null | tail -3)
+        err_msg=$(tail -3 "$ytdlp_err" 2>/dev/null)
         log_warn "Method 2: yt-dlp dump-json failed"
         [[ -n "$err_msg" ]] && log_info "  yt-dlp error: ${err_msg}"
         log_info "  URL tried: ${live_url}"
-        log_info "  Cookies: ${cookies_arg:-none}"
+        log_info "  Cookies: ${cookies_args[*]:-none}"
         rm -f "$ytdlp_err"
         return 1
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Bookmark, Share2, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check, Keyboard, ChevronRight, Play } from 'lucide-react';
+import { Download, Bookmark, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check, Keyboard, ChevronRight, Play } from 'lucide-react';
 import { StreamData, fetchStreams } from '../utils/dataFetcher';
 
 export default function Watch() {
@@ -47,7 +47,7 @@ export default function Watch() {
         }
       }
     });
-  }, [id]);
+  }, [id, stream, activeSource]);
 
   // Load Bookmarks
   useEffect(() => {
@@ -55,11 +55,20 @@ export default function Watch() {
       try {
         const saved = localStorage.getItem(`bookmarks_${id}`);
         if (saved) setBookmarks(JSON.parse(saved));
-      } catch (e) {}
+      } catch {}
     }
   }, [id]);
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────
+  const switchSource = useCallback((key: string) => {
+    if (key === activeSource) return;
+    setSourceTransition(true);
+    window.setTimeout(() => {
+      setActiveSource(key);
+      window.setTimeout(() => setSourceTransition(false), 100);
+    }, 200);
+  }, [activeSource]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -72,6 +81,7 @@ export default function Watch() {
           e.preventDefault();
           if (stream) {
             const keys = Object.keys(stream.sources);
+            if (keys.length === 0) return;
             const idx = keys.indexOf(activeSource);
             const next = keys[(idx + 1) % keys.length];
             switchSource(next);
@@ -89,16 +99,7 @@ export default function Watch() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [stream, activeSource]);
-
-  const switchSource = (key: string) => {
-    if (key === activeSource) return;
-    setSourceTransition(true);
-    setTimeout(() => {
-      setActiveSource(key);
-      setTimeout(() => setSourceTransition(false), 100);
-    }, 200);
-  };
+  }, [stream, activeSource, switchSource]);
 
   // Not Found
   if (notFound) {

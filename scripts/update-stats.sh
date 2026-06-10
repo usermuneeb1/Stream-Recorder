@@ -42,11 +42,16 @@ update_stats() {
     existing_stats=$(github_api_read_content "stats.json" 2>/dev/null) || existing_stats=""
     
     local total_streams=0 total_hours=0 total_gb=0 avg_duration=0
+    local src_archive=0 src_mega=0 src_pixel=0 src_gofile=0
     
     if [[ -n "$existing_stats" ]]; then
         total_streams=$(echo "$existing_stats" | jq -r '.total_streams // 0' 2>/dev/null)
         total_hours=$(echo "$existing_stats" | jq -r '.total_hours // 0' 2>/dev/null)
         total_gb=$(echo "$existing_stats" | jq -r '.total_gb // 0' 2>/dev/null)
+        src_archive=$(echo "$existing_stats" | jq -r '.sources.archive // 0' 2>/dev/null)
+        src_mega=$(echo "$existing_stats" | jq -r '.sources.mega // 0' 2>/dev/null)
+        src_pixel=$(echo "$existing_stats" | jq -r '.sources.pixel // .sources.pixeldrain // 0' 2>/dev/null)
+        src_gofile=$(echo "$existing_stats" | jq -r '.sources.gofile // 0' 2>/dev/null)
         log_info "Existing: ${total_streams} streams, ${total_hours}h, ${total_gb} GB"
     else
         log_info "No existing stats — creating from scratch"
@@ -65,20 +70,26 @@ update_stats() {
     [[ "$avg_duration"  == .* ]] && avg_duration="0${avg_duration}"
     [[ "$size_gb"       == .* ]] && size_gb="0${size_gb}"
     
+    # Count one provider hit per recording if at least one link was produced.
+    [[ -n "${ARCHIVE_LINKS:-}" ]] && src_archive=$(( src_archive + 1 ))
+    [[ -n "${MEGA_LINKS:-}" ]] && src_mega=$(( src_mega + 1 ))
+    [[ -n "${PIXELDRAIN_LINKS:-}" ]] && src_pixel=$(( src_pixel + 1 ))
+    [[ -n "${GOFILE_LINKS:-}" ]] && src_gofile=$(( src_gofile + 1 ))
+    
     log_info "Updated: ${total_streams} streams, ${total_hours}h, ${total_gb} GB, avg ${avg_duration}h"
+    log_info "Sources: archive=${src_archive}, mega=${src_mega}, pixel=${src_pixel}, gofile=${src_gofile}"
     
     # ── Build new stats JSON ─────────────────────────────────────────────────
-    local esc_title esc_channel esc_date
-    esc_title=$(json_escape "$stream_title")
-    esc_channel=$(json_escape "$stream_channel")
-    esc_date=$(json_escape "$current_date")
-    
     local new_stats
     new_stats=$(jq -n \
         --arg total_streams      "$total_streams" \
         --arg total_hours        "$total_hours" \
         --arg total_gb           "$total_gb" \
         --arg avg_duration_hours "$avg_duration" \
+        --arg src_archive        "$src_archive" \
+        --arg src_mega           "$src_mega" \
+        --arg src_pixel          "$src_pixel" \
+        --arg src_gofile         "$src_gofile" \
         --arg last_title         "$stream_title" \
         --arg last_channel       "$stream_channel" \
         --arg last_date          "$current_date" \
@@ -90,6 +101,12 @@ update_stats() {
             total_hours: ($total_hours | tonumber // 0),
             total_gb: ($total_gb | tonumber // 0),
             avg_duration_hours: ($avg_duration_hours | tonumber // 0),
+            sources: {
+                archive: ($src_archive | tonumber // 0),
+                mega: ($src_mega | tonumber // 0),
+                pixel: ($src_pixel | tonumber // 0),
+                gofile: ($src_gofile | tonumber // 0)
+            },
             last_stream: {
                 title: $last_title,
                 channel: $last_channel,
@@ -210,7 +227,12 @@ update_recordings_json() {
         }')
 
     local merged
-    merged=$(echo "$existing" | jq --argjson e "$entry" '[ $e ] + . | unique_by(.video_id)' 2>/dev/null) || merged="[$entry]"
+    merged=$(echo "$existing" | jq --argjson e "$entry" '
+        [$e] + .
+        | reduce .[] as $item ([];
+            if any(.[]; .video_id == $item.video_id) then . else . + [$item] end
+          )
+    ' 2>/dev/null) || merged="[$entry]"
     github_api_write "data/recordings.json" "$merged" "📊 Dashboard: ${STREAM_TITLE:-recording}" >/dev/null 2>&1 || true
 }
 

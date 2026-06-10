@@ -109,16 +109,27 @@ jobs:
       - name: "🧹 Cleanup Old Workflow Runs"
         continue-on-error: true
         run: |
-          # Delete old completed runs to keep Actions tab clean (keep latest 5)
+          # Delete old completed runs to keep Actions tab clean (keep latest 5).
+          # This step is intentionally best-effort and must never block recording.
           echo "🧹 Cleaning up old workflow runs..."
-          RUNS=$(curl -s -H "Authorization: token ${GH_PAT}" \
+          if [[ -z "${GH_PAT:-}" ]]; then
+            echo "ℹ️ GH_PAT not set — skipping workflow cleanup"
+            exit 0
+          fi
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "ℹ️ jq not available yet — skipping workflow cleanup"
+            exit 0
+          fi
+          RUNS=$(curl -fsS -H "Authorization: token ${GH_PAT}" \
+            -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=50&status=completed" \
             | jq -r '.workflow_runs[5:] | .[].id' 2>/dev/null) || true
           
           deleted=0
           for run_id in $RUNS; do
-            curl -s -X DELETE -H "Authorization: token ${GH_PAT}" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" 2>/dev/null && ((deleted++)) || true
+            curl -fsS -X DELETE -H "Authorization: token ${GH_PAT}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >/dev/null 2>&1 && ((deleted++)) || true
           done
           echo "✅ Deleted ${deleted} old runs"
 
@@ -214,11 +225,14 @@ jobs:
                [[ -s cookies_b64.tmp ]] && \
                head -1 cookies_b64.tmp | grep -qi "netscape\|mozilla\|#\|\.youtube"; then
               mv cookies_b64.tmp cookies.txt
+              chmod 600 cookies.txt
               log_ok "Cookies decoded from base64"
             else
               rm -f cookies_b64.tmp
-              # Plaintext cookies (same as cookie-keepalive)
-              echo "$YOUTUBE_COOKIES" > cookies.txt
+              # Plaintext cookies (same as cookie-keepalive). Use printf to avoid
+              # shell-specific echo escaping and preserve Netscape cookie rows.
+              printf '%s\n' "$YOUTUBE_COOKIES" > cookies.txt
+              chmod 600 cookies.txt
               log_ok "Cookies stored as plaintext"
             fi
             

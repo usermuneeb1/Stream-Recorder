@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Gamepad2, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export const SnakeGame: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, Variants, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, RefreshCcw, LayoutGrid, List, X, Filter, Edit3 } from 'lucide-react';
+import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, RefreshCcw, LayoutGrid, List, X, Edit3 } from 'lucide-react';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
 import { AdminEditor, applyAdminOverrides } from '../components/AdminEditor';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,6 +50,8 @@ const FILTERS = [
   { key: 'short', label: 'Short (<1h)' },
   { key: 'archive', label: 'Has Archive' },
   { key: 'mega', label: 'Has MEGA' },
+  { key: 'pixel', label: 'Has Pixeldrain' },
+  { key: 'gofile', label: 'Has Gofile' },
 ] as const;
 
 type FilterKey = typeof FILTERS[number]['key'];
@@ -75,7 +77,7 @@ export default function Gallery() {
         setStreams(applyAdminOverrides(data));
         setLoading(false);
       })
-      .catch(err => {
+      .catch(() => {
         setError('Failed to load recordings. Please check your connection and try again.');
         setLoading(false);
       });
@@ -107,6 +109,12 @@ export default function Gallery() {
       }
       if (activeFilter === 'mega') {
         if (!s.sources.mega) return false;
+      }
+      if (activeFilter === 'pixel') {
+        if (!s.sources.pixel) return false;
+      }
+      if (activeFilter === 'gofile') {
+        if (!s.sources.gofile) return false;
       }
       return true;
     })

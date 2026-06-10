@@ -7,7 +7,6 @@ import { SnakeGame } from '../components/SnakeGame';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
-import { AnimatedText } from '../components/AnimatedText';
 import { Link } from 'react-router-dom';
 
 const containerVariants: Variants = {
@@ -48,6 +47,21 @@ function useTilt() {
   }, [x, y]);
 
   return { ref, rotateX, rotateY, handleMouse, handleLeave };
+}
+
+const RAW_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
+
+interface ArchiveStatsFile {
+  total_streams?: number;
+  total_hours?: number;
+  total_gb?: number;
+  sources?: {
+    mega?: number;
+    archive?: number;
+    pixel?: number;
+    pixeldrain?: number;
+    gofile?: number;
+  };
 }
 
 // ── StatCard Component (hooks called at component level, not in .map) ──
@@ -99,14 +113,44 @@ export default function Home() {
   }, [logoX, logoY]);
 
   useEffect(() => {
-    fetchStreams().then(streams => {
+    let cancelled = false;
+
+    async function loadDashboardData() {
+      const streams = await fetchStreams();
+      if (cancelled) return;
+      setRecentStreams(streams.slice(0, 4));
+
+      try {
+        const res = await fetch(`${RAW_URL}/stats.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`stats.json HTTP ${res.status}`);
+        const repoStats = await res.json() as ArchiveStatsFile;
+        if (cancelled) return;
+
+        setStats({
+          total_streams: repoStats.total_streams ?? streams.length,
+          total_hours: Math.round(repoStats.total_hours ?? 0),
+          total_gb: Math.round((repoStats.total_gb ?? 0) * 10) / 10,
+        });
+        setSources({
+          mega: repoStats.sources?.mega ?? 0,
+          archive: repoStats.sources?.archive ?? 0,
+          pixel: repoStats.sources?.pixel ?? repoStats.sources?.pixeldrain ?? 0,
+          gofile: repoStats.sources?.gofile ?? 0,
+        });
+        return;
+      } catch {
+        // Fallback for local/offline previews: derive approximate totals from stream cards.
+      }
+
       let hours = 0;
       let gb = 0;
       let m = 0, a = 0, p = 0, g = 0;
 
       streams.forEach(s => {
         const hMatch = s.duration?.match(/(\d+)h/);
+        const mMatch = s.duration?.match(/(\d+)m/);
         if (hMatch) hours += parseInt(hMatch[1]);
+        if (mMatch) hours += parseInt(mMatch[1]) / 60;
         if (s.size?.includes('GB')) gb += parseFloat(s.size);
         if (s.size?.includes('MB')) gb += parseFloat(s.size) / 1024;
         if (s.sources.mega) m++;
@@ -115,21 +159,27 @@ export default function Home() {
         if (s.sources.gofile) g++;
       });
 
-      setStats({
-        total_streams: streams.length,
-        total_hours: Math.round(hours),
-        total_gb: Math.round(gb * 10) / 10
-      });
-      setSources({ mega: m, archive: a, pixel: p, gofile: g });
-      setRecentStreams(streams.slice(0, 4));
-    });
+      if (!cancelled) {
+        setStats({
+          total_streams: streams.length,
+          total_hours: Math.round(hours),
+          total_gb: Math.round(gb * 10) / 10
+        });
+        setSources({ mega: m, archive: a, pixel: p, gofile: g });
+      }
+    }
+
+    loadDashboardData().catch(() => undefined);
+    return () => { cancelled = true; };
   }, []);
+
+  const activeProviderCount = Object.values(sources).filter(count => count > 0).length || 4;
 
   const statCards = [
     { label: 'Total Streams', value: stats.total_streams, icon: <Film />, color: 'text-blue-500', bg: 'from-blue-500/10 to-blue-500/5' },
     { label: 'Hours Archived', value: stats.total_hours, suffix: '+', icon: <Database />, color: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5' },
     { label: 'Storage Used', value: stats.total_gb, suffix: ' GB', icon: <HardDrive />, color: 'text-brand-500', bg: 'from-brand-500/10 to-brand-500/5' },
-    { label: 'Cloud Providers', value: 4, suffix: ' Active', icon: <Cloud />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
+    { label: 'Cloud Providers', value: activeProviderCount, suffix: ' Active', icon: <Cloud />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
   ];
 
   const features = [
@@ -388,7 +438,7 @@ export default function Home() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {features.map((feature, i) => (
+          {features.map((feature) => (
             <motion.div
               key={feature.title}
               variants={itemVariants}

@@ -162,13 +162,13 @@ record_method_d() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
-    local cookies_arg=""
+    local -a cookies_args=()
     if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
-        cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+        cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        $cookies_arg \
+        "${cookies_args[@]}" \
         --extractor-args "youtube:player_client=android_vr" \
         --no-part \
         --no-continue \
@@ -200,13 +200,13 @@ record_method_e() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
-    local cookies_arg=""
+    local -a cookies_args=()
     if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
-        cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+        cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        $cookies_arg \
+        "${cookies_args[@]}" \
         --extractor-args "youtube:player_client=mweb" \
         --user-agent "$mobile_ua" \
         --no-part \
@@ -244,13 +244,13 @@ record_method_f() {
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
     
     # Use cookies with streamlink if available
-    local cookies_arg=""
+    local -a cookies_args=()
     if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
-        cookies_arg="--http-cookie-file ${COOKIES_FILE:-cookies.txt}"
+        cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
     
     timeout "${MAX_RECORD_DURATION:-18000}" streamlink \
-        $cookies_arg \
+        "${cookies_args[@]}" \
         --output "$output_file" \
         --force \
         --stream-segment-threads 3 \
@@ -277,13 +277,13 @@ record_method_g() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
-    local cookies_arg=""
+    local -a cookies_args=()
     if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
-        cookies_arg="--cookies ${COOKIES_FILE:-cookies.txt}"
+        cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
     timeout "${MAX_RECORD_DURATION:-18000}" yt-dlp \
-        $cookies_arg \
+        "${cookies_args[@]}" \
         --no-part \
         --no-continue \
         --no-check-certificates \
@@ -453,7 +453,7 @@ merge_segments() {
     
     # Create concat file for ffmpeg
     local concat_file="${RECORD_DIR}/concat_list.txt"
-    > "$concat_file"
+    : > "$concat_file"
     for segment in "${RECORDED_FILES[@]}"; do
         echo "file '$(realpath "$segment")'" >> "$concat_file"
     done

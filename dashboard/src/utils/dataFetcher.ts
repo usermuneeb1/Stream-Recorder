@@ -21,6 +21,13 @@ export interface StatsData {
   total_streams: number;
   total_hours: number;
   total_gb: number;
+  sources?: {
+    mega?: number;
+    archive?: number;
+    pixel?: number;
+    pixeldrain?: number;
+    gofile?: number;
+  };
 }
 
 const RAW_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
@@ -212,7 +219,7 @@ export async function fetchStreams(): Promise<StreamData[]> {
     const res = await fetch(`${RAW_URL}/links.txt?t=${Date.now()}`);
     const text = await res.text();
     list = parseLinks(text);
-  } catch (e) {
+  } catch {
     console.warn('Could not parse links.txt');
   }
 
@@ -220,7 +227,7 @@ export async function fetchStreams(): Promise<StreamData[]> {
     const res = await fetch(`${RAW_URL}/data/recordings.json?t=${Date.now()}`);
     const recs = await res.json();
     list = mergeData(list, recs);
-  } catch (e) {
+  } catch {
     console.warn('Could not parse recordings.json');
   }
 

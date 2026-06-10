@@ -1,0 +1,92 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  ✅ QUALITY CHECK — Backend scripts + Dashboard build                       ║
+# ║  Fast validation gate for professional maintenance.                         ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "✅ Quality Check"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "package*.json"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: quality-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-scripts:
+    name: "🐚 Bash / Workflow Hygiene"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install linters"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck jq python3
+
+      - name: "🔎 Bash syntax"
+        run: |
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          for f in scripts/*.sh; do
+            echo "Checking syntax: $f"
+            bash -n "$f"
+          done
+
+      - name: "🔎 ShellCheck"
+        run: |
+          # Treat correctness findings as failures; allow style/warning noise for now.
+          shellcheck -x -S error scripts/*.sh
+
+      - name: "🔐 Secret reference summary"
+        run: |
+          echo "## Referenced GitHub Secrets" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          grep -RohE '\$\{\{[[:space:]]*secrets\.[A-Za-z0-9_]+[[:space:]]*\}\}' .github/workflows scripts 2>/dev/null \
+            | sed -E 's/.*secrets\.([A-Za-z0-9_]+).*/- `\1`/' \
+            | sort -u >> "$GITHUB_STEP_SUMMARY" || true
+
+  dashboard:
+    name: "🖥️ Dashboard Lint + Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: dashboard
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🔧 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: "📦 Install dependencies"
+        run: npm ci
+
+      - name: "🔎 Lint"
+        run: npm run lint
+
+      - name: "🏗️ Build"
+        run: npm run build

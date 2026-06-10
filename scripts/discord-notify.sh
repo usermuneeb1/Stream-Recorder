@@ -153,7 +153,7 @@ notify_live_detected() {
     local method="${STREAM_DETECTION_METHOD:-Unknown}"
     local detect_time="${STREAM_DETECTION_TIME:-$(now_pkt)}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local dashboard_url="${DASHBOARD_URL:-https://muslim-lantern-archive.vercel.app/}"
     local cookie_status="${COOKIE_STATUS:-unknown}"
     local disk_space="${DISK_SPACE_GB:-N/A}"
     local timestamp
@@ -267,7 +267,7 @@ notify_recording_complete() {
     local thumbnail="${STREAM_THUMBNAIL:-}"
     local video_id="${STREAM_VIDEO_ID:-}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local dashboard_url="${DASHBOARD_URL:-https://muslim-lantern-archive.vercel.app/}"
     local timestamp
     timestamp=$(now_utc_iso)
     
@@ -537,7 +537,7 @@ notify_recording_failed() {
     local thumbnail="${STREAM_THUMBNAIL:-}"
     local video_id="${STREAM_VIDEO_ID:-}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local dashboard_url="${DASHBOARD_URL:-https://muslim-lantern-archive.vercel.app/}"
     local timestamp
     timestamp=$(now_utc_iso)
     
@@ -707,7 +707,7 @@ notify_links_refreshed() {
     local active="${REFRESH_ACTIVE:-0}"
     local expired="${REFRESH_EXPIRED:-0}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local dashboard_url="${DASHBOARD_URL:-https://muslim-lantern-archive.vercel.app/}"
     local timestamp
     timestamp=$(now_utc_iso)
     local refresh_time
@@ -810,7 +810,7 @@ _notify_system_health_check() {
     local cookie_status="${COOKIE_STATUS:-unknown}"
     local warp="${WARP_CONNECTED:-false}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local dashboard_url="${DASHBOARD_URL:-https://muslim-lantern-archive.vercel.app/}"
     local timestamp
     timestamp=$(now_utc_iso)
     local check_time
@@ -880,7 +880,7 @@ notify_cookie_warning() {
     local status="${1:-expired}"
     local days_old="${2:-unknown}"
     local avatar="${AVATAR_URL:-}"
-    local dashboard_url="${DASHBOARD_URL:-https://usermuneeb1.github.io/Stream-Recorder/}"
+    local dashboard_url="${DASHBOARD_URL:-https://muslim-lantern-archive.vercel.app/}"
     local timestamp
     timestamp=$(now_utc_iso)
     local warn_time
