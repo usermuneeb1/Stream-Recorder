@@ -7,7 +7,7 @@ import { SnakeGame } from '../components/SnakeGame';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
-import { PremiumShowcase } from '../components/PremiumShowcase';
+import { ArchiveExperience } from '../components/ArchiveExperience';
 import { Link } from 'react-router-dom';
 
 const containerVariants: Variants = {
@@ -330,12 +330,11 @@ export default function Home() {
         ))}
       </motion.div>
 
-      {/* ═══ PREMIUM SYSTEM SHOWCASE ═══════════════════════════════ */}
-      <PremiumShowcase
+      {/* ═══ PREMIUM PUBLIC ARCHIVE EXPERIENCE ════════════════════ */}
+      <ArchiveExperience
         streams={stats.total_streams}
         hours={stats.total_hours}
         storageGb={stats.total_gb}
-        sources={sources}
       />
 
       {/* ═══ YOUTUBE STATS + RECENT STREAMS ════════════════════════ */}

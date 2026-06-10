@@ -43,12 +43,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Scroll Progress Bar */}
       <ScrollProgress />
 
-      {/* Cinematic layered background */}
+      {/* Cinematic background */}
       <div className="aurora-bg" aria-hidden="true">
         <div className="aurora-blob-3" />
       </div>
-      <div className="premium-page-mesh" aria-hidden="true" />
-      <div className="premium-noise" aria-hidden="true" />
 
       {/* Cursor Glow */}
       <div className="cursor-glow hidden lg:block" aria-hidden="true" />
