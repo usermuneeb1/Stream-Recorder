@@ -7,6 +7,7 @@ import { SnakeGame } from '../components/SnakeGame';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
+import { PremiumShowcase } from '../components/PremiumShowcase';
 import { Link } from 'react-router-dom';
 
 const containerVariants: Variants = {
@@ -329,6 +330,14 @@ export default function Home() {
         ))}
       </motion.div>
 
+      {/* ═══ PREMIUM SYSTEM SHOWCASE ═══════════════════════════════ */}
+      <PremiumShowcase
+        streams={stats.total_streams}
+        hours={stats.total_hours}
+        storageGb={stats.total_gb}
+        sources={sources}
+      />
+
       {/* ═══ YOUTUBE STATS + RECENT STREAMS ════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-24 relative z-10">
         {/* YouTube Stats Card */}
@@ -443,7 +452,7 @@ export default function Home() {
               key={feature.title}
               variants={itemVariants}
               whileHover={{ y: -5 }}
-              className="glass-panel p-8 rounded-3xl border border-dark-200 dark:border-dark-800 card-hover-glow group transition-all duration-500 hover:shadow-xl hover:shadow-brand-500/5"
+              className="holographic-card p-8 rounded-3xl card-hover-glow group transition-all duration-500 hover:shadow-xl hover:shadow-brand-500/10"
             >
               <motion.div
                 whileHover={{ scale: 1.1, rotate: 5 }}

@@ -352,8 +352,10 @@ export default function Gallery() {
                   <Link
                     to={`/watch/${stream.videoId}`}
                     state={{ stream }}
-                    className="relative aspect-video rounded-2xl overflow-hidden bg-dark-900 shadow-lg border border-dark-200 dark:border-dark-800 hover:shadow-2xl hover:shadow-brand-500/10 transition-all duration-500"
+                    className="premium-link-card relative aspect-video rounded-2xl overflow-hidden bg-dark-900 shadow-lg border border-dark-200 dark:border-dark-800 hover:shadow-2xl hover:shadow-brand-500/20 transition-all duration-500"
                   >
+                    <div className="absolute inset-0 z-[1] bg-[radial-gradient(circle_at_var(--glow-x,50%)_var(--glow-y,50%),rgba(239,68,68,0.24),transparent_34%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="absolute inset-x-0 top-0 z-[2] h-16 bg-gradient-to-b from-black/50 to-transparent opacity-80" />
                     <img
                       src={stream.thumbnail}
                       alt={stream.title}
@@ -379,18 +381,22 @@ export default function Gallery() {
                       {stream.duration || 'Unknown'}
                     </div>
 
-                    {/* Source dots */}
-                    <div className="absolute top-3 left-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                    {/* Source badges */}
+                    <div className="absolute top-3 left-3 z-20 flex gap-1.5 transition-all duration-300">
                       {Object.entries(stream.sources).slice(0, 4).map(([key, src]) => (
                         <div
                           key={key}
-                          className={`h-2 rounded-full transition-all duration-500 group-hover:px-2 ${sourceColors[key] || 'bg-gray-500'}`}
-                          style={{ width: '8px' }}
+                          className={`h-7 rounded-full px-2.5 flex items-center gap-1 text-[10px] font-black text-white shadow-lg backdrop-blur-md border border-white/20 transition-all duration-500 ${sourceColors[key] || 'bg-gray-500'}`}
                           title={src.label}
                         >
-                          <span className="text-[8px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          <span className="hidden group-hover:inline">{key === 'pixel' ? 'PX' : key.toUpperCase().slice(0, 4)}</span>
                         </div>
                       ))}
+                    </div>
+
+                    <div className="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-black/65 text-white text-[10px] font-black tracking-widest border border-white/10 backdrop-blur-md">
+                      {Object.keys(stream.sources).length} MIRRORS
                     </div>
 
                     {/* Progress bar */}
