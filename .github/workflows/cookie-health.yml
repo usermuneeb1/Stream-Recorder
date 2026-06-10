@@ -1,0 +1,84 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🍪 COOKIE HEALTH SENTINEL                                                  ║
+# ║  Runs independently so YouTube cookie problems alert before a live stream.  ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🍪 Cookie Health Sentinel"
+
+on:
+  schedule:
+    # Every 6 hours
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: cookie-health
+  cancel-in-progress: true
+
+env:
+  YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+  GH_PAT: ${{ secrets.GH_PAT }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  COOKIES_FILE: cookies.txt
+  TZ: Asia/Karachi
+
+jobs:
+  cookie-health:
+    name: "🍪 Verify YouTube Cookies"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq coreutils
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
+
+      - name: "🍪 Prepare cookies"
+        run: |
+          if [[ -z "${YOUTUBE_COOKIES:-}" ]]; then
+            echo "⚠️ YOUTUBE_COOKIES secret is empty"
+            : > cookies.txt
+            exit 0
+          fi
+
+          if printf '%s' "$YOUTUBE_COOKIES" | base64 -d > cookies_b64.tmp 2>/dev/null && \
+             [[ -s cookies_b64.tmp ]] && \
+             head -1 cookies_b64.tmp | grep -qi "netscape\|mozilla\|#\|\.youtube"; then
+            mv cookies_b64.tmp cookies.txt
+          else
+            rm -f cookies_b64.tmp
+            printf '%s\n' "$YOUTUBE_COOKIES" > cookies.txt
+          fi
+          chmod 600 cookies.txt
+          echo "Prepared cookies: $(wc -l < cookies.txt) lines"
+
+      - name: "🔎 Run cookie health check"
+        id: check
+        run: bash scripts/check-cookies.sh
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          source scripts/utils.sh
+          echo "## 🍪 Cookie Health Sentinel" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Time | $(now_pkt) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${COOKIE_STATUS:-unknown} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Lines | $(wc -l < cookies.txt 2>/dev/null || echo 0) |" >> "$GITHUB_STEP_SUMMARY"

@@ -493,6 +493,38 @@ refresh_links() {
         fi
     fi
     
+    # ── Persist source health snapshot for private/admin dashboards ───────────
+    local health_json
+    health_json=$(jq -n \
+        --arg checked "$total_checked" \
+        --arg alive "$total_alive" \
+        --arg refreshed "$total_refreshed" \
+        --arg dead "$total_dead" \
+        --arg edited "$total_edited" \
+        --arg total_gofile "$total_gofile" \
+        --arg total_pixeldrain "$total_pixeldrain" \
+        --arg dry_run "$dry_run" \
+        --arg updated_at "$(now_utc_iso)" \
+        '{
+            updated_at: $updated_at,
+            dry_run: ($dry_run == "true"),
+            totals: {
+                checked: ($checked | tonumber),
+                alive: ($alive | tonumber),
+                refreshed: ($refreshed | tonumber),
+                dead: ($dead | tonumber),
+                discord_messages_edited: ($edited | tonumber)
+            },
+            providers: {
+                gofile: { total: ($total_gofile | tonumber) },
+                pixeldrain: { total: ($total_pixeldrain | tonumber) },
+                archive: { permanent: true }
+            }
+        }')
+    if [[ "$dry_run" != "true" ]]; then
+        github_api_write "data/source-health.json" "$health_json" "🔄 Source health updated ($(now_pkt))" >/dev/null 2>&1 || true
+    fi
+    
     # ── Summary ──────────────────────────────────────────────────────────────
     local refresh_elapsed=$(( $(now_epoch) - refresh_start ))
     

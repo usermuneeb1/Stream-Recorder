@@ -1,0 +1,112 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🚨 WORKFLOW WATCHDOG                                                       ║
+# ║  Alerts Discord when critical automation workflows fail.                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🚨 Workflow Watchdog"
+
+on:
+  schedule:
+    # Hourly
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: "How many hours back to inspect"
+        required: false
+        default: "6"
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: workflow-watchdog
+  cancel-in-progress: true
+
+env:
+  GH_PAT: ${{ secrets.GH_PAT }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  watchdog:
+    name: "🚨 Check recent failures"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq
+
+      - name: "🚨 Inspect workflows"
+        run: |
+          set -euo pipefail
+          LOOKBACK="${{ github.event.inputs.lookback_hours }}"
+          LOOKBACK="${LOOKBACK:-6}"
+          SINCE_EPOCH=$(date -u -d "${LOOKBACK} hours ago" +%s)
+          TOKEN="${GH_PAT:-${GITHUB_TOKEN:-}}"
+          if [[ -z "$TOKEN" ]]; then
+            echo "GH_PAT missing; cannot inspect workflow runs"
+            exit 0
+          fi
+
+          CRITICAL='stream-recorder.yml cookie-health.yml cloud-refresh.yml account-keepalive.yml youtube-to-archive.yml archive-to-mega.yml deploy-pages.yml quality-check.yml'
+          RUNS=$(curl -fsS \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=60")
+
+          FAILURES=$(echo "$RUNS" | jq -r --argjson since "$SINCE_EPOCH" --arg critical "$CRITICAL" '
+            .workflow_runs[]
+            | select((.status == "completed") and (.conclusion != "success") and (.conclusion != "cancelled"))
+            | select((.updated_at | fromdateiso8601) >= $since)
+            | select(($critical | split(" ")) as $c | $c | index(.path | split("/")[-1]))
+            | "- **" + .name + "** — `" + .conclusion + "` — " + .html_url
+          ')
+
+          COUNT=$(printf '%s\n' "$FAILURES" | sed '/^$/d' | wc -l | tr -d ' ')
+          echo "Found $COUNT recent critical failure(s)"
+          {
+            echo "## 🚨 Workflow Watchdog"
+            echo ""
+            echo "Lookback: ${LOOKBACK}h"
+            echo "Failures: ${COUNT}"
+            [[ "$COUNT" != "0" ]] && printf '\n%s\n' "$FAILURES"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$COUNT" == "0" ]]; then
+            exit 0
+          fi
+
+          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+          PAYLOAD=$(jq -n \
+            --arg username "☪️ The Muslim Lantern" \
+            --arg avatar "${AVATAR_URL:-}" \
+            --arg failures "$FAILURES" \
+            --arg repo "${GITHUB_REPOSITORY}" \
+            --arg lookback "$LOOKBACK" \
+            --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            '{
+              content: "@everyone",
+              username: $username,
+              avatar_url: $avatar,
+              embeds: [{
+                title: "🚨 Critical Workflow Failure Detected",
+                description: ("Recent automation failures in `" + $repo + "` within the last **" + $lookback + "h**:\n\n" + $failures),
+                color: 15158332,
+                timestamp: $ts
+              }]
+            }')
+          curl -fsS -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK" >/dev/null

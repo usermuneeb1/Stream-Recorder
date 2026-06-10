@@ -55,6 +55,21 @@ jobs:
           # Treat correctness findings as failures; allow style/warning noise for now.
           shellcheck -x -S error scripts/*.sh
 
+      - name: "🔎 Python syntax"
+        run: |
+          python3 -m py_compile scripts/mega/*.py
+
+      - name: "🔎 GitHub Actions lint"
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          # Run actionlint's workflow semantics checks. Shell scripts are already
+          # checked separately by ShellCheck, so disable actionlint's embedded
+          # shellcheck integration to avoid duplicate/noisy inline-workflow style findings.
+          ./actionlint -color -shellcheck ""
+
+      - name: "🧪 Database audit"
+        run: bash scripts/database-audit.sh
+
       - name: "🔐 Secret reference summary"
         run: |
           echo "## Referenced GitHub Secrets" >> "$GITHUB_STEP_SUMMARY"
