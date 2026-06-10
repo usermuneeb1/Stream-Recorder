@@ -8,6 +8,7 @@ import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
 import { ArchiveExperience } from '../components/ArchiveExperience';
+import { PremiumHangingLantern } from '../components/PremiumHangingLantern';
 import { Link } from 'react-router-dom';
 
 const containerVariants: Variants = {
@@ -269,52 +270,8 @@ export default function Home() {
           </motion.div>
         </motion.div>
 
-        {/* Floating 3D Logo */}
-        <motion.div
-          initial={{ opacity: 0, filter: 'blur(30px)', scale: 0.8 }}
-          animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut", delay: 0.3 }}
-          className="hidden lg:flex justify-center relative items-center"
-          style={{ perspective: 1000 }}
-        >
-          {/* Glow rings */}
-          <motion.div
-            animate={{ scale: [1, 1.15, 1], opacity: [0.1, 0.25, 0.1] }}
-            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-            className="absolute w-[280px] h-[280px] bg-brand-500/20 blur-[80px] rounded-full"
-          />
-          <motion.div
-            animate={{ scale: [1.1, 1, 1.1], opacity: [0.05, 0.15, 0.05] }}
-            transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
-            className="absolute w-[350px] h-[350px] bg-indigo-500/10 blur-[100px] rounded-full"
-          />
-
-          {/* Logo with 3D parallax */}
-          <motion.div
-            style={{ rotateX: logoRotateX, rotateY: logoRotateY }}
-            className="relative z-10"
-          >
-            <motion.div
-              animate={{ y: [-8, 8, -8] }}
-              transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-            >
-              <img
-                src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`}
-                alt="The Muslim Lantern"
-                className="w-full max-w-[220px] object-contain rounded-full shadow-[0_0_80px_rgba(239,68,68,0.2)] bg-white/5 border border-white/10 backdrop-blur-md"
-              />
-              {/* Orbiting dot */}
-              <motion.div
-                className="absolute w-3 h-3 bg-brand-500 rounded-full shadow-glow-sm"
-                style={{ top: '50%', left: '50%' }}
-                animate={{ rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              >
-                <div className="absolute w-3 h-3 bg-brand-500 rounded-full" style={{ transform: 'translateX(130px)' }} />
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        </motion.div>
+        {/* Premium Hanging Lantern */}
+        <PremiumHangingLantern rotateX={logoRotateX} rotateY={logoRotateY} />
       </div>
 
       {/* ═══ STATS GRID ═════════════════════════════════════════════ */}

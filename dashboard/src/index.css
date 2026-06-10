@@ -399,6 +399,108 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   PREMIUM LANTERN HERO — hanging string, glass glow, living flame
+   ═══════════════════════════════════════════════════════════════════ */
+
+.preserve-3d { transform-style: preserve-3d; }
+
+@keyframes lantern-breathe {
+  0%, 100% { opacity: .42; transform: translate(-50%, -50%) scale(.94); }
+  45% { opacity: .82; transform: translate(-50%, -50%) scale(1.12); }
+  70% { opacity: .58; transform: translate(-50%, -50%) scale(1.02); }
+}
+
+@keyframes flame-dance {
+  0%, 100% { transform: translateX(-50%) scaleY(1) scaleX(.96) rotate(-2deg); border-radius: 62% 38% 58% 42% / 72% 70% 30% 28%; }
+  18% { transform: translateX(-52%) scaleY(1.13) scaleX(.88) rotate(3deg); border-radius: 48% 52% 44% 56% / 78% 66% 34% 22%; }
+  36% { transform: translateX(-48%) scaleY(.92) scaleX(1.05) rotate(-4deg); border-radius: 56% 44% 64% 36% / 70% 76% 24% 30%; }
+  58% { transform: translateX(-53%) scaleY(1.2) scaleX(.82) rotate(5deg); border-radius: 44% 56% 52% 48% / 82% 64% 36% 18%; }
+  78% { transform: translateX(-49%) scaleY(1.02) scaleX(1.02) rotate(-1deg); border-radius: 60% 40% 48% 52% / 74% 72% 28% 26%; }
+}
+
+@keyframes flame-core {
+  0%, 100% { opacity: .92; transform: translateX(-50%) translateY(0) scale(.82); }
+  35% { opacity: 1; transform: translateX(-48%) translateY(-5px) scale(.98); }
+  65% { opacity: .82; transform: translateX(-53%) translateY(3px) scale(.74); }
+}
+
+@keyframes spark-rise {
+  0% { opacity: 0; transform: translate3d(0, 18px, 0) scale(.55); }
+  18% { opacity: .9; }
+  100% { opacity: 0; transform: translate3d(var(--spark-x), -64px, 0) scale(.12); }
+}
+
+.animate-lantern-breathe {
+  animation: lantern-breathe 3.2s ease-in-out infinite;
+}
+
+.animate-lantern-breathe-delayed {
+  animation: lantern-breathe 2.4s ease-in-out infinite;
+  animation-delay: -.8s;
+}
+
+.premium-lantern-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 11% 16% 4% 16%;
+  z-index: 0;
+  border-radius: 48%;
+  background: radial-gradient(circle at 50% 55%, rgba(251,191,36,.36), rgba(249,115,22,.16) 36%, transparent 68%);
+  filter: blur(28px);
+  animation: lantern-breathe 3s ease-in-out infinite;
+}
+
+.premium-flame {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform-origin: 50% 90%;
+  filter: blur(.2px) drop-shadow(0 0 16px rgba(251,191,36,.95));
+}
+
+.premium-flame-outer {
+  width: 58px;
+  height: 94px;
+  background: radial-gradient(circle at 50% 78%, #fff7ad 0 10%, #facc15 18%, #fb923c 42%, #ef4444 66%, rgba(239,68,68,0) 78%);
+  animation: flame-dance .92s ease-in-out infinite;
+  opacity: .95;
+}
+
+.premium-flame-mid {
+  width: 38px;
+  height: 72px;
+  bottom: 10px;
+  background: radial-gradient(circle at 50% 76%, #ffffff 0 12%, #fde68a 24%, #f59e0b 52%, rgba(245,158,11,0) 76%);
+  animation: flame-dance .72s ease-in-out infinite reverse;
+  opacity: .96;
+}
+
+.premium-flame-core {
+  width: 20px;
+  height: 44px;
+  bottom: 18px;
+  background: radial-gradient(circle at 50% 80%, #fff 0 22%, #fef3c7 42%, rgba(254,243,199,0) 76%);
+  animation: flame-core .62s ease-in-out infinite;
+  opacity: .92;
+}
+
+.premium-flame-spark {
+  position: absolute;
+  left: 50%;
+  bottom: 42px;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #fde68a;
+  box-shadow: 0 0 12px rgba(251,191,36,.9);
+  animation: spark-rise 1.7s ease-out infinite;
+}
+
+.spark-a { --spark-x: -22px; animation-delay: 0s; }
+.spark-b { --spark-x: 18px; animation-delay: .48s; width: 4px; height: 4px; }
+.spark-c { --spark-x: 4px; animation-delay: .96s; width: 3px; height: 3px; }
+
+/* ═══════════════════════════════════════════════════════════════════
    PREMIUM VISUAL SYSTEM — cinematic mesh, holographic cards, scanlines
    ═══════════════════════════════════════════════════════════════════ */
 
