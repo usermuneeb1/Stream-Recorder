@@ -1,8 +1,96 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bookmark, ArrowLeft, ExternalLink, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check, Keyboard, ChevronRight, Play } from 'lucide-react';
+import { Bookmark, ArrowLeft, HardDrive, Clock, X, MessageSquare, AlertTriangle, Copy, Check, Keyboard, ChevronRight, Play } from 'lucide-react';
 import { StreamData, fetchStreams } from '../utils/dataFetcher';
+
+
+function ArchiveVideoPlayer({ archiveId, title }: { archiveId: string; title: string }) {
+  const [videoSrc, setVideoSrc] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadArchiveFile() {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetch(`https://archive.org/metadata/${archiveId}?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`Archive metadata HTTP ${res.status}`);
+        const data = await res.json();
+        const files = Array.isArray(data.files) ? data.files : [];
+        const candidates = files
+          .filter((file: { name?: string; format?: string; size?: string }) => {
+            const name = file.name || '';
+            const format = (file.format || '').toLowerCase();
+            return /\.(mp4|m4v|webm|mkv)$/i.test(name)
+              && !name.includes('_thumb')
+              && !name.includes('_ia_thumb')
+              && !format.includes('thumbnail');
+          })
+          .sort((a: { name?: string; format?: string; size?: string }, b: { name?: string; format?: string; size?: string }) => {
+            const score = (file: { name?: string; format?: string; size?: string }) => {
+              const name = (file.name || '').toLowerCase();
+              const format = (file.format || '').toLowerCase();
+              let value = 0;
+              if (name.endsWith('.mp4')) value += 100;
+              if (format.includes('mpeg4') || format.includes('h.264')) value += 50;
+              if (!name.includes('compressed')) value += 20;
+              value += Math.min(Number(file.size || 0) / 1_000_000_000, 20);
+              return value;
+            };
+            return score(b) - score(a);
+          });
+
+        const selected = candidates[0];
+        if (!selected?.name) throw new Error('No playable public video file found');
+        const encodedName = selected.name.split('/').map(encodeURIComponent).join('/');
+        if (!cancelled) setVideoSrc(`https://archive.org/download/${archiveId}/${encodedName}`);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load public player');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadArchiveFile();
+    return () => { cancelled = true; };
+  }, [archiveId]);
+
+  if (loading) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-dark-950 to-black text-white">
+        <div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-sm text-white/70 font-medium">Preparing public player…</p>
+      </div>
+    );
+  }
+
+  if (error || !videoSrc) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-dark-950 to-black text-center p-6 text-white">
+        <AlertTriangle size={34} className="text-brand-400 mb-4" />
+        <h3 className="text-xl font-bold mb-2">Public playback unavailable</h3>
+        <p className="text-white/60 max-w-md text-sm">This recording is archived, but a clean public player could not be prepared right now.</p>
+      </div>
+    );
+  }
+
+  return (
+    <video
+      className="w-full h-full bg-black object-contain"
+      src={videoSrc}
+      poster={`https://archive.org/services/img/${archiveId}`}
+      title={title}
+      controls
+      playsInline
+      preload="metadata"
+      controlsList="nodownload noplaybackrate"
+    />
+  );
+}
 
 export default function Watch() {
   const { id } = useParams();
@@ -12,12 +100,9 @@ export default function Watch() {
   const [notFound, setNotFound] = useState(false);
   const [allStreams, setAllStreams] = useState<StreamData[]>([]);
 
-  const [activeSource, setActiveSource] = useState<string>('pixel');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [bookmarks, setBookmarks] = useState<{time: number, note: string}[]>([]);
   const [copied, setCopied] = useState(false);
-  const [sourceTransition, setSourceTransition] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     fetchStreams().then(data => {
@@ -26,27 +111,12 @@ export default function Watch() {
         const found = data.find(s => s.videoId === id);
         if (found) {
           setStream(found);
-          const srcKeys = Object.keys(found.sources);
-          if (srcKeys.length > 0) {
-            if (found.sources.pixel) setActiveSource('pixel');
-            else if (found.sources.mega) setActiveSource('mega');
-            else if (found.sources.archive) setActiveSource('archive');
-            else setActiveSource(srcKeys[0]);
-          }
         } else {
           setNotFound(true);
         }
-      } else {
-        const srcKeys = Object.keys(stream.sources);
-        if (srcKeys.length > 0 && !stream.sources[activeSource]) {
-          if (stream.sources.pixel) setActiveSource('pixel');
-          else if (stream.sources.mega) setActiveSource('mega');
-          else if (stream.sources.archive) setActiveSource('archive');
-          else setActiveSource(srcKeys[0]);
-        }
       }
     });
-  }, [id, stream, activeSource]);
+  }, [id, stream]);
 
   // Load Bookmarks
   useEffect(() => {
@@ -59,14 +129,6 @@ export default function Watch() {
   }, [id]);
 
   // ── Keyboard Shortcuts ─────────────────────────────────────────
-  const switchSource = useCallback((key: string) => {
-    if (key === activeSource) return;
-    setSourceTransition(true);
-    window.setTimeout(() => {
-      setActiveSource(key);
-      window.setTimeout(() => setSourceTransition(false), 100);
-    }, 200);
-  }, [activeSource]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -74,16 +136,6 @@ export default function Watch() {
       switch (e.key.toLowerCase()) {
         case 'd':
           // Direct cloud download links are intentionally not exposed on the public site.
-          break;
-        case 's':
-          e.preventDefault();
-          if (stream) {
-            const keys = Object.keys(stream.sources);
-            if (keys.length === 0) return;
-            const idx = keys.indexOf(activeSource);
-            const next = keys[(idx + 1) % keys.length];
-            switchSource(next);
-          }
           break;
         case '?':
           e.preventDefault();
@@ -96,7 +148,7 @@ export default function Watch() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [stream, activeSource, switchSource]);
+  }, []);
 
   useEffect(() => {
     if (!showShortcuts) return;
@@ -138,8 +190,8 @@ export default function Watch() {
     );
   }
 
-  const sources = Object.entries(stream.sources);
-  const currentSource = stream.sources[activeSource];
+  const archiveSource = stream.sources.archive || stream.sources.archiveSmall;
+  const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
 
   const handleAddBookmark = () => {
     const timeStr = prompt("Enter timestamp to bookmark (e.g., 01:23:45):");
@@ -167,30 +219,12 @@ export default function Watch() {
     }
   };
 
-  const generateEmbedUrl = (source: any) => {
-    if (source.type === 'pixeldrain') {
-      const pId = source.url.split('/').pop();
-      return `https://pixeldrain.com/api/file/${pId}?embed`;
-    }
-    if (source.type === 'mega') return source.url.replace('/file/', '/embed/');
-    if (source.type === 'archive') {
-      const aId = source.url.split('/details/')[1]?.split('/')[0];
-      return `https://archive.org/embed/${aId}`;
-    }
-    if (source.type === 'odysee') return source.url.replace('odysee.com/', 'odysee.com/$/embed/');
-    if (source.type === 'rumble') return source.url.replace('/v', '/embed/v');
-    return source.url;
-  };
-
-  const isUnembeddable = currentSource?.type === 'gofile';
 
   // Related streams (exclude current, take 4)
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
 
-  const publicSourceLabel = (index: number) => index === 0 ? 'Primary Player' : `Backup Player ${index}`;
 
   const shortcutItems = [
-    { key: 'S', desc: 'Cycle playback source', hint: 'Quickly rotate through available playback options' },
     { key: '?', desc: 'Toggle shortcuts panel', hint: 'Show or hide this help overlay' },
     { key: 'Esc', desc: 'Close overlays', hint: 'Dismiss shortcuts and panels' },
   ];
@@ -220,44 +254,21 @@ export default function Watch() {
 
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeSource}
+                key={archiveId || stream.videoId}
                 initial={{ opacity: 0 }}
-                animate={{ opacity: sourceTransition ? 0 : 1 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 className="w-full h-full"
               >
-                {currentSource ? (
-                  isUnembeddable ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-dark-900 to-dark-800 text-center p-6">
-                      <motion.div
-                        animate={{ scale: [1, 1.05, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        className="w-20 h-20 rounded-full bg-brand-500/10 flex items-center justify-center mb-6"
-                      >
-                        <ExternalLink size={36} className="text-brand-500" />
-                      </motion.div>
-                      <h3 className="text-xl font-bold mb-2">Playback Option Unavailable</h3>
-                      <p className="text-dark-400 mb-6 max-w-md">This backup source cannot be embedded directly. Please try another playback option.</p>
-                      {sources.length > 1 && (
-                        <button onClick={() => {
-                          const keys = Object.keys(stream.sources).filter(k => k !== activeSource);
-                          if (keys[0]) switchSource(keys[0]);
-                        }} className="btn-primary flex items-center gap-2">
-                          <Play size={18} /> Try Another Source
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <iframe
-                      ref={iframeRef}
-                      src={generateEmbedUrl(currentSource)}
-                      className="w-full h-full border-0"
-                      allowFullScreen
-                    />
-                  )
+                {archiveId ? (
+                  <ArchiveVideoPlayer archiveId={archiveId} title={stream.title} />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-dark-400">No embeddable source available</div>
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-dark-950 to-black text-center p-6 text-white">
+                    <AlertTriangle size={34} className="text-brand-400 mb-4" />
+                    <h3 className="text-xl font-bold mb-2">Public playback unavailable</h3>
+                    <p className="text-white/60 max-w-md text-sm">This recording is still being prepared for clean public playback.</p>
+                  </div>
                 )}
               </motion.div>
             </AnimatePresence>
@@ -344,41 +355,6 @@ export default function Watch() {
 
         {/* ── Sidebar ──────────────────────────────────────────────── */}
         <div className="space-y-5">
-          {/* Source Switcher */}
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="glass-panel p-5 rounded-2xl border border-dark-200 dark:border-dark-800">
-            <h3 className="font-bold mb-4 text-base flex items-center gap-2">
-              Playback Options
-              <span className="text-xs text-dark-400 font-normal ml-auto">Press S</span>
-            </h3>
-            <div className="space-y-2">
-              {sources.map(([key], index) => (
-                <motion.button
-                  key={key}
-                  whileHover={{ x: 3 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => switchSource(key)}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-300 ${
-                    activeSource === key
-                      ? 'bg-brand-50 dark:bg-brand-900/30 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 shadow-sm'
-                      : 'bg-dark-50 dark:bg-dark-800 border border-transparent hover:border-dark-200 dark:hover:border-dark-700'
-                  }`}
-                >
-                  <span className="font-medium text-sm flex items-center gap-2">
-                    <span>{index === 0 ? '▶' : '↻'}</span>
-                    {publicSourceLabel(index)}
-                  </span>
-                  {activeSource === key && (
-                    <motion.div
-                      layoutId="activeSourceDot"
-                      className="w-2 h-2 rounded-full bg-brand-500"
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-
           {/* Bookmarks */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="glass-panel p-5 rounded-2xl border border-dark-200 dark:border-dark-800">
             <h3 className="font-bold mb-4 text-base">My Highlights</h3>
