@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Eye, Video, ExternalLink, Calendar } from 'lucide-react';
+import { Users, Eye, ExternalLink, Calendar, PlayCircle } from 'lucide-react';
 import { AnimatedCounter } from './AnimatedCounter';
 import { MagneticButton } from './MagneticButton';
 
@@ -10,7 +10,6 @@ interface YouTubeStatsData {
   subscribersSuffix: string;
   totalViews: number;
   viewsSuffix: string;
-  videoCount: number;
   joinedDate: string;
 }
 
@@ -20,7 +19,6 @@ const DEFAULTS: YouTubeStatsData = {
   subscribersSuffix: 'K',
   totalViews: 183,
   viewsSuffix: 'M',
-  videoCount: 651,
   joinedDate: 'Mar 3, 2021',
 };
 
@@ -89,7 +87,6 @@ export const YouTubeStats: React.FC = () => {
             subscribersSuffix: data.subscribers_suffix || DEFAULTS.subscribersSuffix,
             totalViews: data.total_views || DEFAULTS.totalViews,
             viewsSuffix: data.views_suffix || DEFAULTS.viewsSuffix,
-            videoCount: data.video_count || DEFAULTS.videoCount,
             joinedDate: data.joined_date || DEFAULTS.joinedDate,
           });
         }
@@ -164,10 +161,10 @@ export const YouTubeStats: React.FC = () => {
             delay={0.4}
           />
           <StatItem
-            icon={<Video size={16} />}
-            label="Videos"
-            value={stats.videoCount}
-            suffix=""
+            icon={<PlayCircle size={16} />}
+            label="Archive"
+            value={1}
+            suffix=" Ready"
             delay={0.6}
           />
         </div>

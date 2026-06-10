@@ -47,6 +47,12 @@ function ytId(u?: string) {
   return m ? m[1] : '';
 }
 
+function fallbackThumbnail(id: string, customThumb?: string) {
+  if (customThumb) return customThumb;
+  if (!id || id.startsWith('manual-')) return `${import.meta.env.BASE_URL}thumbnail.jpg`;
+  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+}
+
 function buildSources(links: any) {
   const s: Record<string, StreamSource> = {};
   if (links.archive_hd) s.archive = { label: '🏛️ Archive.org', url: links.archive_hd, type: 'archive' };
@@ -99,7 +105,7 @@ function parseLinks(text: string): StreamData[] {
       url,
       duration: formatDuration(get('Duration')),
       size: formatSize(get('Size')),
-      thumbnail: customThumb || `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+      thumbnail: fallbackThumbnail(vid, customThumb),
       archiveId: archiveId,
       sources: sources
     });
@@ -182,7 +188,7 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
       url: r.video_url,
       duration: formatDuration(r.duration_fmt),
       size: formatSize(r.size_human),
-      thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      thumbnail: fallbackThumbnail(id, r.thumbnail),
       archiveId: undefined,
       sources: {}
     };

@@ -2,8 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, Variants, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
-import { Database, Film, HardDrive, Shield, Globe, Zap, Cloud, Bell, Bot, ExternalLink, Play, ChevronRight } from 'lucide-react';
-import { SnakeGame } from '../components/SnakeGame';
+import { BookOpenText, Clock3, Film, HardDrive, HeartHandshake, Search, Shield, ExternalLink, Play, ChevronRight } from 'lucide-react';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
@@ -57,13 +56,6 @@ interface ArchiveStatsFile {
   total_streams?: number;
   total_hours?: number;
   total_gb?: number;
-  sources?: {
-    mega?: number;
-    archive?: number;
-    pixel?: number;
-    pixeldrain?: number;
-    gofile?: number;
-  };
 }
 
 // ── StatCard Component (hooks called at component level, not in .map) ──
@@ -99,7 +91,6 @@ function StatCard({ metric, index }: { metric: { label: string; value: number; s
 
 export default function Home() {
   const [stats, setStats] = useState({ total_streams: 0, total_hours: 0, total_gb: 0 });
-  const [sources, setSources] = useState({ mega: 0, archive: 0, pixel: 0, gofile: 0 });
   const [recentStreams, setRecentStreams] = useState<StreamData[]>([]);
 
 
@@ -118,15 +109,9 @@ export default function Home() {
         if (cancelled) return;
 
         setStats({
-          total_streams: repoStats.total_streams ?? streams.length,
+          total_streams: streams.length,
           total_hours: Math.round(repoStats.total_hours ?? 0),
           total_gb: Math.round((repoStats.total_gb ?? 0) * 10) / 10,
-        });
-        setSources({
-          mega: repoStats.sources?.mega ?? 0,
-          archive: repoStats.sources?.archive ?? 0,
-          pixel: repoStats.sources?.pixel ?? repoStats.sources?.pixeldrain ?? 0,
-          gofile: repoStats.sources?.gofile ?? 0,
         });
         return;
       } catch {
@@ -135,8 +120,6 @@ export default function Home() {
 
       let hours = 0;
       let gb = 0;
-      let m = 0, a = 0, p = 0, g = 0;
-
       streams.forEach(s => {
         const hMatch = s.duration?.match(/(\d+)h/);
         const mMatch = s.duration?.match(/(\d+)m/);
@@ -144,10 +127,6 @@ export default function Home() {
         if (mMatch) hours += parseInt(mMatch[1]) / 60;
         if (s.size?.includes('GB')) gb += parseFloat(s.size);
         if (s.size?.includes('MB')) gb += parseFloat(s.size) / 1024;
-        if (s.sources.mega) m++;
-        if (s.sources.archive) a++;
-        if (s.sources.pixel) p++;
-        if (s.sources.gofile) g++;
       });
 
       if (!cancelled) {
@@ -156,7 +135,6 @@ export default function Home() {
           total_hours: Math.round(hours),
           total_gb: Math.round(gb * 10) / 10
         });
-        setSources({ mega: m, archive: a, pixel: p, gofile: g });
       }
     }
 
@@ -164,13 +142,11 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
-  const activeProviderCount = Object.values(sources).filter(count => count > 0).length || 4;
-
   const statCards = [
-    { label: 'Total Streams', value: stats.total_streams, icon: <Film />, color: 'text-blue-500', bg: 'from-blue-500/10 to-blue-500/5' },
-    { label: 'Hours Archived', value: stats.total_hours, suffix: '+', icon: <Database />, color: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5' },
-    { label: 'Storage Used', value: stats.total_gb, suffix: ' GB', icon: <HardDrive />, color: 'text-brand-500', bg: 'from-brand-500/10 to-brand-500/5' },
-    { label: 'Cloud Providers', value: activeProviderCount, suffix: ' Active', icon: <Cloud />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
+    { label: 'Recordings', value: stats.total_streams, icon: <Film />, color: 'text-blue-500', bg: 'from-blue-500/10 to-blue-500/5' },
+    { label: 'Hours Preserved', value: stats.total_hours, suffix: '+', icon: <Clock3 />, color: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5' },
+    { label: 'Archive Size', value: stats.total_gb, suffix: ' GB', icon: <HardDrive />, color: 'text-brand-500', bg: 'from-brand-500/10 to-brand-500/5' },
+    { label: 'Archive Access', value: stats.total_streams > 0 ? 1 : 0, suffix: stats.total_streams > 0 ? ' Ready' : ' Soon', icon: <HeartHandshake />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
   ];
 
   const features = [
@@ -178,29 +154,29 @@ export default function Home() {
       icon: <Shield className="w-10 h-10" />,
       color: 'text-green-500',
       bg: 'bg-green-500/10',
-      title: 'Immutable Preservation',
-      desc: 'Recordings are permanently written to Archive.org, immune to takedowns or platform censorship. Once archived, they exist forever.'
+      title: 'Preserved with Care',
+      desc: 'Important conversations are organized in a clean archive so viewers can revisit beneficial content whenever they need it.'
     },
     {
-      icon: <Globe className="w-10 h-10" />,
+      icon: <Search className="w-10 h-10" />,
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
-      title: 'Decentralized Delivery',
-      desc: 'Multi-cloud redundancy across 4 independent providers ensures content survives even if one service goes down.'
+      title: 'Easy to Explore',
+      desc: 'Search, sort, filter, and jump into recordings quickly with a calm interface built for long-form watching.'
     },
     {
-      icon: <Bot className="w-10 h-10" />,
+      icon: <BookOpenText className="w-10 h-10" />,
       color: 'text-violet-500',
       bg: 'bg-violet-500/10',
-      title: 'Autonomous Recording',
-      desc: 'Fully automated pipeline: detect live → record in 1080p → process → upload to all clouds → notify. Zero human intervention.'
+      title: 'Focused Learning',
+      desc: 'The design keeps attention on the lectures, debates, and live discussions instead of distracting technical clutter.'
     },
     {
-      icon: <Bell className="w-10 h-10" />,
+      icon: <HeartHandshake className="w-10 h-10" />,
       color: 'text-amber-500',
       bg: 'bg-amber-500/10',
-      title: 'Instant Alerts',
-      desc: 'Discord notifications with rich embeds are sent within seconds of recording completion, including thumbnails and download links.'
+      title: 'Built for the Ummah',
+      desc: 'A respectful viewing space for preserving and revisiting dawah material with clarity, polish, and long-term care.'
     },
   ];
 
@@ -223,9 +199,9 @@ export default function Home() {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-medium mb-6 border border-brand-500/20 backdrop-blur-sm"
           >
             <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }}>
-              <Zap size={14} />
+              <BookOpenText size={14} />
             </motion.div>
-            Ultra-Premium Infrastructure
+            Curated Dawah Archive
           </motion.div>
 
           {/* Title */}
@@ -240,7 +216,7 @@ export default function Home() {
             variants={itemVariants}
             className="text-lg md:text-xl text-dark-500 dark:text-dark-400 max-w-2xl lg:max-w-[90%] mx-auto lg:mx-0 mb-8 leading-relaxed font-light"
           >
-            A state-of-the-art cinematic archive. Every live session, debate, and lecture is permanently preserved and distributed across a decentralized multi-cloud architecture.
+            A refined archive of Muslim Lantern live sessions, debates, and lectures — preserved for easy viewing, reflection, and long-term benefit.
           </motion.p>
 
           {/* CTAs */}
@@ -384,10 +360,10 @@ export default function Home() {
       >
         <motion.div variants={itemVariants} className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold font-display mb-4">
-            Built for <span className="text-gradient-animated">Permanence</span>
+            Designed for <span className="text-gradient-animated">Beneficial Access</span>
           </h2>
           <p className="text-dark-500 dark:text-dark-400 max-w-2xl mx-auto text-lg">
-            A fully autonomous preservation system designed to ensure no dawah content is ever lost.
+            A calm, organized archive experience focused on helping viewers find and revisit meaningful content.
           </p>
         </motion.div>
 
@@ -411,37 +387,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Cloud Provider Badges */}
-        <motion.div
-          variants={itemVariants}
-          className="mt-8 flex flex-wrap items-center justify-center gap-4"
-        >
-          {[
-            { name: 'Archive.org', count: sources.archive, color: 'blue' },
-            { name: 'MEGA.nz', count: sources.mega, color: 'red' },
-            { name: 'Pixeldrain', count: sources.pixel, color: 'purple' },
-            { name: 'Gofile', count: sources.gofile, color: 'green' },
-          ].filter(p => p.count > 0).map(provider => (
-            <motion.div
-              key={provider.name}
-              whileHover={{ scale: 1.05 }}
-              className={`px-4 py-2 rounded-full bg-${provider.color}-500/10 text-${provider.color}-600 dark:text-${provider.color}-400 text-sm font-medium border border-${provider.color}-500/20 backdrop-blur-sm`}
-            >
-              {provider.name} • {provider.count} recordings
-            </motion.div>
-          ))}
-        </motion.div>
-      </motion.div>
 
-      {/* ═══ ARCADE SECTION ═══════════════════════════════════════════ */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6 }}
-        className="mb-24 relative z-10"
-      >
-        <SnakeGame />
       </motion.div>
 
       {/* ═══ SYSTEM HEALTH ════════════════════════════════════════════ */}
