@@ -11,13 +11,9 @@ import {
   Copy,
   HardDrive,
   Keyboard,
-  Maximize,
   MessageSquare,
-  Minimize,
   X,
 } from 'lucide-react';
-import { MediaPlayer, MediaProvider } from '@vidstack/react';
-import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
@@ -158,9 +154,6 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
   const [iframeSrc, setIframeSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [duration, setDuration] = useState(0);
-  const [current, setCurrent] = useState(0);
-  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,25 +200,12 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     }, 120);
   };
 
-  const toggleFullscreen = async () => {
-    const el = wrapRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) await el.requestFullscreen();
-    else await document.exitFullscreen();
-  };
-
-  useEffect(() => {
-    const handler = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
-
   if (loading) {
     return (
-      <div className="premium-watch-frame flex h-full w-full items-center justify-center bg-black text-white">
+      <div className="flex h-full w-full items-center justify-center bg-black text-white">
         <div className="text-center">
-          <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-brand-500 border-t-transparent animate-spin" />
-          <p className="text-sm font-semibold text-white/80">Preparing {option.label}</p>
+          <div className="mx-auto mb-5 h-12 w-12 rounded-full border-4 border-brand-500 border-t-transparent animate-spin" />
+          <p className="text-sm font-semibold text-white/70">Preparing player…</p>
         </div>
       </div>
     );
@@ -233,12 +213,10 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
 
   if (error) {
     return (
-      <div className="premium-watch-frame flex h-full w-full items-center justify-center bg-black p-8 text-center text-white">
+      <div className="flex h-full w-full items-center justify-center bg-black p-8 text-center text-white">
         <div className="max-w-md">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-300 ring-1 ring-brand-500/20">
-            <AlertTriangle size={32} />
-          </div>
-          <h3 className="text-2xl font-black font-display">Playback unavailable</h3>
+          <AlertTriangle size={34} className="mx-auto mb-4 text-brand-400" />
+          <h3 className="text-xl font-bold">Playback unavailable</h3>
           <p className="mt-2 text-sm leading-relaxed text-white/55">{error}. Please choose another player source.</p>
         </div>
       </div>
@@ -247,15 +225,8 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
 
   if (iframeSrc) {
     return (
-      <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black">
+      <div ref={wrapRef} className="relative h-full w-full overflow-hidden bg-black">
         <iframe src={iframeSrc} title={option.label} className="h-full w-full border-0" allowFullScreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture" />
-        <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-white shadow-2xl backdrop-blur-xl">
-          <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-9 w-9 rounded-xl object-cover ring-1 ring-white/20" />
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-brand-300">The Muslim Lantern</div>
-            <div className="text-xs font-bold">{option.label}</div>
-          </div>
-        </div>
       </div>
     );
   }
@@ -263,70 +234,30 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
   const activeSrc = directSources[activeQuality];
 
   return (
-    <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black text-white">
-      <MediaPlayer
+    <div ref={wrapRef} className="relative h-full w-full overflow-hidden bg-black">
+      <video
+        ref={videoRef}
         key={activeSrc?.url}
-        title={stream.title}
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
-        aspectRatio="16/9"
+        className="h-full w-full bg-black object-contain"
+        controls
         playsInline
-        load="visible"
-        className="vidstack-premium-player h-full w-full bg-black"
-        onLoadedMetadata={(event: any) => {
-          const target = event?.target as HTMLMediaElement | undefined;
-          setDuration(target?.duration || duration || 0);
-        }}
-        onDurationChange={(event: any) => {
-          const target = event?.target as HTMLMediaElement | undefined;
-          setDuration(target?.duration || 0);
-        }}
-        onTimeUpdate={(event: any) => {
-          const target = event?.target as HTMLMediaElement | undefined;
-          const time = target?.currentTime || 0;
-          const dur = target?.duration || duration;
-          setCurrent(time);
-          if (dur) setDuration(dur);
-          onTime(time);
-        }}
-      >
-        <MediaProvider />
-        <DefaultVideoLayout icons={defaultLayoutIcons} />
-      </MediaPlayer>
-
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-black/80 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-black/70 to-transparent" />
-
-      <div className="pointer-events-none absolute left-4 top-4 flex max-w-[70%] items-center gap-3 rounded-2xl border border-white/10 bg-black/48 px-3 py-2 shadow-2xl backdrop-blur-xl">
-        <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20" />
-        <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-brand-300">The Muslim Lantern Archive</div>
-          <div className="truncate text-sm font-bold text-white">{stream.title}</div>
-        </div>
-      </div>
-
-      <div className="absolute right-4 top-4 flex items-center gap-2">
-        <div className="rounded-full border border-white/10 bg-black/48 px-3 py-1.5 text-xs font-black text-white shadow-xl backdrop-blur-xl">
-          {option.label} · {activeSrc?.quality || 'Auto'}
-        </div>
-        <button onClick={toggleFullscreen} className="rounded-full border border-white/10 bg-black/48 p-2.5 text-white shadow-xl backdrop-blur-xl transition hover:bg-white/15" aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-          {fullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
-        </button>
-      </div>
+        preload="metadata"
+        controlsList="nodownload"
+        onTimeUpdate={(e) => onTime(e.currentTarget.currentTime)}
+        onError={() => setError('The selected player source failed to load')}
+      />
 
       {directSources.length > 1 && (
-        <div className="absolute bottom-16 right-4 hidden items-center gap-1 rounded-full border border-white/10 bg-black/48 p-1 shadow-xl backdrop-blur-xl md:flex">
+        <div className="absolute bottom-4 right-4 hidden items-center gap-1 rounded-full border border-white/10 bg-black/55 p-1 shadow-xl backdrop-blur-xl md:flex">
           {directSources.map((src, i) => (
-            <button key={src.id} onClick={() => switchQuality(i)} className={`rounded-full px-3 py-1.5 text-xs font-black transition ${i === activeQuality ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/25' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
+            <button key={src.id} onClick={() => switchQuality(i)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${i === activeQuality ? 'bg-brand-500 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
               {src.quality}
             </button>
           ))}
         </div>
       )}
-
-      <div className="pointer-events-none absolute bottom-4 left-4 rounded-full bg-black/38 px-3 py-1 text-xs font-mono text-white/70 backdrop-blur-md">
-        {formatClock(current)} / {formatClock(duration)}
-      </div>
     </div>
   );
 }
