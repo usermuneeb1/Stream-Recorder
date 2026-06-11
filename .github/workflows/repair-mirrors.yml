@@ -1,0 +1,89 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🛠️ REPAIR MIRRORS FROM ARCHIVE.ORG                                         ║
+# ║  Reuploads missing/expired Gofile/Pixeldrain/MEGA mirrors from permanent    ║
+# ║  Archive.org copies and updates data/recordings.json.                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🛠️ Repair Cloud Mirrors"
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_id:
+        description: "Optional single video_id to repair"
+        required: false
+        default: ""
+        type: string
+      max_items:
+        description: "Maximum recordings to repair this run"
+        required: false
+        default: "3"
+        type: string
+      destinations:
+        description: "Comma list: gofile,pixeldrain,mega"
+        required: false
+        default: "gofile,pixeldrain,mega"
+        type: string
+      dry_run:
+        description: "Check only; do not download/upload/update"
+        required: false
+        default: "false"
+        type: boolean
+
+  schedule:
+    # Weekly repair pass, Sunday 08:30 UTC
+    - cron: "30 8 * * 0"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: repair-mirrors
+  cancel-in-progress: false
+
+env:
+  GH_PAT: ${{ secrets.GH_PAT }}
+  GOFILE_API_KEY: ${{ secrets.GOFILE_API_KEY }}
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+  MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  repair:
+    name: "🛠️ Repair mirrors"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq aria2 megatools bc python3
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
+
+      - name: "🛠️ Repair from Archive.org"
+        env:
+          TARGET_VIDEO_ID: ${{ github.event.inputs.video_id }}
+          MAX_ITEMS: ${{ github.event.inputs.max_items || '3' }}
+          DESTINATIONS: ${{ github.event.inputs.destinations || 'gofile,pixeldrain,mega' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: bash scripts/repair-mirrors.sh
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          echo "## 🛠️ Mirror Repair" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Completed at $(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')" >> "$GITHUB_STEP_SUMMARY"
