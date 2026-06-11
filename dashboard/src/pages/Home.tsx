@@ -2,11 +2,10 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, Variants, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
-import { BookOpenText, Clock3, Film, HardDrive, HeartHandshake, ExternalLink, Play, ChevronRight, Sparkles } from 'lucide-react';
+import { BookOpenText, Clock3, Film, HardDrive, HeartHandshake, ExternalLink, Play, ChevronRight, ArrowRight } from 'lucide-react';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
-import { ArchiveExperience } from '../components/ArchiveExperience';
 import { Link } from 'react-router-dom';
 
 const containerVariants: Variants = {
@@ -145,7 +144,7 @@ export default function Home() {
     { label: 'Recordings', value: stats.total_streams, icon: <Film />, color: 'text-blue-500', bg: 'from-blue-500/10 to-blue-500/5' },
     { label: 'Hours Preserved', value: stats.total_hours, display: `${stats.total_hours}+`, icon: <Clock3 />, color: 'text-purple-500', bg: 'from-purple-500/10 to-purple-500/5' },
     { label: 'Archive Size', value: stats.total_gb, display: `${stats.total_gb.toFixed(1)} GB`, icon: <HardDrive />, color: 'text-brand-500', bg: 'from-brand-500/10 to-brand-500/5' },
-    { label: 'Archive Access', value: 1, display: stats.total_streams > 0 ? 'Ready' : 'Soon', icon: <HeartHandshake />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
+    { label: 'Collection', value: 1, display: stats.total_streams > 0 ? 'Open' : 'Soon', icon: <HeartHandshake />, color: 'text-teal-500', bg: 'from-teal-500/10 to-teal-500/5' },
   ];
 
 
@@ -155,58 +154,66 @@ export default function Home() {
       <ParticleField count={20} />
 
       {/* ═══ HERO SECTION ═══════════════════════════════════════════ */}
-      <div className="relative z-10 mb-14 lg:mb-16 pt-12 lg:pt-16">
-        <div className="absolute left-1/2 top-8 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-[110px] pointer-events-none" />
-        <div className="absolute left-1/2 top-16 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-gradient-to-r from-brand-500/5 via-orange-500/5 to-indigo-500/5 blur-3xl pointer-events-none" />
+      <section className="relative z-10 mb-16 pt-10 lg:pt-14">
+        <div className="absolute left-1/2 top-12 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-gradient-to-r from-brand-500/10 via-orange-500/8 to-indigo-500/8 blur-3xl pointer-events-none" />
+
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="relative mx-auto max-w-4xl text-center"
+          className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/75 p-6 shadow-2xl shadow-dark-900/5 backdrop-blur-2xl dark:border-white/10 dark:bg-[#111114]/70 dark:shadow-black/35 md:p-9 lg:p-10"
         >
-          {/* Badge */}
-          <motion.div
-            variants={itemVariants}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-medium mb-6 border border-brand-500/20 backdrop-blur-sm"
-          >
-            <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }}>
-              <BookOpenText size={14} />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(239,68,68,.14),transparent_34%),radial-gradient(circle_at_82%_18%,rgba(249,115,22,.10),transparent_30%)]" />
+          <div className="relative grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
+            <div className="lg:col-span-7 text-center lg:text-left">
+              <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-bold mb-6 border border-brand-500/20 backdrop-blur-sm">
+                <BookOpenText size={14} /> Curated Dawah Archive
+              </motion.div>
+              <motion.h1 variants={itemVariants} className="text-4xl sm:text-5xl lg:text-6xl font-black font-display tracking-tight mb-6 leading-[1.05]">
+                Preserving the Legacy of <span className="text-gradient-animated">The Muslim Lantern</span>
+              </motion.h1>
+              <motion.p variants={itemVariants} className="text-lg md:text-xl text-dark-500 dark:text-dark-400 max-w-2xl mx-auto lg:mx-0 mb-8 leading-relaxed">
+                A refined archive of Muslim Lantern live sessions, debates, and lectures — organized for easy viewing, reflection, and long-term benefit.
+              </motion.p>
+              <motion.div variants={itemVariants} className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                <Link to="/gallery" className="btn-primary text-base px-8 py-3 shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30">
+                  <Play size={18} fill="currentColor" /> Browse Archive
+                </Link>
+                <a href="https://youtube.com/@TheMuslimLantern" target="_blank" rel="noreferrer" className="btn-secondary text-base px-8 py-3">
+                  <ExternalLink size={18} /> YouTube Channel
+                </a>
+              </motion.div>
+              <motion.div variants={itemVariants} className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs font-bold uppercase tracking-wider text-dark-400">
+                <span className="rounded-full border border-dark-200/80 bg-white/70 px-3 py-1.5 dark:border-white/10 dark:bg-white/5">Curated Recordings</span>
+                <span className="rounded-full border border-dark-200/80 bg-white/70 px-3 py-1.5 dark:border-white/10 dark:bg-white/5">Clean Watch Experience</span>
+                <span className="rounded-full border border-dark-200/80 bg-white/70 px-3 py-1.5 dark:border-white/10 dark:bg-white/5">Long-form Archive</span>
+              </motion.div>
+            </div>
+
+            <motion.div variants={itemVariants} className="lg:col-span-5">
+              {recentStreams[0] ? (
+                <Link to={`/watch/${recentStreams[0].videoId}`} state={{ stream: recentStreams[0] }} className="group block overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 shadow-2xl shadow-brand-500/10 backdrop-blur-xl dark:border-white/10 dark:bg-dark-900/70">
+                  <div className="relative aspect-video overflow-hidden bg-dark-900">
+                    <img src={recentStreams[0].thumbnail} alt={recentStreams[0].title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" onError={(e) => { (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`; }} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-black/5" />
+                    <div className="absolute left-4 top-4 rounded-full bg-brand-500 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-brand-500/25">Latest</div>
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="line-clamp-2 text-xl font-black font-display text-white">{recentStreams[0].title}</h3>
+                      <div className="mt-2 text-xs font-semibold text-white/75">{recentStreams[0].date} {recentStreams[0].duration && `• ${recentStreams[0].duration}`}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-5">
+                    <div className="text-sm font-bold text-dark-700 dark:text-dark-200">Continue to latest recording</div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/25 transition-transform group-hover:translate-x-1"><ArrowRight size={18} /></div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="h-64 rounded-[2rem] border border-white/70 bg-white/70 dark:border-white/10 dark:bg-dark-900/70" />
+              )}
             </motion.div>
-            Curated Dawah Archive
-          </motion.div>
-
-          {/* Title */}
-          <motion.div variants={itemVariants}>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display tracking-tight mb-6 leading-[1.15]">
-              Preserving the Legacy of <span className="text-gradient-animated">The Muslim Lantern</span>
-            </h1>
-          </motion.div>
-
-          {/* Subtitle */}
-          <motion.p
-            variants={itemVariants}
-            className="text-lg md:text-xl text-dark-500 dark:text-dark-400 max-w-2xl mx-auto mb-8 leading-relaxed font-light"
-          >
-            A refined archive of Muslim Lantern live sessions, debates, and lectures — preserved for easy viewing, reflection, and long-term benefit.
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div variants={itemVariants} className="flex flex-wrap gap-4 justify-center">
-            <Link to="/gallery" className="btn-primary text-base px-8 py-3 shadow-lg shadow-brand-500/25 hover:shadow-xl hover:shadow-brand-500/30">
-              <Play size={18} fill="currentColor" /> Browse Archive
-            </Link>
-            <a
-              href="https://youtube.com/@TheMuslimLantern"
-              target="_blank"
-              rel="noreferrer"
-              className="btn-secondary text-base px-8 py-3"
-            >
-              <ExternalLink size={18} /> YouTube Channel
-            </a>
-          </motion.div>
+          </div>
         </motion.div>
-
-      </div>
+      </section>
 
       {/* ═══ STATS GRID ═════════════════════════════════════════════ */}
       <motion.div
@@ -214,69 +221,12 @@ export default function Home() {
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: "-50px" }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12 lg:mb-16 relative z-10"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-16 relative z-10"
       >
         {statCards.map((metric, i) => (
           <StatCard key={metric.label} metric={metric} index={i} />
         ))}
       </motion.div>
-
-      {/* ═══ FEATURED LATEST RECORDING ════════════════════════════ */}
-      {recentStreams[0] && (
-        <motion.div
-          initial={{ opacity: 0, y: 28 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ type: "spring", stiffness: 190, damping: 24 }}
-          className="relative z-10 mb-16"
-        >
-          <Link
-            to={`/watch/${recentStreams[0].videoId}`}
-            state={{ stream: recentStreams[0] }}
-            className="group block overflow-hidden rounded-[2rem] border border-white/70 dark:border-white/10 bg-white/80 dark:bg-dark-900/60 shadow-2xl shadow-dark-900/5 dark:shadow-black/30 backdrop-blur-xl"
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-5">
-              <div className="relative lg:col-span-2 aspect-video lg:aspect-auto min-h-[260px] overflow-hidden bg-dark-900">
-                <img
-                  src={recentStreams[0].thumbnail}
-                  alt={recentStreams[0].title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  loading="lazy"
-                  onError={(e) => { (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-4 left-4 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur-md border border-white/20">
-                  Latest preserved recording
-                </div>
-              </div>
-              <div className="relative lg:col-span-3 p-7 md:p-9 flex flex-col justify-center">
-                <div className="absolute right-8 top-8 hidden md:flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 border border-brand-500/20">
-                  <Sparkles size={24} />
-                </div>
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-brand-500 mb-3">Watch latest</p>
-                <h2 className="text-2xl md:text-4xl font-black font-display leading-tight max-w-2xl group-hover:text-brand-500 transition-colors">
-                  {recentStreams[0].title}
-                </h2>
-                <div className="mt-4 flex flex-wrap gap-3 text-sm text-dark-500 dark:text-dark-400 font-medium">
-                  <span>{recentStreams[0].date}</span>
-                  {recentStreams[0].duration && <span>• {recentStreams[0].duration}</span>}
-                  {recentStreams[0].size && <span>• {recentStreams[0].size}</span>}
-                </div>
-                <div className="mt-7 inline-flex w-fit items-center gap-2 rounded-full bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-brand-500/25 group-hover:bg-brand-500 transition-colors">
-                  <Play size={17} fill="currentColor" /> Watch Now
-                </div>
-              </div>
-            </div>
-          </Link>
-        </motion.div>
-      )}
-
-      {/* ═══ PREMIUM PUBLIC ARCHIVE EXPERIENCE ════════════════════ */}
-      <ArchiveExperience
-        streams={stats.total_streams}
-        hours={stats.total_hours}
-        storageGb={stats.total_gb}
-      />
 
       {/* ═══ YOUTUBE STATS + RECENT STREAMS ════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16 relative z-10">
