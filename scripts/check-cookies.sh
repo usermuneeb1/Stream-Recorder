@@ -143,10 +143,9 @@ check_cookie_health() {
         -H "User-Agent: ${user_agent}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         "https://www.youtube.com/" 2>/dev/null) || {
-        log_warn "Could not reach YouTube — cookie status unverified"
+        log_warn "Could not reach YouTube from GitHub runner — skipping Discord alert"
         set_env "COOKIE_STATUS" "check_failed"
         set_output "cookie_status" "check_failed"
-        _cookie_alert "unverified" "network check failed"
         return 0
     }
     
@@ -165,13 +164,14 @@ check_cookie_health() {
         set_env "COOKIE_STATUS" "valid"
         set_output "cookie_status" "valid"
     else
-        # Do not mark as expired solely because the homepage was inconclusive;
-        # YouTube sometimes returns consent/limited pages to GitHub runners.
-        # Still alert loudly so cookies can be refreshed before a live is missed.
-        log_warn "🍪 Cookie login could not be verified from GitHub Actions"
+        # Do not mark as expired solely because the homepage was inconclusive.
+        # YouTube often hides logged-in indicators from datacenter/GitHub IPs,
+        # even when yt-dlp can still use the cookies successfully. Only expired,
+        # expiring, or old cookies should trigger Discord alerts by default.
+        log_warn "🍪 Cookie login could not be verified from GitHub Actions homepage check"
+        log_info "No Discord alert sent: session cookies exist and are not expired/near-expiry"
         set_env "COOKIE_STATUS" "valid_unverified"
         set_output "cookie_status" "valid_unverified"
-        _cookie_alert "unverified" "login not verified"
     fi
     
     local warn_days="${COOKIE_WARNING_DAYS:-14}"
