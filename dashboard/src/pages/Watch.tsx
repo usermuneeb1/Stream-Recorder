@@ -16,7 +16,8 @@ import {
   Minimize,
   X,
 } from 'lucide-react';
-import { MediaCommunitySkin, MediaOutlet, MediaPlayer, MediaPoster } from '@vidstack/react';
+import { MediaPlayer, MediaProvider } from '@vidstack/react';
+import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
@@ -265,11 +266,12 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black text-white">
       <MediaPlayer
         key={activeSrc?.url}
+        title={stream.title}
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
         aspectRatio="16/9"
-        crossorigin="anonymous"
-        playsinline
+        crossOrigin
+        playsInline
         load="visible"
         className="vidstack-premium-player h-full w-full bg-black"
         onLoadedMetadata={(event: any) => {
@@ -289,10 +291,8 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
           onTime(time);
         }}
       >
-        <MediaOutlet>
-          <MediaPoster className="vds-poster" alt={stream.title} />
-        </MediaOutlet>
-        <MediaCommunitySkin />
+        <MediaProvider />
+        <DefaultVideoLayout icons={defaultLayoutIcons} />
       </MediaPlayer>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-black/80 to-transparent" />

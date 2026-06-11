@@ -11,18 +11,16 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.0",
-    "@vidstack/react": "^0.6.15",
+    "@vidstack/react": "^1.15.6",
     "clsx": "^2.1.1",
     "date-fns": "^4.3.0",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.16.0",
-    "maverick.js": "^0.37.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1",
     "recharts": "^3.8.1",
-    "tailwind-merge": "^3.6.0",
-    "vidstack": "^0.6.15"
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
