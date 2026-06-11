@@ -21,7 +21,7 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
-const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'archiveSmall', 'gofile', 'odysee', 'rumble'];
+const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'archiveSmall', 'odysee', 'rumble'];
 
 interface PlayerOption {
   key: string;
@@ -53,7 +53,7 @@ function formatClock(seconds: number) {
 }
 
 function sortSourceEntries(sources: Record<string, StreamSource>): [string, StreamSource][] {
-  return Object.entries(sources).sort(([a], [b]) => {
+  return Object.entries(sources).filter(([key]) => key !== 'gofile').sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -270,7 +270,6 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
         aspectRatio="16/9"
-        crossOrigin
         playsInline
         load="visible"
         className="vidstack-premium-player h-full w-full bg-black"
