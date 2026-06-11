@@ -16,6 +16,7 @@ import {
   Minimize,
   X,
 } from 'lucide-react';
+import { MediaCommunitySkin, MediaOutlet, MediaPlayer, MediaPoster } from '@vidstack/react';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['D3xture', 'Heart', 'Jatt', 'Helicopter'];
@@ -263,23 +264,31 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
 
   return (
     <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black text-white">
-      <video
-        ref={videoRef}
+      <MediaPlayer
         key={activeSrc?.url}
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
-        className="h-full w-full bg-black object-contain"
-        controls
-        playsInline
-        preload="metadata"
-        controlsList="nodownload"
-        disablePictureInPicture={false}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onTimeUpdate={(e) => { setCurrent(e.currentTarget.currentTime); onTime(e.currentTarget.currentTime); }}
-      />
+        aspectRatio="16/9"
+        crossorigin="anonymous"
+        playsinline
+        className="vidstack-premium-player h-full w-full bg-black"
+        onLoadedMetadata={(event: any) => setDuration(event?.target?.duration || event?.detail?.duration || 0)}
+        onTimeUpdate={(event: any) => {
+          const time = event?.target?.currentTime ?? event?.detail?.currentTime ?? 0;
+          const dur = event?.target?.duration ?? event?.detail?.duration ?? duration;
+          setCurrent(time || 0);
+          if (dur) setDuration(dur);
+          onTime(time || 0);
+        }}
+      >
+        <MediaOutlet>
+          <MediaPoster className="vds-poster" alt={stream.title} />
+        </MediaOutlet>
+        <MediaCommunitySkin />
+      </MediaPlayer>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-black/80 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-black/70 to-transparent" />
 
       <div className="pointer-events-none absolute left-4 top-4 flex max-w-[70%] items-center gap-3 rounded-2xl border border-white/10 bg-black/48 px-3 py-2 shadow-2xl backdrop-blur-xl">
         <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20" />
