@@ -210,6 +210,9 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     if (r.archive_link) {
       s.sources.archive = { label: '🏛️ Archive.org', url: r.archive_link, type: 'archive' };
       if (!s.archiveId) s.archiveId = r.archive_link.split('/details/')[1]?.split('/')[0];
+      if (s.archiveId && (!s.thumbnail || s.thumbnail.includes('thumbnail.jpg') || s.videoId.startsWith('manual-') || s.videoId.startsWith('archive-'))) {
+        s.thumbnail = `https://archive.org/services/img/${s.archiveId}`;
+      }
     }
     if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link, type: 'mega' };
     if (r.gofile_link) s.sources.gofile = { label: '📁 Gofile', url: r.gofile_link, type: 'gofile' };

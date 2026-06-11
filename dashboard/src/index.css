@@ -1072,3 +1072,26 @@
 .premium-watch-frame video::-webkit-media-controls-fullscreen-button {
   filter: saturate(1.1);
 }
+
+/* Vidstack premium theme overrides */
+.vidstack-premium-player {
+  --media-brand: rgb(239 68 68);
+  --media-focus-ring-color: rgba(239,68,68,.65);
+  --media-slider-track-bg: rgba(255,255,255,.22);
+  --media-slider-track-fill-bg: linear-gradient(90deg, rgb(239 68 68), rgb(249 115 22));
+  --media-controls-bg: linear-gradient(transparent, rgba(0,0,0,.86));
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: #000;
+}
+.vidstack-premium-player media-outlet,
+.vidstack-premium-player video {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.vidstack-premium-player .vds-poster {
+  object-fit: cover;
+}
