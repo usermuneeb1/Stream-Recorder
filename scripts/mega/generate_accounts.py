@@ -76,6 +76,7 @@ def try_create_account(name, password, provider_classes=None):
             universal_newlines=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            timeout=90,
         )
 
         if registration.returncode != 0:
@@ -128,6 +129,7 @@ def try_create_account(name, password, provider_classes=None):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 universal_newlines=True,
+                timeout=90,
             )
 
             if "registered successfully!" in str(verification.stdout):
@@ -211,3 +213,6 @@ if __name__ == "__main__":
     print(f"✅ Done! {success_count}/{args.number} new accounts created")
     print(f"📊 Total accounts in CSV: {total}")
     print(f"✅ Accounts saved to {CSV_FILE}")
+    if success_count == 0:
+        print("❌ No new MEGA accounts were created — failing workflow so you get a real signal")
+        exit(1)

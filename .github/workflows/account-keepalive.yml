@@ -18,7 +18,6 @@ on:
 env:
   MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-  MEGA_ACCOUNTS_JSON: ${{ secrets.MEGA_ACCOUNTS_JSON }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
@@ -75,9 +74,7 @@ jobs:
             echo "⚠️ MEGA_EMAIL/MEGA_PASSWORD not set — skipping main account"
           fi
 
-          # Method 2: Sign into ALL generated accounts.
-          # Prefer MEGA_ACCOUNTS_JSON secret so account passwords are not committed.
-          python3 scripts/mega/load_accounts_secret.py || true
+          # Method 2: Sign into ALL generated accounts from tracked accounts.csv.
           if [[ -f scripts/mega/accounts.csv ]]; then
             echo ""
             echo "📂 Signing into generated accounts (accounts.csv)..."

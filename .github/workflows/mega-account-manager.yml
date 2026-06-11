@@ -40,7 +40,6 @@ on:
 env:
   GH_PAT: ${{ secrets.GH_PAT }}
   RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
-  MEGA_ACCOUNTS_JSON: ${{ secrets.MEGA_ACCOUNTS_JSON }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
@@ -107,15 +106,15 @@ jobs:
           NUM="${NUM:-3}"
           PASS="${{ github.event.inputs.account_password }}"
           
-          ARGS="-n $NUM"
-          [[ -n "$PASS" ]] && ARGS="$ARGS -p $PASS"
+          ARGS=(-n "$NUM")
+          [[ -n "$PASS" ]] && ARGS+=( -p "$PASS" )
           
           echo "Generating $NUM accounts..."
           echo "Working directory: $(pwd)"
           echo "CSV location: scripts/mega/accounts.csv"
           
           # Run the generator with full output (no suppression)
-          python3 scripts/mega/generate_accounts.py $ARGS 2>&1
+          python3 scripts/mega/generate_accounts.py "${ARGS[@]}" 2>&1
           GEN_RC=$?
           
           if [[ $GEN_RC -eq 0 ]]; then
@@ -148,8 +147,7 @@ jobs:
           echo "🔄 MEGA Account Keep-Alive Sign-In"
           echo "═══════════════════════════════════════"
           
-          # Prefer MEGA_ACCOUNTS_JSON secret so account passwords are not committed.
-          python3 scripts/mega/load_accounts_secret.py || true
+          # accounts.csv is intentionally tracked in this repository for this project.
           if [[ ! -f scripts/mega/accounts.csv ]]; then
             echo "⚠️ No accounts.csv found — skipping sign-in"
             echo "status=skipped" >> $GITHUB_OUTPUT
@@ -190,15 +188,8 @@ jobs:
             exit 0
           fi
           
-          # Do not commit account credentials unless explicitly enabled.
-          if [[ "${ALLOW_COMMIT_MEGA_ACCOUNTS:-false}" != "true" ]]; then
-            echo "🔒 Not committing scripts/mega/accounts.csv (credentials should live in MEGA_ACCOUNTS_JSON secret)"
-            echo "If new accounts were generated, copy them into the MEGA_ACCOUNTS_JSON secret, then rerun keepalive."
-            exit 0
-          fi
-          
           # Check for any changes (new file or modified)
-          git add -f scripts/mega/accounts.csv 2>/dev/null || true
+          git add scripts/mega/accounts.csv 2>/dev/null || true
           
           if git diff --cached --quiet; then
             echo "📝 No staged changes"
