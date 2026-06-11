@@ -82,8 +82,8 @@ PY
     [[ -z "$filename" ]] && filename="$(sanitize_filename "$title").mp4"
     out="${REPAIR_DIR}/$(make_safe_filename "$filename")"
 
-    log_info "  Archive source: $url"
-    log_info "  Downloading to: $out"
+    log_info "  Archive source: $url" >&2
+    log_info "  Downloading to: $out" >&2
     if [[ ! -s "$out" ]]; then
         aria2c -x 8 -s 8 -k 1M --max-tries=5 --retry-wait=5 --dir="$REPAIR_DIR" --out="$(basename "$out")" "$url" >/dev/null 2>&1 || \
         curl -L --retry 3 --max-time 7200 -o "$out" "$url"
@@ -175,7 +175,12 @@ repair_mirrors() {
         fi
 
         local file
-        file=$(_download_archive_file "$archive_link" "$title") || { log_error "  Could not download Archive.org source"; continue; }
+        file=$(_download_archive_file "$archive_link" "$title" | tail -n 1) || { log_error "  Could not download Archive.org source"; continue; }
+        if [[ -z "$file" || ! -s "$file" ]]; then
+            log_error "  Downloaded Archive.org source is missing or empty: ${file:-none}"
+            continue
+        fi
+        log_ok "  Download ready: $(basename "$file") ($(format_size "$(get_file_size "$file")"))"
 
         local new_gofile="" new_pixel="" new_mega=""
         if [[ "$need_gofile" == true ]]; then
