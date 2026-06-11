@@ -46,12 +46,8 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
 // ─── Filter Chips ────────────────────────────────────────────────
 const FILTERS = [
   { key: 'all', label: 'All' },
-  { key: 'long', label: 'Long (2h+)' },
-  { key: 'short', label: 'Short (<1h)' },
-  { key: 'archive', label: 'Has Archive' },
-  { key: 'mega', label: 'Has MEGA' },
-  { key: 'pixel', label: 'Has Pixeldrain' },
-  { key: 'gofile', label: 'Has Gofile' },
+  { key: 'long', label: 'Long Form' },
+  { key: 'short', label: 'Short Watch' },
 ] as const;
 
 type FilterKey = typeof FILTERS[number]['key'];
@@ -104,18 +100,6 @@ export default function Gallery() {
         const hMatch = s.duration?.match(/(\d+)h/);
         if (hMatch && parseInt(hMatch[1]) >= 1) return false;
       }
-      if (activeFilter === 'archive') {
-        if (!s.sources.archive) return false;
-      }
-      if (activeFilter === 'mega') {
-        if (!s.sources.mega) return false;
-      }
-      if (activeFilter === 'pixel') {
-        if (!s.sources.pixel) return false;
-      }
-      if (activeFilter === 'gofile') {
-        if (!s.sources.gofile) return false;
-      }
       return true;
     })
     .sort((a, b) => {
@@ -153,15 +137,7 @@ export default function Gallery() {
     }
   };
 
-  const sourceColors: Record<string, string> = {
-    archive: 'bg-blue-500',
-    mega: 'bg-red-500',
-    pixel: 'bg-purple-500',
-    gofile: 'bg-green-500',
-    archiveSmall: 'bg-blue-400',
-    odysee: 'bg-teal-500',
-    rumble: 'bg-emerald-500',
-  };
+
 
   const galleryContent = (
     <div className="max-w-7xl mx-auto px-4 py-8 relative">
@@ -385,16 +361,7 @@ export default function Gallery() {
                       {stream.duration || 'Unknown'}
                     </div>
 
-                    {/* Source availability dots (minimal, non-technical) */}
-                    <div className="absolute top-3 left-3 z-20 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                      {Object.entries(stream.sources).slice(0, 4).map(([key, src]) => (
-                        <div
-                          key={key}
-                          className={`h-2.5 w-2.5 rounded-full shadow-lg ring-2 ring-white/30 ${sourceColors[key] || 'bg-gray-500'}`}
-                          title={src.label}
-                        />
-                      ))}
-                    </div>
+
 
                     {/* Progress bar */}
                     {progressPercent > 0 && (
@@ -457,10 +424,11 @@ export default function Gallery() {
                 <Link
                   to={`/watch/${stream.videoId}`}
                   state={{ stream }}
-                  className="flex gap-4 p-3 rounded-2xl glass-panel border border-dark-200 dark:border-dark-800 hover:border-brand-500/30 hover:shadow-lg hover:shadow-brand-500/5 transition-all duration-300 group"
+                  className="relative overflow-hidden flex gap-4 p-3 rounded-3xl bg-white/80 dark:bg-[#141416]/90 border border-white/70 dark:border-white/10 hover:border-brand-500/35 shadow-lg shadow-dark-900/5 dark:shadow-black/20 hover:shadow-2xl hover:shadow-brand-500/10 transition-all duration-500 group backdrop-blur-xl"
                 >
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-brand-500/8 via-transparent to-orange-500/8 pointer-events-none" />
                   {/* Thumbnail */}
-                  <div className="relative w-40 md:w-48 flex-shrink-0 aspect-video rounded-xl overflow-hidden bg-dark-900">
+                  <div className="relative z-10 w-40 md:w-52 flex-shrink-0 aspect-video rounded-2xl overflow-hidden bg-dark-900 shadow-xl">
                     <img
                       src={stream.thumbnail}
                       alt={stream.title}
@@ -480,22 +448,19 @@ export default function Gallery() {
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 min-w-0 py-1">
-                    <h3 className="font-bold text-base truncate group-hover:text-brand-500 transition-colors">{stream.title}</h3>
+                  <div className="relative z-10 flex-1 min-w-0 py-2 pr-3">
+                    <h3 className="font-black text-lg truncate group-hover:text-brand-500 transition-colors">{stream.title}</h3>
                     <div className="flex items-center gap-4 mt-2 text-xs text-dark-500 dark:text-dark-400 font-medium">
                       <span className="flex items-center gap-1"><Clock size={12} /> {stream.date}</span>
                       {stream.size && <span className="flex items-center gap-1"><HardDrive size={12} /> {stream.size}</span>}
                     </div>
-                    {/* Source badges */}
-                    <div className="flex gap-1.5 mt-3">
-                      {Object.entries(stream.sources).map(([key, src]) => (
-                        <span
-                          key={key}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold text-white ${sourceColors[key] || 'bg-gray-500'}`}
-                        >
-                          {src.label.replace(/[^\w\s.]/g, '').trim()}
-                        </span>
-                      ))}
+                    <div className="flex items-center gap-2 mt-4">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider">
+                        <Play size={11} fill="currentColor" /> Watch
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider">
+                        Available
+                      </span>
                     </div>
                   </div>
                 </Link>
