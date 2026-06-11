@@ -379,8 +379,8 @@ jobs:
                   --max-time 7200 \
                   -H "authorization: LOW ${ACCESS}:${SECRET}" \
                   -H "x-archive-auto-make-bucket: 1" \
-                  -H "x-archive-meta-title: ${vtitle}" \
-                  -H "x-archive-meta-creator: ${CHANNEL}" \
+                  -H "x-archive-meta-title: Personal Media Backup" \
+                  -H "x-archive-meta-creator: Media Archive Bot" \
                   -H "x-archive-meta-date: ${DATE_STR}" \
                   -H "x-archive-meta-description: ${vtitle} by ${CHANNEL}. Playlist: ${vplaylist}." \
                   -H "x-archive-meta-mediatype: movies" \

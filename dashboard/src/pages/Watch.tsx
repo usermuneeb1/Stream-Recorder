@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
-const PLAYER_NAMES = ['D3xture', 'heart', 'jatt', 'helicopter'];
+const PLAYER_NAMES = ['D3xture', 'Heart', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'archiveSmall', 'gofile', 'odysee', 'rumble'];
 
 interface PlayerOption {
@@ -411,7 +411,7 @@ export default function Watch() {
     { key: '← / →', desc: 'Seek 10 seconds', hint: 'Jump backward or forward' },
     { key: 'M', desc: 'Mute audio', hint: 'Toggle sound' },
     { key: 'F', desc: 'Fullscreen', hint: 'Enter cinema mode' },
-    { key: 'S', desc: 'Switch player', hint: 'Cycle D3xture / heart / jatt / helicopter' },
+    { key: 'S', desc: 'Switch player', hint: 'Cycle D3xture / Heart / Jatt / Helicopter' },
     { key: '?', desc: 'Shortcuts', hint: 'Show this panel' },
   ];
 
