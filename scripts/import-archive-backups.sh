@@ -31,10 +31,13 @@ _human_size() {
 _id_from_identifier() {
     local identifier="$1"
     local id=""
-    # Prefer a YouTube-style 11-character token embedded in tml identifiers,
-    # but avoid grabbing arbitrary words such as "youtube_arc".
-    id=$(tr '-' '
-' <<< "$identifier" | grep -E '^[A-Za-z0-9_-]{11}$' | grep -Ev '^(youtube_arc|Personal|backup)$' | head -1 || true)
+    # tml identifiers are usually: tml-YYYY-MM-VIDEOID-TIMESTAMP.
+    # Extract the VIDEOID part even when it contains a dash (e.g. 1-Rb7AkebH4).
+    if [[ "$identifier" =~ ^tml-[0-9]{4}-[0-9]{2}-(.+)-[0-9]{9,}$ ]]; then
+        id="${BASH_REMATCH[1]}"
+    else
+        id=$(grep -oE '[A-Za-z0-9_-]{11}' <<< "$identifier" | grep -Ev '^(youtube_arc|Personal|backup)$' | head -1 || true)
+    fi
     if [[ -n "$id" ]]; then
         echo "$id"
     else
@@ -138,17 +141,22 @@ import_archive_backups() {
     existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing="$(cat data/recordings.json 2>/dev/null || echo '[]')"
     [[ -z "$existing" || "$existing" != "["* ]] && existing='[]'
 
-    local existing_ids existing_archive_ids
+    local existing_ids existing_archive_ids existing_base_ids
     existing_ids=$(jq -r '.[].video_id // empty' <<< "$existing" 2>/dev/null | sort -u)
     existing_archive_ids=$(jq -r '.[].archive_link // empty' <<< "$existing" 2>/dev/null | sed -E 's#.*archive\.org/details/([^/?#]+).*#\1#' | sort -u)
+    existing_base_ids=$(jq -r '.[].archive_link // empty' <<< "$existing" 2>/dev/null         | while IFS= read -r archive_url; do
+            [[ "$archive_url" == *archive.org/details/* ]] || continue
+            archive_identifier=$(sed -E 's#.*archive\.org/details/([^/?#]+).*#\1#' <<< "$archive_url")
+            [[ -n "$archive_identifier" ]] && _id_from_identifier "$archive_identifier"
+          done | sort -u)
 
     local imported=0 skipped=0 failed=0 entries="[]"
     while IFS= read -r identifier; do
         [[ -z "$identifier" ]] && continue
         local video_id
         video_id=$(_id_from_identifier "$identifier")
-        if grep -qxF "$identifier" <<< "$existing_archive_ids" || grep -qxF "$video_id" <<< "$existing_ids"; then
-            log_info "Skip duplicate: $identifier"
+        if grep -qxF "$identifier" <<< "$existing_archive_ids"             || grep -qxF "$video_id" <<< "$existing_ids"             || grep -qxF "$video_id" <<< "$existing_base_ids"; then
+            log_info "Skip duplicate: $identifier (base video: $video_id)"
             skipped=$((skipped + 1))
             continue
         fi
