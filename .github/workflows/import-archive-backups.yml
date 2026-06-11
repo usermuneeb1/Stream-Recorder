@@ -1,0 +1,68 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🏛️ IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                    ║
+# ║  Adds missing Personal Media Backup Archive.org videos to the gallery.      ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🏛️ Import Archive Backups"
+
+on:
+  workflow_dispatch:
+    inputs:
+      archive_query:
+        description: "Archive.org search query for backup videos"
+        required: false
+        default: "identifier:tml-* AND (title:\"Personal Media Backup\" OR creator:\"Media Archive Bot\" OR subject:backup)"
+        type: string
+      display_title:
+        description: "Public title to show in gallery"
+        required: false
+        default: "Non-Muslims Question Islam Live! Muhammed Ali"
+        type: string
+      max_items:
+        description: "Max Archive.org items to inspect"
+        required: false
+        default: "100"
+        type: string
+      dry_run:
+        description: "Preview only, do not commit"
+        required: false
+        default: "false"
+        type: boolean
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: import-archive-backups
+  cancel-in-progress: false
+
+env:
+  GH_PAT: ${{ secrets.GH_PAT }}
+  ARCHIVE_QUERY: ${{ github.event.inputs.archive_query }}
+  DISPLAY_TITLE: ${{ github.event.inputs.display_title }}
+  MAX_ITEMS: ${{ github.event.inputs.max_items }}
+  DRY_RUN: ${{ github.event.inputs.dry_run }}
+  TZ: Asia/Karachi
+
+jobs:
+  import:
+    name: "🏛️ Import backup videos"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq bc python3
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
+
+      - name: "🏛️ Import missing backups"
+        run: bash scripts/import-archive-backups.sh
