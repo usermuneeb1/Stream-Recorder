@@ -164,6 +164,17 @@ import_archive_backups() {
         log_info "Importing: $identifier"
         local entry
         if entry=$(_metadata_entry "$identifier" "$display_title"); then
+            # Extra duplicate protection by date + duration. This catches the
+            # same recording uploaded under a different Archive identifier.
+            local cand_duration cand_date duration_match
+            cand_duration=$(jq -r '.duration_sec // 0' <<< "$entry")
+            cand_date=$(jq -r '.date // ""' <<< "$entry")
+            duration_match=$(jq -r                 --argjson dur "${cand_duration:-0}"                 --arg date "$cand_date"                 '[.[] | select((.date // "") == $date) | select((((.duration_sec // 0) - $dur) | if . < 0 then -. else . end) <= 5)] | length'                 <<< "$existing" 2>/dev/null || echo 0)
+            if [[ "$duration_match" =~ ^[0-9]+$ ]] && (( duration_match > 0 )); then
+                log_info "Skip duplicate by date+duration: $identifier (${cand_date}, ${cand_duration}s)"
+                skipped=$((skipped + 1))
+                continue
+            fi
             entries=$(jq --argjson e "$entry" '. + [$e]' <<< "$entries")
             imported=$((imported + 1))
         else
