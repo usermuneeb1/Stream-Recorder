@@ -7,7 +7,6 @@ import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
 import { ParticleField } from '../components/ParticleField';
 import { ArchiveExperience } from '../components/ArchiveExperience';
-import { PremiumHangingLantern } from '../components/PremiumHangingLantern';
 import { Link } from 'react-router-dom';
 
 const containerVariants: Variants = {
@@ -89,6 +88,90 @@ function StatCard({ metric, index }: { metric: { label: string; value: number; d
   );
 }
 
+function HeroArchivePreview({ stream }: { stream?: StreamData }) {
+  const tilt = useTilt();
+  const fallbackThumb = `${import.meta.env.BASE_URL}thumbnail.jpg`;
+  const thumb = stream?.thumbnail || fallbackThumb;
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      ref={tilt.ref}
+      onMouseMove={tilt.handleMouse}
+      onMouseLeave={tilt.handleLeave}
+      style={{ rotateX: tilt.rotateX, rotateY: tilt.rotateY, transformPerspective: 1200 }}
+      className="relative hidden lg:block min-h-[520px]"
+    >
+      {/* premium ornamental arch */}
+      <div className="absolute left-1/2 top-4 h-[500px] w-[410px] -translate-x-1/2 rounded-t-[14rem] rounded-b-[2.5rem] border border-brand-500/15 bg-gradient-to-b from-brand-500/8 via-white/5 to-transparent dark:from-brand-500/10 dark:via-white/[0.03] shadow-[0_0_120px_rgba(239,68,68,0.12)]" />
+      <div className="absolute left-1/2 top-10 h-[440px] w-[340px] -translate-x-1/2 rounded-t-[12rem] rounded-b-[2rem] border border-white/10" />
+      <div className="absolute left-1/2 top-20 h-80 w-80 -translate-x-1/2 rounded-full bg-brand-500/15 blur-[95px]" />
+      <div className="absolute left-1/2 top-36 h-72 w-72 -translate-x-1/2 rounded-full bg-orange-400/10 blur-[85px]" />
+
+      {/* floating preview card */}
+      <motion.div
+        animate={{ y: [-6, 6, -6] }}
+        transition={{ duration: 6.5, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute left-1/2 top-20 w-[420px] -translate-x-1/2 overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-2xl shadow-brand-500/10 backdrop-blur-2xl dark:border-white/10 dark:bg-[#111114]/80 dark:shadow-black/40"
+      >
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-orange-500 to-amber-300" />
+        <div className="relative aspect-video overflow-hidden bg-dark-900">
+          <img
+            src={thumb}
+            alt={stream?.title || 'Archive preview'}
+            className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+            onError={(e) => { (e.target as HTMLImageElement).src = fallbackThumb; }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-black/10" />
+          <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md">
+            <span className="h-2 w-2 rounded-full bg-brand-500 shadow-[0_0_12px_rgba(239,68,68,.8)]" />
+            Featured Recording
+          </div>
+          <div className="absolute bottom-4 left-4 right-4">
+            <h3 className="line-clamp-2 text-xl font-black font-display text-white drop-shadow-lg">
+              {stream?.title || 'The Muslim Lantern Archive'}
+            </h3>
+            <div className="mt-2 flex items-center gap-3 text-xs font-semibold text-white/75">
+              <span>{stream?.date || 'Preserved collection'}</span>
+              {stream?.duration && <span>• {stream.duration}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-dark-200/70 p-4 dark:divide-white/10">
+          {[
+            ['Watch', 'Now'],
+            ['Browse', 'Archive'],
+            ['Access', 'Ready'],
+          ].map(([a, b]) => (
+            <div key={a} className="text-center">
+              <div className="text-[10px] font-black uppercase tracking-widest text-dark-400">{a}</div>
+              <div className="mt-1 text-sm font-black text-dark-900 dark:text-white">{b}</div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* side floating cards */}
+      <motion.div
+        animate={{ y: [4, -7, 4], x: [0, 4, 0] }}
+        transition={{ duration: 5.8, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute right-2 top-72 rounded-3xl border border-white/70 bg-white/75 p-4 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-dark-900/70"
+      >
+        <div className="text-[10px] font-black uppercase tracking-widest text-brand-500">Curated</div>
+        <div className="mt-1 text-lg font-black">Dawah Library</div>
+      </motion.div>
+      <motion.div
+        animate={{ y: [-4, 7, -4], x: [0, -4, 0] }}
+        transition={{ duration: 6.2, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute left-2 top-96 rounded-3xl border border-white/70 bg-white/75 p-4 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-dark-900/70"
+      >
+        <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Clean</div>
+        <div className="mt-1 text-lg font-black">Viewing</div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function Home() {
   const [stats, setStats] = useState({ total_streams: 0, total_hours: 0, total_gb: 0 });
   const [recentStreams, setRecentStreams] = useState<StreamData[]>([]);
@@ -156,7 +239,7 @@ export default function Home() {
       <ParticleField count={20} />
 
       {/* ═══ HERO SECTION ═══════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start mb-16 lg:mb-20 relative z-10 pt-10 lg:pt-14">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center mb-14 lg:mb-16 relative z-10 pt-10 lg:pt-12">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -205,8 +288,8 @@ export default function Home() {
           </motion.div>
         </motion.div>
 
-        {/* Premium Hanging Lantern */}
-        <PremiumHangingLantern />
+        {/* Premium archive visual */}
+        <HeroArchivePreview stream={recentStreams[0]} />
       </div>
 
       {/* ═══ STATS GRID ═════════════════════════════════════════════ */}
