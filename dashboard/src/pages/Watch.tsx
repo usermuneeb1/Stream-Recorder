@@ -14,6 +14,8 @@ import {
   MessageSquare,
   X,
 } from 'lucide-react';
+import { MediaPlayer, MediaProvider } from '@vidstack/react';
+import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
@@ -235,19 +237,23 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
 
   return (
     <div ref={wrapRef} className="relative h-full w-full overflow-hidden bg-black">
-      <video
-        ref={videoRef}
+      <MediaPlayer
         key={activeSrc?.url}
+        title={stream.title}
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
-        className="h-full w-full bg-black object-contain"
-        controls
+        aspectRatio="16/9"
         playsInline
-        preload="metadata"
-        controlsList="nodownload"
-        onTimeUpdate={(e) => onTime(e.currentTarget.currentTime)}
-        onError={() => setError('The selected player source failed to load')}
-      />
+        load="visible"
+        className="vidstack-premium-player h-full w-full bg-black"
+        onTimeUpdate={(event: any) => {
+          const target = event?.target as HTMLMediaElement | undefined;
+          onTime(target?.currentTime || 0);
+        }}
+      >
+        <MediaProvider />
+        <DefaultVideoLayout icons={defaultLayoutIcons} />
+      </MediaPlayer>
 
       {directSources.length > 1 && (
         <div className="absolute bottom-4 right-4 hidden items-center gap-1 rounded-full border border-white/10 bg-black/55 p-1 shadow-xl backdrop-blur-xl md:flex">
