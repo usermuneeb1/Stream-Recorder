@@ -1055,3 +1055,20 @@
   border-radius: 999px;
   background: rgba(255,255,255,.28);
 }
+
+/* Professional native HTML5 watch frame */
+.premium-watch-frame {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 -90px 140px rgba(0,0,0,.52), 0 24px 90px rgba(0,0,0,.35);
+}
+.premium-watch-frame video::-webkit-media-controls-panel {
+  background-image: linear-gradient(transparent, rgba(0,0,0,.78));
+}
+.premium-watch-frame video::-webkit-media-controls-play-button,
+.premium-watch-frame video::-webkit-media-controls-timeline,
+.premium-watch-frame video::-webkit-media-controls-current-time-display,
+.premium-watch-frame video::-webkit-media-controls-time-remaining-display,
+.premium-watch-frame video::-webkit-media-controls-mute-button,
+.premium-watch-frame video::-webkit-media-controls-volume-slider,
+.premium-watch-frame video::-webkit-media-controls-fullscreen-button {
+  filter: saturate(1.1);
+}

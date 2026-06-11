@@ -9,19 +9,11 @@ import {
   ChevronRight,
   Clock,
   Copy,
-  Gauge,
   HardDrive,
   Keyboard,
   Maximize,
   MessageSquare,
   Minimize,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-  Settings,
-  Volume2,
-  VolumeX,
   X,
 } from 'lucide-react';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
@@ -164,13 +156,8 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
   const [iframeSrc, setIframeSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
-  const [volume, setVolume] = useState(0.9);
-  const [muted, setMuted] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [speed, setSpeed] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
@@ -186,14 +173,14 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
         if (option.source.type === 'pixeldrain') {
           const url = pixeldrainDirect(option.source.url);
-          if (url) direct = [{ id: 'pixel-direct', quality: 'Fast', url }];
+          if (url) direct = [{ id: 'pixel-direct', quality: 'Auto', url }];
         }
         if (!cancelled && direct.length > 0) {
           setDirectSources(direct);
           return;
         }
         const iframe = embedUrl(option.source);
-        if (!iframe) throw new Error('This playback option cannot be embedded');
+        if (!iframe) throw new Error('This playback option cannot be prepared');
         if (!cancelled) setIframeSrc(iframe);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Could not prepare this player');
@@ -206,25 +193,10 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
   }, [option, archiveId]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.volume = volume;
-    video.muted = muted;
-    video.playbackRate = speed;
-  }, [volume, muted, speed, activeQuality]);
-
-  const togglePlay = async () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) await video.play();
-    else video.pause();
-  };
-
-  const seekTo = (value: number) => {
-    const video = videoRef.current;
-    if (!video || !duration) return;
-    video.currentTime = (value / 100) * duration;
-  };
+    const handler = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const switchQuality = (index: number) => {
     const video = videoRef.current;
@@ -236,7 +208,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
       if (!next) return;
       next.currentTime = previousTime;
       if (wasPlaying) next.play().catch(() => undefined);
-    }, 150);
+    }, 120);
   };
 
   const toggleFullscreen = async () => {
@@ -246,138 +218,102 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     else await document.exitFullscreen();
   };
 
-  useEffect(() => {
-    const handler = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
+  if (loading) {
+    return (
+      <div className="premium-watch-frame flex h-full w-full items-center justify-center bg-black text-white">
+        <div className="text-center">
+          <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-brand-500 border-t-transparent animate-spin" />
+          <p className="text-sm font-semibold text-white/80">Preparing {option.label}</p>
+          <p className="mt-1 text-xs text-white/45">Loading protected archive playback…</p>
+        </div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const video = videoRef.current;
-      switch (e.key.toLowerCase()) {
-        case ' ':
-        case 'k': e.preventDefault(); togglePlay(); break;
-        case 'm': setMuted(prev => !prev); break;
-        case 'f': toggleFullscreen(); break;
-        case 'arrowright': if (video) video.currentTime += 10; break;
-        case 'arrowleft': if (video) video.currentTime -= 10; break;
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  if (loading) return <div className="w-full h-full flex flex-col items-center justify-center bg-black text-white"><div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4" /><p className="text-sm text-white/70">Preparing {option.label}…</p></div>;
-  if (error) return <div className="w-full h-full flex flex-col items-center justify-center bg-black text-center p-6 text-white"><AlertTriangle size={34} className="text-brand-400 mb-4" /><h3 className="text-xl font-bold mb-2">Playback unavailable</h3><p className="text-white/60 max-w-md text-sm">{error}. Please choose another player.</p></div>;
+  if (error) {
+    return (
+      <div className="premium-watch-frame flex h-full w-full items-center justify-center bg-black p-8 text-center text-white">
+        <div className="max-w-md">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-300 ring-1 ring-brand-500/20">
+            <AlertTriangle size={32} />
+          </div>
+          <h3 className="text-2xl font-black font-display">Playback unavailable</h3>
+          <p className="mt-2 text-sm leading-relaxed text-white/55">{error}. Please choose another player source.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (iframeSrc) {
     return (
-      <div ref={wrapRef} className="relative w-full h-full bg-black overflow-hidden">
-        <iframe src={iframeSrc} title={option.label} className="w-full h-full border-0" allowFullScreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture" />
-        <div className="pointer-events-none absolute top-4 left-4 flex items-center gap-2 rounded-full bg-black/45 px-3 py-2 backdrop-blur-md border border-white/10 text-white">
-          <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-7 w-7 rounded-full object-cover" />
-          <span className="text-xs font-bold">{option.label}</span>
+      <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black">
+        <iframe src={iframeSrc} title={option.label} className="h-full w-full border-0" allowFullScreen allow="fullscreen; autoplay; encrypted-media; picture-in-picture" />
+        <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-white shadow-2xl backdrop-blur-xl">
+          <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-9 w-9 rounded-xl object-cover ring-1 ring-white/20" />
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-brand-300">The Muslim Lantern</div>
+            <div className="text-xs font-bold">{option.label}</div>
+          </div>
         </div>
       </div>
     );
   }
 
   const activeSrc = directSources[activeQuality];
-  const progress = duration ? (current / duration) * 100 : 0;
 
   return (
-    <div ref={wrapRef} className="premium-player-shell relative w-full h-full bg-black text-white group overflow-hidden">
+    <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black text-white">
       <video
         ref={videoRef}
         key={activeSrc?.url}
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
-        className="w-full h-full object-contain bg-black"
+        className="h-full w-full bg-black object-contain"
+        controls
         playsInline
         preload="metadata"
-        controlsList="nodownload noplaybackrate"
-        onClick={togglePlay}
-        onDoubleClick={toggleFullscreen}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        controlsList="nodownload"
+        disablePictureInPicture={false}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
         onTimeUpdate={(e) => { setCurrent(e.currentTarget.currentTime); onTime(e.currentTarget.currentTime); }}
       />
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 via-black/5 to-black/55" />
-      <div className="pointer-events-none absolute inset-0 premium-player-vignette" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
 
-      <div className="absolute left-4 right-4 top-4 flex items-center justify-between gap-4 opacity-0 translate-y-[-8px] group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
-        <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-black/42 px-3 py-2 backdrop-blur-xl border border-white/10 shadow-2xl">
-          <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20" />
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.24em] text-brand-300 font-black">The Muslim Lantern Archive</div>
-            <div className="truncate text-sm font-bold text-white/95 max-w-[520px]">{stream.title}</div>
-          </div>
-        </div>
-        <div className="rounded-full bg-black/45 px-3 py-1.5 text-xs font-black backdrop-blur-xl border border-white/10 shadow-xl">
-          {option.label} <span className="text-white/45">•</span> {activeSrc?.quality || 'Auto'}
+      <div className="pointer-events-none absolute left-4 top-4 flex max-w-[70%] items-center gap-3 rounded-2xl border border-white/10 bg-black/48 px-3 py-2 shadow-2xl backdrop-blur-xl">
+        <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20" />
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-[0.24em] text-brand-300">The Muslim Lantern Archive</div>
+          <div className="truncate text-sm font-bold text-white">{stream.title}</div>
         </div>
       </div>
 
-      <button
-        onClick={togglePlay}
-        aria-label={playing ? 'Pause video' : 'Play video'}
-        className="absolute inset-0 m-auto h-24 w-24 rounded-full bg-white/12 backdrop-blur-2xl border border-white/25 flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 shadow-[0_20px_80px_rgba(0,0,0,.45)] hover:bg-brand-500/80"
-      >
-        {playing ? <Pause size={40} fill="currentColor" /> : <Play size={46} fill="currentColor" className="ml-1" />}
-      </button>
-
-      <div className="absolute left-0 right-0 bottom-0 p-4 md:p-6 opacity-100 md:opacity-0 md:translate-y-3 md:group-hover:opacity-100 md:group-hover:translate-y-0 transition-all duration-300">
-        <div className="rounded-[1.6rem] bg-black/46 border border-white/10 backdrop-blur-2xl p-3 md:p-4 shadow-2xl">
-          <input
-            aria-label="Seek video"
-            type="range"
-            min="0"
-            max="100"
-            value={progress || 0}
-            onChange={(e) => seekTo(Number(e.target.value))}
-            className="premium-video-range w-full mb-3"
-          />
-          <div className="flex items-center gap-2 md:gap-3">
-            <button aria-label={playing ? 'Pause' : 'Play'} onClick={togglePlay} className="player-btn player-btn-primary">{playing ? <Pause size={19} /> : <Play size={19} />}</button>
-            <button aria-label="Back 10 seconds" onClick={() => { const video = videoRef.current; if (video) video.currentTime -= 10; }} className="player-btn"><RotateCcw size={17} /></button>
-            <button aria-label="Forward 10 seconds" onClick={() => { const video = videoRef.current; if (video) video.currentTime += 10; }} className="player-btn"><RotateCw size={17} /></button>
-            <div className="hidden sm:block text-xs font-mono text-white/80 min-w-[104px]">{formatClock(current)} / {formatClock(duration)}</div>
-            <button aria-label={muted ? 'Unmute' : 'Mute'} onClick={() => setMuted(prev => !prev)} className="player-btn">{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
-            <input aria-label="Volume" type="range" min="0" max="1" step="0.01" value={muted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} className="premium-volume-range w-20 hidden lg:block" />
-            <div className="ml-auto flex items-center gap-2">
-              <div className="hidden md:flex rounded-full bg-white/8 border border-white/10 p-1">
-                {directSources.map((src, i) => (
-                  <button key={src.id} onClick={() => switchQuality(i)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all ${i === activeQuality ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/25' : 'text-white/65 hover:text-white hover:bg-white/10'}`}>{src.quality}</button>
-                ))}
-              </div>
-              <div className="relative">
-                <button aria-label="Player settings" onClick={() => setShowSettings(prev => !prev)} className="player-btn"><Settings size={18} /></button>
-                <AnimatePresence>
-                  {showSettings && <motion.div initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.96 }} className="absolute bottom-12 right-0 w-64 rounded-2xl bg-black/90 border border-white/10 backdrop-blur-2xl p-3 shadow-2xl">
-                    <div className="text-[11px] uppercase tracking-widest text-white/45 font-black px-2 mb-2">Quality</div>
-                    {directSources.map((src, i) => <button key={src.id} onClick={() => { switchQuality(i); setShowSettings(false); }} className={`w-full text-left px-3 py-2 rounded-xl text-sm font-semibold ${i === activeQuality ? 'bg-brand-500 text-white' : 'hover:bg-white/10 text-white/75'}`}>{src.quality}</button>)}
-                    <div className="h-px bg-white/10 my-2" />
-                    <div className="text-[11px] uppercase tracking-widest text-white/45 font-black px-2 mb-2">Speed</div>
-                    {[0.75, 1, 1.25, 1.5, 2].map(rate => <button key={rate} onClick={() => setSpeed(rate)} className={`w-full text-left px-3 py-2 rounded-xl text-sm font-semibold ${speed === rate ? 'bg-white/15 text-white' : 'hover:bg-white/10 text-white/75'}`}><Gauge size={14} className="inline mr-2" />{rate}x</button>)}
-                  </motion.div>}
-                </AnimatePresence>
-              </div>
-              <button aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={toggleFullscreen} className="player-btn">{fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}</button>
-            </div>
-          </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-white/45 sm:hidden">
-            <span>{formatClock(current)}</span><span>{formatClock(duration)}</span>
-          </div>
+      <div className="absolute right-4 top-4 flex items-center gap-2">
+        <div className="rounded-full border border-white/10 bg-black/48 px-3 py-1.5 text-xs font-black text-white shadow-xl backdrop-blur-xl">
+          {option.label} · {activeSrc?.quality || 'Auto'}
         </div>
+        <button onClick={toggleFullscreen} className="rounded-full border border-white/10 bg-black/48 p-2.5 text-white shadow-xl backdrop-blur-xl transition hover:bg-white/15" aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+          {fullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
+        </button>
+      </div>
+
+      {directSources.length > 1 && (
+        <div className="absolute bottom-16 right-4 hidden items-center gap-1 rounded-full border border-white/10 bg-black/48 p-1 shadow-xl backdrop-blur-xl md:flex">
+          {directSources.map((src, i) => (
+            <button key={src.id} onClick={() => switchQuality(i)} className={`rounded-full px-3 py-1.5 text-xs font-black transition ${i === activeQuality ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/25' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
+              {src.quality}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute bottom-4 left-4 rounded-full bg-black/38 px-3 py-1 text-xs font-mono text-white/70 backdrop-blur-md">
+        {formatClock(current)} / {formatClock(duration)}
       </div>
     </div>
   );
 }
-
 function ChatReplay({ chatUrl, archiveId, currentTime }: { chatUrl?: string; archiveId?: string; currentTime: number }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
