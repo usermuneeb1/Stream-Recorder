@@ -16,10 +16,9 @@ import {
   Minimize,
   X,
 } from 'lucide-react';
-import { MediaCommunitySkin, MediaOutlet, MediaPlayer, MediaPoster } from '@vidstack/react';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
-const PLAYER_NAMES = ['D3xture', 'Heart', 'Jatt', 'Helicopter'];
+const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'archiveSmall', 'gofile', 'odysee', 'rumble'];
 
 interface PlayerOption {
@@ -193,12 +192,6 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     return () => { cancelled = true; };
   }, [option, archiveId]);
 
-  useEffect(() => {
-    const handler = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
-
   const switchQuality = (index: number) => {
     const video = videoRef.current;
     const previousTime = video?.currentTime || 0;
@@ -219,13 +212,18 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     else await document.exitFullscreen();
   };
 
+  useEffect(() => {
+    const handler = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
   if (loading) {
     return (
       <div className="premium-watch-frame flex h-full w-full items-center justify-center bg-black text-white">
         <div className="text-center">
           <div className="mx-auto mb-5 h-14 w-14 rounded-full border-4 border-brand-500 border-t-transparent animate-spin" />
           <p className="text-sm font-semibold text-white/80">Preparing {option.label}</p>
-          <p className="mt-1 text-xs text-white/45">Loading protected archive playback…</p>
         </div>
       </div>
     );
@@ -264,31 +262,24 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
 
   return (
     <div ref={wrapRef} className="premium-watch-frame relative h-full w-full overflow-hidden bg-black text-white">
-      <MediaPlayer
+      <video
+        ref={videoRef}
         key={activeSrc?.url}
         src={activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
-        aspectRatio="16/9"
-        crossorigin="anonymous"
-        playsinline
-        className="vidstack-premium-player h-full w-full bg-black"
-        onLoadedMetadata={(event: any) => setDuration(event?.target?.duration || event?.detail?.duration || 0)}
-        onTimeUpdate={(event: any) => {
-          const time = event?.target?.currentTime ?? event?.detail?.currentTime ?? 0;
-          const dur = event?.target?.duration ?? event?.detail?.duration ?? duration;
-          setCurrent(time || 0);
-          if (dur) setDuration(dur);
-          onTime(time || 0);
-        }}
-      >
-        <MediaOutlet>
-          <MediaPoster className="vds-poster" alt={stream.title} />
-        </MediaOutlet>
-        <MediaCommunitySkin />
-      </MediaPlayer>
+        className="h-full w-full bg-black object-contain"
+        controls
+        playsInline
+        preload="metadata"
+        controlsList="nodownload"
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => { setCurrent(e.currentTarget.currentTime); onTime(e.currentTarget.currentTime); }}
+        onError={() => setError('The selected player source failed to load')}
+      />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-black/80 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-black/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
 
       <div className="pointer-events-none absolute left-4 top-4 flex max-w-[70%] items-center gap-3 rounded-2xl border border-white/10 bg-black/48 px-3 py-2 shadow-2xl backdrop-blur-xl">
         <img src={`${import.meta.env.BASE_URL}logo-vertical.pn.jpg`} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20" />
@@ -399,7 +390,7 @@ export default function Watch() {
     { key: '← / →', desc: 'Seek 10 seconds', hint: 'Jump backward or forward' },
     { key: 'M', desc: 'Mute audio', hint: 'Toggle sound' },
     { key: 'F', desc: 'Fullscreen', hint: 'Enter cinema mode' },
-    { key: 'S', desc: 'Switch player', hint: 'Cycle D3xture / Heart / Jatt / Helicopter' },
+    { key: 'S', desc: 'Switch player', hint: 'Cycle Dxture / Heart / Jatt / Helicopter' },
     { key: '?', desc: 'Shortcuts', hint: 'Show this panel' },
   ];
 
