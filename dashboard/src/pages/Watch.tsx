@@ -55,8 +55,10 @@ function pixeldrainStreamCandidates(url?: string): DirectSource[] {
   const proxy = pixeldrainProxyStream(url);
   const official = pixeldrainOfficialStream(url);
   const out: DirectSource[] = [];
-  if (proxy) out.push({ id: 'pixel-fast', quality: 'Fast', url: proxy });
-  if (official) out.push({ id: 'pixel-direct', quality: 'Direct', url: official });
+  // Pixeldrain stream URLs have no .mp4 extension, so we MUST declare the MIME
+  // type explicitly or the player cannot detect that it is a video.
+  if (proxy) out.push({ id: 'pixel-fast', quality: 'Fast', url: proxy, mime: 'video/mp4' });
+  if (official) out.push({ id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' });
   return out;
 }
 
@@ -76,6 +78,7 @@ interface DirectSource {
   id: string;
   quality: string;
   url: string;
+  mime?: 'video/mp4' | 'video/webm' | 'video/ogg';
 }
 
 interface ChatMessage {
@@ -227,6 +230,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
   const [iframeSrc, setIframeSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [failedSources, setFailedSources] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,6 +240,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
       setDirectSources([]);
       setIframeSrc('');
       setActiveQuality(0);
+      setFailedSources([]);
       try {
         let direct: DirectSource[] = [];
         if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
@@ -314,7 +319,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
       <MediaPlayer
         key={activeSrc?.url}
         title={stream.title}
-        src={activeSrc?.url}
+        src={activeSrc?.mime ? { src: activeSrc.url, type: activeSrc.mime } : activeSrc?.url}
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
         aspectRatio="16/9"
         playsInline
@@ -326,20 +331,26 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         }}
         onError={() => {
           // Auto-failover: if the current stream candidate (e.g. the Fast proxy)
-          // fails to load, transparently advance to the next candidate (Direct)
-          // without surfacing an error to the viewer.
+          // genuinely fails, advance to the next candidate ONCE. We only show the
+          // hard error after every candidate has actually been tried, so a single
+          // transient hiccup never cascades into "all sources unavailable".
           const previousTime = videoRef.current?.currentTime || 0;
-          setActiveQuality(prev => {
-            const next = prev + 1;
-            if (next >= directSources.length) {
+          setFailedSources(prevFailed => {
+            const currentUrl = directSources[activeQuality]?.url;
+            if (currentUrl && prevFailed.includes(currentUrl)) return prevFailed;
+            const nextFailed = currentUrl ? [...prevFailed, currentUrl] : prevFailed;
+            // Find the next candidate that has not failed yet.
+            const nextIndex = directSources.findIndex(s => !nextFailed.includes(s.url));
+            if (nextIndex === -1) {
               setError('All playback sources are unavailable right now');
-              return prev;
+            } else {
+              setActiveQuality(nextIndex);
+              window.setTimeout(() => {
+                const v = videoRef.current;
+                if (v && previousTime > 0) v.currentTime = previousTime;
+              }, 200);
             }
-            window.setTimeout(() => {
-              const v = videoRef.current;
-              if (v && previousTime > 0) v.currentTime = previousTime;
-            }, 150);
-            return next;
+            return nextFailed;
           });
         }}
       >
