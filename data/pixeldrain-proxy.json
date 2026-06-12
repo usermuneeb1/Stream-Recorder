@@ -1,8 +1,8 @@
 {
-  "updated_at": "2026-06-12T15:49:36.000Z",
+  "updated_at": "2026-06-12T17:18:23.000Z",
   "proxy_host": "cdn.pixeldrain.eu.cc",
   "official_host": "pixeldrain.com",
   "proxy_status": "down",
-  "official_status": "down",
-  "probe_id": "8k33gJSm"
+  "official_status": "alive",
+  "probe_id": "sv8taSQd"
 }
