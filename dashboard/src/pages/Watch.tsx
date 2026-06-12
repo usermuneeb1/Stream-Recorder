@@ -69,6 +69,38 @@ function pixeldrainDownload(url?: string) {
   return id ? `https://${PIXELDRAIN_PROXY_HOST}/${id}` : '';
 }
 
+// Quickly probe a Pixeldrain candidate to see if it actually serves video right
+// now. Pixeldrain has started returning 403 JSON ("hotlinking ... requires a
+// paid subscription") for embedded playback, so without this the player would
+// spin forever. We do a tiny ranged request and check the content type.
+// Returns true only when the response looks like real video. Times out fast.
+async function pixeldrainPlayable(url: string, timeoutMs = 3500): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    // No custom headers -> stays a CORS "simple request" (no preflight). The
+    // fetch resolves as soon as response headers arrive; we read the status +
+    // content-type, then abort so the body is never downloaded.
+    const res = await fetch(url, { method: 'GET', signal: controller.signal });
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    const ok = res.ok && (type.startsWith('video/') || type === 'application/octet-stream');
+    controller.abort(); // stop the body stream immediately
+    return ok;
+  } catch {
+    return false; // network error / timeout / CORS / blocked
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+// Returns the playable Pixeldrain candidates (proxy/official) in the requested
+// order, filtering out any that are currently blocked. Probes run in parallel.
+async function resolvePixeldrainSources(url: string | undefined, mode: 'fast' | 'direct'): Promise<DirectSource[]> {
+  const candidates = pixeldrainStreamCandidates(url, mode);
+  const checks = await Promise.all(candidates.map(c => pixeldrainPlayable(c.url)));
+  return candidates.filter((_, i) => checks[i]);
+}
+
 interface PlayerOption {
   key: string;
   label: string;
@@ -249,9 +281,13 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         let direct: DirectSource[] = [];
         if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
         if (option.source.type === 'pixeldrain') {
-          // Order depends on which server button was chosen (Fast vs Heart),
-          // but each still keeps the other as a silent automatic fallback.
-          direct = pixeldrainStreamCandidates(option.source.url, option.pixeldrainMode || 'fast');
+          // Probe before playing: Pixeldrain blocks embedded/hotlinked playback
+          // (403) so we verify which candidate actually serves video. This
+          // avoids an endless spinner and shows a clear message if all blocked.
+          direct = await resolvePixeldrainSources(option.source.url, option.pixeldrainMode || 'fast');
+          if (!cancelled && direct.length === 0) {
+            throw new Error('Pixeldrain is currently blocking embedded playback. Use the Dxture (Archive) source, or the Download button');
+          }
         }
         if (option.source.type === 'gofile') {
           direct = await gofileDirectSources(option.source.url);
