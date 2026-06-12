@@ -193,6 +193,13 @@ repair_mirrors() {
         fi
         if [[ "$need_mega" == true ]]; then
             MEGA_LINKS=()
+            # Use generated MEGA accounts from scripts/mega/accounts.csv when available.
+            # This avoids relying only on the single MEGA_EMAIL/MEGA_PASSWORD secret.
+            if [[ -f "$SCRIPT_DIR/mega-rotate.sh" ]]; then
+                # shellcheck source=scripts/mega-rotate.sh
+                source "$SCRIPT_DIR/mega-rotate.sh"
+                select_mega_account || true
+            fi
             upload_to_mega "$file" "HD" && new_mega=$(printf '%s' "${MEGA_LINKS[0]:-}" | cut -d'|' -f2) || true
         fi
 
