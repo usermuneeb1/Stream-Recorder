@@ -5,6 +5,7 @@ import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, Refre
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
 import { AdminEditor, applyAdminOverrides } from '../components/AdminEditor';
 import { useAuth } from '../contexts/AuthContext';
+import { useGithub } from '../contexts/GithubContext';
 
 // ─── 3D Tilt Card Wrapper ────────────────────────────────────────
 function TiltCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -54,6 +55,7 @@ type FilterKey = typeof FILTERS[number]['key'];
 
 export default function Gallery() {
   const { role } = useAuth();
+  const { pat, removeRecording } = useGithub();
   const isAdmin = role === 'admin';
   const [streams, setStreams] = useState<StreamData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,16 +66,13 @@ export default function Gallery() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [searchFocused, setSearchFocused] = useState(false);
   const [editingStream, setEditingStream] = useState<StreamData | null>(null);
-  const [deletedIds, setDeletedIds] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('admin_deleted_videos') || '[]'); } catch { return []; }
-  });
 
   const loadStreams = () => {
     setLoading(true);
     setError(null);
     fetchStreams()
       .then(data => {
-        setStreams(applyAdminOverrides(data).filter(stream => !deletedIds.includes(stream.videoId)));
+        setStreams(applyAdminOverrides(data));
         setLoading(false);
       })
       .catch(() => {
@@ -84,7 +83,7 @@ export default function Gallery() {
 
   useEffect(() => {
     loadStreams();
-  }, [deletedIds]);
+  }, []);
 
   // Filter and sort
   const filtered = streams
@@ -143,14 +142,20 @@ export default function Gallery() {
 
 
 
-  const handleDeleteStream = (stream: StreamData) => {
+  const handleDeleteStream = async (stream: StreamData) => {
     if (!isAdmin) return;
-    const ok = window.confirm(`Remove this recording from your gallery view?\n\n${stream.title}\n\nThis hides it in the dashboard using admin local storage. It does not delete cloud/archive files.`);
+    if (!pat) {
+      alert('Admin GitHub PAT is required to remove a recording globally. Open Command Center and unlock with your PAT first.');
+      return;
+    }
+    const ok = window.confirm(`Remove this recording from the public gallery for everyone?\n\n${stream.title}\n\nThis updates data/recordings.json. It does not delete cloud/archive files.`);
     if (!ok) return;
-    const next = Array.from(new Set([...deletedIds, stream.videoId]));
-    setDeletedIds(next);
-    localStorage.setItem('admin_deleted_videos', JSON.stringify(next));
     setStreams(prev => prev.filter(item => item.videoId !== stream.videoId));
+    const success = await removeRecording(stream.videoId);
+    if (!success) {
+      alert('Failed to update GitHub. Restoring item locally. Check PAT permissions.');
+      loadStreams();
+    }
   };
 
   const galleryContent = (

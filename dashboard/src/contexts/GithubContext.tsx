@@ -6,6 +6,7 @@ interface GithubContextType {
   dispatchWorkflow: (workflowId: string, inputs: Record<string, string>) => Promise<{success: boolean, error?: string}>;
   getWorkflowRuns: (workflowId?: string) => Promise<any[]>;
   addManualEntry: (entry: any) => Promise<boolean>;
+  removeRecording: (videoId: string) => Promise<boolean>;
 }
 
 const GithubContext = createContext<GithubContextType>({
@@ -14,6 +15,7 @@ const GithubContext = createContext<GithubContextType>({
   dispatchWorkflow: async () => ({ success: false }),
   getWorkflowRuns: async () => [],
   addManualEntry: async () => false,
+  removeRecording: async () => false,
 });
 
 const OWNER = 'usermuneeb1';
@@ -148,8 +150,48 @@ export const GithubProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+
+  const removeRecording = async (videoId: string): Promise<boolean> => {
+    if (!pat || !videoId) return false;
+    try {
+      const getRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/data/recordings.json`, {
+        headers: {
+          Authorization: `Bearer ${pat}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (!getRes.ok) return false;
+      const getJson = await getRes.json();
+      const text = decodeURIComponent(escape(atob(getJson.content)));
+      const recordings = JSON.parse(text);
+      if (!Array.isArray(recordings)) return false;
+
+      const next = recordings.filter((entry: any) => entry.video_id !== videoId && entry.videoId !== videoId);
+      if (next.length === recordings.length) return true;
+
+      const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(next, null, 2))));
+      const putRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/data/recordings.json`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${pat}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `🗑️ Remove recording from gallery: ${videoId}`,
+          content: newContent,
+          sha: getJson.sha,
+        }),
+      });
+      return putRes.ok;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  };
+
   return (
-    <GithubContext.Provider value={{ pat, setPat, dispatchWorkflow, getWorkflowRuns, addManualEntry }}>
+    <GithubContext.Provider value={{ pat, setPat, dispatchWorkflow, getWorkflowRuns, addManualEntry, removeRecording }}>
       {children}
     </GithubContext.Provider>
   );

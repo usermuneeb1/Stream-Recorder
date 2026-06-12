@@ -31,8 +31,8 @@ on:
         type: boolean
 
   schedule:
-    # Weekly repair pass, Sunday 08:30 UTC
-    - cron: "30 8 * * 0"
+    # Daily repair pass at 08:30 UTC to replace expired temporary mirrors quickly.
+    - cron: "30 8 * * *"
 
 permissions:
   contents: read

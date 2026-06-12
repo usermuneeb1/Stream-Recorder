@@ -368,8 +368,8 @@ export default function Watch() {
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
   const downloadLinks = [
-    stream.sources.mega && { label: 'Download Mirror 1', url: stream.sources.mega.url },
-    stream.sources.gofile && { label: 'Download Mirror 2', url: stream.sources.gofile.url },
+    stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url },
+    stream.sources.gofile && { label: 'Gofile', url: stream.sources.gofile.url },
   ].filter(Boolean) as { label: string; url: string }[];
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
@@ -420,7 +420,7 @@ export default function Watch() {
                   <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-white hover:border-brand-500/40 hover:bg-brand-500/10 transition-all">
                     <div>
                       <div className="font-bold">{item.label}</div>
-                      <div className="text-xs text-white/45">Mirror {index + 1}</div>
+                      <div className="text-xs text-white/45">{index === 0 ? 'Encrypted storage mirror' : 'Fast file mirror'}</div>
                     </div>
                     <Download size={18} className="text-brand-400" />
                   </a>
