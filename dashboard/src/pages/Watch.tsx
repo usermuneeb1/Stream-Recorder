@@ -23,14 +23,12 @@ const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" proxy configuration ──
-// Streaming order: YOUR Cloudflare Worker (if set) → GameDrive CDN → official.
-// The Worker (see /worker/README.md) caches files on Cloudflare's edge and
-// bypasses Pixeldrain's hotlink/rate-limit block, giving fast, bulletproof
-// playback you fully control. Leave PIXELDRAIN_WORKER_HOST empty to use the
-// public proxies only.
-//
-//   const PIXELDRAIN_WORKER_HOST = 'pixeldrain-fast.YOUR-NAME.workers.dev';
-const PIXELDRAIN_WORKER_HOST = '';
+// Streaming order: OWN Vercel proxy (/api/pd/<id>) → GameDrive CDN → official.
+// The Vercel function (dashboard/api/pd/[id].js) fetches the file server-side to
+// bypass Pixeldrain's hotlink/rate-limit 403 and edge-caches it for speed. It
+// lives on your own site, so there is nothing extra to deploy. If Pixeldrain
+// blocks Vercel's IPs too, the player automatically falls back to the public
+// GameDrive CDN and then official Pixeldrain.
 const PIXELDRAIN_PROXY_HOST = 'cdn.pixeldrain.eu.cc';
 const PIXELDRAIN_OFFICIAL_HOST = 'pixeldrain.com';
 
@@ -40,10 +38,10 @@ function pixeldrainId(url?: string) {
     || '';
 }
 
-// YOUR Cloudflare Worker stream (fast + cached). Empty if not configured.
+// OWN Vercel serverless proxy on the same domain (relative URL works anywhere).
 function pixeldrainWorkerStream(url?: string) {
   const id = pixeldrainId(url);
-  return (id && PIXELDRAIN_WORKER_HOST) ? `https://${PIXELDRAIN_WORKER_HOST}/${id}` : '';
+  return id ? `/api/pd/${id}` : '';
 }
 
 // GameDrive CDN proxy stream (public, may be blocked at times).
