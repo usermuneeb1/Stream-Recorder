@@ -22,6 +22,50 @@ import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'pixel', 'odysee', 'rumble'];
 
+// ── Pixeldrain "fast playback" proxy configuration ──
+// The GameDrive bypass CDN streams the raw mp4 (video/mp4, Accept-Ranges, CORS *)
+// so it can be embedded directly in the player and seeks correctly. If GameDrive
+// is ever blocked by Pixeldrain, we transparently fall back to the official
+// direct endpoint. cdn.pixeldrain.eu.cc is the current GameDrive proxy host; it
+// 302-redirects to a cdnNN.pixeldrain.eu.cc node that serves the video bytes.
+const PIXELDRAIN_PROXY_HOST = 'cdn.pixeldrain.eu.cc';
+const PIXELDRAIN_OFFICIAL_HOST = 'pixeldrain.com';
+
+function pixeldrainId(url?: string) {
+  return (url || '').match(/pixeldrain(?:\.com|-bypass\.gamedrive\.org|\.eu\.cc)?\/(?:u|api\/file)\/([a-zA-Z0-9_-]+)/)?.[1]
+    || (url || '').match(/(?:eu\.cc|gamedrive\.org)\/([a-zA-Z0-9_-]+)$/)?.[1]
+    || '';
+}
+
+// Proxy stream URL (fast) — GameDrive CDN redirects to a cdnNN.* node serving video/mp4.
+function pixeldrainProxyStream(url?: string) {
+  const id = pixeldrainId(url);
+  return id ? `https://${PIXELDRAIN_PROXY_HOST}/${id}` : '';
+}
+
+// Official direct stream URL (reliable fallback).
+function pixeldrainOfficialStream(url?: string) {
+  const id = pixeldrainId(url);
+  return id ? `https://${PIXELDRAIN_OFFICIAL_HOST}/api/file/${id}` : '';
+}
+
+// Ordered list of playable stream candidates for a Pixeldrain link. The player
+// tries them top-to-bottom and auto-fails-over on error.
+function pixeldrainStreamCandidates(url?: string): DirectSource[] {
+  const proxy = pixeldrainProxyStream(url);
+  const official = pixeldrainOfficialStream(url);
+  const out: DirectSource[] = [];
+  if (proxy) out.push({ id: 'pixel-fast', quality: 'Fast', url: proxy });
+  if (official) out.push({ id: 'pixel-direct', quality: 'Direct', url: official });
+  return out;
+}
+
+// Download URL (proxy first; bypasses Pixeldrain speed limits).
+function pixeldrainDownload(url?: string) {
+  const id = pixeldrainId(url);
+  return id ? `https://${PIXELDRAIN_PROXY_HOST}/${id}` : '';
+}
+
 interface PlayerOption {
   key: string;
   label: string;
@@ -64,10 +108,7 @@ function sortSourceEntries(sources: Record<string, StreamSource>): [string, Stre
   });
 }
 
-function pixeldrainDirect(url?: string) {
-  const id = (url || '').match(/pixeldrain\.com\/u\/([a-zA-Z0-9_-]+)/)?.[1];
-  return id ? `https://pixeldrain.com/api/file/${id}` : '';
-}
+
 
 
 async function gofileDirectSources(url?: string): Promise<DirectSource[]> {
@@ -99,8 +140,9 @@ function embedUrl(source: StreamSource) {
     return source.url.replace('/file/', '/embed/');
   }
   if (source.type === 'pixeldrain') {
-    const id = source.url.match(/pixeldrain\.com\/u\/([a-zA-Z0-9_-]+)/)?.[1];
-    return id ? `https://pixeldrain.com/api/file/${id}?embed` : '';
+    // Pixeldrain is handled as a direct stream (with proxy failover), not an
+    // iframe embed. This is only a last-resort fallback.
+    return pixeldrainOfficialStream(source.url);
   }
   if (source.type === 'odysee') return source.url.replace('odysee.com/', 'odysee.com/$/embed/');
   if (source.type === 'rumble') return source.url.replace('/v', '/embed/v');
@@ -198,8 +240,8 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         let direct: DirectSource[] = [];
         if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
         if (option.source.type === 'pixeldrain') {
-          const url = pixeldrainDirect(option.source.url);
-          if (url) direct = [{ id: 'pixel-direct', quality: 'Auto', url }];
+          // Fast proxy stream first, official direct as automatic fallback.
+          direct = pixeldrainStreamCandidates(option.source.url);
         }
         if (option.source.type === 'gofile') {
           direct = await gofileDirectSources(option.source.url);
@@ -281,6 +323,24 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         onTimeUpdate={(event: any) => {
           const target = event?.target as HTMLMediaElement | undefined;
           onTime(target?.currentTime || 0);
+        }}
+        onError={() => {
+          // Auto-failover: if the current stream candidate (e.g. the Fast proxy)
+          // fails to load, transparently advance to the next candidate (Direct)
+          // without surfacing an error to the viewer.
+          const previousTime = videoRef.current?.currentTime || 0;
+          setActiveQuality(prev => {
+            const next = prev + 1;
+            if (next >= directSources.length) {
+              setError('All playback sources are unavailable right now');
+              return prev;
+            }
+            window.setTimeout(() => {
+              const v = videoRef.current;
+              if (v && previousTime > 0) v.currentTime = previousTime;
+            }, 150);
+            return next;
+          });
         }}
       >
         <MediaProvider />
@@ -368,9 +428,10 @@ export default function Watch() {
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
   const downloadLinks = [
+    stream.sources.pixel && { label: 'Pixeldrain (Fast)', url: pixeldrainDownload(stream.sources.pixel.url) },
     stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url },
     stream.sources.gofile && { label: 'Gofile', url: stream.sources.gofile.url },
-  ].filter(Boolean) as { label: string; url: string }[];
+  ].filter((item) => item && item.url) as { label: string; url: string }[];
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
   const removeBookmark = (index: number) => { const newBms = bookmarks.filter((_, i) => i !== index); setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
