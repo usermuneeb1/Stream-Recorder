@@ -22,15 +22,18 @@ import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'pixel', 'odysee', 'rumble'];
 
-// ── Pixeldrain "fast playback" proxy configuration ──
-// Streaming order: OWN Vercel proxy (/api/pd/<id>) → GameDrive CDN → official.
-// The Vercel function (dashboard/api/pd/[id].js) fetches the file server-side to
-// bypass Pixeldrain's hotlink/rate-limit 403 and edge-caches it for speed. It
-// lives on your own site, so there is nothing extra to deploy. If Pixeldrain
-// blocks Vercel's IPs too, the player automatically falls back to the public
-// GameDrive CDN and then official Pixeldrain.
-const PIXELDRAIN_PROXY_HOST = 'cdn.pixeldrain.eu.cc';
-const PIXELDRAIN_OFFICIAL_HOST = 'pixeldrain.com';
+// ── Pixeldrain "fast playback" configuration ──
+// EVERYTHING goes through our OWN Vercel proxy (/api/pd/<id>). The proxy fetches
+// the file server-side (bypassing Pixeldrain's hotlink/rate-limit 403) and
+// edge-caches it, so repeat plays never re-hit Pixeldrain. We deliberately do
+// NOT stream directly from the browser to Pixeldrain anymore, because every
+// direct request counts as a "download" and trips Pixeldrain's 3:1 rate limit.
+//
+//   Fast  -> /api/pd/<id>                  (GameDrive CDN first, then official)
+//   Heart -> /api/pd/<id>?prefer=official  (official first, then GameDrive)
+//
+// Both are the SAME cached proxy URL family, so a play through one warms the
+// cache for the other. The proxy itself handles all fallback server-side.
 
 function pixeldrainId(url?: string) {
   return (url || '').match(/pixeldrain(?:\.com|-bypass\.gamedrive\.org|\.eu\.cc)?\/(?:u|api\/file)\/([a-zA-Z0-9_-]+)/)?.[1]
@@ -38,79 +41,61 @@ function pixeldrainId(url?: string) {
     || '';
 }
 
-// OWN Vercel serverless proxy on the same domain (relative URL works anywhere).
-function pixeldrainWorkerStream(url?: string) {
+// Same-origin Vercel proxy stream. `mode` only changes upstream preference.
+function pixeldrainProxyUrl(url?: string, mode: 'fast' | 'direct' = 'fast') {
   const id = pixeldrainId(url);
-  return id ? `/api/pd/${id}` : '';
+  if (!id) return '';
+  return mode === 'direct' ? `/api/pd/${id}?prefer=official` : `/api/pd/${id}`;
 }
 
-// GameDrive CDN proxy stream (public, may be blocked at times).
-function pixeldrainProxyStream(url?: string) {
-  const id = pixeldrainId(url);
-  return id ? `https://${PIXELDRAIN_PROXY_HOST}/${id}` : '';
-}
-
-// Official direct stream URL (reliable fallback).
-function pixeldrainOfficialStream(url?: string) {
-  const id = pixeldrainId(url);
-  return id ? `https://${PIXELDRAIN_OFFICIAL_HOST}/api/file/${id}` : '';
-}
-
-// Ordered list of playable stream candidates for a Pixeldrain link. The player
-// tries them top-to-bottom and auto-fails-over on error. `mode` decides which
-// stream is tried first: 'fast' = GameDrive proxy CDN, 'direct' = official.
+// One playable candidate per server: the cached proxy. No browser-side fallback
+// chain (that is what caused request amplification + rate limiting). The proxy
+// does its own server-side GameDrive/official fallback.
 function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
-  const worker = pixeldrainWorkerStream(url);
-  const proxy = pixeldrainProxyStream(url);
-  const official = pixeldrainOfficialStream(url);
+  const proxy = pixeldrainProxyUrl(url, mode);
+  if (!proxy) return [];
   // Pixeldrain stream URLs have no .mp4 extension, so we MUST declare the MIME
   // type explicitly or the player cannot detect that it is a video.
-  const workerSrc: DirectSource | null = worker ? { id: 'pixel-worker', quality: 'Fast', url: worker, mime: 'video/mp4' } : null;
-  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-fast', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
-  const directSrc: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
-  // 'fast' = your Worker → GameDrive → official.  'direct' = official → Worker → GameDrive.
-  const ordered = mode === 'direct'
-    ? [directSrc, workerSrc, proxySrc]
-    : [workerSrc, proxySrc, directSrc];
-  return ordered.filter(Boolean) as DirectSource[];
+  return [{ id: mode === 'direct' ? 'pixel-direct' : 'pixel-fast', quality: mode === 'direct' ? 'Direct' : 'Fast', url: proxy, mime: 'video/mp4' }];
 }
 
-// Download URL (proxy first; bypasses Pixeldrain speed limits).
+// Download URL: route through the proxy too (forces attachment + bypasses limit).
 function pixeldrainDownload(url?: string) {
   const id = pixeldrainId(url);
-  return id ? `https://${PIXELDRAIN_PROXY_HOST}/${id}` : '';
+  return id ? `/api/pd/${id}?download` : '';
 }
 
-// Quickly probe a Pixeldrain candidate to see if it actually serves video right
-// now. Pixeldrain has started returning 403 JSON ("hotlinking ... requires a
-// paid subscription") for embedded playback, so without this the player would
-// spin forever. We do a tiny ranged request and check the content type.
-// Returns true only when the response looks like real video. Times out fast.
-async function pixeldrainPlayable(url: string, timeoutMs = 3500): Promise<boolean> {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    // No custom headers -> stays a CORS "simple request" (no preflight). The
-    // fetch resolves as soon as response headers arrive; we read the status +
-    // content-type, then abort so the body is never downloaded.
-    const res = await fetch(url, { method: 'GET', signal: controller.signal });
-    const type = (res.headers.get('content-type') || '').toLowerCase();
-    const ok = res.ok && (type.startsWith('video/') || type === 'application/octet-stream');
-    controller.abort(); // stop the body stream immediately
-    return ok;
-  } catch {
-    return false; // network error / timeout / CORS / blocked
-  } finally {
-    window.clearTimeout(timer);
-  }
+// Single lightweight probe (HEAD-equivalent via tiny GET) against the proxy to
+// decide if this file is currently playable. Runs ONCE per source, not per
+// candidate, so it adds at most one request. Result is cached per id+mode.
+const _probeCache = new Map<string, Promise<boolean>>();
+async function pixeldrainPlayable(proxyUrl: string, timeoutMs = 8000): Promise<boolean> {
+  if (_probeCache.has(proxyUrl)) return _probeCache.get(proxyUrl)!;
+  const run = (async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(proxyUrl, { method: 'GET', signal: controller.signal });
+      const type = (res.headers.get('content-type') || '').toLowerCase();
+      const ok = res.ok && (type.startsWith('video/') || type === 'application/octet-stream');
+      controller.abort();
+      return ok;
+    } catch {
+      return false;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  })();
+  _probeCache.set(proxyUrl, run);
+  return run;
 }
 
-// Returns the playable Pixeldrain candidates (proxy/official) in the requested
-// order, filtering out any that are currently blocked. Probes run in parallel.
+// Returns the (single) playable proxy candidate if available, else [].
 async function resolvePixeldrainSources(url: string | undefined, mode: 'fast' | 'direct'): Promise<DirectSource[]> {
   const candidates = pixeldrainStreamCandidates(url, mode);
-  const checks = await Promise.all(candidates.map(c => pixeldrainPlayable(c.url)));
-  return candidates.filter((_, i) => checks[i]);
+  if (candidates.length === 0) return [];
+  const ok = await pixeldrainPlayable(candidates[0].url);
+  return ok ? candidates : [];
 }
 
 interface PlayerOption {
@@ -191,9 +176,8 @@ function embedUrl(source: StreamSource) {
     return source.url.replace('/file/', '/embed/');
   }
   if (source.type === 'pixeldrain') {
-    // Pixeldrain is handled as a direct stream (with proxy failover), not an
-    // iframe embed. This is only a last-resort fallback.
-    return pixeldrainOfficialStream(source.url);
+    // Pixeldrain is handled as a proxied direct stream, never an iframe embed.
+    return pixeldrainProxyUrl(source.url, 'fast');
   }
   if (source.type === 'odysee') return source.url.replace('odysee.com/', 'odysee.com/$/embed/');
   if (source.type === 'rumble') return source.url.replace('/v', '/embed/v');
@@ -298,7 +282,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
           // avoids an endless spinner and shows a clear message if all blocked.
           direct = await resolvePixeldrainSources(option.source.url, option.pixeldrainMode || 'fast');
           if (!cancelled && direct.length === 0) {
-            throw new Error('Pixeldrain is currently blocking embedded playback. Use the Dxture (Archive) source, or the Download button');
+            throw new Error('This file is temporarily rate-limited by Pixeldrain. Switch to the Dxture (Archive) source — it always works — or try again in a little while');
           }
         }
         if (option.source.type === 'gofile') {

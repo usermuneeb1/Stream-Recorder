@@ -12,10 +12,8 @@
 
 export const config = { runtime: 'edge' };
 
-const UPSTREAMS = [
-  (id) => `https://cdn.pixeldrain.eu.cc/${id}`,
-  (id) => `https://pixeldrain.com/api/file/${id}`,
-];
+const GAMEDRIVE = (id) => `https://cdn.pixeldrain.eu.cc/${id}`;
+const OFFICIAL = (id) => `https://pixeldrain.com/api/file/${id}`;
 
 function cors(extra = {}) {
   return {
@@ -42,10 +40,13 @@ export default async function handler(request) {
   }
 
   const forceDownload = url.searchParams.has('download');
+  // ?prefer=official flips the upstream order (used by the "Heart" server).
+  const preferOfficial = url.searchParams.get('prefer') === 'official';
+  const upstreams = preferOfficial ? [OFFICIAL, GAMEDRIVE] : [GAMEDRIVE, OFFICIAL];
   const range = request.headers.get('range') || '';
 
   let lastStatus = 502;
-  for (const build of UPSTREAMS) {
+  for (const build of upstreams) {
     const upstream = build(id);
     const fwd = new Headers();
     if (range) fwd.set('Range', range);
@@ -78,8 +79,8 @@ export default async function handler(request) {
     }
     out.set('Content-Type', ctype.startsWith('video/') ? ctype : 'video/mp4');
     out.set('Accept-Ranges', 'bytes');
-    // Cache on Vercel's edge so repeat plays are fast.
-    out.set('Cache-Control', 'public, max-age=604800, s-maxage=604800');
+    // Cache on Vercel's edge so repeat plays are fast and stop re-hitting Pixeldrain.
+    out.set('Cache-Control', 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400');
     out.set('X-PD-Upstream', new URL(upstream).host);
     out.set('Content-Disposition', forceDownload ? `attachment; filename="${id}.mp4"` : 'inline');
 
@@ -87,7 +88,7 @@ export default async function handler(request) {
   }
 
   return new Response(
-    JSON.stringify({ success: false, error: 'All upstreams unavailable (Pixeldrain may be blocking proxies).' }),
+    JSON.stringify({ success: false, error: 'All upstreams unavailable (Pixeldrain may be rate-limiting this file).' }),
     { status: lastStatus, headers: cors({ 'Content-Type': 'application/json' }) }
   );
 }
