@@ -23,11 +23,14 @@ const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" proxy configuration ──
-// The GameDrive bypass CDN streams the raw mp4 (video/mp4, Accept-Ranges, CORS *)
-// so it can be embedded directly in the player and seeks correctly. If GameDrive
-// is ever blocked by Pixeldrain, we transparently fall back to the official
-// direct endpoint. cdn.pixeldrain.eu.cc is the current GameDrive proxy host; it
-// 302-redirects to a cdnNN.pixeldrain.eu.cc node that serves the video bytes.
+// Streaming order: YOUR Cloudflare Worker (if set) → GameDrive CDN → official.
+// The Worker (see /worker/README.md) caches files on Cloudflare's edge and
+// bypasses Pixeldrain's hotlink/rate-limit block, giving fast, bulletproof
+// playback you fully control. Leave PIXELDRAIN_WORKER_HOST empty to use the
+// public proxies only.
+//
+//   const PIXELDRAIN_WORKER_HOST = 'pixeldrain-fast.YOUR-NAME.workers.dev';
+const PIXELDRAIN_WORKER_HOST = '';
 const PIXELDRAIN_PROXY_HOST = 'cdn.pixeldrain.eu.cc';
 const PIXELDRAIN_OFFICIAL_HOST = 'pixeldrain.com';
 
@@ -37,7 +40,13 @@ function pixeldrainId(url?: string) {
     || '';
 }
 
-// Proxy stream URL (fast) — GameDrive CDN redirects to a cdnNN.* node serving video/mp4.
+// YOUR Cloudflare Worker stream (fast + cached). Empty if not configured.
+function pixeldrainWorkerStream(url?: string) {
+  const id = pixeldrainId(url);
+  return (id && PIXELDRAIN_WORKER_HOST) ? `https://${PIXELDRAIN_WORKER_HOST}/${id}` : '';
+}
+
+// GameDrive CDN proxy stream (public, may be blocked at times).
 function pixeldrainProxyStream(url?: string) {
   const id = pixeldrainId(url);
   return id ? `https://${PIXELDRAIN_PROXY_HOST}/${id}` : '';
@@ -53,13 +62,18 @@ function pixeldrainOfficialStream(url?: string) {
 // tries them top-to-bottom and auto-fails-over on error. `mode` decides which
 // stream is tried first: 'fast' = GameDrive proxy CDN, 'direct' = official.
 function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
+  const worker = pixeldrainWorkerStream(url);
   const proxy = pixeldrainProxyStream(url);
   const official = pixeldrainOfficialStream(url);
   // Pixeldrain stream URLs have no .mp4 extension, so we MUST declare the MIME
   // type explicitly or the player cannot detect that it is a video.
-  const fast: DirectSource | null = proxy ? { id: 'pixel-fast', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
-  const direct: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
-  const ordered = mode === 'direct' ? [direct, fast] : [fast, direct];
+  const workerSrc: DirectSource | null = worker ? { id: 'pixel-worker', quality: 'Fast', url: worker, mime: 'video/mp4' } : null;
+  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-fast', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
+  const directSrc: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
+  // 'fast' = your Worker → GameDrive → official.  'direct' = official → Worker → GameDrive.
+  const ordered = mode === 'direct'
+    ? [directSrc, workerSrc, proxySrc]
+    : [workerSrc, proxySrc, directSrc];
   return ordered.filter(Boolean) as DirectSource[];
 }
 
