@@ -19,7 +19,7 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
-const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'gofile', 'archiveSmall', 'odysee', 'rumble'];
+const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'pixel', 'odysee', 'rumble'];
 
 interface PlayerOption {
   key: string;
@@ -51,7 +51,12 @@ function formatClock(seconds: number) {
 }
 
 function sortSourceEntries(sources: Record<string, StreamSource>): [string, StreamSource][] {
-  return Object.entries(sources).sort(([a], [b]) => {
+  return Object.entries(sources)
+    // MEGA and Gofile are kept as storage mirrors, but they are not reliable
+    // in-browser playback providers. MEGA often opens a download flow and
+    // Gofile requires tokenized direct links, so hide them from public player UI.
+    .filter(([key]) => key !== 'mega' && key !== 'gofile')
+    .sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
