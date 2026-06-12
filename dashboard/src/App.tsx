@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home as HomeIcon, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { CommandPalette } from './components/CommandPalette';
 import { ParticleField } from './components/ParticleField';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { RouteEffects } from './components/RouteEffects';
 
 import Home from './pages/Home';
 import Gallery from './pages/Gallery';
@@ -131,17 +133,20 @@ function App() {
   const { role } = useAuth();
 
   return (
-    <Layout>
-      <CommandPalette />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/gallery" element={<Gallery />} />
-        <Route path="/watch/:id" element={<Watch />} />
-        <Route path="/admin" element={<AdminLogin />} />
-        <Route path="/command-center" element={role === 'admin' ? <CommandCenter /> : <AdminLogin />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <RouteEffects />
+      <Layout>
+        <CommandPalette />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/watch/:id" element={<Watch />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/command-center" element={role === 'admin' ? <CommandCenter /> : <AdminLogin />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   );
 }
 

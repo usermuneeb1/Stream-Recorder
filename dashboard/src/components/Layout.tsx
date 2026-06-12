@@ -40,6 +40,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return (
     <div className="min-h-screen flex flex-col bg-dark-50 dark:bg-[#09090b] text-dark-900 dark:text-dark-50 transition-colors duration-300" onMouseMove={handleMouseMove}>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[9999] focus:rounded-full focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white">
+        Skip to content
+      </a>
       {/* Scroll Progress Bar */}
       <ScrollProgress />
 
@@ -148,7 +151,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </motion.nav>
 
       {/* ── Main Content ──────────────────────────────────────────── */}
-      <main className="flex-1 relative z-10 pt-16">
+      <main id="main-content" className="flex-1 relative z-10 pt-16" tabIndex={-1}>
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
