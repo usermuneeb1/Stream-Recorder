@@ -50,16 +50,17 @@ function pixeldrainOfficialStream(url?: string) {
 }
 
 // Ordered list of playable stream candidates for a Pixeldrain link. The player
-// tries them top-to-bottom and auto-fails-over on error.
-function pixeldrainStreamCandidates(url?: string): DirectSource[] {
+// tries them top-to-bottom and auto-fails-over on error. `mode` decides which
+// stream is tried first: 'fast' = GameDrive proxy CDN, 'direct' = official.
+function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
   const proxy = pixeldrainProxyStream(url);
   const official = pixeldrainOfficialStream(url);
-  const out: DirectSource[] = [];
   // Pixeldrain stream URLs have no .mp4 extension, so we MUST declare the MIME
   // type explicitly or the player cannot detect that it is a video.
-  if (proxy) out.push({ id: 'pixel-fast', quality: 'Fast', url: proxy, mime: 'video/mp4' });
-  if (official) out.push({ id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' });
-  return out;
+  const fast: DirectSource | null = proxy ? { id: 'pixel-fast', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
+  const direct: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
+  const ordered = mode === 'direct' ? [direct, fast] : [fast, direct];
+  return ordered.filter(Boolean) as DirectSource[];
 }
 
 // Download URL (proxy first; bypasses Pixeldrain speed limits).
@@ -72,6 +73,9 @@ interface PlayerOption {
   key: string;
   label: string;
   source: StreamSource;
+  // For Pixeldrain sources: 'fast' = GameDrive proxy CDN first, 'direct' =
+  // official pixeldrain.com first. Each still keeps the other as silent fallback.
+  pixeldrainMode?: 'fast' | 'direct';
 }
 
 interface DirectSource {
@@ -245,8 +249,9 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         let direct: DirectSource[] = [];
         if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
         if (option.source.type === 'pixeldrain') {
-          // Fast proxy stream first, official direct as automatic fallback.
-          direct = pixeldrainStreamCandidates(option.source.url);
+          // Order depends on which server button was chosen (Fast vs Heart),
+          // but each still keeps the other as a silent automatic fallback.
+          direct = pixeldrainStreamCandidates(option.source.url, option.pixeldrainMode || 'fast');
         }
         if (option.source.type === 'gofile') {
           direct = await gofileDirectSources(option.source.url);
@@ -266,7 +271,10 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     }
     resolve();
     return () => { cancelled = true; };
-  }, [option, archiveId]);
+    // Re-resolve only when the chosen server actually changes (URL/type/mode),
+    // not on every parent re-render. This keeps Fast vs Heart distinct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [option.source.url, option.source.type, option.pixeldrainMode, archiveId]);
 
   const switchQuality = (index: number) => {
     const video = videoRef.current;
@@ -358,7 +366,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         <DefaultVideoLayout icons={defaultLayoutIcons} />
       </MediaPlayer>
 
-      {directSources.length > 1 && (
+      {directSources.length > 1 && !directSources[0]?.id.startsWith('pixel') && (
         <div className="absolute bottom-4 right-4 hidden items-center gap-1 rounded-full border border-white/10 bg-black/55 p-1 shadow-xl backdrop-blur-xl md:flex">
           {directSources.map((src, i) => (
             <button key={src.id} onClick={() => switchQuality(i)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${i === activeQuality ? 'bg-brand-500 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
@@ -420,7 +428,9 @@ export default function Watch() {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key.toLowerCase() === 's') {
-        const count = stream ? sortSourceEntries(stream.sources).length : 0;
+        const base = stream ? sortSourceEntries(stream.sources) : [];
+        // +1 for the dedicated "Fast" Pixeldrain server we inject into the list.
+        const count = base.length + (base.some(([, s]) => s.type === 'pixeldrain') ? 1 : 0);
         if (count > 1) setActivePlayer(prev => (prev + 1) % count);
       }
       if (e.key === '?') { e.preventDefault(); setShowShortcuts(prev => !prev); }
@@ -433,7 +443,23 @@ export default function Watch() {
   if (notFound) return <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4"><div className="max-w-md"><div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6"><AlertTriangle size={44} className="text-red-500" /></div><h2 className="text-3xl font-bold font-display mb-3">Video Not Found</h2><p className="text-dark-500 mb-8">This recording does not exist in the archive.</p><button onClick={() => navigate('/gallery')} className="btn-primary">Browse Gallery</button></div></div>;
   if (!stream) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
 
-  const entries = sortSourceEntries(stream.sources).map(([key, source], index) => ({ key, source, label: PLAYER_NAMES[index] || `Player ${index + 1}` }));
+  const baseEntries: PlayerOption[] = sortSourceEntries(stream.sources).map(([key, source], index) => ({
+    key,
+    source,
+    label: PLAYER_NAMES[index] || `Player ${index + 1}`,
+    pixeldrainMode: source.type === 'pixeldrain' ? ('direct' as const) : undefined,
+  }));
+  // Promote a dedicated "Fast" server (Pixeldrain via GameDrive proxy CDN) so it
+  // appears as its own button in the Player Sources list — not as an inner toggle.
+  // "Heart" keeps the official Pixeldrain stream; both fall back to each other.
+  const pixelIdx = baseEntries.findIndex(e => e.source.type === 'pixeldrain');
+  const entries: PlayerOption[] = pixelIdx === -1
+    ? baseEntries
+    : [
+        ...baseEntries.slice(0, pixelIdx),
+        { key: 'pixel-fast', source: baseEntries[pixelIdx].source, label: 'Fast', pixeldrainMode: 'fast' as const },
+        ...baseEntries.slice(pixelIdx),
+      ];
   const currentOption = entries[Math.min(activePlayer, Math.max(entries.length - 1, 0))];
   const archiveSource = stream.sources.archive || stream.sources.archiveSmall;
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
