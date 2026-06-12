@@ -1,0 +1,169 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🟣 Pixeldrain Account Manager — Generate & Maintain Pixeldrain Accounts   ║
+# ║    • Generates accounts via the official Pixeldrain API + temp emails       ║
+# ║    • Verifies via the e-mailed login link, stores the API key               ║
+# ║    • Keep-alive: calls GET /user on a schedule (cancels 7-day deletion)     ║
+# ║    • Optionally pushes the healthiest API key to PIXELDRAIN_API_KEY secret  ║
+# ║  Accounts are stored in scripts/pixeldrain/accounts.csv (committed).        ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🟣 Pixeldrain Account Manager"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - generate     # Generate new accounts
+          - signin       # Keep-alive health check on all accounts
+          - both         # Generate + keep-alive
+      num_accounts:
+        description: "Number of accounts to generate (generate/both)"
+        required: false
+        default: "5"
+        type: string
+      account_password:
+        description: "Password for new accounts (empty = random)"
+        required: false
+        default: ""
+        type: string
+      push_secret:
+        description: "Push healthiest API key to PIXELDRAIN_API_KEY secret"
+        required: false
+        default: true
+        type: boolean
+
+  # Keep-alive on the 1st and 15th of every month.
+  schedule:
+    - cron: "30 10 1 * *"
+    - cron: "30 10 15 * *"
+
+env:
+  GH_PAT: ${{ secrets.GH_PAT }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  pixeldrain-manager:
+    name: "🟣 Pixeldrain Account Manager"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: "📥 Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "📦 Install Dependencies"
+        run: |
+          pip3 install --quiet -r scripts/pixeldrain/requirements.txt pynacl
+          echo "python3: $(python3 --version)"
+
+      # ─── GENERATE ──────────────────────────────────────────────────────────
+      - name: "🟣 Generate Pixeldrain Accounts"
+        id: generate
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          (github.event.inputs.action == 'generate' || github.event.inputs.action == 'both')
+        working-directory: scripts/pixeldrain
+        run: |
+          NUM="${{ github.event.inputs.num_accounts }}"; NUM="${NUM:-5}"
+          PASS="${{ github.event.inputs.account_password }}"
+          ARGS=(-n "$NUM"); [[ -n "$PASS" ]] && ARGS+=( -p "$PASS" )
+          set +e
+          python3 generate_accounts.py "${ARGS[@]}"
+          RC=$?
+          set -e
+          TOTAL=$(tail -n +2 accounts.csv 2>/dev/null | wc -l | tr -d ' ')
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "status=$([[ $RC -eq 0 ]] && echo success || echo failed)" >> "$GITHUB_OUTPUT"
+
+      # ─── KEEP-ALIVE ────────────────────────────────────────────────────────
+      - name: "🔄 Keep-Alive Health Check"
+        id: signin
+        if: >-
+          github.event_name == 'schedule' ||
+          github.event.inputs.action == 'signin' ||
+          github.event.inputs.action == 'both'
+        working-directory: scripts/pixeldrain
+        run: |
+          if [[ ! -f accounts.csv ]] || [[ $(tail -n +2 accounts.csv | wc -l) -eq 0 ]]; then
+            echo "status=skipped" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          set +e
+          python3 signin_accounts.py
+          set -e
+          if [[ -f signin_results.json ]]; then
+            echo "success_count=$(jq -r '.success' signin_results.json)" >> "$GITHUB_OUTPUT"
+            echo "failed_count=$(jq -r '.failed' signin_results.json)"  >> "$GITHUB_OUTPUT"
+            echo "total_count=$(jq -r '.total' signin_results.json)"    >> "$GITHUB_OUTPUT"
+            FAILED=$(jq -r '.failed' signin_results.json)
+            echo "status=$([[ "$FAILED" -eq 0 ]] && echo success || echo partial)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ─── PUSH BEST API KEY TO SECRET ───────────────────────────────────────
+      - name: "🔐 Update PIXELDRAIN_API_KEY Secret"
+        if: >-
+          github.event_name == 'schedule' ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.push_secret == 'true')
+        working-directory: scripts/pixeldrain
+        run: python3 load_accounts_secret.py || echo "⚠️ secret update skipped/failed"
+
+      # ─── COMMIT ────────────────────────────────────────────────────────────
+      - name: "💾 Commit Account Changes"
+        if: always()
+        run: |
+          rm -f scripts/pixeldrain/signin_results.json
+          [[ -f scripts/pixeldrain/accounts.csv ]] || exit 0
+          git add scripts/pixeldrain/accounts.csv 2>/dev/null || true
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder.local"
+          git commit -m "🟣 Pixeldrain accounts updated — $(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')"
+          [[ -n "${GH_PAT:-}" ]] && git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}.git"
+          git push && echo "✅ Pushed"
+
+      # ─── DISCORD REPORT ────────────────────────────────────────────────────
+      - name: "📡 Send Discord Report"
+        if: always()
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+          GEN_STATUS="${{ steps.generate.outputs.status }}"
+          GEN_TOTAL="${{ steps.generate.outputs.total }}"
+          SI_STATUS="${{ steps.signin.outputs.status }}"
+          SI_OK="${{ steps.signin.outputs.success_count }}"
+          SI_FAIL="${{ steps.signin.outputs.failed_count }}"
+          SI_TOTAL="${{ steps.signin.outputs.total_count }}"
+          ACTION="${{ github.event.inputs.action }}"; [[ -z "$ACTION" ]] && ACTION="signin (scheduled)"
+
+          COLOR=5763757; TITLE="✅ Pixeldrain Accounts OK"
+          [[ "$GEN_STATUS" == "failed" ]] && { COLOR=15158332; TITLE="❌ Generation Failed"; }
+          [[ "$SI_STATUS" == "partial" ]] && { COLOR=16744448; TITLE="⚠️ Some Accounts Need Attention"; }
+
+          DESC="**Action:** \`${ACTION}\`\n"
+          [[ -n "$GEN_STATUS" ]] && DESC+="**Generated:** ${GEN_STATUS} (total on file: ${GEN_TOTAL})\n"
+          [[ -n "$SI_STATUS" ]]  && DESC+="**Keep-alive:** ${SI_OK:-0}/${SI_TOTAL:-0} alive, ${SI_FAIL:-0} failed\n"
+          DESC+="\n☁️ Provider: **Pixeldrain** · 📧 Mail.tm/Gmailnator · ⏰ 1st & 15th monthly"
+
+          PAYLOAD=$(jq -n \
+            --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
+            --arg avatar "${AVATAR_URL:-}" \
+            --arg title "$TITLE" \
+            --arg desc "$DESC" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --argjson color "$COLOR" \
+            '{username:$username, avatar_url:$avatar, embeds:[{author:{name:"Pixeldrain Account Manager"}, title:$title, url:$url, description:$desc, color:$color, footer:{text:"☪️ Pixeldrain Account Manager · Muneeb Ahmad"}}]}')
+          curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" --max-time 15 \
+            -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK"
