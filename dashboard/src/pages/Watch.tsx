@@ -41,22 +41,35 @@ function pixeldrainId(url?: string) {
     || '';
 }
 
-// Same-origin Vercel proxy stream. `mode` only changes upstream preference.
+// Same-origin Vercel proxy stream (server-side fetch + edge cache).
 function pixeldrainProxyUrl(url?: string, mode: 'fast' | 'direct' = 'fast') {
   const id = pixeldrainId(url);
   if (!id) return '';
   return mode === 'direct' ? `/api/pd/${id}?prefer=official` : `/api/pd/${id}`;
 }
 
-// One playable candidate per server: the cached proxy. No browser-side fallback
-// chain (that is what caused request amplification + rate limiting). The proxy
-// does its own server-side GameDrive/official fallback.
+// Official direct stream. Works embedded for files uploaded via an account key
+// with hotlinking enabled (the account manager sets this up). For those files
+// this is the fastest path (no proxy hop).
+function pixeldrainOfficialUrl(url?: string) {
+  const id = pixeldrainId(url);
+  return id ? `https://pixeldrain.com/api/file/${id}` : '';
+}
+
+// Candidates per server. 'fast' = official direct first (instant for hotlink
+// accounts), then the cached Vercel proxy as automatic fallback. 'direct' =
+// proxy first. Either way the player auto-fails-over and the probe skips dead
+// ones, so a rate-limited file never spins forever.
 function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
+  const official = pixeldrainOfficialUrl(url);
   const proxy = pixeldrainProxyUrl(url, mode);
-  if (!proxy) return [];
+  if (!official && !proxy) return [];
   // Pixeldrain stream URLs have no .mp4 extension, so we MUST declare the MIME
   // type explicitly or the player cannot detect that it is a video.
-  return [{ id: mode === 'direct' ? 'pixel-direct' : 'pixel-fast', quality: mode === 'direct' ? 'Direct' : 'Fast', url: proxy, mime: 'video/mp4' }];
+  const officialSrc: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
+  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-proxy', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
+  const ordered = mode === 'direct' ? [proxySrc, officialSrc] : [officialSrc, proxySrc];
+  return ordered.filter(Boolean) as DirectSource[];
 }
 
 // Download URL: route through the proxy too (forces attachment + bypasses limit).
@@ -90,12 +103,14 @@ async function pixeldrainPlayable(proxyUrl: string, timeoutMs = 8000): Promise<b
   return run;
 }
 
-// Returns the (single) playable proxy candidate if available, else [].
+// Probe candidates in order; return the playable ones (preserving order) so the
+// player has automatic in-player failover between them. Probes run in parallel
+// and are memoized, so this adds at most one request per distinct URL.
 async function resolvePixeldrainSources(url: string | undefined, mode: 'fast' | 'direct'): Promise<DirectSource[]> {
   const candidates = pixeldrainStreamCandidates(url, mode);
   if (candidates.length === 0) return [];
-  const ok = await pixeldrainPlayable(candidates[0].url);
-  return ok ? candidates : [];
+  const checks = await Promise.all(candidates.map(c => pixeldrainPlayable(c.url)));
+  return candidates.filter((_, i) => checks[i]);
 }
 
 interface PlayerOption {

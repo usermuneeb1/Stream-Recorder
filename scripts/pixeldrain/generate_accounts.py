@@ -135,6 +135,36 @@ def login_with_link(session, email, uid, lid):
         return None
 
 
+def enable_embedding(session, api_key):
+    """Enable hotlinking + skip viewer + embed domains so uploaded files stream
+    embedded without the hotlink 403. Returns True on success."""
+    domains = os.environ.get(
+        "PIXELDRAIN_EMBED_DOMAINS",
+        "muslim-lantern-archive.vercel.app usermuneeb1.github.io",
+    ).strip()
+    clean = " ".join(d for d in domains.split() if "." in d)
+    token = (
+        __import__("base64").b64encode(f":{api_key}".encode()).decode()
+    )
+    try:
+        r = session.put(
+            f"{API}/user",
+            headers={**HEADERS, "Authorization": f"Basic {token}"},
+            data={
+                "hotlinking_enabled": "true",
+                "skip_file_viewer": "true",
+                "embed_domains": clean,
+            },
+            timeout=30,
+        )
+        ok = r.status_code == 200 and r.json().get("success", False)
+        print(f"   {'✅ embedded playback enabled' if ok else '⚠️ embed config skipped'}")
+        return ok
+    except Exception as e:
+        print(f"   ⚠️ embed config error: {e}")
+        return False
+
+
 def login_with_password(session, email, password):
     """Fallback: password login → returns auth_key or None."""
     try:
@@ -194,6 +224,9 @@ def try_create_account(password_override=None):
             api_key = login_with_password(session, email, password)
 
         if api_key:
+            # Immediately enable embedded playback on the new account so any file
+            # uploaded with its key streams on the site without the hotlink 403.
+            enable_embedding(session, api_key)
             mail_pw = getattr(provider, "password", "") or ""
             mail_id = getattr(provider, "account_id", "") or getattr(provider, "email_id", "") or ""
             return {

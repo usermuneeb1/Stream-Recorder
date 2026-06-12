@@ -17,8 +17,9 @@ on:
         required: true
         type: choice
         options:
-          - generate     # Generate new accounts
+          - generate     # Generate new accounts (auto-enables embedding)
           - signin       # Keep-alive health check on all accounts
+          - configure    # Re-assert embed/hotlink settings on all accounts
           - both         # Generate + keep-alive
       num_accounts:
         description: "Number of accounts to generate (generate/both)"
@@ -46,6 +47,7 @@ env:
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  PIXELDRAIN_EMBED_DOMAINS: "muslim-lantern-archive.vercel.app usermuneeb1.github.io"
   TZ: Asia/Karachi
 
 jobs:
@@ -111,6 +113,15 @@ jobs:
             FAILED=$(jq -r '.failed' signin_results.json)
             echo "status=$([[ "$FAILED" -eq 0 ]] && echo success || echo partial)" >> "$GITHUB_OUTPUT"
           fi
+
+      # ─── ENABLE EMBEDDED PLAYBACK ──────────────────────────────────────────
+      - name: "🖼️ Enable Embedded Playback (hotlink + embed_domains)"
+        if: >-
+          github.event_name == 'schedule' ||
+          github.event.inputs.action == 'configure' ||
+          github.event.inputs.action == 'both'
+        working-directory: scripts/pixeldrain
+        run: python3 configure_embed.py || echo "⚠️ embed config skipped/failed"
 
       # ─── PUSH BEST API KEY TO SECRET ───────────────────────────────────────
       - name: "🔐 Update PIXELDRAIN_API_KEY Secret"
