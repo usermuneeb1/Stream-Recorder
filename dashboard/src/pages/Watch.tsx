@@ -19,7 +19,7 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['Dxture', 'Heart', 'Jatt', 'Helicopter'];
-const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'archiveSmall', 'odysee', 'rumble'];
+const SOURCE_PRIORITY = ['archive', 'pixel', 'mega', 'gofile', 'archiveSmall', 'odysee', 'rumble'];
 
 interface PlayerOption {
   key: string;
@@ -51,7 +51,7 @@ function formatClock(seconds: number) {
 }
 
 function sortSourceEntries(sources: Record<string, StreamSource>): [string, StreamSource][] {
-  return Object.entries(sources).filter(([key]) => key !== 'gofile').sort(([a], [b]) => {
+  return Object.entries(sources).sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -63,12 +63,35 @@ function pixeldrainDirect(url?: string) {
   return id ? `https://pixeldrain.com/api/file/${id}` : '';
 }
 
+
+async function gofileDirectSources(url?: string): Promise<DirectSource[]> {
+  const folderId = (url || '').match(/gofile\.io\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+  if (!folderId) return [];
+  // Gofile public direct links require their content API. If anonymous access is
+  // blocked/rate-limited, this returns [] and the UI will show a clean error.
+  const api = `https://api.gofile.io/contents/${folderId}`;
+  const res = await fetch(api);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const children = Object.values(data?.data?.children || {}) as any[];
+  const videos = children.filter((item) => /video|mp4|webm|mkv/i.test(`${item?.mimetype || ''} ${item?.name || ''}`));
+  return videos.map((item, index) => ({
+    id: `gofile-${index}`,
+    quality: index === 0 ? 'Auto' : `Alt ${index}`,
+    url: item.link || item.directLink || item.downloadPage || '',
+  })).filter((item) => item.url);
+}
+
 function embedUrl(source: StreamSource) {
   if (source.type === 'archive') {
     const id = source.url.split('/details/')[1]?.split('/')[0];
     return id ? `https://archive.org/embed/${id}` : '';
   }
-  if (source.type === 'mega') return source.url.replace('/file/', '/embed/');
+  if (source.type === 'mega') {
+    const old = source.url.match(/mega\.nz\/#!([^!]+)!([^/?#]+)/);
+    if (old) return `https://mega.nz/embed/${old[1]}#${old[2]}`;
+    return source.url.replace('/file/', '/embed/');
+  }
   if (source.type === 'pixeldrain') {
     const id = source.url.match(/pixeldrain\.com\/u\/([a-zA-Z0-9_-]+)/)?.[1];
     return id ? `https://pixeldrain.com/api/file/${id}?embed` : '';
@@ -171,6 +194,9 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         if (option.source.type === 'pixeldrain') {
           const url = pixeldrainDirect(option.source.url);
           if (url) direct = [{ id: 'pixel-direct', quality: 'Auto', url }];
+        }
+        if (option.source.type === 'gofile') {
+          direct = await gofileDirectSources(option.source.url);
         }
         if (!cancelled && direct.length > 0) {
           setDirectSources(direct);
