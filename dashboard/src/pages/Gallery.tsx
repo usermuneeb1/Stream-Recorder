@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, Variants, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, RefreshCcw, LayoutGrid, List, X, Edit3 } from 'lucide-react';
+import { Clock, HardDrive, Play, Search, SlidersHorizontal, AlertTriangle, RefreshCcw, LayoutGrid, List, X, Edit3, Trash2 } from 'lucide-react';
 import { fetchStreams, StreamData } from '../utils/dataFetcher';
 import { AdminEditor, applyAdminOverrides } from '../components/AdminEditor';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,13 +64,16 @@ export default function Gallery() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [searchFocused, setSearchFocused] = useState(false);
   const [editingStream, setEditingStream] = useState<StreamData | null>(null);
+  const [deletedIds, setDeletedIds] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('admin_deleted_videos') || '[]'); } catch { return []; }
+  });
 
   const loadStreams = () => {
     setLoading(true);
     setError(null);
     fetchStreams()
       .then(data => {
-        setStreams(applyAdminOverrides(data));
+        setStreams(applyAdminOverrides(data).filter(stream => !deletedIds.includes(stream.videoId)));
         setLoading(false);
       })
       .catch(() => {
@@ -81,7 +84,7 @@ export default function Gallery() {
 
   useEffect(() => {
     loadStreams();
-  }, []);
+  }, [deletedIds]);
 
   // Filter and sort
   const filtered = streams
@@ -138,6 +141,17 @@ export default function Gallery() {
   };
 
 
+
+
+  const handleDeleteStream = (stream: StreamData) => {
+    if (!isAdmin) return;
+    const ok = window.confirm(`Remove this recording from your gallery view?\n\n${stream.title}\n\nThis hides it in the dashboard using admin local storage. It does not delete cloud/archive files.`);
+    if (!ok) return;
+    const next = Array.from(new Set([...deletedIds, stream.videoId]));
+    setDeletedIds(next);
+    localStorage.setItem('admin_deleted_videos', JSON.stringify(next));
+    setStreams(prev => prev.filter(item => item.videoId !== stream.videoId));
+  };
 
   const galleryContent = (
     <div className="max-w-7xl mx-auto px-4 py-8 relative">
@@ -380,13 +394,22 @@ export default function Gallery() {
                         {stream.title}
                       </h3>
                       {isAdmin && (
-                        <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingStream(stream); }}
-                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-900/30 text-dark-400 hover:text-brand-500 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Edit details"
-                        >
-                          <Edit3 size={14} />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingStream(stream); }}
+                            className="flex-shrink-0 p-1.5 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-900/30 text-dark-400 hover:text-brand-500 transition-colors"
+                            title="Edit details"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteStream(stream); }}
+                            className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-dark-400 hover:text-red-500 transition-colors"
+                            title="Remove from gallery"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-2.5 text-xs text-dark-500 dark:text-dark-400 font-medium">
@@ -449,7 +472,18 @@ export default function Gallery() {
 
                   {/* Info */}
                   <div className="relative z-10 flex-1 min-w-0 py-2 pr-3">
-                    <h3 className="font-black text-lg truncate group-hover:text-brand-500 transition-colors">{stream.title}</h3>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-black text-lg truncate group-hover:text-brand-500 transition-colors">{stream.title}</h3>
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteStream(stream); }}
+                          className="p-1.5 rounded-lg text-dark-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                          title="Remove from gallery"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-dark-500 dark:text-dark-400 font-medium">
                       <span className="flex items-center gap-1"><Clock size={12} /> {stream.date}</span>
                       {stream.size && <span className="flex items-center gap-1"><HardDrive size={12} /> {stream.size}</span>}

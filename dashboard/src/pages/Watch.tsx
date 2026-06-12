@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  Download,
   HardDrive,
   Keyboard,
   MessageSquare,
@@ -325,6 +326,7 @@ export default function Watch() {
   const [notFound, setNotFound] = useState(false);
   const [allStreams, setAllStreams] = useState<StreamData[]>([]);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showDownloads, setShowDownloads] = useState(false);
   const [bookmarks, setBookmarks] = useState<{time: number, note: string}[]>([]);
   const [copied, setCopied] = useState(false);
   const [playerTime, setPlayerTime] = useState(0);
@@ -365,6 +367,10 @@ export default function Watch() {
   const archiveSource = stream.sources.archive || stream.sources.archiveSmall;
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
+  const downloadLinks = [
+    stream.sources.mega && { label: 'Download Mirror 1', url: stream.sources.mega.url },
+    stream.sources.gofile && { label: 'Download Mirror 2', url: stream.sources.gofile.url },
+  ].filter(Boolean) as { label: string; url: string }[];
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
   const removeBookmark = (index: number) => { const newBms = bookmarks.filter((_, i) => i !== index); setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
@@ -386,7 +392,7 @@ export default function Watch() {
           <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
             {currentOption ? <PremiumVideoPlayer stream={stream} option={currentOption} archiveId={archiveId} onTime={setPlayerTime} /> : <div className="w-full h-full flex items-center justify-center text-white">No player available</div>}
           </div>
-          <div><h1 className="text-2xl sm:text-3xl font-bold font-display leading-tight mb-3">{stream.title}</h1><div className="flex flex-wrap items-center gap-4 text-sm text-dark-500 dark:text-dark-400 font-medium"><span className="flex items-center gap-1.5"><Clock size={16} /> {stream.date} • {stream.duration}</span>{stream.size && <span className="flex items-center gap-1.5"><HardDrive size={16} /> {stream.size}</span>}</div><div className="flex flex-wrap items-center gap-3 mt-6 pb-6 border-b border-dark-200 dark:border-dark-800"><button onClick={handleAddBookmark} className="btn-secondary flex items-center gap-2"><Bookmark size={18} /> Bookmark</button><button onClick={handleShare} className="btn-secondary flex items-center gap-2">{copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}{copied ? 'Copied!' : 'Share'}</button><button onClick={() => setShowShortcuts(true)} className="btn-secondary flex items-center gap-2 ml-auto"><Keyboard size={16} /> Shortcuts</button></div></div>
+          <div><h1 className="text-2xl sm:text-3xl font-bold font-display leading-tight mb-3">{stream.title}</h1><div className="flex flex-wrap items-center gap-4 text-sm text-dark-500 dark:text-dark-400 font-medium"><span className="flex items-center gap-1.5"><Clock size={16} /> {stream.date} • {stream.duration}</span>{stream.size && <span className="flex items-center gap-1.5"><HardDrive size={16} /> {stream.size}</span>}</div><div className="flex flex-wrap items-center gap-3 mt-6 pb-6 border-b border-dark-200 dark:border-dark-800"><button onClick={handleAddBookmark} className="btn-secondary flex items-center gap-2"><Bookmark size={18} /> Bookmark</button><button onClick={handleShare} className="btn-secondary flex items-center gap-2">{copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}{copied ? 'Copied!' : 'Share'}</button>{downloadLinks.length > 0 && <button onClick={() => setShowDownloads(true)} className="btn-primary flex items-center gap-2 bg-brand-600 hover:bg-brand-500"><Download size={18} /> Download</button>}<button onClick={() => setShowShortcuts(true)} className="btn-secondary flex items-center gap-2 ml-auto"><Keyboard size={16} /> Shortcuts</button></div></div>
           {relatedStreams.length > 0 && <div><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-bold font-display">More Recordings</h3><Link to="/gallery" className="text-sm text-brand-500 font-medium flex items-center gap-1">View All <ChevronRight size={14} /></Link></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{relatedStreams.map(rs => <Link key={rs.videoId} to={`/watch/${rs.videoId}`} state={{ stream: rs }} className="group"><div className="relative aspect-video rounded-xl overflow-hidden bg-dark-200 dark:bg-dark-800 mb-2"><img src={rs.thumbnail} alt={rs.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`; }} /></div><h4 className="text-xs font-semibold line-clamp-2 group-hover:text-brand-500 transition-colors">{rs.title}</h4></Link>)}</div></div>}
         </div>
         <div className="space-y-5">
@@ -395,6 +401,35 @@ export default function Watch() {
           <div className="glass-panel p-5 rounded-2xl border border-dark-200 dark:border-dark-800"><h3 className="font-bold mb-4 text-base flex items-center gap-2"><MessageSquare size={16} /> Live Chat Replay</h3><ChatReplay chatUrl={stream.chatUrl} archiveId={archiveId} currentTime={playerTime} /></div>
         </div>
       </div>
+      <AnimatePresence>
+        {showDownloads && (
+          <motion.div className="fixed inset-0 z-[105] flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <button type="button" aria-label="Close downloads" onClick={() => setShowDownloads(false)} className="absolute inset-0 bg-black/75 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, y: 24, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.96 }} className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#111114]/95 p-6 shadow-2xl">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-orange-500 to-yellow-400" />
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.25em] text-brand-500 mb-2">Private Downloads</div>
+                  <h2 className="text-2xl font-black font-display text-white">Download Recording</h2>
+                  <p className="text-sm text-white/50 mt-1">Use these mirrors for saving the recording offline.</p>
+                </div>
+                <button onClick={() => setShowDownloads(false)} className="p-2 rounded-full hover:bg-white/10 text-white/70"><X size={18} /></button>
+              </div>
+              <div className="space-y-3">
+                {downloadLinks.map((item, index) => (
+                  <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-white hover:border-brand-500/40 hover:bg-brand-500/10 transition-all">
+                    <div>
+                      <div className="font-bold">{item.label}</div>
+                      <div className="text-xs text-white/45">Mirror {index + 1}</div>
+                    </div>
+                    <Download size={18} className="text-brand-400" />
+                  </a>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>{showShortcuts && <motion.div className="fixed inset-0 z-[110] flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><button onClick={() => setShowShortcuts(false)} className="absolute inset-0 bg-black/70 backdrop-blur-md" /><motion.div initial={{ opacity: 0, y: 24, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.94 }} className="relative w-full max-w-lg glass-panel rounded-3xl z-[111] shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden"><div className="p-6 border-b border-dark-200 dark:border-dark-800 flex justify-between"><div><div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-500 text-xs font-bold mb-3 border border-brand-500/20"><Keyboard size={14} /> Watch Controls</div><h2 className="text-2xl font-bold font-display">Keyboard Shortcuts</h2></div><button onClick={() => setShowShortcuts(false)}><X size={18} /></button></div><div className="p-6 space-y-3">{shortcuts.map(item => <div key={item.key} className="flex items-center justify-between gap-4 p-4 bg-white/70 dark:bg-dark-800/80 rounded-2xl border border-dark-200/80 dark:border-dark-700/80"><div><span className="block text-sm font-semibold">{item.desc}</span><span className="block text-xs text-dark-400 mt-0.5">{item.hint}</span></div><kbd className="min-w-12 text-center px-3 py-2 rounded-xl bg-dark-900 text-white dark:bg-white dark:text-dark-900 text-xs font-mono font-black">{item.key}</kbd></div>)}</div></motion.div></motion.div>}</AnimatePresence>
     </div>
   );
