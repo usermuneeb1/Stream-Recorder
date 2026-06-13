@@ -19,7 +19,7 @@ import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
-const PLAYER_NAMES = ['dxture', 'Heart', 'Jatt', 'Helicopter'];
+const PLAYER_NAMES = ['github', 'R3AL', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['github', 'archive', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" configuration ──
