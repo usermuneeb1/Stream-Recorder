@@ -61,6 +61,7 @@ record_method_a() {
         --no-continue \
         --no-check-certificates \
         $live_start_flag \
+        --concurrent-fragments "${CONCURRENT_FRAGMENTS:-4}" \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -106,6 +107,7 @@ record_method_b() {
         --no-continue \
         --no-check-certificates \
         $live_start_flag \
+        --concurrent-fragments "${CONCURRENT_FRAGMENTS:-4}" \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -137,6 +139,7 @@ record_method_c() {
         --no-continue \
         --no-check-certificates \
         $live_start_flag \
+        --concurrent-fragments "${CONCURRENT_FRAGMENTS:-4}" \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -174,6 +177,7 @@ record_method_d() {
         --no-continue \
         --no-check-certificates \
         $live_start_flag \
+        --concurrent-fragments "${CONCURRENT_FRAGMENTS:-4}" \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -213,6 +217,7 @@ record_method_e() {
         --no-continue \
         --no-check-certificates \
         $live_start_flag \
+        --concurrent-fragments "${CONCURRENT_FRAGMENTS:-4}" \
         --fixup never \
         -f "bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
@@ -288,6 +293,7 @@ record_method_g() {
         --no-continue \
         --no-check-certificates \
         $live_start_flag \
+        --concurrent-fragments "${CONCURRENT_FRAGMENTS:-4}" \
         --fixup never \
         -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
         --merge-output-format mp4 \
