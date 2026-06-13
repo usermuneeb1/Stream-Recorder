@@ -362,56 +362,84 @@
     "archive_node": "https://ia802907.us.archive.org/11/items/tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "mega_link": "https://mega.nz/#!T5IQHarY!EiIHbSHC0fZx3ZrF-qgXdmWDOw8ArDFrQj-mjjWvL70",
     "gofile_link": "https://gofile.io/d/8hMp0e",
-    "ai_summary": "Muhammed Ali hosts a live stream for non-Muslims to ask questions about Islam, discussing various topics such as Quranist ideology, Islamic practices, and interactions with non-Muslims. He emphasizes the importance of following Islamic teachings and the potential consequences of compromising one's faith. The stream also touches on personal issues, including a Muslim woman's situation with her non-Muslim husband and the need for separation due to Islamic teachings.",
+    "ai_summary": "This live-stream features a Q&A session with Muhammed Ali, where non-Muslims ask questions about Islam. The discussion covers various topics, including the Quran, prophets, and Islamic practices. The conversation is interactive, with callers joining in and sharing their thoughts and questions.",
     "ai_tags": [
       "Islam",
-      "Quranist",
+      "Q&A",
       "Non-Muslims",
-      "Islamic Practices",
-      "Interfaith Dialogue",
-      "Muslim Women",
-      "Islamic Teachings"
+      "Muhammed Ali",
+      "Islamic practices",
+      "Quran",
+      "Prophets"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction and Stream Setup"
+        "label": "Introduction"
       },
       {
-        "time": 300,
-        "label": "Discussion with a Quranist"
+        "time": 120,
+        "label": "Host introduction"
       },
       {
-        "time": 900,
-        "label": "Importance of Islamic Manners and Knowledge"
+        "time": 482,
+        "label": "Initial discussion"
+      },
+      {
+        "time": 1084,
+        "label": "Caller joins"
       },
       {
         "time": 1200,
-        "label": "Collaborations and Promoting Islamic Content"
+        "label": "Prophets and Quran discussion"
       },
       {
-        "time": 1500,
-        "label": "Interacting with Non-Muslims and Answering Questions"
+        "time": 1561,
+        "label": "Quran and Sunnah discussion"
       },
       {
-        "time": 2100,
-        "label": "Personal Issues and Islamic Guidance"
-      },
-      {
-        "time": 2400,
-        "label": "Islamic Practices and Daily Life"
-      },
-      {
-        "time": 2700,
-        "label": "Permissibility of Certain Actions in Islam"
+        "time": 2284,
+        "label": "Non-Muslims join the conversation"
       },
       {
         "time": 3000,
-        "label": "Conclusion and Final Thoughts"
+        "label": "Chat interaction"
+      },
+      {
+        "time": 4200,
+        "label": "Marriage and Islam discussion"
+      },
+      {
+        "time": 5400,
+        "label": "Divorce and remarriage discussion"
+      },
+      {
+        "time": 6962,
+        "label": "Divorce laws in the West"
+      },
+      {
+        "time": 7800,
+        "label": "Personal growth and self-reflection"
+      },
+      {
+        "time": 8881,
+        "label": "Attributes of God"
+      },
+      {
+        "time": 9480,
+        "label": "Prayer and spirituality"
+      },
+      {
+        "time": 9721,
+        "label": "Shahada and faith"
+      },
+      {
+        "time": 9842,
+        "label": "Conclusion"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776554397/transcript.json",
-    "ai_enriched_at": "2026-06-13T07:11:35Z"
+    "ai_enriched_at": "2026-06-13T11:05:02Z"
   },
   {
     "video_id": "tml-2026-04-1-Rb7AkebH4-1776546681",
