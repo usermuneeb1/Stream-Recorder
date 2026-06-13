@@ -283,14 +283,10 @@ export async function fetchStreams(): Promise<StreamData[]> {
     return _cache;
   }
 
+  // recordings.json is the single source of truth. We no longer fetch the
+  // retired links.txt (it was empty and added a wasted network round-trip that
+  // slowed every page open). One fetch = faster load.
   let list: StreamData[] = [];
-  try {
-    const res = await fetchRepoFile('links.txt');
-    if (res) list = parseLinks(await res.text());
-  } catch {
-    console.warn('Could not parse links.txt');
-  }
-
   try {
     const res = await fetchRepoFile('data/recordings.json');
     if (res) list = mergeData(list, await res.json());

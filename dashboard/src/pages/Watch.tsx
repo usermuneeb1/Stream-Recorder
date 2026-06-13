@@ -19,7 +19,7 @@ import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
-const PLAYER_NAMES = ['github', 'R3AL', 'Jatt', 'Helicopter'];
+const PLAYER_NAMES = ['R3AL', 'B3ING', 'Jatt', 'Helicopter'];
 const SOURCE_PRIORITY = ['github', 'archive', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" configuration ──
@@ -256,8 +256,12 @@ function parseChatPayload(payload: unknown): ChatMessage[] {
   return source.map(normalize).filter(Boolean).sort((a: ChatMessage, b: ChatMessage) => a.time - b.time) as ChatMessage[];
 }
 
-async function fetchChatMessages(chatUrl?: string, archiveId?: string): Promise<ChatMessage[]> {
-  const candidates = [chatUrl, archiveId ? `https://archive.org/download/${archiveId}/chat.json` : ''].filter(Boolean) as string[];
+async function fetchChatMessages(chatUrl?: string, _archiveId?: string): Promise<ChatMessage[]> {
+  // Only fetch when a real chat URL exists. We deliberately do NOT guess an
+  // Archive chat.json URL: most recordings have no chat capture, so that guess
+  // 404s AND triggers a noisy cross-origin (CORS) console error on every video.
+  // Skipping it keeps the console clean and the page faster.
+  const candidates = [chatUrl].filter(Boolean) as string[];
   for (const url of candidates) {
     try {
       const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`);
