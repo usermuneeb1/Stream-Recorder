@@ -1,0 +1,55 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  📊 System Status — regenerate status JSON + README badges                   ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "📊 System Status"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/recordings.json"
+      - "data/youtube-stats.json"
+      - "stats.json"
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: status
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "📊 Generate status + badges"
+        run: python3 scripts/gen-status.py
+
+      - name: "⬆️ Commit"
+        run: |
+          if [[ -n "$(git status -s data/system-status.json data/badges)" ]]; then
+            git config user.name "Stream Recorder Bot"
+            git config user.email "bot@stream-recorder.local"
+            git add data/system-status.json data/badges
+            git commit -m "📊 Update system status + badges"
+            git push
+            echo "✅ Status updated."
+          else
+            echo "No change."
+          fi
