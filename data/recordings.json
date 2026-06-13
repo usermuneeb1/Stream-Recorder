@@ -21,16 +21,16 @@
     "archive_node": "https://ia800409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
     "mega_link": "https://mega.nz/#!tc1iwC7I!eKgBCS8sA_Ab3bE7PuvBkaovYxM1VP3P2HtHIzSxBm8",
     "gofile_link": "https://gofile.io/d/J4FK97",
-    "ai_summary": "The video is a live stream where the host, Muhammed Ali, discusses various topics related to Islam with non-Muslims. He answers questions about polytheism, the concept of hell, and the nature of God. He also engages in a debate with a Christian and an agnostic, addressing their concerns and providing explanations from an Islamic perspective.",
+    "ai_summary": "This live stream features a Q&A session where non-Muslims can ask questions about Islam. The discussion covers various topics, including the concept of God, the role of Jesus, and the principles of Islam. The conversation is informal and open, allowing participants to share their thoughts and perspectives.",
     "ai_tags": [
       "Islam",
+      "Q&A",
       "Non-Muslims",
-      "Polytheism",
-      "Hell",
+      "Jesus",
       "God",
+      "Religion",
       "Debate",
-      "Agnostic",
-      "Christianity"
+      "Live Stream"
     ],
     "ai_chapters": [
       {
@@ -38,36 +38,76 @@
         "label": "Introduction"
       },
       {
-        "time": 300,
-        "label": "Discussion on Polytheism"
+        "time": 725,
+        "label": "Non-Muslim Q&A Introduction"
       },
       {
-        "time": 900,
-        "label": "Concept of Hell in Islam"
+        "time": 1089,
+        "label": "Makashif Joins"
       },
       {
-        "time": 1500,
-        "label": "Nature of God in Islam"
+        "time": 1200,
+        "label": "Jesus in the Bible"
       },
       {
-        "time": 2100,
-        "label": "Debate with a Christian"
+        "time": 1561,
+        "label": "Caller Questions"
       },
       {
-        "time": 2700,
-        "label": "Discussion with an Agnostic"
+        "time": 2160,
+        "label": "Worshiping Allah"
       },
       {
-        "time": 3300,
-        "label": "Addressing Concerns about Islam"
+        "time": 2762,
+        "label": "Punishment for Non-Believers"
       },
       {
-        "time": 3900,
-        "label": "Conclusion and Final Thoughts"
+        "time": 3123,
+        "label": "Caller from India"
+      },
+      {
+        "time": 3722,
+        "label": "Christians and the Quran"
+      },
+      {
+        "time": 4321,
+        "label": "Doing Justice"
+      },
+      {
+        "time": 5044,
+        "label": "Interpreting the Bible"
+      },
+      {
+        "time": 6125,
+        "label": "Prophets and Miracles"
+      },
+      {
+        "time": 6849,
+        "label": "Jesus and God"
+      },
+      {
+        "time": 7684,
+        "label": "Quran and Scripture"
+      },
+      {
+        "time": 8645,
+        "label": "Caller's Question"
+      },
+      {
+        "time": 10084,
+        "label": "Punishments and Laws"
+      },
+      {
+        "time": 10925,
+        "label": "Final Questions"
+      },
+      {
+        "time": 11165,
+        "label": "Conclusion"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-vSKAJZkhuq4-1778975061/transcript.json",
-    "ai_enriched_at": "2026-06-13T07:08:21Z"
+    "ai_enriched_at": "2026-06-13T10:24:18Z"
   },
   {
     "video_id": "tml-2026-05-lQySsXx00Io-1778454605",
