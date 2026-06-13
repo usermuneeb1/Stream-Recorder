@@ -31,6 +31,9 @@ GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 ARCHIVE_ACCESS = os.environ.get("ARCHIVE_ACCESS_KEY", "").strip()
 ARCHIVE_SECRET = os.environ.get("ARCHIVE_SECRET_KEY", "").strip()
 MAX_ITEMS = int(os.environ.get("AI_MAX_ITEMS", "2"))
+# AI_FORCE=true re-enriches recordings that already have ai_summary (e.g. to
+# regenerate chapters with an improved prompt).
+FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
@@ -120,19 +123,40 @@ def transcribe(wav_chunks):
     return segments, " ".join(full).strip()
 
 
-def llm_enrich(title, transcript_text):
-    """Ask the LLM for summary + chapters + tags as strict JSON."""
-    # Keep prompt within token limits: trim very long transcripts.
-    text = transcript_text[:48000]
+def llm_enrich(title, segments):
+    """Ask the LLM for summary + chapters + tags as strict JSON.
+
+    `segments` is a list of {start, end, text}. We feed the model a
+    timestamped transcript so chapters use REAL timestamps (not guesses) and
+    can mark meaningful moments — especially when a guest/caller joins or a new
+    topic begins (YouTube-style chapters)."""
+    # Build a compact timestamped transcript (mm:ss | text), trimmed to fit.
+    lines = []
+    for s in segments:
+        t = int(s.get("start", 0))
+        stamp = f"{t // 60:02d}:{t % 60:02d}"
+        txt = (s.get("text") or "").strip()
+        if txt:
+            lines.append(f"[{t}s {stamp}] {txt}")
+    ts_transcript = "\n".join(lines)[:46000]
+
     prompt = (
-        "You are summarizing a recorded Islamic live-stream/debate video for an archive website.\n"
+        "You are creating YouTube-style chapters and a summary for a recorded "
+        "Islamic live-stream / Q&A / debate video for an archive website.\n"
         f"Video title: {title}\n\n"
-        "From the transcript below, return STRICT JSON with keys:\n"
+        "The transcript below is timestamped as [SECONDS mm:ss].\n"
+        "Return STRICT JSON with keys:\n"
         '  "summary": a 2-3 sentence neutral summary,\n'
         '  "tags": array of 4-8 short topic tags,\n'
-        '  "chapters": array of {"time": SECONDS_INT, "label": "short title"} (5-12 chapters across the video).\n'
+        '  "chapters": array of {"time": SECONDS_INT, "label": "short title"}.\n'
+        "CHAPTER RULES:\n"
+        " - Use the REAL second value from the transcript timestamps, not round guesses.\n"
+        " - Create a NEW chapter whenever a guest/caller JOINS or is introduced "
+        "(label it with their name if mentioned, e.g. 'Ahmed joins'), and whenever "
+        "the topic clearly changes.\n"
+        " - 6-15 chapters, in chronological order, first chapter at or near 0.\n"
         "Return ONLY the JSON object, no markdown.\n\n"
-        f"TRANSCRIPT:\n{text}"
+        f"TIMESTAMPED TRANSCRIPT:\n{ts_transcript}"
     )
     res = groq_post(
         "/chat/completions",
@@ -191,7 +215,7 @@ def main():
     with open(RECORDINGS) as f:
         recs = json.load(f)
 
-    todo = [r for r in recs if not r.get("ai_summary") and archive_audio_url(r)][:MAX_ITEMS]
+    todo = [r for r in recs if (FORCE or not r.get("ai_summary")) and archive_audio_url(r)][:MAX_ITEMS]
     if not todo:
         log("✅ All recordings already enriched (nothing to do).")
         return 0
@@ -214,7 +238,7 @@ def main():
                 continue
             log(f"   transcript: {len(text)} chars, {len(segments)} segments")
 
-            enrich = llm_enrich(rec.get("title", ""), text)
+            enrich = llm_enrich(rec.get("title", ""), segments)
             transcript_obj = {"segments": segments, "text": text}
 
             # Upload transcript + srt to Archive

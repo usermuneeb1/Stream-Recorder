@@ -14,6 +14,11 @@ on:
         required: false
         default: "2"
         type: string
+      force:
+        description: "Re-enrich videos that already have AI data (regenerate chapters)"
+        required: false
+        default: false
+        type: boolean
   schedule:
     # Daily at 09:00 UTC — picks up any recordings missing AI data.
     - cron: "0 9 * * *"
@@ -70,6 +75,7 @@ jobs:
           ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
           ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
           AI_MAX_ITEMS: ${{ github.event.inputs.max_items || '2' }}
+          AI_FORCE: ${{ github.event.inputs.force || 'false' }}
         run: python3 scripts/ai/enrich.py
 
       - name: "💾 Commit AI metadata"
