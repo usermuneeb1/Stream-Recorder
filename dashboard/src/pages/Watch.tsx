@@ -408,17 +408,11 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
           if (archiveFallback) direct = [...direct, { id: 'archive-fallback', quality: 'Backup', url: archiveFallback, mime: 'video/mp4' }];
         }
         if (!cancelled && direct.length > 0) {
-          // Warm-start: kick off background requests to the first source so the
-          // Archive storage node "wakes up" and the CDN caches the opening bytes
-          // BEFORE the player asks for them. The MP4 is faststart (moov atom at
-          // the front), so priming the first couple of MB lets playback begin
-          // almost immediately instead of waiting on a cold node. We fire two
-          // ranges: a tiny one to wake the node, then a bigger one to fill the
-          // initial playback buffer.
-          try {
-            fetch(direct[0].url, { headers: { Range: 'bytes=0-65535' }, mode: 'no-cors' }).catch(() => undefined);
-            fetch(direct[0].url, { headers: { Range: 'bytes=0-3145727' }, mode: 'no-cors' }).catch(() => undefined);
-          } catch { /* ignore */ }
+          // Hand the sources straight to the player and let IT do the loading.
+          // (We previously fired background "warm-start" range fetches here, but
+          // on slower connections those competed with the player for bandwidth
+          // and actually made the play button appear LATER. The MP4 is faststart,
+          // so the player streams the opening instantly on its own.)
           setDirectSources(direct);
           return;
         }
@@ -478,11 +472,11 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
         key={activeSrc?.url}
         title={stream.title}
         src={activeSrc?.mime ? { src: activeSrc.url, type: activeSrc.mime } : activeSrc?.url}
-        poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
+        poster={stream.thumbnail}
         aspectRatio="16/9"
         playsInline
         load="eager"
-        preload="auto"
+        preload="metadata"
         streamType="on-demand"
         className="vidstack-premium-player h-full w-full bg-black"
         onCanPlay={(_e: any, nativeEvent: any) => {
