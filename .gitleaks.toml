@@ -1,0 +1,22 @@
+# gitleaks configuration for Stream-Recorder
+# Uses the default rule set, with allowlists for files that intentionally
+# contain low-risk or already-public data.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Project-specific allowlist"
+paths = [
+  # Disposable cloud-account CSVs are intentionally committed for this project
+  # (throwaway accounts, not personal credentials).
+  '''scripts/mega/accounts\.csv''',
+  '''scripts/pixeldrain/accounts\.csv''',
+  # Lockfiles can contain hash-like strings that trigger false positives.
+  '''dashboard/package-lock\.json''',
+]
+# Ignore obvious placeholder/example values.
+regexes = [
+  '''INSERT_YOUR_.*_HERE''',
+  '''example\.com''',
+  '''YOUR-NAME''',
+]

@@ -1,0 +1,25 @@
+# Dependabot — automatic dependency update PRs (supply-chain safety).
+version: 2
+updates:
+  # Dashboard npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/dashboard"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]
+
+  # Python deps for the account managers + AI scripts
+  - package-ecosystem: "pip"
+    directory: "/scripts/ai"
+    schedule:
+      interval: "monthly"
+    labels: ["dependencies"]

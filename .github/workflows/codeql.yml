@@ -1,0 +1,36 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🛡️ CodeQL — static security analysis for the dashboard (JS/TS)              ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🛡️ CodeQL"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+  pull_request:
+    paths:
+      - "dashboard/**"
+  schedule:
+    - cron: "30 5 * * 2"   # weekly Tuesday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🧰 Init CodeQL"
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: "🔍 Analyze"
+        uses: github/codeql-action/analyze@v3
