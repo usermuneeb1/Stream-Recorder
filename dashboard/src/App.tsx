@@ -25,9 +25,9 @@ function AdminLogin() {
     return <Navigate to="/command-center" replace />;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(password)) {
+    if (await login(password)) {
       navigate('/command-center', { replace: true });
     } else {
       setError(true);
