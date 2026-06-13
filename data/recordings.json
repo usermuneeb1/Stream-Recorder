@@ -21,16 +21,16 @@
     "archive_node": "https://ia800409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
     "mega_link": "https://mega.nz/#!tc1iwC7I!eKgBCS8sA_Ab3bE7PuvBkaovYxM1VP3P2HtHIzSxBm8",
     "gofile_link": "https://gofile.io/d/J4FK97",
-    "ai_summary": "This live stream features a Q&A session where non-Muslims can ask questions about Islam. The discussion covers various topics, including the concept of God, the role of Jesus, and the principles of Islam. The conversation is informal and open, allowing participants to share their thoughts and perspectives.",
+    "ai_summary": "This live stream features a Q&A session where non-Muslims ask questions about Islam, with discussions on various topics including the nature of God, the role of Jesus, and the concept of sin. The conversation is informal and open, with participants sharing their perspectives and engaging in respectful dialogue. The session aims to promote understanding and clarify misconceptions about Islam.",
     "ai_tags": [
       "Islam",
       "Q&A",
       "Non-Muslims",
       "Jesus",
       "God",
+      "Sin",
       "Religion",
-      "Debate",
-      "Live Stream"
+      "Dialogue"
     ],
     "ai_chapters": [
       {
@@ -38,28 +38,44 @@
         "label": "Introduction"
       },
       {
+        "time": 123,
+        "label": "Viewer Comments"
+      },
+      {
+        "time": 241,
+        "label": "Discussing Islam"
+      },
+      {
+        "time": 484,
+        "label": "Understanding Sin"
+      },
+      {
         "time": 725,
-        "label": "Non-Muslim Q&A Introduction"
+        "label": "Non-Muslim Questions"
       },
       {
         "time": 1089,
         "label": "Makashif Joins"
       },
       {
-        "time": 1200,
+        "time": 1325,
         "label": "Jesus in the Bible"
       },
       {
         "time": 1561,
-        "label": "Caller Questions"
+        "label": "Fear and Faith"
       },
       {
-        "time": 2160,
-        "label": "Worshiping Allah"
+        "time": 1921,
+        "label": "Philosophical Discussions"
       },
       {
-        "time": 2762,
-        "label": "Punishment for Non-Believers"
+        "time": 2281,
+        "label": "Hell and Punishment"
+      },
+      {
+        "time": 2883,
+        "label": "Prophetic Journey"
       },
       {
         "time": 3123,
@@ -67,47 +83,47 @@
       },
       {
         "time": 3722,
-        "label": "Christians and the Quran"
+        "label": "Christian Perspectives"
       },
       {
         "time": 4321,
-        "label": "Doing Justice"
+        "label": "Social Justice"
       },
       {
         "time": 5044,
-        "label": "Interpreting the Bible"
+        "label": "Biblical Interpretation"
       },
       {
-        "time": 6125,
-        "label": "Prophets and Miracles"
+        "time": 5880,
+        "label": "Jesus' Claim to Divinity"
       },
       {
-        "time": 6849,
-        "label": "Jesus and God"
+        "time": 6600,
+        "label": "Muslim Perspectives"
       },
       {
-        "time": 7684,
-        "label": "Quran and Scripture"
+        "time": 7445,
+        "label": "Pagan Worship"
       },
       {
         "time": 8645,
-        "label": "Caller's Question"
+        "label": "Fan Interaction"
       },
       {
-        "time": 10084,
-        "label": "Punishments and Laws"
+        "time": 10200,
+        "label": "Historical Context"
       },
       {
-        "time": 10925,
-        "label": "Final Questions"
+        "time": 10800,
+        "label": "Neighborhood and Community"
       },
       {
         "time": 11165,
-        "label": "Conclusion"
+        "label": "Conclusion and Final Thoughts"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-vSKAJZkhuq4-1778975061/transcript.json",
-    "ai_enriched_at": "2026-06-13T10:24:18Z"
+    "ai_enriched_at": "2026-06-13T10:35:22Z"
   },
   {
     "video_id": "tml-2026-05-lQySsXx00Io-1778454605",
@@ -131,49 +147,77 @@
     "archive_node": "https://ia800802.us.archive.org/16/items/tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "mega_link": "https://mega.nz/#!uDIR0BgA!X3Evqi3jxQiO3QFcRyvPhFeur8co7AqQT0X5qwM_O7w",
     "gofile_link": "https://gofile.io/d/MFEBBX",
-    "ai_summary": "The video features a live stream where the host, Muhammed Ali, engages with non-Muslims and discusses various topics related to Islam, including morality, the existence of God, and the Quran. The host also interacts with viewers, answering their questions and addressing their concerns. The conversation covers a range of subjects, from the concept of fitra and innate knowledge of right and wrong to the idea of objective morality and the role of revelation in guiding human behavior.",
+    "ai_summary": "This live stream features a Q&A session with Muhammed Ali, where he discusses various topics related to Islam and responds to questions from non-Muslims. The conversation covers a range of subjects, including the existence of God, morality, and the comparison of Islamic and Christian beliefs. The discussion is informal and interactive, with participants joining in and sharing their thoughts and opinions.",
     "ai_tags": [
       "Islam",
+      "Q&A",
+      "Debate",
       "Morality",
       "God",
-      "Quran",
-      "Agnosticism",
-      "Objective Morality",
-      "Fitra",
-      "Revelation"
+      "Christianity",
+      "Comparative Religion",
+      "Atheism"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction and Welcome"
+        "label": "Introduction"
       },
       {
-        "time": 300,
-        "label": "Discussion on Morality and Fitra"
+        "time": 484,
+        "label": "Reasons for Muslims to speak out"
       },
       {
-        "time": 900,
-        "label": "Conversation with Agnostic Viewer"
+        "time": 963,
+        "label": "The Shahada"
       },
       {
-        "time": 1500,
-        "label": "Objective Morality and Revelation"
+        "time": 1200,
+        "label": "Atheism and the concept of a creator"
       },
       {
-        "time": 2100,
-        "label": "Interactions with Viewers and Q&A"
+        "time": 1442,
+        "label": "The Quran's claim of divine origin"
       },
       {
-        "time": 2700,
-        "label": "Discussion on Islam and Other Religions"
+        "time": 1920,
+        "label": "Universal principles"
       },
       {
-        "time": 3300,
-        "label": "Conclusion and Final Thoughts"
+        "time": 2286,
+        "label": "Historical references in the Quran"
+      },
+      {
+        "time": 2400,
+        "label": "Sam joins the conversation"
+      },
+      {
+        "time": 3483,
+        "label": "Objective morality"
+      },
+      {
+        "time": 4561,
+        "label": "Irrational questions"
+      },
+      {
+        "time": 5641,
+        "label": "Final questions"
+      },
+      {
+        "time": 6842,
+        "label": "Biblical references"
+      },
+      {
+        "time": 7088,
+        "label": "Comparing Muhammad and Jesus"
+      },
+      {
+        "time": 7800,
+        "label": "Conclusion and final thoughts"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-lQySsXx00Io-1778454605/transcript.json",
-    "ai_enriched_at": "2026-06-13T07:09:33Z"
+    "ai_enriched_at": "2026-06-13T10:38:34Z"
   },
   {
     "video_id": "tml-2026-04-LT7jTHW_e8Y-1777157490",
