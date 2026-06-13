@@ -247,13 +247,22 @@ def main():
             upload_to_archive(ident, "subtitles.srt",
                               segments_to_srt(segments).encode(), "text/plain")
 
-            rec["ai_summary"] = enrich.get("summary", "")
-            rec["ai_tags"] = enrich.get("tags", [])
-            rec["ai_chapters"] = enrich.get("chapters", [])
-            if t_url:
-                rec["transcript_url"] = t_url
-            rec["ai_enriched_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
-            log(f"   ✅ summary + {len(rec['ai_tags'])} tags + {len(rec['ai_chapters'])} chapters")
+            # SAFETY: only overwrite existing AI fields when the new result is
+            # actually valid. A failed/rate-limited LLM call returns {} — never
+            # let that wipe previously-good summaries/chapters.
+            new_summary = enrich.get("summary", "")
+            new_chapters = enrich.get("chapters", [])
+            if new_summary:
+                rec["ai_summary"] = new_summary
+                rec["ai_tags"] = enrich.get("tags", [])
+                if new_chapters:
+                    rec["ai_chapters"] = new_chapters
+                if t_url:
+                    rec["transcript_url"] = t_url
+                rec["ai_enriched_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                log(f"   ✅ summary + {len(rec.get('ai_tags', []))} tags + {len(rec.get('ai_chapters', []))} chapters")
+            else:
+                log("   ⚠️ LLM returned no summary — keeping existing AI data, not overwriting")
 
         # Save after each item so partial progress persists
         with open(RECORDINGS, "w") as f:
