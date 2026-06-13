@@ -684,7 +684,7 @@ export default function Watch() {
                   <button
                     key={`${ch.time}-${i}`}
                     ref={(el) => { if (isActive && el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}
-                    onClick={() => setSeekRequest({ t: ch.time, n: Date.now() })}
+                    onClick={() => { setPlayerTime(ch.time); setSeekRequest({ t: ch.time, n: Date.now() }); }}
                     className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors group ${isActive ? 'bg-brand-100 dark:bg-brand-900/40 ring-1 ring-brand-300 dark:ring-brand-700' : 'hover:bg-brand-50 dark:hover:bg-brand-900/30'}`}
                   >
                     <span className="text-xs font-mono font-bold text-brand-500 shrink-0 mt-0.5">{formatClock(ch.time)}</span>
