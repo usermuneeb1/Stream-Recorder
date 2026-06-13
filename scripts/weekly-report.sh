@@ -30,87 +30,45 @@ generate_weekly_report() {
     
     log_info "Lifetime: ${lifetime_streams} streams, ${lifetime_hours}h, ${lifetime_gb} GB"
     
-    # ── Read links.txt for this week ─────────────────────────────────────────
+    # ── Read recordings.json for this week ───────────────────────────────────
+    # (Canonical data source. links.txt was retired; recordings.json is truth.)
     log_step "Analyzing this week's recordings..."
-    
-    local links_content
-    links_content=$(github_api_read_content "links.txt" 2>/dev/null) || links_content=""
-    
+
+    local recs_content
+    recs_content=$(github_api_read_content "data/recordings.json" 2>/dev/null) || recs_content="[]"
+    echo "$recs_content" | jq -e 'type=="array"' >/dev/null 2>&1 || recs_content="[]"
+
     # Calculate date range for this week (Monday-Sunday)
     local week_start
     week_start=$(TZ='Asia/Karachi' date -d 'last monday' '+%Y-%m-%d' 2>/dev/null || \
                  TZ='Asia/Karachi' date -d '7 days ago' '+%Y-%m-%d')
     local today
     today=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
-    
+
     log_info "Week range: ${week_start} to ${today}"
-    
-    # Parse this week's entries from links.txt
+
     local weekly_streams=0
     local weekly_hours=0
     local weekly_gb=0
     local streams_list=""
-    local in_entry=false
-    local entry_date="" entry_title="" entry_duration="" entry_size="" entry_channel=""
-    local channel_filter="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
-    
-    while IFS= read -r line; do
-        # Start of entry
-        if [[ "$line" == "========================================"* ]] && [[ "$in_entry" == "false" ]]; then
-            in_entry=true
-            entry_date="" entry_title="" entry_duration="" entry_size="" entry_channel=""
-            continue
-        fi
-        
-        # End of entry
-        if [[ "$line" == "========================================"* ]] && [[ "$in_entry" == "true" ]]; then
-            in_entry=false
-            
-            # Check if this entry is from this week (single channel only)
-            if [[ -n "$entry_date" ]] && [[ -z "$entry_channel" || "$entry_channel" == *"$channel_filter"* ]]; then
-                local entry_ymd
-                entry_ymd=$(echo "$entry_date" | grep -oP '\d{4}-\d{2}-\d{2}' | head -1)
-                
-                if [[ -n "$entry_ymd" ]] && [[ ! "$entry_ymd" < "$week_start" ]] && [[ ! "$entry_ymd" > "$today" ]]; then
-                    (( weekly_streams++ ))
-                    
-                    # Parse duration to hours
-                    if [[ "$entry_duration" =~ ([0-9]+):([0-9]+):([0-9]+) ]]; then
-                        local d_hours=${BASH_REMATCH[1]}
-                        local d_mins=${BASH_REMATCH[2]}
-                        local d_total_hours
-                        d_total_hours=$(echo "scale=2; $d_hours + $d_mins / 60" | bc)
-                        [[ "$d_total_hours" == .* ]] && d_total_hours="0${d_total_hours}"
-                        weekly_hours=$(echo "scale=2; $weekly_hours + $d_total_hours" | bc)
-                        [[ "$weekly_hours" == .* ]] && weekly_hours="0${weekly_hours}"
-                    fi
-                    
-                    # Parse size
-                    local s_val
-                    s_val=$(echo "$entry_size" | grep -oP '[\d.]+(?=\s*GB)' | head -1)
-                    if [[ -n "$s_val" ]]; then
-                        weekly_gb=$(echo "scale=2; $weekly_gb + $s_val" | bc)
-                        [[ "$weekly_gb" == .* ]] && weekly_gb="0${weekly_gb}"
-                    fi
-                    
-                    # Build stream list entry
-                    local short_title="${entry_title:0:40}"
-                    [[ ${#entry_title} -gt 40 ]] && short_title+="..."
-                    streams_list+="• **${short_title}** — ${entry_ymd} — ${entry_duration} — ${entry_size}\\n"
-                fi
-            fi
-            continue
-        fi
-        
-        # Parse entry fields
-        if [[ "$in_entry" == "true" ]]; then
-            [[ "$line" =~ ^Date:\ *(.+)$ ]] && entry_date="${BASH_REMATCH[1]}"
-            [[ "$line" =~ ^Title:\ *(.+)$ ]] && entry_title="${BASH_REMATCH[1]}"
-            [[ "$line" =~ ^Channel:\ *(.+)$ ]] && entry_channel="${BASH_REMATCH[1]}"
-            [[ "$line" =~ ^Duration:\ *(.+)$ ]] && entry_duration="${BASH_REMATCH[1]}"
-            [[ "$line" =~ ^Size:\ *(.+)$ ]] && entry_size="${BASH_REMATCH[1]}"
-        fi
-    done <<< "$links_content"
+
+    # Count + summarize entries whose date falls in this week.
+    weekly_streams=$(echo "$recs_content" | jq --arg s "$week_start" --arg e "$today" \
+        '[ .[] | select(.date >= $s and .date <= $e) ] | length' 2>/dev/null || echo 0)
+
+    if [[ "${weekly_streams:-0}" -gt 0 ]]; then
+        # Sum hours (from duration_sec) and GB (from size_gb/size_bytes).
+        weekly_hours=$(echo "$recs_content" | jq -r --arg s "$week_start" --arg e "$today" \
+            '[ .[] | select(.date >= $s and .date <= $e) | (.duration_sec // 0) ] | add / 3600 | (.*100|round/100)' 2>/dev/null || echo 0)
+        weekly_gb=$(echo "$recs_content" | jq -r --arg s "$week_start" --arg e "$today" \
+            '[ .[] | select(.date >= $s and .date <= $e) | (.size_gb // ((.size_bytes // 0)/1073741824)) ] | add | (.*100|round/100)' 2>/dev/null || echo 0)
+
+        # Build the per-stream list (markdown bullets).
+        streams_list=$(echo "$recs_content" | jq -r --arg s "$week_start" --arg e "$today" '
+            [ .[] | select(.date >= $s and .date <= $e) ]
+            | map("• **" + ((.title // "Untitled")[0:40]) + "** — " + (.date // "?") + " — " + (.duration_fmt // "?") + " — " + (.size_human // "?"))
+            | join("\\n")' 2>/dev/null || echo "")
+    fi
     
     # Calculate weekly average
     local weekly_avg="0h"
