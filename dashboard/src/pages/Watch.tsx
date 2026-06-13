@@ -15,7 +15,7 @@ import {
   MessageSquare,
   X,
 } from 'lucide-react';
-import { MediaPlayer, MediaProvider } from '@vidstack/react';
+import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/react';
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
@@ -264,7 +264,7 @@ async function fetchChatMessages(chatUrl?: string, archiveId?: string): Promise<
 }
 
 function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { stream: StreamData; option: PlayerOption; archiveId?: string; onTime: (time: number) => void; seekTo?: { t: number; n: number } }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<MediaPlayerInstance>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const resumedRef = useRef(false); // ensures we resume position only once per load
   const [directSources, setDirectSources] = useState<DirectSource[]>([]);
@@ -275,10 +275,23 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
   const [failedSources, setFailedSources] = useState<string[]>([]);
 
   // Apply external seek requests (e.g. clicking an AI chapter).
+  // Vidstack exposes seeking on the player INSTANCE (player.currentTime), not on
+  // a raw <video> element — so we drive it through playerRef. We also retry for a
+  // moment in case the player isn't fully ready the instant the chapter is
+  // clicked (e.g. very first click before metadata has loaded).
   useEffect(() => {
     if (!seekTo || seekTo.t < 0) return;
-    const v = videoRef.current;
-    if (v) { v.currentTime = seekTo.t; v.play?.().catch(() => undefined); }
+    let tries = 0;
+    const apply = () => {
+      const p = playerRef.current;
+      if (p && (p.state.canPlay || p.state.duration > 0)) {
+        p.currentTime = seekTo.t;
+        p.play?.().catch(() => undefined);
+        return;
+      }
+      if (tries++ < 40) window.setTimeout(apply, 100); // retry up to ~4s
+    };
+    apply();
   }, [seekTo]);
 
   useEffect(() => {
@@ -328,11 +341,16 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
           direct = await gofileDirectSources(option.source.url);
         }
         if (!cancelled && direct.length > 0) {
-          // Warm-start: kick off a tiny background request to the first source so
-          // the storage node "wakes up" and starts caching before the player is
-          // ready. This makes the slow Archive cold-cache first-load feel faster.
+          // Warm-start: kick off background requests to the first source so the
+          // Archive storage node "wakes up" and the CDN caches the opening bytes
+          // BEFORE the player asks for them. The MP4 is faststart (moov atom at
+          // the front), so priming the first couple of MB lets playback begin
+          // almost immediately instead of waiting on a cold node. We fire two
+          // ranges: a tiny one to wake the node, then a bigger one to fill the
+          // initial playback buffer.
           try {
             fetch(direct[0].url, { headers: { Range: 'bytes=0-65535' }, mode: 'no-cors' }).catch(() => undefined);
+            fetch(direct[0].url, { headers: { Range: 'bytes=0-3145727' }, mode: 'no-cors' }).catch(() => undefined);
           } catch { /* ignore */ }
           setDirectSources(direct);
           return;
@@ -389,6 +407,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
   return (
     <div ref={wrapRef} className="relative h-full w-full overflow-hidden bg-black">
       <MediaPlayer
+        ref={playerRef}
         key={activeSrc?.url}
         title={stream.title}
         src={activeSrc?.mime ? { src: activeSrc.url, type: activeSrc.mime } : activeSrc?.url}
@@ -434,7 +453,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
           // genuinely fails, advance to the next candidate ONCE. We only show the
           // hard error after every candidate has actually been tried, so a single
           // transient hiccup never cascades into "all sources unavailable".
-          const previousTime = videoRef.current?.currentTime || 0;
+          const previousTime = playerRef.current?.currentTime || 0;
           setFailedSources(prevFailed => {
             const currentUrl = directSources[activeQuality]?.url;
             if (currentUrl && prevFailed.includes(currentUrl)) return prevFailed;
@@ -450,7 +469,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
             } else {
               setActiveQuality(nextIndex);
               window.setTimeout(() => {
-                const v = videoRef.current;
+                const v = playerRef.current;
                 if (v && previousTime > 0) v.currentTime = previousTime;
               }, 200);
             }
@@ -620,16 +639,20 @@ export default function Watch() {
             <div className="glass-panel p-5 rounded-2xl border border-dark-200 dark:border-dark-800">
               <h3 className="font-bold mb-4 text-base flex items-center gap-2">📑 Chapters</h3>
               <div className="space-y-1 max-h-[320px] overflow-y-auto pr-1">
-                {stream.aiChapters.map((ch, i) => (
+                {stream.aiChapters.map((ch, i) => {
+                  const next = stream.aiChapters![i + 1];
+                  const isActive = playerTime >= ch.time && (!next || playerTime < next.time);
+                  return (
                   <button
                     key={`${ch.time}-${i}`}
                     onClick={() => setSeekRequest({ t: ch.time, n: Date.now() })}
-                    className="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-brand-50 dark:hover:bg-brand-900/30 transition-colors group"
+                    className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors group ${isActive ? 'bg-brand-100 dark:bg-brand-900/40 ring-1 ring-brand-300 dark:ring-brand-700' : 'hover:bg-brand-50 dark:hover:bg-brand-900/30'}`}
                   >
                     <span className="text-xs font-mono font-bold text-brand-500 shrink-0 mt-0.5">{formatClock(ch.time)}</span>
-                    <span className="text-sm text-dark-700 dark:text-dark-200 group-hover:text-brand-600 dark:group-hover:text-brand-300">{ch.label}</span>
+                    <span className={`text-sm group-hover:text-brand-600 dark:group-hover:text-brand-300 ${isActive ? 'font-semibold text-brand-700 dark:text-brand-300' : 'text-dark-700 dark:text-dark-200'}`}>{ch.label}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
