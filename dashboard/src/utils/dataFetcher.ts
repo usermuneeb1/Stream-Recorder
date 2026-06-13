@@ -43,6 +43,21 @@ export interface StatsData {
 }
 
 const RAW_URL = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
+// jsDelivr global CDN mirror — fast + bypasses GitHub raw rate limits. It can be
+// up to ~12h stale on @main, so we use it as the FIRST try and fall back to the
+// always-fresh raw URL if jsDelivr fails or returns nothing.
+const CDN_URL = 'https://cdn.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main';
+
+// Fetch a repo path: try jsDelivr first (fast), fall back to raw (fresh).
+async function fetchRepoFile(path: string): Promise<Response | null> {
+  for (const base of [CDN_URL, RAW_URL]) {
+    try {
+      const res = await fetch(`${base}/${path}?t=${Date.now()}`);
+      if (res.ok) return res;
+    } catch { /* try next */ }
+  }
+  return null;
+}
 const CHANNEL = 'the muslim lantern';
 
 // ── In-memory cache to prevent redundant network requests ──
@@ -258,17 +273,15 @@ export async function fetchStreams(): Promise<StreamData[]> {
 
   let list: StreamData[] = [];
   try {
-    const res = await fetch(`${RAW_URL}/links.txt?t=${Date.now()}`);
-    const text = await res.text();
-    list = parseLinks(text);
+    const res = await fetchRepoFile('links.txt');
+    if (res) list = parseLinks(await res.text());
   } catch {
     console.warn('Could not parse links.txt');
   }
 
   try {
-    const res = await fetch(`${RAW_URL}/data/recordings.json?t=${Date.now()}`);
-    const recs = await res.json();
-    list = mergeData(list, recs);
+    const res = await fetchRepoFile('data/recordings.json');
+    if (res) list = mergeData(list, await res.json());
   } catch {
     console.warn('Could not parse recordings.json');
   }

@@ -41,6 +41,13 @@ jobs:
       - name: "📊 Generate status + badges"
         run: python3 scripts/gen-status.py
 
+      - name: "🧹 Purge jsDelivr CDN cache (keep gallery data fresh)"
+        run: |
+          for p in data/recordings.json data/youtube-stats.json data/system-status.json; do
+            curl -s -o /dev/null "https://purge.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main/$p" || true
+          done
+          echo "Requested jsDelivr purge for data files."
+
       - name: "⬆️ Commit"
         run: |
           if [[ -n "$(git status -s data/system-status.json data/badges)" ]]; then
