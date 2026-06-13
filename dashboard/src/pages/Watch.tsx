@@ -241,11 +241,22 @@ async function fetchChatMessages(chatUrl?: string, archiveId?: string): Promise<
     try {
       const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`);
       if (!res.ok) continue;
+      // Reject HTML error pages (Archive returns a 200/404 HTML page when the
+      // file is missing). Only accept real JSON / JSONL chat payloads.
+      const ctype = (res.headers.get('content-type') || '').toLowerCase();
       const text = await res.text();
-      try { return parseChatPayload(JSON.parse(text)); }
-      catch {
-        const parsed = text.split('\n').map(line => line.trim()).filter(Boolean).map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
-        return parseChatPayload(parsed);
+      const looksHtml = ctype.includes('text/html') || /^\s*<(?:!doctype|html)/i.test(text);
+      if (looksHtml) continue;
+      try {
+        const parsed = parseChatPayload(JSON.parse(text));
+        if (parsed.length) return parsed;
+        continue;
+      } catch {
+        const lines = text.split('\n').map(line => line.trim()).filter(Boolean)
+          .map(line => { try { return JSON.parse(line); } catch { return null; } })
+          .filter(Boolean);
+        const parsed = parseChatPayload(lines);
+        if (parsed.length) return parsed;
       }
     } catch {}
   }

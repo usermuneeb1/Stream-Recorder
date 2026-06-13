@@ -247,6 +247,7 @@ update_recordings_json() {
         --arg pd "$pixeldrain_link" \
         --arg gof "$gofile_link" \
         --arg mega "$mega_link" \
+        --arg chat "${RECORD_CHAT_URL:-}" \
         --arg rec "$recorded_at" '
         # thumbnail intentionally empty → site uses public/thumbnail.jpg
         ( [ .[] | select(.video_id != $id) ] ) as $rest
@@ -270,7 +271,7 @@ update_recordings_json() {
             pixeldrain_link: $pd,
             gofile_link: $gof,
             mega_link: $mega,
-            chat_url: "",
+            chat_url: $chat,
             recorded_at: $rec
           } ] + $rest
         | sort_by(.date) | reverse

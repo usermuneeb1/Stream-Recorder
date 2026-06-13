@@ -416,10 +416,11 @@ upload_to_archive() {
             log_info "  Archive.org: Link → ${link} (PERMANENT)"
             ARCHIVE_LINKS+=("${part_name}|${link}|${identifier}")
 
-            # Upload chat.json if available
-            local chat_file="/tmp/stream-recorder/chat.json"
-            if [[ -f "$chat_file" ]]; then
-                log_info "  🏛️  Archive.org: Uploading chat.json..."
+            # Upload chat.json if available (only when it has real content).
+            # Prefer the path the recorder reported; fall back to the default.
+            local chat_file="${RECORD_CHAT_FILE:-${RECORD_DIR:-/tmp/stream-recorder}/chat.json}"
+            if [[ -f "$chat_file" ]] && [[ $(wc -c < "$chat_file" 2>/dev/null || echo 0) -gt 50 ]]; then
+                log_info "  🏛️  Archive.org: Uploading chat.json ($(wc -c < "$chat_file") bytes)..."
                 curl -s -o /dev/null \
                     --max-time 300 --location \
                     -H "authorization: LOW ${access_key}:${secret_key}" \
@@ -429,6 +430,8 @@ upload_to_archive() {
                     2>/dev/null || true
                 set_env "RECORD_CHAT_URL" "https://archive.org/download/${identifier}/chat.json"
                 log_ok "  Archive.org: Chat log uploaded"
+            else
+                log_info "  Archive.org: No chat log to upload (file missing or empty)"
             fi
 
             return 0
