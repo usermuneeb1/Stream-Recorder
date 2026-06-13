@@ -137,10 +137,10 @@ function formatClock(seconds: number) {
 
 function sortSourceEntries(sources: Record<string, StreamSource>): [string, StreamSource][] {
   return Object.entries(sources)
-    // MEGA and Gofile are kept as storage mirrors, but they are not reliable
-    // in-browser playback providers. MEGA often opens a download flow and
-    // Gofile requires tokenized direct links, so hide them from public player UI.
-    .filter(([key]) => key !== 'mega' && key !== 'gofile')
+    // Pixeldrain is hidden from playback sources: free Pixeldrain rate-limits
+    // embedded playback (403), so it is unreliable as a player. It remains a
+    // Download mirror. Archive is the reliable player source.
+    .filter(([key]) => key !== 'mega' && key !== 'gofile' && key !== 'pixel' && key !== 'pixeldrain')
     .sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
@@ -467,9 +467,7 @@ export default function Watch() {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key.toLowerCase() === 's') {
-        const base = stream ? sortSourceEntries(stream.sources) : [];
-        // +1 for the dedicated "Fast" Pixeldrain server we inject into the list.
-        const count = base.length + (base.some(([, s]) => s.type === 'pixeldrain') ? 1 : 0);
+        const count = stream ? sortSourceEntries(stream.sources).length : 0;
         if (count > 1) setActivePlayer(prev => (prev + 1) % count);
       }
       if (e.key === '?') { e.preventDefault(); setShowShortcuts(prev => !prev); }
@@ -482,23 +480,12 @@ export default function Watch() {
   if (notFound) return <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4"><div className="max-w-md"><div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6"><AlertTriangle size={44} className="text-red-500" /></div><h2 className="text-3xl font-bold font-display mb-3">Video Not Found</h2><p className="text-dark-500 mb-8">This recording does not exist in the archive.</p><button onClick={() => navigate('/gallery')} className="btn-primary">Browse Gallery</button></div></div>;
   if (!stream) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
 
-  const baseEntries: PlayerOption[] = sortSourceEntries(stream.sources).map(([key, source], index) => ({
+  // Pixeldrain is excluded above, so the playback list is Archive-only (Dxture).
+  const entries: PlayerOption[] = sortSourceEntries(stream.sources).map(([key, source], index) => ({
     key,
     source,
     label: PLAYER_NAMES[index] || `Player ${index + 1}`,
-    pixeldrainMode: source.type === 'pixeldrain' ? ('direct' as const) : undefined,
   }));
-  // Promote a dedicated "Fast" server (Pixeldrain via GameDrive proxy CDN) so it
-  // appears as its own button in the Player Sources list — not as an inner toggle.
-  // "Heart" keeps the official Pixeldrain stream; both fall back to each other.
-  const pixelIdx = baseEntries.findIndex(e => e.source.type === 'pixeldrain');
-  const entries: PlayerOption[] = pixelIdx === -1
-    ? baseEntries
-    : [
-        ...baseEntries.slice(0, pixelIdx),
-        { key: 'pixel-fast', source: baseEntries[pixelIdx].source, label: 'Fast', pixeldrainMode: 'fast' as const },
-        ...baseEntries.slice(pixelIdx),
-      ];
   const currentOption = entries[Math.min(activePlayer, Math.max(entries.length - 1, 0))];
   const archiveSource = stream.sources.archive || stream.sources.archiveSmall;
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
