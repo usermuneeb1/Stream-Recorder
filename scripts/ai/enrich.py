@@ -239,7 +239,23 @@ def main():
     with open(RECORDINGS) as f:
         recs = json.load(f)
 
-    todo = [r for r in recs if (FORCE or not r.get("ai_summary")) and archive_audio_url(r)][:MAX_ITEMS]
+    def needs_enrich(r):
+        if not archive_audio_url(r):
+            return False
+        if not r.get("ai_summary"):
+            return True            # never enriched
+        if not FORCE:
+            return False
+        # FORCE: only redo videos whose chapters look BAD — i.e. they don't span
+        # the video (last chapter < 70% of duration) or have too few. This lets
+        # repeated force runs finish the remaining bad ones instead of always
+        # restarting from video #1.
+        ch = r.get("ai_chapters", [])
+        dur = r.get("duration_sec", 0) or 0
+        last = ch[-1].get("time", 0) if ch else 0
+        return len(ch) < 8 or (dur and last < dur * 0.7)
+
+    todo = [r for r in recs if needs_enrich(r)][:MAX_ITEMS]
     if not todo:
         log("✅ All recordings already enriched (nothing to do).")
         return 0
