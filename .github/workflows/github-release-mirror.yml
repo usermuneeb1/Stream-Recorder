@@ -1,0 +1,72 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🎁 GitHub Releases Mirror — fast, free, permanent video hosting              ║
+# ║  Uploads each recording's .mp4 to a GitHub Release asset (≤2 GiB/file, no     ║
+# ║  total-size or bandwidth cap) and saves the fast Azure-CDN URL into           ║
+# ║  data/recordings.json so the player can use it as the #1 source.             ║
+# ║  Uses the built-in GITHUB_TOKEN — no extra secrets, no account farming.       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🎁 GitHub Release Mirror"
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_items:
+        description: "Max videos to mirror this run"
+        required: false
+        default: "5"
+        type: string
+  schedule:
+    # Every 6 hours — picks up any new recordings missing a github_release link.
+    - cron: "30 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "data/recordings.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-release-mirror
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "📦 Install deps"
+        run: pip3 install --quiet requests
+
+      - name: "🎁 Upload videos to Releases"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          GH_MAX_ITEMS: ${{ github.event.inputs.max_items || '5' }}
+        run: python3 scripts/github-release-upload.py
+
+      - name: "💾 Commit release links"
+        run: |
+          if [[ -n "$(git status -s data/recordings.json)" ]]; then
+            git config user.name "Stream Recorder Bot"
+            git config user.email "bot@stream-recorder.local"
+            git add data/recordings.json
+            git commit -m "🎁 Mirror: upload videos to GitHub Releases — $(date -u '+%Y-%m-%d')"
+            git push
+            echo "✅ Release links committed."
+          else
+            echo "No changes to commit."
+          fi

@@ -20,7 +20,7 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['dxture', 'Heart', 'Jatt', 'Helicopter'];
-const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
+const SOURCE_PRIORITY = ['github', 'archive', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" configuration ──
 // EVERYTHING goes through our OWN Vercel proxy (/api/pd/<id>). The proxy fetches
@@ -353,15 +353,23 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
       setFailedSources([]);
       try {
         let direct: DirectSource[] = [];
-        if (option.source.type === 'archive') {
-          // Fast path: stream the precomputed direct storage-node URL instantly
-          // (skips Archive's 302 redirect + metadata lookup). Keep the /download
-          // URL as an automatic fallback in case the node changes, then the
-          // metadata resolver as a last resort.
+        if (option.source.type === 'archive' || option.source.type === 'github') {
+          // Fast path: stream the precomputed direct URL instantly.
+          // - github: the Release asset URL (Azure CDN, fast + permanent). We
+          //   append the Archive direct URL as a silent fallback so playback
+          //   never fails even if a Release asset is unavailable.
+          // - archive: the direct storage-node URL (skips the 302 + metadata).
           const fast: DirectSource[] = [];
-          if (option.source.directUrl) fast.push({ id: 'archive-node', quality: 'Best', url: option.source.directUrl, mime: 'video/mp4' });
+          if (option.source.directUrl) fast.push({ id: 'src-direct', quality: 'Best', url: option.source.directUrl, mime: 'video/mp4' });
           if (option.source.fallbackUrl && option.source.fallbackUrl !== option.source.directUrl) {
-            fast.push({ id: 'archive-dl', quality: 'Backup', url: option.source.fallbackUrl, mime: 'video/mp4' });
+            fast.push({ id: 'src-backup', quality: 'Backup', url: option.source.fallbackUrl, mime: 'video/mp4' });
+          }
+          // Cross-source safety net for GitHub: add Archive as a final fallback.
+          if (option.source.type === 'github') {
+            const archiveFallback = stream.sources.archive?.directUrl || stream.sources.archiveSmall?.directUrl;
+            if (archiveFallback && !fast.some(f => f.url === archiveFallback)) {
+              fast.push({ id: 'archive-fallback', quality: 'Backup', url: archiveFallback, mime: 'video/mp4' });
+            }
           }
           if (fast.length > 0) {
             direct = fast;
