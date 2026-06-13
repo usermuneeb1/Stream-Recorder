@@ -491,10 +491,13 @@ export default function Watch() {
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
   const downloadLinks = [
-    stream.sources.pixel && { label: 'Pixeldrain (Fast)', url: pixeldrainDownload(stream.sources.pixel.url) },
-    stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url },
-    stream.sources.gofile && { label: 'Gofile', url: stream.sources.gofile.url },
-  ].filter((item) => item && item.url) as { label: string; url: string }[];
+    stream.sources.pixel && { label: 'Pixeldrain', url: pixeldrainDownload(stream.sources.pixel.url), note: 'Fast file mirror (proxy)' },
+    stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url, note: 'Encrypted storage mirror' },
+    stream.sources.gofile && { label: 'Gofile', url: stream.sources.gofile.url, note: 'Free file mirror' },
+    (stream.sources.archive?.fallbackUrl || stream.sources.archive?.directUrl) && {
+      label: 'Archive.org', url: (stream.sources.archive?.fallbackUrl || stream.sources.archive?.directUrl)!, note: 'Permanent direct MP4',
+    },
+  ].filter((item) => item && item.url) as { label: string; url: string; note: string }[];
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
   const removeBookmark = (index: number) => { const newBms = bookmarks.filter((_, i) => i !== index); setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
@@ -540,11 +543,11 @@ export default function Watch() {
                 <button onClick={() => setShowDownloads(false)} className="p-2 rounded-full hover:bg-white/10 text-white/70"><X size={18} /></button>
               </div>
               <div className="space-y-3">
-                {downloadLinks.map((item, index) => (
+                {downloadLinks.map((item) => (
                   <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-white hover:border-brand-500/40 hover:bg-brand-500/10 transition-all">
                     <div>
                       <div className="font-bold">{item.label}</div>
-                      <div className="text-xs text-white/45">{index === 0 ? 'Encrypted storage mirror' : 'Fast file mirror'}</div>
+                      <div className="text-xs text-white/45">{item.note}</div>
                     </div>
                     <Download size={18} className="text-brand-400" />
                   </a>
