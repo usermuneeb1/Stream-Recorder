@@ -84,12 +84,6 @@ function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fas
   return ordered.filter(Boolean) as DirectSource[];
 }
 
-// Download URL: route through the proxy too (forces attachment + bypasses limit).
-function pixeldrainDownload(url?: string) {
-  const id = pixeldrainId(url);
-  return id ? `/api/pd/${id}?download` : '';
-}
-
 // Single lightweight probe (HEAD-equivalent via tiny GET) against the proxy to
 // decide if this file is currently playable. Runs ONCE per source, not per
 // candidate, so it adds at most one request. Result is cached per id+mode.
@@ -491,12 +485,8 @@ export default function Watch() {
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
   const downloadLinks = [
-    stream.sources.pixel && { label: 'Pixeldrain', url: pixeldrainDownload(stream.sources.pixel.url), note: 'Fast file mirror (proxy)' },
+    stream.sources.pixel && { label: 'Pixeldrain', url: stream.sources.pixel.url, note: 'Open Pixeldrain to download' },
     stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url, note: 'Encrypted storage mirror' },
-    stream.sources.gofile && { label: 'Gofile', url: stream.sources.gofile.url, note: 'Free file mirror' },
-    (stream.sources.archive?.fallbackUrl || stream.sources.archive?.directUrl) && {
-      label: 'Archive.org', url: (stream.sources.archive?.fallbackUrl || stream.sources.archive?.directUrl)!, note: 'Permanent direct MP4',
-    },
   ].filter((item) => item && item.url) as { label: string; url: string; note: string }[];
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
