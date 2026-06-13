@@ -21,110 +21,45 @@
     "archive_node": "https://ia800409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
     "mega_link": "https://mega.nz/#!tc1iwC7I!eKgBCS8sA_Ab3bE7PuvBkaovYxM1VP3P2HtHIzSxBm8",
     "gofile_link": "https://gofile.io/d/J4FK97",
-    "ai_summary": "This live stream features a Q&A session where non-Muslims ask questions about Islam, with discussions on various topics including the nature of God, the role of Jesus, and the concept of sin. The conversation is led by Muhammed Ali, who engages with callers and provides insights into Islamic beliefs. The session covers a range of themes, from the interpretation of religious texts to the importance of seeking knowledge and understanding.",
+    "ai_summary": "Muhammed Ali hosts a live Q&A session, answering questions from non-Muslims about Islam. Various topics are discussed, including the nature of God, the role of Jesus, and the concept of sin. The conversation is informal and open, with participants sharing their perspectives and engaging in respectful dialogue.",
     "ai_tags": [
       "Islam",
       "Q&A",
       "Non-Muslims",
       "Muhammed Ali",
       "Religion",
-      "Atheism",
-      "Christianity",
-      "Judaism",
-      "Interfaith Dialogue"
+      "Debate",
+      "Live Stream"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction"
-      },
-      {
-        "time": 123,
-        "label": "Caller Introduction"
-      },
-      {
-        "time": 241,
-        "label": "Discussing Interesting Places"
-      },
-      {
-        "time": 484,
-        "label": "Lantern Analogy"
-      },
-      {
-        "time": 725,
-        "label": "Non-Muslim Q&A Introduction"
+        "label": "Stream starts"
       },
       {
         "time": 1089,
-        "label": "Makashif Joins"
-      },
-      {
-        "time": 1325,
-        "label": "Inshallah Discussion"
-      },
-      {
-        "time": 1561,
-        "label": "Fear and Faith"
-      },
-      {
-        "time": 1921,
-        "label": "Color Analogy"
-      },
-      {
-        "time": 2281,
-        "label": "Hell and Punishment"
-      },
-      {
-        "time": 2762,
-        "label": "Punishment for Rejection"
+        "label": "Makashif joins"
       },
       {
         "time": 3123,
-        "label": "Caller from India"
-      },
-      {
-        "time": 3481,
-        "label": "Jesus and God"
-      },
-      {
-        "time": 4080,
-        "label": "Trinity Discussion"
-      },
-      {
-        "time": 4682,
-        "label": "Lost Souls"
-      },
-      {
-        "time": 5400,
-        "label": "Evidence and Truth"
+        "label": "Caller from India joins"
       },
       {
         "time": 6361,
-        "label": "Paul Introduction"
-      },
-      {
-        "time": 7200,
-        "label": "Religion and Sacrifice"
+        "label": "Paul joins"
       },
       {
         "time": 8645,
-        "label": "Fan Introduction"
+        "label": "Fan joins"
       },
       {
-        "time": 10200,
-        "label": "Historical Context"
-      },
-      {
-        "time": 10800,
-        "label": "Neighbor Question"
-      },
-      {
-        "time": 11165,
-        "label": "Straight Path and Salvation"
+        "time": 10321,
+        "label": "Matthew joins"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-vSKAJZkhuq4-1778975061/transcript.json",
-    "ai_enriched_at": "2026-06-13T10:45:50Z"
+    "ai_enriched_at": "2026-06-13T11:49:55Z",
+    "chapter_logic_version": 2
   },
   {
     "video_id": "tml-2026-05-lQySsXx00Io-1778454605",
@@ -148,89 +83,41 @@
     "archive_node": "https://ia800802.us.archive.org/16/items/tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "mega_link": "https://mega.nz/#!uDIR0BgA!X3Evqi3jxQiO3QFcRyvPhFeur8co7AqQT0X5qwM_O7w",
     "gofile_link": "https://gofile.io/d/MFEBBX",
-    "ai_summary": "This live-streamed Q&A and debate session, titled 'Non-Muslims Question Islam Live! Muhammed Ali', features discussions on various aspects of Islam, Christianity, and atheism, with participants engaging in debates and sharing their perspectives. The conversation covers topics such as the existence of God, morality, and the comparison of religious figures like Muhammad and Jesus Christ. The session is characterized by a mix of respectful dialogue and disagreements, with participants challenging each other's views and presenting their arguments.",
+    "ai_summary": "Muhammed Ali hosts a live Q&A session, addressing various questions and topics related to Islam. The discussion covers a range of subjects, including the existence of a creator, morality, and comparisons between different religious figures. The conversation is interactive, with the host engaging with callers and responding to their queries.",
     "ai_tags": [
       "Islam",
-      "Christianity",
-      "Atheism",
-      "Morality",
-      "Debate",
       "Q&A",
-      "Muhammad",
-      "Jesus Christ"
+      "Morality",
+      "Creator",
+      "Religion",
+      "Debate",
+      "Muhammed Ali"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction"
-      },
-      {
-        "time": 484,
-        "label": "Reasons for Muslims to speak out"
-      },
-      {
-        "time": 963,
-        "label": "The Shahada"
-      },
-      {
-        "time": 1200,
-        "label": "Atheism and the concept of a creator"
-      },
-      {
-        "time": 1442,
-        "label": "The Quran's claim of divine origin"
-      },
-      {
-        "time": 1920,
-        "label": "Discussion on morality and space"
-      },
-      {
-        "time": 2286,
-        "label": "Historical references in religious texts"
+        "label": "Stream starts"
       },
       {
         "time": 2400,
-        "label": "Sam joins the conversation"
+        "label": "Sam joins"
       },
       {
-        "time": 2887,
-        "label": "Complex questions and clarifications"
+        "time": 6125,
+        "label": "Guest joins"
       },
       {
-        "time": 3483,
-        "label": "Objective morality and its sources"
+        "time": 6842,
+        "label": "Brother joins"
       },
       {
-        "time": 4200,
-        "label": "Punishment and individual responsibility"
-      },
-      {
-        "time": 4923,
-        "label": "Attributes of a creator and fine-tuning"
-      },
-      {
-        "time": 5525,
-        "label": "Confirmation and invitation to join"
-      },
-      {
-        "time": 6242,
-        "label": "Comparing Jesus and Muhammad"
-      },
-      {
-        "time": 6840,
-        "label": "Highlighting contradictions and double standards"
-      },
-      {
-        "time": 7080,
-        "label": "Shared values and common ground"
-      },
-      {
-        "time": 7200,
-        "label": "Conclusion and final thoughts"
+        "time": 7088,
+        "label": "Brother leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-lQySsXx00Io-1778454605/transcript.json",
-    "ai_enriched_at": "2026-06-13T10:46:48Z"
+    "ai_enriched_at": "2026-06-13T11:51:06Z",
+    "chapter_logic_version": 2
   },
   {
     "video_id": "tml-2026-04-LT7jTHW_e8Y-1777157490",
@@ -254,91 +141,49 @@
     "archive_node": "https://ia800900.us.archive.org/31/items/tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
     "mega_link": "https://mega.nz/#!SDQUWaCI!mTXG0wBKfHXrVFxPhEJVAWtDxo7aFCC_SZBzocF9wao",
     "gofile_link": "https://gofile.io/d/Gpsi6b",
-    "ai_summary": "This live stream features a Q&A session with Muhammed Ali, where he addresses various questions and topics related to Islam. The discussion covers a range of subjects, including faith, worship, and social interactions. The session is interactive, with participants joining in and sharing their thoughts and questions.",
+    "ai_summary": "Muhammed Ali hosts a live Q&A session, addressing various questions and topics related to Islam. The discussion covers a range of subjects, from worship and zakat to wudu and da'wah. The host engages with callers and chat participants, providing insights and clarifications on Islamic principles.",
     "ai_tags": [
       "Islam",
       "Q&A",
       "Muhammed Ali",
-      "Faith",
       "Worship",
-      "Social Interactions"
+      "Zakat",
+      "Wudu",
+      "Da'wah"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction"
-      },
-      {
-        "time": 120,
-        "label": "Initial Discussion"
-      },
-      {
-        "time": 360,
-        "label": "Individual Perspective"
-      },
-      {
-        "time": 600,
-        "label": "Personal Experience"
-      },
-      {
-        "time": 859,
-        "label": "Muslim Identity"
-      },
-      {
-        "time": 1080,
-        "label": "Doubts and Questions"
-      },
-      {
-        "time": 1321,
-        "label": "Debate Atmosphere"
-      },
-      {
-        "time": 1566,
-        "label": "Challenges and Difficulties"
-      },
-      {
-        "time": 1922,
-        "label": "Purpose and Meaning"
-      },
-      {
-        "time": 2400,
-        "label": "Divine Communication"
-      },
-      {
-        "time": 2762,
-        "label": "Kai's Shahada"
-      },
-      {
-        "time": 3120,
-        "label": "Camera and Participation"
-      },
-      {
-        "time": 3366,
-        "label": "Repentance and Punishment"
+        "label": "Stream starts"
       },
       {
         "time": 3600,
-        "label": "Sister's Question"
+        "label": "Sister in chat joins"
       },
       {
         "time": 3840,
-        "label": "Lucid Joins"
+        "label": "Lucid joins"
       },
       {
-        "time": 4200,
-        "label": "Wudu and Physical Contact"
+        "time": 4081,
+        "label": "Brother joins"
       },
       {
-        "time": 4564,
-        "label": "Final Thoughts"
+        "time": 4441,
+        "label": "Christian caller joins"
+      },
+      {
+        "time": 4680,
+        "label": "Caller leaves"
       },
       {
         "time": 4800,
-        "label": "Conclusion"
+        "label": "Stream ends"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-LT7jTHW_e8Y-1777157490/transcript.json",
-    "ai_enriched_at": "2026-06-13T10:48:16Z"
+    "ai_enriched_at": "2026-06-13T11:51:37Z",
+    "chapter_logic_version": 2
   },
   {
     "video_id": "tml-2026-04-1-Rb7AkebH4-1776554397",
@@ -362,84 +207,65 @@
     "archive_node": "https://ia802907.us.archive.org/11/items/tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "mega_link": "https://mega.nz/#!T5IQHarY!EiIHbSHC0fZx3ZrF-qgXdmWDOw8ArDFrQj-mjjWvL70",
     "gofile_link": "https://gofile.io/d/8hMp0e",
-    "ai_summary": "This live-stream features a Q&A session with Muhammed Ali, where non-Muslims ask questions about Islam. The discussion covers various topics, including the Quran, prophets, and Islamic practices. The conversation is interactive, with callers joining in and sharing their thoughts and questions.",
+    "ai_summary": "The video 'Non-Muslims Question Islam Live! Muhammed Ali' features a live Q&A session where non-Muslims ask questions about Islam. The host, Muhammed Ali, responds to various questions and engages in discussions with callers. The conversation covers a range of topics, including Islamic principles, marriage, and faith.",
     "ai_tags": [
       "Islam",
       "Q&A",
       "Non-Muslims",
       "Muhammed Ali",
-      "Islamic practices",
-      "Quran",
-      "Prophets"
+      "Islamic Principles",
+      "Marriage",
+      "Faith"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction"
-      },
-      {
-        "time": 120,
-        "label": "Host introduction"
-      },
-      {
-        "time": 482,
-        "label": "Initial discussion"
+        "label": "Stream starts"
       },
       {
         "time": 1084,
         "label": "Caller joins"
       },
       {
-        "time": 1200,
-        "label": "Prophets and Quran discussion"
-      },
-      {
-        "time": 1561,
-        "label": "Quran and Sunnah discussion"
-      },
-      {
         "time": 2284,
-        "label": "Non-Muslims join the conversation"
+        "label": "Non-Muslims join"
       },
       {
-        "time": 3000,
-        "label": "Chat interaction"
+        "time": 2522,
+        "label": "Callers removed"
       },
       {
-        "time": 4200,
-        "label": "Marriage and Islam discussion"
+        "time": 3960,
+        "label": "Caller joins"
       },
       {
-        "time": 5400,
-        "label": "Divorce and remarriage discussion"
+        "time": 4927,
+        "label": "Caller speaks"
       },
       {
-        "time": 6962,
-        "label": "Divorce laws in the West"
+        "time": 6120,
+        "label": "New topic starts"
       },
       {
-        "time": 7800,
-        "label": "Personal growth and self-reflection"
+        "time": 7200,
+        "label": "Caller leaves"
+      },
+      {
+        "time": 8043,
+        "label": "New caller joins"
       },
       {
         "time": 8881,
-        "label": "Attributes of God"
-      },
-      {
-        "time": 9480,
-        "label": "Prayer and spirituality"
+        "label": "Caller asks question"
       },
       {
         "time": 9721,
-        "label": "Shahada and faith"
-      },
-      {
-        "time": 9842,
-        "label": "Conclusion"
+        "label": "Lulu person removed"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776554397/transcript.json",
-    "ai_enriched_at": "2026-06-13T11:05:02Z"
+    "ai_enriched_at": "2026-06-13T11:52:40Z",
+    "chapter_logic_version": 2
   },
   {
     "video_id": "tml-2026-04-1-Rb7AkebH4-1776546681",
@@ -463,60 +289,56 @@
     "archive_node": "https://ia800808.us.archive.org/0/items/tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "mega_link": "https://mega.nz/#!BJMxVboA!zMHvsF4NTTsD6QwMWrmP0iPSPa00a095UraBacb16nY",
     "gofile_link": "https://gofile.io/d/0CiUnF",
-    "ai_summary": "Muhammed Ali hosts a live stream for non-Muslims to ask questions about Islam, discussing various topics such as collaborations, promoting others, and Islamic manners. He also shares his personal experiences and thoughts on different subjects, including his migration to Syria and his search for a good short editor. The stream is interactive, with Muhammed Ali engaging with his audience and addressing their comments and questions.",
+    "ai_summary": "Muhammed Ali hosts a live Q&A session, addressing various questions and topics from non-Muslims. The discussion covers a range of issues, including Islamic principles and practices. The host engages with callers and provides insights into the Islamic faith.",
     "ai_tags": [
       "Islam",
-      "Non-Muslims",
       "Q&A",
-      "Collaborations",
-      "Promoting Others",
-      "Islamic Manners",
-      "Migration",
-      "Video Editing"
+      "Non-Muslims",
+      "Muhammed Ali",
+      "Live Stream",
+      "Islamic Principles",
+      "Faith"
     ],
     "ai_chapters": [
       {
         "time": 0,
-        "label": "Introduction and Welcome"
-      },
-      {
-        "time": 300,
-        "label": "Technical Issues and Stream Setup"
-      },
-      {
-        "time": 600,
-        "label": "Migration to Syria and Personal Experiences"
+        "label": "Stream starts"
       },
       {
         "time": 1200,
-        "label": "Searching for a Good Short Editor"
+        "label": "Caller joins"
       },
       {
-        "time": 1500,
-        "label": "Collaborations and Promoting Others"
+        "time": 1562,
+        "label": "Caller leaves"
       },
       {
-        "time": 2100,
-        "label": "Islamic Manners and Behavior"
+        "time": 1681,
+        "label": "Lebanese caller joins"
+      },
+      {
+        "time": 1800,
+        "label": "Lebanese caller leaves"
+      },
+      {
+        "time": 2042,
+        "label": "Brother joins"
+      },
+      {
+        "time": 2163,
+        "label": "Brother leaves"
       },
       {
         "time": 2400,
-        "label": "Engaging with Non-Muslims and Answering Questions"
+        "label": "New caller joins"
       },
       {
-        "time": 2700,
-        "label": "Removing Muslims from the Backstage and Focusing on Non-Muslims"
-      },
-      {
-        "time": 3000,
-        "label": "Discussing Quranism and Islamic Ideology"
-      },
-      {
-        "time": 3300,
-        "label": "Conclusion and Final Thoughts"
+        "time": 2524,
+        "label": "New caller leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776546681/transcript.json",
-    "ai_enriched_at": "2026-06-13T07:12:37Z"
+    "ai_enriched_at": "2026-06-13T11:53:03Z",
+    "chapter_logic_version": 2
   }
 ]
