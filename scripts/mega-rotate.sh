@@ -16,8 +16,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # CSV file with generated accounts
 MEGA_CSV="${SCRIPT_DIR}/mega/accounts.csv"
 
-# Track which account index was last used (simple round-robin)
-MEGA_INDEX_FILE="${SCRIPT_DIR}/mega/.last_account_index"
 
 select_mega_account() {
     # Priority 1: Use accounts from CSV (generated accounts)
@@ -27,15 +25,21 @@ select_mega_account() {
         total_accounts=$(tail -n +2 "$MEGA_CSV" 2>/dev/null | grep -c '.' || echo "0")
 
         if (( total_accounts > 0 )); then
-            # Get last used index
-            local last_index=0
-            if [[ -f "$MEGA_INDEX_FILE" ]]; then
-                last_index=$(cat "$MEGA_INDEX_FILE" 2>/dev/null || echo "0")
+            # ── Stateless rotation ────────────────────────────────────────────
+            # The previous version persisted .last_account_index to the runner's
+            # disk, which is wiped on every fresh runner → it always reused
+            # account #0. Instead we derive the index deterministically from the
+            # current epoch-day, so accounts rotate over time WITHOUT needing to
+            # persist state across ephemeral runners. An explicit MEGA_ROTATE_INDEX
+            # env var (if set) overrides for manual control.
+            local next_index
+            if [[ -n "${MEGA_ROTATE_INDEX:-}" ]]; then
+                next_index=$(( MEGA_ROTATE_INDEX % total_accounts ))
+            else
+                local epoch_day=$(( $(date -u +%s) / 86400 ))
+                next_index=$(( epoch_day % total_accounts ))
             fi
 
-            # Next index (round-robin)
-            local next_index=$(( (last_index + 1) % total_accounts ))
-            
             # Line number in CSV (index + 2 to skip header, +1 for 1-based)
             local line_num=$(( next_index + 2 ))
 
@@ -49,10 +53,8 @@ select_mega_account() {
                 password=$(echo "$account_line" | cut -d',' -f2 | tr -d '"' | tr -d ' ')
 
                 if [[ -n "$email" ]] && [[ -n "$password" ]]; then
-                    # Save index for next time
-                    echo "$next_index" > "$MEGA_INDEX_FILE"
-
-                    # Export for upload-clouds.sh
+                    # Export for upload-clouds.sh (stateless rotation — nothing
+                    # to persist).
                     export MEGA_EMAIL="$email"
                     export MEGA_PASSWORD="$password"
 

@@ -105,15 +105,25 @@ refresh_pixeldrain() {
         ten_percent=1048576
     fi
     
-    local size_human
-    size_human=$(format_size "$ten_percent" 2>/dev/null || echo "${ten_percent} bytes")
-    log_info "    Downloading ${size_human} (10% of $(format_size "$file_size" 2>/dev/null || echo "${file_size} bytes"))..."
-    
-    # Download 10% from the direct download endpoint
+    # ── Smart pre-warming (bandwidth saver) ──────────────────────────────────
+    # REFRESH_LITE=true → fetch only a tiny range (1MB) instead of 10%. This
+    # registers a recent download/access at a fraction of the bandwidth. Set
+    # REFRESH_LITE=false (default) to keep the original 10% behavior if a host
+    # ever requires a larger read to reset the timer.
+    if [[ "${REFRESH_LITE:-false}" == "true" ]]; then
+        ten_percent=1048576  # 1MB
+        log_info "    Lite mode: fetching 1MB to register access..."
+    else
+        local size_human
+        size_human=$(format_size "$ten_percent" 2>/dev/null || echo "${ten_percent} bytes")
+        log_info "    Downloading ${size_human} (10% of $(format_size "$file_size" 2>/dev/null || echo "${file_size} bytes"))..."
+    fi
+
+    # Fetch the range from the direct download endpoint.
     curl -s -o /dev/null --max-time 300 \
         -r "0-${ten_percent}" \
         -L "https://pixeldrain.com/api/file/${file_id}" 2>/dev/null
-    
+
     return $?
 }
 
