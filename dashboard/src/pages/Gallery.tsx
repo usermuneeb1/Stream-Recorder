@@ -88,10 +88,18 @@ export default function Gallery() {
   // Filter and sort
   const filtered = streams
     .filter(s => {
-      // Search filter
+      // Search filter — also matches AI summary + tags so search covers
+      // spoken content once AI enrichment has run.
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
-        if (!s.title.toLowerCase().includes(q) && !s.date.includes(q) && !s.videoId.includes(q)) return false;
+        const hay = [
+          s.title,
+          s.date,
+          s.videoId,
+          s.aiSummary || '',
+          (s.aiTags || []).join(' '),
+        ].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
       }
       // Category filter
       if (activeFilter === 'long') {
