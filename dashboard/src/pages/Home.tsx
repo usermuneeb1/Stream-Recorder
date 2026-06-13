@@ -5,6 +5,7 @@ import { fetchStreams, StreamData } from '../utils/dataFetcher';
 import { BookOpenText, Clock3, Film, HardDrive, HeartHandshake, ExternalLink, Play, ChevronRight, ArrowRight } from 'lucide-react';
 import { YouTubeStats } from '../components/YouTubeStats';
 import { SystemHealth } from '../components/SystemHealth';
+import { ArchiveAnalytics } from '../components/ArchiveAnalytics';
 import { ParticleField } from '../components/ParticleField';
 import { Link } from 'react-router-dom';
 
@@ -90,6 +91,7 @@ function StatCard({ metric, index }: { metric: { label: string; value: number; d
 export default function Home() {
   const [stats, setStats] = useState({ total_streams: 0, total_hours: 0, total_gb: 0 });
   const [recentStreams, setRecentStreams] = useState<StreamData[]>([]);
+  const [allStreams, setAllStreams] = useState<StreamData[]>([]);
 
 
   useEffect(() => {
@@ -99,6 +101,7 @@ export default function Home() {
       const streams = await fetchStreams();
       if (cancelled) return;
       setRecentStreams(streams.slice(0, 4));
+      setAllStreams(streams);
 
       try {
         const res = await fetch(`${RAW_URL}/stats.json?t=${Date.now()}`);
@@ -328,6 +331,11 @@ export default function Home() {
         className="relative z-10"
       >
         <SystemHealth />
+        {allStreams.length > 1 && (
+          <div className="mt-8">
+            <ArchiveAnalytics streams={allStreams} />
+          </div>
+        )}
       </motion.div>
     </div>
   );
