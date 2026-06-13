@@ -126,37 +126,60 @@ def transcribe(wav_chunks):
 def llm_enrich(title, segments):
     """Ask the LLM for summary + chapters + tags as strict JSON.
 
-    `segments` is a list of {start, end, text}. We feed the model a
-    timestamped transcript so chapters use REAL timestamps (not guesses) and
-    can mark meaningful moments — especially when a guest/caller joins or a new
-    topic begins (YouTube-style chapters)."""
-    # Build a compact timestamped transcript (mm:ss | text), trimmed to fit.
-    lines = []
+    `segments` is a list of {start, end, text}. CRITICAL: long videos (3h+)
+    produce transcripts far bigger than the LLM token limit. Naively trimming
+    the first N chars meant the model only saw the first ~hour and invented
+    round-number chapters for the rest. Instead we DOWNSAMPLE evenly across the
+    ENTIRE video — one short snippet roughly every ~2 minutes spanning the full
+    duration — so the model sees the whole video and uses REAL, well-spread
+    timestamps. We also pass the total duration explicitly."""
+    total = int(segments[-1].get("end", 0)) if segments else 0
+
+    # Evenly sample snippets across the whole timeline (target ~one per 120s,
+    # capped so the prompt stays within token limits).
+    target_window = 120  # seconds between sampled snippets
+    buckets = {}
     for s in segments:
         t = int(s.get("start", 0))
-        stamp = f"{t // 60:02d}:{t % 60:02d}"
-        txt = (s.get("text") or "").strip()
-        if txt:
-            lines.append(f"[{t}s {stamp}] {txt}")
-    ts_transcript = "\n".join(lines)[:46000]
+        key = t // target_window
+        if key not in buckets:  # first segment in each window
+            txt = (s.get("text") or "").strip()
+            if txt:
+                buckets[key] = (t, txt)
+    sampled = [buckets[k] for k in sorted(buckets)]
+    # Hard cap on number of snippets to respect token limits (~700 * ~60 chars).
+    if len(sampled) > 700:
+        step = len(sampled) / 700
+        sampled = [sampled[int(i * step)] for i in range(700)]
 
+    lines = []
+    for t, txt in sampled:
+        lines.append(f"[{t}s {t // 60:02d}:{t % 60:02d}] {txt[:160]}")
+    ts_transcript = "\n".join(lines)[:48000]
+
+    dur_str = f"{total // 3600:02d}:{(total % 3600) // 60:02d}:{total % 60:02d}"
     prompt = (
         "You are creating YouTube-style chapters and a summary for a recorded "
         "Islamic live-stream / Q&A / debate video for an archive website.\n"
-        f"Video title: {title}\n\n"
-        "The transcript below is timestamped as [SECONDS mm:ss].\n"
+        f"Video title: {title}\n"
+        f"TOTAL VIDEO DURATION: {dur_str} ({total} seconds).\n\n"
+        "Below are transcript snippets sampled evenly across the WHOLE video, "
+        "each tagged [SECONDS mm:ss].\n"
         "Return STRICT JSON with keys:\n"
         '  "summary": a 2-3 sentence neutral summary,\n'
         '  "tags": array of 4-8 short topic tags,\n'
         '  "chapters": array of {"time": SECONDS_INT, "label": "short title"}.\n'
-        "CHAPTER RULES:\n"
-        " - Use the REAL second value from the transcript timestamps, not round guesses.\n"
+        "CHAPTER RULES (important):\n"
+        f" - Chapters MUST span the ENTIRE video from 0 up to ~{total} seconds — "
+        "do NOT stop early; the LAST chapter should be near the end.\n"
+        " - Use the REAL second values shown in the snippets, NOT round guesses "
+        "like 0,300,600. Pick the actual second where a topic/segment begins.\n"
         " - Create a NEW chapter whenever a guest/caller JOINS or is introduced "
-        "(label it with their name if mentioned, e.g. 'Ahmed joins'), and whenever "
-        "the topic clearly changes.\n"
-        " - 6-15 chapters, in chronological order, first chapter at or near 0.\n"
+        "(use their name if mentioned, e.g. 'Ahmed joins'), and at clear topic changes.\n"
+        " - Produce 10-20 chapters spread across the full duration, chronological, "
+        "first at or near 0.\n"
         "Return ONLY the JSON object, no markdown.\n\n"
-        f"TIMESTAMPED TRANSCRIPT:\n{ts_transcript}"
+        f"TIMESTAMPED SNIPPETS:\n{ts_transcript}"
     )
     res = groq_post(
         "/chat/completions",
@@ -164,7 +187,8 @@ def llm_enrich(title, segments):
         data=json.dumps({
             "model": LLM_MODEL,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3,
+            "temperature": 0.2,
+            "max_tokens": 4000,
             "response_format": {"type": "json_object"},
         }),
     )
