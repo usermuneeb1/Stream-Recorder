@@ -20,7 +20,7 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['dxture', 'Heart', 'Jatt', 'Helicopter'];
-const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'pixel', 'odysee', 'rumble'];
+const SOURCE_PRIORITY = ['archive', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" configuration ──
 // EVERYTHING goes through our OWN Vercel proxy (/api/pd/<id>). The proxy fetches
@@ -94,6 +94,20 @@ function pixeldrainStreamCandidates(url?: string, _mode: 'fast' | 'direct' = 'fa
 // the next candidate. This makes playback start almost instantly.
 function resolvePixeldrainSources(url: string | undefined, mode: 'fast' | 'direct'): DirectSource[] {
   return pixeldrainStreamCandidates(url, mode);
+}
+
+// ── Buzzheavier playback ──
+// Buzzheavier has no stable direct media URL (the link is revealed by a dynamic
+// request and is short-lived), so we ALWAYS stream it through our same-origin
+// Vercel proxy (/api/bh/<id>), which resolves + streams it server-side. This
+// also avoids browser hotlink/CORS issues entirely.
+function buzzheavierId(url?: string) {
+  return (url || '').match(/(?:buzzheavier\.com|bzzhr\.co)\/(?:f\/)?([a-zA-Z0-9_-]+)/)?.[1] || '';
+}
+function resolveBuzzheavierSources(url?: string): DirectSource[] {
+  const id = buzzheavierId(url);
+  if (!id) return [];
+  return [{ id: 'buzz-proxy', quality: 'Fast', url: `/api/bh/${id}`, mime: 'video/mp4' }];
 }
 
 interface PlayerOption {
@@ -369,6 +383,13 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
         if (option.source.type === 'gofile') {
           direct = await gofileDirectSources(option.source.url);
         }
+        if (option.source.type === 'buzzheavier') {
+          // Stream via our proxy; append Archive as the silent safety-net so the
+          // viewer always gets video even if Buzzheavier's host is down.
+          direct = resolveBuzzheavierSources(option.source.url);
+          const archiveFallback = stream.sources.archive?.directUrl || stream.sources.archiveSmall?.directUrl;
+          if (archiveFallback) direct = [...direct, { id: 'archive-fallback', quality: 'Backup', url: archiveFallback, mime: 'video/mp4' }];
+        }
         if (!cancelled && direct.length > 0) {
           // Warm-start: kick off background requests to the first source so the
           // Archive storage node "wakes up" and the CDN caches the opening bytes
@@ -603,6 +624,7 @@ export default function Watch() {
   const archiveId = stream.archiveId || archiveSource?.url.split('/details/')[1]?.split('/')[0];
   const relatedStreams = allStreams.filter(s => s.videoId !== id).slice(0, 4);
   const downloadLinks = [
+    stream.sources.buzz && { label: 'Buzzheavier', url: stream.sources.buzz.url, note: 'Fast direct download' },
     stream.sources.pixel && { label: 'Pixeldrain', url: stream.sources.pixel.url, note: 'Open Pixeldrain to download' },
     stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url, note: 'Encrypted storage mirror' },
   ].filter((item) => item && item.url) as { label: string; url: string; note: string }[];

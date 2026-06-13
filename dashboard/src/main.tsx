@@ -23,3 +23,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </HashRouter>
   </React.StrictMode>,
 )
+
+// Register the Service Worker for instant repeat loads + cache-what-you-watch
+// video caching. Only in production (HTTPS); harmless no-op if unsupported.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    const base = import.meta.env.BASE_URL || '/';
+    navigator.serviceWorker.register(`${base}sw.js`).catch(() => {
+      /* SW is a progressive enhancement — ignore failures */
+    });
+  });
+}
+

@@ -1,7 +1,7 @@
 export interface StreamSource {
   label: string;
   url: string;
-  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'odysee' | 'rumble';
+  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'odysee' | 'rumble' | 'buzzheavier';
   // Optional precomputed direct media URL (e.g. the exact Archive .mp4). When
   // present the player streams it instantly without a metadata lookup.
   directUrl?: string;
@@ -234,6 +234,7 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     if (s.title) s.title = cleanTitle(s.title);
 
     if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link, type: 'pixeldrain' };
+    if (r.buzzheavier_link) s.sources.buzz = { label: '⚡ Buzzheavier', url: r.buzzheavier_link, type: 'buzzheavier' };
     if (r.archive_link) {
       // directUrl = fast direct storage-node URL (skips the 302 redirect);
       // fallbackUrl = the always-valid /download URL used if the node changes.
