@@ -5,6 +5,9 @@ export interface StreamSource {
   // Optional precomputed direct media URL (e.g. the exact Archive .mp4). When
   // present the player streams it instantly without a metadata lookup.
   directUrl?: string;
+  // Optional secondary URL tried if directUrl fails (e.g. the /download URL
+  // which always resolves even when the storage node changes).
+  fallbackUrl?: string;
 }
 
 export interface StreamData {
@@ -212,7 +215,15 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
 
     if (r.pixeldrain_link) s.sources.pixel = { label: '🟣 Pixeldrain', url: r.pixeldrain_link, type: 'pixeldrain' };
     if (r.archive_link) {
-      s.sources.archive = { label: '🏛️ Archive.org', url: r.archive_link, type: 'archive', directUrl: r.archive_direct || undefined };
+      // directUrl = fast direct storage-node URL (skips the 302 redirect);
+      // fallbackUrl = the always-valid /download URL used if the node changes.
+      s.sources.archive = {
+        label: '🏛️ Archive.org',
+        url: r.archive_link,
+        type: 'archive',
+        directUrl: r.archive_node || r.archive_direct || undefined,
+        fallbackUrl: r.archive_direct || undefined,
+      };
       if (!s.archiveId) s.archiveId = r.archive_link.split('/details/')[1]?.split('/')[0];
     }
     if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link, type: 'mega' };

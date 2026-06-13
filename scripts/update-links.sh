@@ -201,6 +201,27 @@ update_recordings_json() {
     local resolution="${RECORD_RESOLUTION:-1920x1080}"
     local recorded_at; recorded_at=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
 
+    # ── Resolve fast Archive playback URLs (skip the 302 redirect at play time) ─
+    # archive_direct = the /download/<id>/<file>.mp4 URL (always valid)
+    # archive_node   = the direct storage-node URL (fastest; resolved via 302)
+    local archive_direct="" archive_node=""
+    if [[ -n "$archive_link" ]]; then
+        local meta
+        meta=$(curl -s -m 30 "https://archive.org/metadata/${rec_id}" 2>/dev/null) || meta=""
+        local mp4
+        mp4=$(echo "$meta" | jq -r '
+            (.files // [])
+            | map(select((.name|test("\\.(mp4|m4v|webm|mkv)$";"i")) and (.name|test("_thumb")|not)))
+            | sort_by(.size|tonumber? // 0) | reverse | .[0].name // empty' 2>/dev/null)
+        if [[ -n "$mp4" ]]; then
+            # URL-encode each path segment
+            local enc
+            enc=$(printf '%s' "$mp4" | jq -sRr @uri | sed 's/%2F/\//g')
+            archive_direct="https://archive.org/download/${rec_id}/${enc}"
+            archive_node=$(curl -s -o /dev/null -w "%{redirect_url}" -r 0-1 -m 20 "$archive_direct" 2>/dev/null) || archive_node=""
+        fi
+    fi
+
     # ── Read current recordings.json (array) ──────────────────────────────────
     local current
     current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="[]"
@@ -221,6 +242,8 @@ update_recordings_json() {
         --argjson sizeb "${size_bytes:-0}" \
         --arg res "$resolution" \
         --arg arch "$archive_link" \
+        --arg archdir "$archive_direct" \
+        --arg archnode "$archive_node" \
         --arg pd "$pixeldrain_link" \
         --arg gof "$gofile_link" \
         --arg mega "$mega_link" \
@@ -242,6 +265,8 @@ update_recordings_json() {
             date: $date,
             month: $month,
             archive_link: $arch,
+            archive_direct: $archdir,
+            archive_node: $archnode,
             pixeldrain_link: $pd,
             gofile_link: $gof,
             mega_link: $mega,

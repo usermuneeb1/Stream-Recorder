@@ -278,11 +278,17 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
       try {
         let direct: DirectSource[] = [];
         if (option.source.type === 'archive') {
-          // Fast path: if a precomputed direct .mp4 URL exists, stream it
-          // instantly (no slow metadata lookup). Otherwise fall back to the
-          // metadata-based resolver.
-          if (option.source.directUrl) {
-            direct = [{ id: 'archive-direct', quality: 'Best', url: option.source.directUrl, mime: 'video/mp4' }];
+          // Fast path: stream the precomputed direct storage-node URL instantly
+          // (skips Archive's 302 redirect + metadata lookup). Keep the /download
+          // URL as an automatic fallback in case the node changes, then the
+          // metadata resolver as a last resort.
+          const fast: DirectSource[] = [];
+          if (option.source.directUrl) fast.push({ id: 'archive-node', quality: 'Best', url: option.source.directUrl, mime: 'video/mp4' });
+          if (option.source.fallbackUrl && option.source.fallbackUrl !== option.source.directUrl) {
+            fast.push({ id: 'archive-dl', quality: 'Backup', url: option.source.fallbackUrl, mime: 'video/mp4' });
+          }
+          if (fast.length > 0) {
+            direct = fast;
           } else if (archiveId) {
             direct = await archiveDirectSources(archiveId);
           }
