@@ -150,7 +150,12 @@ function sortSourceEntries(sources: Record<string, StreamSource>): [string, Stre
     // "hotlink" and never returns the 403 that used to break embedded playback.
     // Archive stays first/primary and is the automatic fallback if the proxy is
     // ever unavailable. MEGA/Gofile remain download-only (not embeddable).
-    .filter(([key]) => key !== 'mega' && key !== 'gofile')
+    // Pixeldrain (pixel) is hidden from PLAYBACK again: free Pixeldrain triggers
+    // a "file_rate_limited_captcha_required" hotlink block that even a server
+    // proxy cannot solve (it needs a human CAPTCHA), so embedded playback breaks
+    // unpredictably. It stays available as a Download link only. Archive (dxture)
+    // is the reliable player. MEGA/Gofile are download-only (not embeddable).
+    .filter(([key]) => key !== 'mega' && key !== 'gofile' && key !== 'pixel' && key !== 'pixeldrain')
     .sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
