@@ -418,13 +418,16 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
         preload="auto"
         streamType="on-demand"
         className="vidstack-premium-player h-full w-full bg-black"
-        onTimeUpdate={(event: any) => {
-          const target = event?.target as HTMLMediaElement | undefined;
-          const t = target?.currentTime || 0;
+        onTimeUpdate={(_detail: any, _nativeEvent: any) => {
+          // Vidstack passes (detail, nativeEvent) — NOT a DOM event with .target.
+          // Read the authoritative time straight off the player instance so the
+          // sidebar chapter highlight tracks playback correctly.
+          const p = playerRef.current;
+          const t = p?.currentTime || 0;
           onTime(t);
           // Continue Watching: persist position every ~5s (skip the first 5s and
           // the last 30s so "finished" videos don't resume at the very end).
-          const dur = target?.duration || 0;
+          const dur = p?.state?.duration || 0;
           if (t > 5 && (dur === 0 || t < dur - 30) && Math.floor(t) % 5 === 0) {
             try { localStorage.setItem(`resume_${stream.videoId}`, String(Math.floor(t))); } catch { /* ignore */ }
           } else if (dur > 0 && t >= dur - 5) {
@@ -645,6 +648,7 @@ export default function Watch() {
                   return (
                   <button
                     key={`${ch.time}-${i}`}
+                    ref={(el) => { if (isActive && el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}
                     onClick={() => setSeekRequest({ t: ch.time, n: Date.now() })}
                     className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors group ${isActive ? 'bg-brand-100 dark:bg-brand-900/40 ring-1 ring-brand-300 dark:ring-brand-700' : 'hover:bg-brand-50 dark:hover:bg-brand-900/30'}`}
                   >

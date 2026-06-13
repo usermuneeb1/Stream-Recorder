@@ -35,6 +35,10 @@ MAX_ITEMS = int(os.environ.get("AI_MAX_ITEMS", "2"))
 # regenerate chapters with an improved prompt).
 FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 
+# Bump this whenever the chapter PROMPT/logic changes, so a forced re-run knows
+# which recordings still need regenerating with the new logic.
+CHAPTER_LOGIC_VERSION = 2  # v2 = guests join/leave only (or Q&A if no guests)
+
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
 LLM_MODEL = "llama-3.3-70b-versatile"
@@ -159,8 +163,8 @@ def llm_enrich(title, segments):
 
     dur_str = f"{total // 3600:02d}:{(total % 3600) // 60:02d}:{total % 60:02d}"
     prompt = (
-        "You are creating YouTube-style chapters and a summary for a recorded "
-        "Islamic live-stream / Q&A / debate video for an archive website.\n"
+        "You are creating chapters and a summary for a recorded Islamic "
+        "live-stream / Q&A / debate video for an archive website.\n"
         f"Video title: {title}\n"
         f"TOTAL VIDEO DURATION: {dur_str} ({total} seconds).\n\n"
         "Below are transcript snippets sampled evenly across the WHOLE video, "
@@ -168,16 +172,26 @@ def llm_enrich(title, segments):
         "Return STRICT JSON with keys:\n"
         '  "summary": a 2-3 sentence neutral summary,\n'
         '  "tags": array of 4-8 short topic tags,\n'
-        '  "chapters": array of {"time": SECONDS_INT, "label": "short title"}.\n'
-        "CHAPTER RULES (important):\n"
-        f" - Chapters MUST span the ENTIRE video from 0 up to ~{total} seconds — "
-        "do NOT stop early; the LAST chapter should be near the end.\n"
-        " - Use the REAL second values shown in the snippets, NOT round guesses "
-        "like 0,300,600. Pick the actual second where a topic/segment begins.\n"
-        " - Create a NEW chapter whenever a guest/caller JOINS or is introduced "
-        "(use their name if mentioned, e.g. 'Ahmed joins'), and at clear topic changes.\n"
-        " - Produce 10-20 chapters spread across the full duration, chronological, "
-        "first at or near 0.\n"
+        '  "chapters": array of {"time": SECONDS_INT, "label": "short title"}.\n\n'
+        "CHAPTER RULES — FOLLOW EXACTLY, DO NOT ADD ANYTHING ELSE:\n"
+        " 1. The chapters must be ONLY about guests/callers joining and leaving.\n"
+        "    - When a guest or caller JOINS / is introduced / starts speaking, add a\n"
+        "      chapter labelled like 'NAME joins' (use their real name if mentioned,\n"
+        "      otherwise 'Caller joins' or 'Guest joins'; add a country/topic if\n"
+        "      clearly stated, e.g. 'Caller from India joins').\n"
+        "    - When that guest/caller LEAVES / is removed / the host moves on to the\n"
+        "      next person, add a chapter labelled like 'NAME leaves'.\n"
+        " 2. Use the REAL second value from the snippet where the join/leave happens.\n"
+        "    NEVER use round guesses like 0, 300, 600, 900.\n"
+        " 3. Do NOT create chapters for topics, sub-topics, side discussions, intros,\n"
+        "    outros, breaks, or anything that is not a guest joining or leaving.\n"
+        " 4. SPECIAL CASE — if the stream has NO guests/callers at all (it is just the\n"
+        "    host talking or answering questions), then INSTEAD create chapters for\n"
+        "    each distinct question answered by Muslims, labelled like\n"
+        "    'Q: <short question topic>'. Still use real second values.\n"
+        " 5. Always include a first chapter at or near second 0 ('Stream starts' or\n"
+        "    the first guest/question). Keep labels short (max ~6 words).\n"
+        " 6. Chapters must be in chronological order by time.\n"
         "Return ONLY the JSON object, no markdown.\n\n"
         f"TIMESTAMPED SNIPPETS:\n{ts_transcript}"
     )
@@ -246,14 +260,13 @@ def main():
             return True            # never enriched
         if not FORCE:
             return False
-        # FORCE: only redo videos whose chapters look BAD — i.e. they don't span
-        # the video (last chapter < 70% of duration) or have too few. This lets
-        # repeated force runs finish the remaining bad ones instead of always
-        # restarting from video #1.
-        ch = r.get("ai_chapters", [])
-        dur = r.get("duration_sec", 0) or 0
-        last = ch[-1].get("time", 0) if ch else 0
-        return len(ch) < 8 or (dur and last < dur * 0.7)
+        # FORCE: regenerate chapters with the current prompt. The chapter
+        # philosophy changed (guest joins/leaves only, or Q&A if no guests), so a
+        # forced run reprocesses videos that were enriched with the OLD prompt.
+        # We mark each successful run with chapter_logic_version; skip videos that
+        # already match the current version so repeated force runs finish the
+        # remaining ones instead of restarting from video #1.
+        return r.get("chapter_logic_version") != CHAPTER_LOGIC_VERSION
 
     todo = [r for r in recs if needs_enrich(r)][:MAX_ITEMS]
     if not todo:
@@ -299,6 +312,8 @@ def main():
                     rec["ai_chapters"] = new_chapters
                 if t_url:
                     rec["transcript_url"] = t_url
+                if new_chapters:
+                    rec["chapter_logic_version"] = CHAPTER_LOGIC_VERSION
                 rec["ai_enriched_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
                 log(f"   ✅ summary + {len(rec.get('ai_tags', []))} tags + {len(rec.get('ai_chapters', []))} chapters")
             else:
