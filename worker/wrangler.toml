@@ -1,8 +1,0 @@
-# Cloudflare Worker config for the Pixeldrain Fast Proxy.
-# Deploy with:  npx wrangler deploy   (run inside the worker/ folder)
-name = "pixeldrain-fast"
-main = "pixeldrain-fast-worker.js"
-compatibility_date = "2024-11-01"
-
-# Optional: a custom route if you have a domain on Cloudflare.
-# routes = [{ pattern = "fast.yourdomain.com/*", zone_name = "yourdomain.com" }]
