@@ -493,13 +493,15 @@ export default function Watch() {
   useEffect(() => {
     fetchStreams().then(data => {
       setAllStreams(data);
-      if (!stream) {
-        const found = data.find(s => s.videoId === id);
-        if (found) setStream(found);
-        else setNotFound(true);
-      }
+      // Always reconcile with the freshly fetched record so newly-added fields
+      // (AI summary/chapters/tags, transcript) appear even when we arrived here
+      // via router state from a gallery page that loaded before enrichment.
+      const found = data.find(s => s.videoId === id);
+      if (found) setStream(found);
+      else if (!stream) setNotFound(true);
     });
-  }, [id, stream]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => { if (id) { try { const saved = localStorage.getItem(`bookmarks_${id}`); if (saved) setBookmarks(JSON.parse(saved)); } catch {} } }, [id]);
 
