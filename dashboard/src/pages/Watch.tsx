@@ -328,6 +328,12 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
           direct = await gofileDirectSources(option.source.url);
         }
         if (!cancelled && direct.length > 0) {
+          // Warm-start: kick off a tiny background request to the first source so
+          // the storage node "wakes up" and starts caching before the player is
+          // ready. This makes the slow Archive cold-cache first-load feel faster.
+          try {
+            fetch(direct[0].url, { headers: { Range: 'bytes=0-65535' }, mode: 'no-cors' }).catch(() => undefined);
+          } catch { /* ignore */ }
           setDirectSources(direct);
           return;
         }
@@ -389,7 +395,9 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
         poster={archiveId ? `https://archive.org/services/img/${archiveId}` : stream.thumbnail}
         aspectRatio="16/9"
         playsInline
-        load="visible"
+        load="eager"
+        preload="auto"
+        streamType="on-demand"
         className="vidstack-premium-player h-full w-full bg-black"
         onTimeUpdate={(event: any) => {
           const target = event?.target as HTMLMediaElement | undefined;
