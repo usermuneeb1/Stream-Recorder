@@ -153,7 +153,14 @@ def main():
                 log(f"   ⬇️ downloading source ({rec.get('size_human','?')})...")
                 if not download(archive_mp4_url(rec), dest):
                     continue
-                log(f"   ⬆️ uploading {name} ({os.path.getsize(dest)//(1024*1024)} MB) to release...")
+                fsize = os.path.getsize(dest)
+                # GitHub Releases hard limit is 2 GiB per file. If a (very long)
+                # recording exceeds it, skip gracefully — Archive (B3ING) still
+                # serves it, so playback is never broken.
+                if fsize > 2 * 1024 * 1024 * 1024 - (5 * 1024 * 1024):
+                    log(f"   ⏭️ {fsize//(1024*1024)} MB exceeds GitHub's 2 GiB limit — skipping (Archive will serve it).")
+                    continue
+                log(f"   ⬆️ uploading {name} ({fsize//(1024*1024)} MB) to release...")
                 code, body = upload_asset(rid, dest, name)
                 if code not in (200, 201) or not body.get("browser_download_url"):
                     log(f"   ❌ upload failed ({code}): {str(body)[:200]}")
