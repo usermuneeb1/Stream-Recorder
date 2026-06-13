@@ -1,0 +1,64 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🎫 Auto-Issue Ticketing                                                     ║
+# ║  When a critical workflow fails, open (or update) a GitHub Issue with a link ║
+# ║  to the run. When that workflow next succeeds, auto-close the open issue.     ║
+# ║  Uses GITHUB_TOKEN (no extra secret). Deduplicates by a stable title.         ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🎫 Auto-Issue Ticketing"
+
+on:
+  workflow_run:
+    workflows:
+      - "☪️ The Muslim Lantern — Stream Recorder"
+      - "📺 YouTube → Archive.org"
+      - "📦 Archive → MEGA Migration"
+      - "🛠️ Repair Cloud Mirrors"
+      - "🧠 AI Enrichment"
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ticket:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "🎫 Open/close issue based on workflow result"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const wf = context.payload.workflow_run;
+            const title = `🚨 Workflow failing: ${wf.name}`;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Find an existing open auto-issue for this workflow.
+            const existing = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', labels: 'auto-ticket', per_page: 100,
+            });
+            const found = existing.data.find(i => i.title === title);
+
+            if (wf.conclusion === 'failure') {
+              const body = [
+                `**Workflow:** ${wf.name}`,
+                `**Status:** ❌ failed`,
+                `**Run:** ${wf.html_url}`,
+                `**Branch:** ${wf.head_branch}`,
+                `**Commit:** ${wf.head_sha}`,
+                `**Time:** ${wf.updated_at}`,
+                ``,
+                `This issue was opened automatically. It will auto-close when "${wf.name}" next succeeds.`,
+              ].join('\n');
+              if (found) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: found.number,
+                  body: `🔁 Still failing — ${wf.html_url} (${wf.updated_at})` });
+              } else {
+                await github.rest.issues.create({ owner, repo, title, body, labels: ['auto-ticket', 'bug'] });
+              }
+            } else if (wf.conclusion === 'success' && found) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: found.number,
+                body: `✅ Recovered — "${wf.name}" succeeded again: ${wf.html_url}` });
+              await github.rest.issues.update({ owner, repo, issue_number: found.number, state: 'closed' });
+            }
