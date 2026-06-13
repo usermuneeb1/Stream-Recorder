@@ -296,6 +296,33 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
     apply();
   }, [seekTo]);
 
+  // Reliable time tracking for the sidebar chapter highlight. The Vidstack
+  // onTimeUpdate prop is finicky (arg shape varies, can fire stale), so instead
+  // we POLL the player instance's currentTime ~4x/sec. This guarantees the
+  // active-chapter highlight in the sidebar always follows playback, even when
+  // the user seeks via a chapter click. Also persists the "Continue Watching"
+  // position. Cheap: just reads a number, no re-render unless the second changes.
+  useEffect(() => {
+    let last = -1;
+    const id = window.setInterval(() => {
+      const p = playerRef.current;
+      if (!p) return;
+      const t = p.currentTime || 0;
+      const sec = Math.floor(t);
+      if (sec === last) return; // only update when the whole second changes
+      last = sec;
+      onTime(t);
+      const dur = p.state?.duration || 0;
+      if (t > 5 && (dur === 0 || t < dur - 30) && sec % 5 === 0) {
+        try { localStorage.setItem(`resume_${stream.videoId}`, String(sec)); } catch { /* ignore */ }
+      } else if (dur > 0 && t >= dur - 5) {
+        try { localStorage.removeItem(`resume_${stream.videoId}`); } catch { /* ignore */ }
+      }
+    }, 250);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.videoId]);
+
   useEffect(() => {
     let cancelled = false;
     async function resolve() {
@@ -420,22 +447,6 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
         preload="auto"
         streamType="on-demand"
         className="vidstack-premium-player h-full w-full bg-black"
-        onTimeUpdate={(_detail: any, _nativeEvent: any) => {
-          // Vidstack passes (detail, nativeEvent) — NOT a DOM event with .target.
-          // Read the authoritative time straight off the player instance so the
-          // sidebar chapter highlight tracks playback correctly.
-          const p = playerRef.current;
-          const t = p?.currentTime || 0;
-          onTime(t);
-          // Continue Watching: persist position every ~5s (skip the first 5s and
-          // the last 30s so "finished" videos don't resume at the very end).
-          const dur = p?.state?.duration || 0;
-          if (t > 5 && (dur === 0 || t < dur - 30) && Math.floor(t) % 5 === 0) {
-            try { localStorage.setItem(`resume_${stream.videoId}`, String(Math.floor(t))); } catch { /* ignore */ }
-          } else if (dur > 0 && t >= dur - 5) {
-            try { localStorage.removeItem(`resume_${stream.videoId}`); } catch { /* ignore */ }
-          }
-        }}
         onCanPlay={(_e: any, nativeEvent: any) => {
           // Resume from saved position (or a ?t= deep-link), once per load.
           if (resumedRef.current) return;
