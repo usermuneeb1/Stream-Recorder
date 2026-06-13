@@ -21,6 +21,11 @@ export interface StreamData {
   thumbnail: string;
   archiveId?: string;
   chatUrl?: string;
+  // AI-enriched metadata (from scripts/ai/enrich.py via Groq). Optional.
+  aiSummary?: string;
+  aiTags?: string[];
+  aiChapters?: { time: number; label: string }[];
+  transcriptUrl?: string;
   sources: Record<string, StreamSource>;
 }
 
@@ -230,6 +235,11 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     if (r.gofile_link) s.sources.gofile = { label: '📁 Gofile', url: r.gofile_link, type: 'gofile' };
     
     if (r.chat_url && !s.chatUrl) s.chatUrl = r.chat_url;
+    // AI-enriched metadata (optional)
+    if (r.ai_summary && !s.aiSummary) s.aiSummary = r.ai_summary;
+    if (Array.isArray(r.ai_tags) && !s.aiTags) s.aiTags = r.ai_tags;
+    if (Array.isArray(r.ai_chapters) && !s.aiChapters) s.aiChapters = r.ai_chapters;
+    if (r.transcript_url && !s.transcriptUrl) s.transcriptUrl = r.transcript_url;
     if (!s.size && r.size_human) s.size = formatSize(r.size_human);
     if (!s.duration && r.duration_fmt) s.duration = formatDuration(r.duration_fmt);
     if (!s.date && r.date) s.date = formatDate(r.date);
