@@ -65,23 +65,23 @@ function pixeldrainGamedriveUrl(url?: string) {
 }
 
 // Candidate order (each declared video/mp4 because the URLs have no extension).
-// Official direct is the FASTEST for our hotlink-enabled account files (~1.4s vs
-// ~3s through the proxy), so BOTH modes try it first. The other sources are only
-// silent fallbacks for when official is rate-limited.
-//   fast   : official direct → GameDrive CDN → Vercel proxy
-//   direct : official direct → Vercel proxy → GameDrive CDN
+// Our SAME-ORIGIN Vercel proxy is tried FIRST: it fetches Pixeldrain server-side
+// so Pixeldrain never sees a browser "hotlink" → it never returns the hotlink
+// 403 that used to break embedded playback. It also forwards Range (seeking
+// works) and edge-caches, so repeat plays don't re-hit Pixeldrain. If the proxy
+// is ever down we fall back to the official direct URL, then the GameDrive CDN.
+//   proxy (?prefer=official) → official direct → GameDrive CDN
 // The player streams the first one immediately and auto-fails-over via onError.
-function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
+function pixeldrainStreamCandidates(url?: string, _mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
   const official = pixeldrainOfficialUrl(url);
   const gamedrive = pixeldrainGamedriveUrl(url);
-  const proxy = pixeldrainProxyUrl(url, mode);
+  // Always use prefer=official inside the proxy: that upstream honours Range
+  // requests (HTTP 206) so the user can seek; the GameDrive upstream does not.
+  const proxy = pixeldrainProxyUrl(url, 'direct');
+  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-proxy', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
   const officialSrc: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
   const gamedriveSrc: DirectSource | null = gamedrive ? { id: 'pixel-cdn', quality: 'CDN', url: gamedrive, mime: 'video/mp4' } : null;
-  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-proxy', quality: 'Proxy', url: proxy, mime: 'video/mp4' } : null;
-  const ordered = mode === 'direct'
-    ? [officialSrc, proxySrc, gamedriveSrc]
-    : [officialSrc, gamedriveSrc, proxySrc];
-  return ordered.filter(Boolean) as DirectSource[];
+  return [proxySrc, officialSrc, gamedriveSrc].filter(Boolean) as DirectSource[];
 }
 
 // Single lightweight probe (HEAD-equivalent via tiny GET) against the proxy to
@@ -131,10 +131,12 @@ function formatClock(seconds: number) {
 
 function sortSourceEntries(sources: Record<string, StreamSource>): [string, StreamSource][] {
   return Object.entries(sources)
-    // Pixeldrain is hidden from playback sources: free Pixeldrain rate-limits
-    // embedded playback (403), so it is unreliable as a player. It remains a
-    // Download mirror. Archive is the reliable player source.
-    .filter(([key]) => key !== 'mega' && key !== 'gofile' && key !== 'pixel' && key !== 'pixeldrain')
+    // Pixeldrain IS shown as a playback source now, but it streams through our
+    // same-origin Vercel proxy (/api/pd) so Pixeldrain never sees a browser
+    // "hotlink" and never returns the 403 that used to break embedded playback.
+    // Archive stays first/primary and is the automatic fallback if the proxy is
+    // ever unavailable. MEGA/Gofile remain download-only (not embeddable).
+    .filter(([key]) => key !== 'mega' && key !== 'gofile')
     .sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
