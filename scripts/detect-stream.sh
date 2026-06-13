@@ -380,9 +380,82 @@ detect_method_3_streams_tab() {
 #  Runs all 3 methods sequentially. Stops at first detection.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Method 4: RSS FEED (additive fallback — no cookies, very reliable)
+#  Resolves the channel UC id, reads the YouTube RSS feed for the newest video,
+#  and confirms it is currently live before reporting. Runs only after the
+#  primary 3 methods find nothing, so it never overrides existing behavior.
+# ═══════════════════════════════════════════════════════════════════════════════
+detect_method_4_rss() {
+    log_step "Method 4: RSS feed check..."
+
+    local channel_input
+    channel_input=$(echo "${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}" | tr -d '[:space:]')
+
+    # Resolve a UC… channel id from whatever form we have.
+    local cid=""
+    if [[ "$channel_input" =~ (UC[a-zA-Z0-9_-]{20,}) ]]; then
+        cid="${BASH_REMATCH[1]}"
+    else
+        local handle="${channel_input##*/}"
+        [[ "$handle" != "@"* ]] && handle="@${handle}"
+        cid=$(curl -s --max-time 15 "https://www.youtube.com/${handle}" 2>/dev/null \
+              | grep -oP '"externalId":"\K[^"]+' | head -1 || true)
+        [[ -z "$cid" ]] && cid=$(curl -s --max-time 15 "https://www.youtube.com/${handle}" 2>/dev/null \
+              | grep -oP 'channel_id=\K[^"&]+' | head -1 || true)
+    fi
+    if [[ -z "$cid" ]]; then
+        log_info "Method 4: Could not resolve channel id"
+        return 1
+    fi
+
+    local feed
+    feed=$(curl -s --max-time 15 "https://www.youtube.com/feeds/videos.xml?channel_id=${cid}" 2>/dev/null) || {
+        log_info "Method 4: RSS fetch failed"
+        return 1
+    }
+
+    # Newest video id from the feed.
+    local video_id
+    video_id=$(echo "$feed" | grep -oP '<yt:videoId>\K[^<]+' | head -1 || true)
+    if [[ -z "$video_id" ]]; then
+        log_info "Method 4: No videos in RSS feed"
+        return 1
+    fi
+
+    # Confirm this newest video is actually LIVE right now (RSS lists VODs too).
+    local ua; ua=$(rotate_user_agent)
+    local watch
+    watch=$(curl -s --max-time 20 -H "User-Agent: ${ua}" \
+        -H "Cookie: CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI" \
+        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || true
+    if ! echo "$watch" | grep -qE '"isLiveNow":true|"isLive":true|"liveBroadcastDetails":\{"isLiveNow":true'; then
+        log_info "Method 4: Newest RSS video (${video_id}) is not live"
+        return 1
+    fi
+
+    local title
+    title=$(echo "$feed" | grep -oP '<media:title>\K[^<]+' | head -1 || true)
+    [[ -z "$title" ]] && title=$(echo "$feed" | grep -oP '<title>\K[^<]+' | sed -n '2p' || true)
+    [[ -z "$title" ]] && title="Live Stream"
+    local channel
+    channel=$(echo "$feed" | grep -oP '<author>\s*<name>\K[^<]+' | head -1 || true)
+    [[ -z "$channel" ]] && channel="${CHANNEL_DISPLAY_NAME:-The Muslim Lantern}"
+
+    DETECTED_VIDEO_ID="$video_id"
+    DETECTED_TITLE="$title"
+    DETECTED_CHANNEL="$channel"
+    DETECTED_THUMBNAIL="https://i.ytimg.com/vi/${video_id}/maxresdefault_live.jpg"
+    DETECTED_METHOD="RSS Feed"
+    DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
+
+    log_ok "Method 4: ✅ LIVE DETECTED via RSS — ${DETECTED_TITLE} by ${DETECTED_CHANNEL}"
+    return 0
+}
+
 detect_live_stream() {
     log_header "🔍 LIVE STREAM DETECTION"
-    
+
     local channel="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
     log_info "Monitoring channel: ${channel} (${CHANNEL_DISPLAY_NAME:-single channel})"
     log_info "Detection started at: $(now_pkt)"
@@ -417,10 +490,18 @@ detect_live_stream() {
         _export_detection_results || return 1
         return 0
     fi
-    
+
+    random_sleep 1 3
+
+    # ── Method 4: RSS Feed (additive, no-cookie fallback) ────────────────────
+    if detect_method_4_rss; then
+        _export_detection_results || return 1
+        return 0
+    fi
+
     # ── All methods found nothing ────────────────────────────────────────────
     log_separator
-    log_info "All 3 detection methods completed — channel is NOT live"
+    log_info "All 4 detection methods completed — channel is NOT live"
     log_info "Detection completed at: $(now_pkt)"
     
     set_output "is_live" "false"
