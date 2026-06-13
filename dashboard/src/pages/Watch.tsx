@@ -277,12 +277,28 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
       setFailedSources([]);
       try {
         let direct: DirectSource[] = [];
-        if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
+        if (option.source.type === 'archive') {
+          // Fast path: if a precomputed direct .mp4 URL exists, stream it
+          // instantly (no slow metadata lookup). Otherwise fall back to the
+          // metadata-based resolver.
+          if (option.source.directUrl) {
+            direct = [{ id: 'archive-direct', quality: 'Best', url: option.source.directUrl, mime: 'video/mp4' }];
+          } else if (archiveId) {
+            direct = await archiveDirectSources(archiveId);
+          }
+        }
         if (option.source.type === 'pixeldrain') {
           // No pre-probe: hand candidates straight to the player so it starts
-          // streaming instantly. onError fails over to the next candidate, and
-          // if all fail it shows the rate-limit message.
+          // streaming instantly. onError fails over to the next candidate.
           direct = resolvePixeldrainSources(option.source.url, option.pixeldrainMode || 'fast');
+          // Cross-source safety net: append the permanent Archive .mp4 as the
+          // FINAL fallback. Free Pixeldrain files can be rate-limited (403) at
+          // any time, so if every Pixeldrain candidate fails the player silently
+          // switches to Archive — the viewer always gets video, never an error.
+          const archiveFallback = stream.sources.archive?.directUrl || stream.sources.archiveSmall?.directUrl;
+          if (archiveFallback) {
+            direct = [...direct, { id: 'archive-fallback', quality: 'Backup', url: archiveFallback, mime: 'video/mp4' }];
+          }
           if (!cancelled && direct.length === 0) {
             throw new Error('This file is temporarily rate-limited by Pixeldrain. Switch to the Dxture (Archive) source — it always works — or try again in a little while');
           }
