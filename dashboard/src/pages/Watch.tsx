@@ -48,27 +48,37 @@ function pixeldrainProxyUrl(url?: string, mode: 'fast' | 'direct' = 'fast') {
   return mode === 'direct' ? `/api/pd/${id}?prefer=official` : `/api/pd/${id}`;
 }
 
-// Official direct stream. Works embedded for files uploaded via an account key
-// with hotlinking enabled (the account manager sets this up). For those files
-// this is the fastest path (no proxy hop).
+// Official direct stream. For our account-uploaded (hotlink-enabled) files this
+// is the FASTEST path — measured ~40MB/s vs ~7MB/s through the GameDrive CDN —
+// so it is tried first.
 function pixeldrainOfficialUrl(url?: string) {
   const id = pixeldrainId(url);
   return id ? `https://pixeldrain.com/api/file/${id}` : '';
 }
 
-// Candidates per server. 'fast' = official direct first (instant for hotlink
-// accounts), then the cached Vercel proxy as automatic fallback. 'direct' =
-// proxy first. Either way the player auto-fails-over and the probe skips dead
-// ones, so a rate-limited file never spins forever.
+// GameDrive CDN proxy. Slower than direct, but it can serve a file even when the
+// account's monthly transfer budget is temporarily exhausted (official returns
+// 403). Used as a fallback so playback keeps working.
+function pixeldrainGamedriveUrl(url?: string) {
+  const id = pixeldrainId(url);
+  return id ? `https://cdn.pixeldrain.eu.cc/${id}` : '';
+}
+
+// Candidate order (each declared video/mp4 because the URLs have no extension):
+//   fast   : official direct → GameDrive CDN → Vercel proxy
+//   direct : Vercel proxy → official direct → GameDrive CDN
+// The player streams the first one immediately and auto-fails-over via onError,
+// so a rate-limited/blocked source never blocks playback.
 function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
   const official = pixeldrainOfficialUrl(url);
+  const gamedrive = pixeldrainGamedriveUrl(url);
   const proxy = pixeldrainProxyUrl(url, mode);
-  if (!official && !proxy) return [];
-  // Pixeldrain stream URLs have no .mp4 extension, so we MUST declare the MIME
-  // type explicitly or the player cannot detect that it is a video.
   const officialSrc: DirectSource | null = official ? { id: 'pixel-direct', quality: 'Direct', url: official, mime: 'video/mp4' } : null;
-  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-proxy', quality: 'Fast', url: proxy, mime: 'video/mp4' } : null;
-  const ordered = mode === 'direct' ? [proxySrc, officialSrc] : [officialSrc, proxySrc];
+  const gamedriveSrc: DirectSource | null = gamedrive ? { id: 'pixel-cdn', quality: 'CDN', url: gamedrive, mime: 'video/mp4' } : null;
+  const proxySrc: DirectSource | null = proxy ? { id: 'pixel-proxy', quality: 'Proxy', url: proxy, mime: 'video/mp4' } : null;
+  const ordered = mode === 'direct'
+    ? [proxySrc, officialSrc, gamedriveSrc]
+    : [officialSrc, gamedriveSrc, proxySrc];
   return ordered.filter(Boolean) as DirectSource[];
 }
 
@@ -81,36 +91,13 @@ function pixeldrainDownload(url?: string) {
 // Single lightweight probe (HEAD-equivalent via tiny GET) against the proxy to
 // decide if this file is currently playable. Runs ONCE per source, not per
 // candidate, so it adds at most one request. Result is cached per id+mode.
-const _probeCache = new Map<string, Promise<boolean>>();
-async function pixeldrainPlayable(proxyUrl: string, timeoutMs = 8000): Promise<boolean> {
-  if (_probeCache.has(proxyUrl)) return _probeCache.get(proxyUrl)!;
-  const run = (async () => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(proxyUrl, { method: 'GET', signal: controller.signal });
-      const type = (res.headers.get('content-type') || '').toLowerCase();
-      const ok = res.ok && (type.startsWith('video/') || type === 'application/octet-stream');
-      controller.abort();
-      return ok;
-    } catch {
-      return false;
-    } finally {
-      window.clearTimeout(timer);
-    }
-  })();
-  _probeCache.set(proxyUrl, run);
-  return run;
-}
-
-// Probe candidates in order; return the playable ones (preserving order) so the
-// player has automatic in-player failover between them. Probes run in parallel
-// and are memoized, so this adds at most one request per distinct URL.
-async function resolvePixeldrainSources(url: string | undefined, mode: 'fast' | 'direct'): Promise<DirectSource[]> {
-  const candidates = pixeldrainStreamCandidates(url, mode);
-  if (candidates.length === 0) return [];
-  const checks = await Promise.all(candidates.map(c => pixeldrainPlayable(c.url)));
-  return candidates.filter((_, i) => checks[i]);
+// Build the ordered list of stream candidates. We do NOT pre-probe them (that
+// used to download each file just to check the type, causing the long
+// "Preparing server…" delay). Instead we hand the candidates straight to the
+// player, which starts streaming immediately and uses onError to fail over to
+// the next candidate. This makes playback start almost instantly.
+function resolvePixeldrainSources(url: string | undefined, mode: 'fast' | 'direct'): DirectSource[] {
+  return pixeldrainStreamCandidates(url, mode);
 }
 
 interface PlayerOption {
@@ -292,10 +279,10 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         let direct: DirectSource[] = [];
         if (option.source.type === 'archive' && archiveId) direct = await archiveDirectSources(archiveId);
         if (option.source.type === 'pixeldrain') {
-          // Probe before playing: Pixeldrain blocks embedded/hotlinked playback
-          // (403) so we verify which candidate actually serves video. This
-          // avoids an endless spinner and shows a clear message if all blocked.
-          direct = await resolvePixeldrainSources(option.source.url, option.pixeldrainMode || 'fast');
+          // No pre-probe: hand candidates straight to the player so it starts
+          // streaming instantly. onError fails over to the next candidate, and
+          // if all fail it shows the rate-limit message.
+          direct = resolvePixeldrainSources(option.source.url, option.pixeldrainMode || 'fast');
           if (!cancelled && direct.length === 0) {
             throw new Error('This file is temporarily rate-limited by Pixeldrain. Switch to the Dxture (Archive) source — it always works — or try again in a little while');
           }
@@ -397,7 +384,11 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
             // Find the next candidate that has not failed yet.
             const nextIndex = directSources.findIndex(s => !nextFailed.includes(s.url));
             if (nextIndex === -1) {
-              setError('All playback sources are unavailable right now');
+              setError(
+                option.source.type === 'pixeldrain'
+                  ? 'This file is temporarily rate-limited by Pixeldrain. Switch to the Dxture (Archive) source — it always works.'
+                  : 'All playback sources are unavailable right now'
+              );
             } else {
               setActiveQuality(nextIndex);
               window.setTimeout(() => {

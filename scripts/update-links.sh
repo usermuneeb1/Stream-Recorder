@@ -159,6 +159,107 @@ update_links() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  UPDATE data/recordings.json  (the gallery's source of truth)
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Appends a structured entry for the new recording so it appears in the website
+#  gallery automatically — no manual editing. Keyed by the Archive identifier so
+#  re-runs update in place instead of duplicating. Uses the first Pixeldrain and
+#  Archive links captured during upload.
+update_recordings_json() {
+    log_header "🗂️  UPDATING data/recordings.json (gallery)"
+
+    # ── Pull first link of each provider from the "part|url;part|url" strings ──
+    local first_link
+    first_link() { echo "$1" | cut -d';' -f1 | cut -d'|' -f2; }
+
+    local archive_link pixeldrain_link gofile_link mega_link
+    archive_link=$(first_link "${ARCHIVE_LINKS:-}")
+    pixeldrain_link=$(first_link "${PIXELDRAIN_LINKS:-}")
+    gofile_link=$(first_link "${GOFILE_LINKS:-}")
+    mega_link=$(first_link "${MEGA_LINKS:-}")
+
+    # Need at least an Archive link (permanent, drives the player + unique id).
+    if [[ -z "$archive_link" ]]; then
+        log_warn "No Archive link — skipping recordings.json update"
+        return 0
+    fi
+
+    # Unique id = the Archive identifier (e.g. tml-2026-05-xxxx-123456).
+    local rec_id
+    rec_id=$(echo "$archive_link" | sed -E 's#.*/details/##; s#/.*##')
+    [[ -z "$rec_id" ]] && { log_warn "Could not derive recording id"; return 0; }
+
+    local video_id="${STREAM_VIDEO_ID:-${DETECTED_VIDEO_ID:-}}"
+    local video_url="${STREAM_URL:-}"
+    local title="${STREAM_TITLE:-Recording}"
+    local date_str; date_str=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
+    local month_str="${date_str:0:7}"
+    local dur_fmt="${RECORD_DURATION_FMT:-}"
+    local dur_sec="${RECORD_DURATION_SEC:-0}"
+    local size_human="${RECORD_SIZE_HUMAN:-}"
+    local size_bytes="${RECORD_SIZE_BYTES:-0}"
+    local resolution="${RECORD_RESOLUTION:-1920x1080}"
+    local recorded_at; recorded_at=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
+
+    # ── Read current recordings.json (array) ──────────────────────────────────
+    local current
+    current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="[]"
+    echo "$current" | jq -e 'type=="array"' >/dev/null 2>&1 || current="[]"
+
+    # ── Build/merge the entry with jq (newest first, dedup by video_id) ───────
+    local updated
+    updated=$(echo "$current" | jq \
+        --arg id "$rec_id" \
+        --arg vid "$video_id" \
+        --arg vurl "$video_url" \
+        --arg title "$title" \
+        --arg date "$date_str" \
+        --arg month "$month_str" \
+        --arg durf "$dur_fmt" \
+        --argjson durs "${dur_sec:-0}" \
+        --arg sizeh "$size_human" \
+        --argjson sizeb "${size_bytes:-0}" \
+        --arg res "$resolution" \
+        --arg arch "$archive_link" \
+        --arg pd "$pixeldrain_link" \
+        --arg gof "$gofile_link" \
+        --arg mega "$mega_link" \
+        --arg rec "$recorded_at" '
+        # thumbnail intentionally empty → site uses public/thumbnail.jpg
+        ( [ .[] | select(.video_id != $id) ] ) as $rest
+        | [ {
+            video_id: $id,
+            title: $title,
+            channel: "The Muslim Lantern",
+            video_url: $vurl,
+            thumbnail: "",
+            duration_sec: $durs,
+            duration_fmt: $durf,
+            size_bytes: $sizeb,
+            size_human: $sizeh,
+            size_gb: (($sizeb // 0) / 1073741824 * 10000 | round / 10000),
+            resolution: $res,
+            date: $date,
+            month: $month,
+            archive_link: $arch,
+            pixeldrain_link: $pd,
+            gofile_link: $gof,
+            mega_link: $mega,
+            chat_url: "",
+            recorded_at: $rec
+          } ] + $rest
+        | sort_by(.date) | reverse
+    ') || { log_warn "jq failed to build recordings.json"; return 0; }
+
+    if github_api_write "data/recordings.json" "$updated" "🗂️ Gallery: add ${title} — ${date_str}"; then
+        log_ok "recordings.json updated — gallery will show the new recording"
+    else
+        log_warn "Failed to update recordings.json — will retry next run"
+    fi
+    return 0
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  READ LINKS (used by refresh and weekly report)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -172,4 +273,5 @@ read_links() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     update_links
+    update_recordings_json
 fi
