@@ -64,11 +64,13 @@ function pixeldrainGamedriveUrl(url?: string) {
   return id ? `https://cdn.pixeldrain.eu.cc/${id}` : '';
 }
 
-// Candidate order (each declared video/mp4 because the URLs have no extension):
+// Candidate order (each declared video/mp4 because the URLs have no extension).
+// Official direct is the FASTEST for our hotlink-enabled account files (~1.4s vs
+// ~3s through the proxy), so BOTH modes try it first. The other sources are only
+// silent fallbacks for when official is rate-limited.
 //   fast   : official direct → GameDrive CDN → Vercel proxy
-//   direct : Vercel proxy → official direct → GameDrive CDN
-// The player streams the first one immediately and auto-fails-over via onError,
-// so a rate-limited/blocked source never blocks playback.
+//   direct : official direct → Vercel proxy → GameDrive CDN
+// The player streams the first one immediately and auto-fails-over via onError.
 function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fast'): DirectSource[] {
   const official = pixeldrainOfficialUrl(url);
   const gamedrive = pixeldrainGamedriveUrl(url);
@@ -77,7 +79,7 @@ function pixeldrainStreamCandidates(url?: string, mode: 'fast' | 'direct' = 'fas
   const gamedriveSrc: DirectSource | null = gamedrive ? { id: 'pixel-cdn', quality: 'CDN', url: gamedrive, mime: 'video/mp4' } : null;
   const proxySrc: DirectSource | null = proxy ? { id: 'pixel-proxy', quality: 'Proxy', url: proxy, mime: 'video/mp4' } : null;
   const ordered = mode === 'direct'
-    ? [proxySrc, officialSrc, gamedriveSrc]
+    ? [officialSrc, proxySrc, gamedriveSrc]
     : [officialSrc, gamedriveSrc, proxySrc];
   return ordered.filter(Boolean) as DirectSource[];
 }
@@ -332,19 +334,6 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [option.source.url, option.source.type, option.pixeldrainMode, archiveId]);
 
-  const switchQuality = (index: number) => {
-    const video = videoRef.current;
-    const previousTime = video?.currentTime || 0;
-    const wasPlaying = video ? !video.paused : false;
-    setActiveQuality(index);
-    window.setTimeout(() => {
-      const next = videoRef.current;
-      if (!next) return;
-      next.currentTime = previousTime;
-      if (wasPlaying) next.play().catch(() => undefined);
-    }, 120);
-  };
-
   if (loading) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-black text-white">
@@ -425,16 +414,6 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         <MediaProvider />
         <DefaultVideoLayout icons={defaultLayoutIcons} />
       </MediaPlayer>
-
-      {directSources.length > 1 && !directSources[0]?.id.startsWith('pixel') && (
-        <div className="absolute bottom-4 right-4 hidden items-center gap-1 rounded-full border border-white/10 bg-black/55 p-1 shadow-xl backdrop-blur-xl md:flex">
-          {directSources.map((src, i) => (
-            <button key={src.id} onClick={() => switchQuality(i)} className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${i === activeQuality ? 'bg-brand-500 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
-              {src.quality}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
