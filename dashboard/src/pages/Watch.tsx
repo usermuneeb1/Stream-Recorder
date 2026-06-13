@@ -266,6 +266,7 @@ async function fetchChatMessages(chatUrl?: string, archiveId?: string): Promise<
 function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: StreamData; option: PlayerOption; archiveId?: string; onTime: (time: number) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const resumedRef = useRef(false); // ensures we resume position only once per load
   const [directSources, setDirectSources] = useState<DirectSource[]>([]);
   const [activeQuality, setActiveQuality] = useState(0);
   const [iframeSrc, setIframeSrc] = useState('');
@@ -385,7 +386,33 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime }: { stream: Str
         className="vidstack-premium-player h-full w-full bg-black"
         onTimeUpdate={(event: any) => {
           const target = event?.target as HTMLMediaElement | undefined;
-          onTime(target?.currentTime || 0);
+          const t = target?.currentTime || 0;
+          onTime(t);
+          // Continue Watching: persist position every ~5s (skip the first 5s and
+          // the last 30s so "finished" videos don't resume at the very end).
+          const dur = target?.duration || 0;
+          if (t > 5 && (dur === 0 || t < dur - 30) && Math.floor(t) % 5 === 0) {
+            try { localStorage.setItem(`resume_${stream.videoId}`, String(Math.floor(t))); } catch { /* ignore */ }
+          } else if (dur > 0 && t >= dur - 5) {
+            try { localStorage.removeItem(`resume_${stream.videoId}`); } catch { /* ignore */ }
+          }
+        }}
+        onCanPlay={(_e: any, nativeEvent: any) => {
+          // Resume from saved position (or a ?t= deep-link), once per load.
+          if (resumedRef.current) return;
+          resumedRef.current = true;
+          const media = nativeEvent?.target as HTMLMediaElement | undefined;
+          let start = 0;
+          // ?t=SECONDS deep-link takes priority over saved position.
+          const tParam = new URLSearchParams(window.location.hash.split('?')[1] || '').get('t');
+          if (tParam && Number.isFinite(Number(tParam))) {
+            start = Number(tParam);
+          } else {
+            try { start = Number(localStorage.getItem(`resume_${stream.videoId}`) || 0); } catch { /* ignore */ }
+          }
+          if (media && start > 0 && start < (media.duration || Infinity)) {
+            media.currentTime = start;
+          }
         }}
         onError={() => {
           // Auto-failover: if the current stream candidate (e.g. the Fast proxy)
@@ -468,6 +495,33 @@ export default function Watch() {
 
   useEffect(() => { if (id) { try { const saved = localStorage.getItem(`bookmarks_${id}`); if (saved) setBookmarks(JSON.parse(saved)); } catch {} } }, [id]);
 
+  // SEO: set the page title and inject schema.org VideoObject JSON-LD so search
+  // engines (and social cards) can index each recording. Cleaned up on unmount.
+  useEffect(() => {
+    if (!stream) return;
+    const prevTitle = document.title;
+    document.title = `${stream.title} — Muslim Lantern Archive`;
+    const ld = {
+      '@context': 'https://schema.org',
+      '@type': 'VideoObject',
+      name: stream.title,
+      description: `${stream.title} — recorded live from ${stream.channel}.`,
+      thumbnailUrl: stream.archiveId ? `https://archive.org/services/img/${stream.archiveId}` : `${import.meta.env.BASE_URL}thumbnail.jpg`,
+      uploadDate: stream.date,
+      duration: stream.duration ? `PT${stream.duration.replace(/\s*h\s*/i, 'H').replace(/\s*m\s*/i, 'M')}` : undefined,
+      contentUrl: stream.sources.archive?.directUrl || stream.sources.archive?.url,
+      embedUrl: window.location.href,
+      publisher: { '@type': 'Organization', name: 'The Muslim Lantern' },
+    };
+    const tag = document.createElement('script');
+    tag.type = 'application/ld+json';
+    tag.id = 'video-jsonld';
+    tag.text = JSON.stringify(ld);
+    document.getElementById('video-jsonld')?.remove();
+    document.head.appendChild(tag);
+    return () => { document.title = prevTitle; document.getElementById('video-jsonld')?.remove(); };
+  }, [stream]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -502,7 +556,13 @@ export default function Watch() {
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
   const removeBookmark = (index: number) => { const newBms = bookmarks.filter((_, i) => i !== index); setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };
-  const handleShare = async () => { const shareUrl = window.location.href; try { await navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { prompt('Copy this link:', shareUrl); } };
+  const handleShare = async () => {
+    // Share with the current timestamp so the link opens at the same moment.
+    let shareUrl = window.location.href.split('?')[0];
+    if (playerTime > 5) shareUrl += `?t=${Math.floor(playerTime)}`;
+    try { await navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { prompt('Copy this link:', shareUrl); }
+  };
   const shortcuts = [
     { key: 'Space / K', desc: 'Play or pause', hint: 'Control video playback' },
     { key: '← / →', desc: 'Seek 10 seconds', hint: 'Jump backward or forward' },
