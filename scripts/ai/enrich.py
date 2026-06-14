@@ -39,7 +39,8 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 # which recordings still need regenerating with the new logic.
 #  v2 = audio LLM guests join/leave (or Q&A if no guests)
 #  v3 = OCR on-screen-name guest detection (primary) + audio Q&A fallback; NO summary
-CHAPTER_LOGIC_VERSION = 3
+#  v4 = refined OCR: rejects shirt logos / donations / chat, 1.5x upscale, 30s step
+CHAPTER_LOGIC_VERSION = 4
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"

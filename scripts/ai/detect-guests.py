@@ -26,7 +26,7 @@ from collections import defaultdict
 from difflib import SequenceMatcher
 
 # ── Tunables (env-overridable) ────────────────────────────────────────────────
-SAMPLE_STEP = int(os.environ.get("GUEST_SAMPLE_STEP", "45"))   # seconds between frames
+SAMPLE_STEP = int(os.environ.get("GUEST_SAMPLE_STEP", "30"))   # seconds between frames
 MIN_HITS = int(os.environ.get("GUEST_MIN_HITS", "2"))          # appearances to be "real"
 # Host name fragments — these caption lines are the channel itself, never a guest.
 HOST_HINTS = [h.strip().lower() for h in os.environ.get(
@@ -43,16 +43,63 @@ def _clean(s: str) -> str:
     return s
 
 
+# Words that are NEVER guest names — clothing logos, UI text, donation/chat junk
+# that the OCR picks up from the host's shirt or on-screen overlays.
+_DENY_WORDS = {
+    "columbia", "montrail", "montrad", "nike", "adidas", "youtube", "subscribe",
+    "live", "chat", "superchat", "super", "donation", "member", "joined",
+    "themuslimlantern", "muslimlantern", "lantern", "verified", "loading",
+}
+
+
 def _looks_like_name(c: str) -> bool:
-    if not (3 <= len(c) <= 30):
+    if not (3 <= len(c) <= 28):
         return False
     if not re.search(r"[A-Za-z]", c):
         return False
-    if len(c.split()) > 4:          # full sentences = chat messages, skip
+
+    words = c.split()
+    if len(words) > 4:                     # full sentences = chat messages
         return False
+
     letters = sum(ch.isalpha() for ch in c)
-    if letters / max(len(c), 1) < 0.6:   # too much OCR garbage
+    if letters / max(len(c), 1) < 0.65:    # too much OCR garbage / symbols
         return False
+
+    low = c.lower()
+
+    # Reject money / donation overlays (e.g. "@RANDOM €2.49", "$5.00").
+    if re.search(r"[€$£₹]\s?\d|\d+[.,]\d{2}\b", c):
+        return False
+
+    # Reject anything that is a known logo / UI word (single or first token).
+    if low in _DENY_WORDS:
+        return False
+    if words[0].lower() in _DENY_WORDS and len(words) <= 2:
+        return False
+
+    # A real caption name has at least 3 letters in its main token and is not a
+    # lone ALL-CAPS spam token. Single-word logos like "Columbia" are rejected
+    # unless they look like a proper @handle.
+    if len(words) == 1:
+        w = words[0]
+        if w.startswith("@"):
+            return len(w) >= 4              # @handles are valid guest IDs
+        # single plain word: require Capitalised + not in denylist + 4-18 chars
+        if not (w[:1].isupper() and 4 <= len(w) <= 18):
+            return False
+        if w.lower() in _DENY_WORDS:
+            return False
+    else:
+        # Multi-word: at least one token must be Capitalised (a real name).
+        if not any(w[:1].isupper() for w in words if w):
+            return False
+
+    # Reject lines that are mostly digits.
+    digits = sum(ch.isdigit() for ch in c)
+    if digits > letters:
+        return False
+
     return True
 
 
@@ -67,9 +114,11 @@ def _norm(s: str) -> str:
 
 def ocr_frame(url: str, t: int):
     """Return cleaned candidate name strings read from the frame at time t."""
+    # Upscale 1.5x — small caption text OCRs noticeably better when enlarged,
+    # so more guest names are caught and fewer are missed.
     fr = subprocess.run(
         ["ffmpeg", "-y", "-ss", str(t), "-i", url, "-frames:v", "1",
-         "-f", "image2", "-vcodec", "png", "pipe:1"],
+         "-vf", "scale=iw*1.5:ih*1.5", "-f", "image2", "-vcodec", "png", "pipe:1"],
         capture_output=True)
     if fr.returncode != 0 or not fr.stdout:
         return []
