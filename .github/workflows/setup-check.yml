@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: "🔧 Run Setup Check"
         run: |
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
