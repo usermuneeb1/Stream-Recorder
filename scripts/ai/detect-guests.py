@@ -40,16 +40,36 @@ def log(m):
 def _clean(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9 @._-]", "", s)
     s = re.sub(r"\s+", " ", s).strip(" |.-_")
+    # Strip a stray leading single letter that OCR adds (e.g. "I Kainat" -> the
+    # icon/avatar misread as "I"). Only when followed by a real word.
+    s = re.sub(r"^[A-Za-z]\s+(?=[A-Z][a-z])", "", s)
     return s
 
 
 # Words that are NEVER guest names — clothing logos, UI text, donation/chat junk
-# that the OCR picks up from the host's shirt or on-screen overlays.
+# that the OCR picks up from the host's shirt or on-screen overlays. Matched
+# FUZZILY so OCR misreads (e.g. "Columbu" for "Columbia") are still caught.
 _DENY_WORDS = {
     "columbia", "montrail", "montrad", "nike", "adidas", "youtube", "subscribe",
     "live", "chat", "superchat", "super", "donation", "member", "joined",
     "themuslimlantern", "muslimlantern", "lantern", "verified", "loading",
 }
+
+
+def _is_denied(word: str) -> bool:
+    """True if word matches a denylist entry exactly OR is a close OCR misread
+    of one (>=80% similar), so 'Columbu' is rejected like 'Columbia'."""
+    w = word.lower().strip("@._-")
+    if w in _DENY_WORDS:
+        return True
+    for d in _DENY_WORDS:
+        if abs(len(w) - len(d)) <= 2 and SequenceMatcher(None, w, d).ratio() >= 0.8:
+            return True
+    return False
+
+
+def _has_vowel(w: str) -> bool:
+    return bool(re.search(r"[aeiouAEIOU]", w))
 
 
 def _looks_like_name(c: str) -> bool:
@@ -72,10 +92,9 @@ def _looks_like_name(c: str) -> bool:
     if re.search(r"[€$£₹]\s?\d|\d+[.,]\d{2}\b", c):
         return False
 
-    # Reject anything that is a known logo / UI word (single or first token).
-    if low in _DENY_WORDS:
-        return False
-    if words[0].lower() in _DENY_WORDS and len(words) <= 2:
+    # Reject anything that is a known logo / UI word (fuzzy — catches OCR
+    # misreads like "Columbu" for "Columbia"). Check every token.
+    if any(_is_denied(w) for w in words):
         return False
 
     # A real caption name has at least 3 letters in its main token and is not a
@@ -84,15 +103,21 @@ def _looks_like_name(c: str) -> bool:
     if len(words) == 1:
         w = words[0]
         if w.startswith("@"):
-            return len(w) >= 4              # @handles are valid guest IDs
-        # single plain word: require Capitalised + not in denylist + 4-18 chars
+            return len(w) >= 4 and _has_vowel(w)   # @handles are valid guest IDs
+        # single plain word: Capitalised, 4-18 chars, has a vowel, not denied,
+        # and not a code-like token (mix of letters+digits+dashes = garbage).
         if not (w[:1].isupper() and 4 <= len(w) <= 18):
             return False
-        if w.lower() in _DENY_WORDS:
+        if not _has_vowel(w):
+            return False
+        if re.search(r"[a-z][0-9]|[0-9][a-z]|-", w):   # "az-fy3mp" style junk
             return False
     else:
-        # Multi-word: at least one token must be Capitalised (a real name).
+        # Multi-word: at least one token must be Capitalised (a real name),
+        # and the whole thing must contain a vowel.
         if not any(w[:1].isupper() for w in words if w):
+            return False
+        if not _has_vowel(c):
             return False
 
     # Reject lines that are mostly digits.

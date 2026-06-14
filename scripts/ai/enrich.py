@@ -40,7 +40,8 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 #  v2 = audio LLM guests join/leave (or Q&A if no guests)
 #  v3 = OCR on-screen-name guest detection (primary) + audio Q&A fallback; NO summary
 #  v4 = refined OCR: rejects shirt logos / donations / chat, 1.5x upscale, 30s step
-CHAPTER_LOGIC_VERSION = 4
+#  v5 = fuzzy logo reject (Columbu), strip stray prefix (I Kainat), drop code-junk
+CHAPTER_LOGIC_VERSION = 5
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
