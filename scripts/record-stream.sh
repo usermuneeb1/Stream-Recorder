@@ -160,13 +160,18 @@ record_method_d() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method D: Android VR player (proven working)"
+    log_info "  Method D: Android VR player (cookieless 1080p — primary)"
     
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # Option C: this primary method is DELIBERATELY COOKIELESS. android_vr returns
+    # full 1080p without cookies (verified 2026-06-14), and passing STALE/rotated
+    # cookies here can actually make YouTube reject the request. Only attach
+    # cookies if they are verified-valid; otherwise run clean cookieless so a bad
+    # cookie file can never block a public-stream recording.
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -393,22 +398,28 @@ attempt_recording() {
     log_info "  URL: ${video_url}"
     log_info "  Output: ${output_base}"
     
+    # ── METHOD ORDER (Option C: cookieless-first reliability) ──────────────
+    # Verified 2026-06-14: android_vr + mediaconnect both return FULL 1080p
+    # WITHOUT cookies. So we try the proven cookieless methods FIRST — this means
+    # stale/expired YouTube cookies can NEVER block a public-stream recording.
+    # The cookie-based methods (A/B) run only AFTER, as a bonus for the rare
+    # members-only / age-restricted stream where cookies are actually required.
     local methods=(
-        "record_method_g"
         "record_method_d"
+        "record_method_c"
         "record_method_a"
         "record_method_b"
+        "record_method_g"
         "record_method_e"
-        "record_method_c"
         "record_method_f"
     )
     local method_names=(
+        "D: Android VR (cookieless 1080p — primary)"
+        "C: mediaconnect (cookieless 1080p)"
+        "A: Cookies+web_creator (bonus)"
+        "B: Cookies+tv_embedded (bonus)"
         "G: Plain yt-dlp (default)"
-        "D: Android VR (best)"
-        "A: Cookies+web_creator"
-        "B: Cookies+tv_embedded"
         "E: Mobile Web"
-        "C: mediaconnect (anonymous)"
         "F: Streamlink (HLS)"
     )
     
