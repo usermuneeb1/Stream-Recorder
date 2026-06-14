@@ -103,7 +103,18 @@ def _looks_like_name(c: str) -> bool:
     if len(words) == 1:
         w = words[0]
         if w.startswith("@"):
-            return len(w) >= 4 and _has_vowel(w)   # @handles are valid guest IDs
+            # Real YouTube handles: letters/digits/dot/underscore only (NO dash).
+            # Real ones are usually a name followed by trailing digits
+            # (e.g. @albinamirzaeva2070). Garbage like "az-fy3mp" has dashes or
+            # digits mixed INTO the letters — reject those.
+            handle = w[1:]
+            if not re.fullmatch(r"[A-Za-z0-9._]{3,30}", handle):
+                return False
+            # Strip trailing digits (allowed), then the rest must be clean letters.
+            core = re.sub(r"\d+$", "", handle)
+            if re.search(r"[0-9]", core):          # digits mixed mid-handle = junk
+                return False
+            return len(core) >= 3 and _has_vowel(core)
         # single plain word: Capitalised, 4-18 chars, has a vowel, not denied,
         # and not a code-like token (mix of letters+digits+dashes = garbage).
         if not (w[:1].isupper() and 4 <= len(w) <= 18):
