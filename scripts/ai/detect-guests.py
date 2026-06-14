@@ -26,8 +26,12 @@ from collections import defaultdict
 from difflib import SequenceMatcher
 
 # ── Tunables (env-overridable) ────────────────────────────────────────────────
-SAMPLE_STEP = int(os.environ.get("GUEST_SAMPLE_STEP", "30"))   # seconds between frames
+SAMPLE_STEP = int(os.environ.get("GUEST_SAMPLE_STEP", "20"))   # seconds between frames
 MIN_HITS = int(os.environ.get("GUEST_MIN_HITS", "2"))          # appearances to be "real"
+# The name caption sits in the BOTTOM band of each tile. Only text below this
+# fraction of frame height is read — rejects mid-frame logos/posters/background.
+NAME_BAND_FRAC = float(os.environ.get("GUEST_NAME_BAND_FRAC", "0.62"))
+MIN_CONF = float(os.environ.get("GUEST_MIN_CONF", "70"))       # OCR confidence floor
 # Host name fragments — these caption lines are the channel itself, never a guest.
 HOST_HINTS = [h.strip().lower() for h in os.environ.get(
     "GUEST_HOST_HINTS", "muslimlantern,themuslimlantern,lantern,m.a").split(",") if h.strip()]
@@ -149,24 +153,74 @@ def _norm(s: str) -> str:
 
 
 def ocr_frame(url: str, t: int):
-    """Return cleaned candidate name strings read from the frame at time t."""
-    # Upscale 1.5x — small caption text OCRs noticeably better when enlarged,
-    # so more guest names are caught and fewer are missed.
+    """Return candidate name strings read from the NAME CAPTION BAND of the frame.
+
+    Two-layer filtering for accuracy:
+      • POSITION: tesseract TSV gives each word's x/y/confidence. We only keep
+        words in the bottom name-band (y >= 62% of height) at caption font-size
+        with decent confidence. This rejects shirt logos, posters and background
+        text in the middle of the frame (the old whole-frame OCR false positives).
+      • CONTENT: the kept words are still passed through _looks_like_name / the
+        denylist so any stray junk is dropped too.
+    Words on the same caption line (same screen side + similar y) are merged so a
+    first+last name like 'Rocco' + 'Donofrio' becomes one 'Rocco Donofrio'.
+    Upscaled 1.5x — small caption text OCRs noticeably better when enlarged."""
     fr = subprocess.run(
         ["ffmpeg", "-y", "-ss", str(t), "-i", url, "-frames:v", "1",
          "-vf", "scale=iw*1.5:ih*1.5", "-f", "image2", "-vcodec", "png", "pipe:1"],
         capture_output=True)
     if fr.returncode != 0 or not fr.stdout:
         return []
-    oc = subprocess.run(["tesseract", "stdin", "stdout"],
+    oc = subprocess.run(["tesseract", "stdin", "stdout", "tsv"],
                         input=fr.stdout, capture_output=True)
+    rows = oc.stdout.decode("utf-8", "ignore").splitlines()
+    if len(rows) < 2:
+        return []
+
+    words = []
+    max_bottom = 1
+    for ln in rows[1:]:
+        f = ln.split("\t")
+        if len(f) < 12:
+            continue
+        try:
+            conf = float(f[10]); x = int(f[6]); y = int(f[7]); w = int(f[8]); h = int(f[9])
+        except ValueError:
+            continue
+        txt = f[11].strip()
+        if not txt:
+            continue
+        words.append({"conf": conf, "x": x, "y": y, "w": w, "h": h, "txt": txt})
+        max_bottom = max(max_bottom, y + h)
+
+    band_y = NAME_BAND_FRAC * max_bottom
+    kept = [wd for wd in words
+            if wd["conf"] >= MIN_CONF and wd["y"] >= band_y
+            and 0.012 * max_bottom <= wd["h"] <= 0.06 * max_bottom]
+    if not kept:
+        return []
+
+    # Merge words into caption lines by screen-side (left/right tile) + y-proximity.
+    half = max_bottom * 16 / 9 / 2
+    tol = max(18, 0.03 * max_bottom)
+    kept.sort(key=lambda d: (d["y"], d["x"]))
+    groups = []
+    for wd in kept:
+        side = 0 if wd["x"] < half else 1
+        for g in groups:
+            if g["side"] == side and abs(wd["y"] - g["y"]) <= tol:
+                g["words"].append(wd)
+                break
+        else:
+            groups.append({"side": side, "y": wd["y"], "words": [wd]})
+
     out = []
-    for line in oc.stdout.decode("utf-8", "ignore").splitlines():
-        # The caption boxes sometimes OCR with a junk prefix before a "|"
-        # separator (e.g. "cg | Josh Bandeira"). Keep the part after the last "|".
-        if "|" in line:
-            line = line.split("|")[-1]
-        c = _clean(line)
+    for g in groups:
+        g["words"].sort(key=lambda d: d["x"])
+        text = " ".join(w["txt"] for w in g["words"])
+        if "|" in text:
+            text = text.split("|")[-1]
+        c = _clean(text)
         if _looks_like_name(c):
             out.append(c)
     return out
