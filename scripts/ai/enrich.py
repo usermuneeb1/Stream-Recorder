@@ -42,7 +42,8 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 #  v4 = refined OCR: rejects shirt logos / donations / chat, 1.5x upscale, 30s step
 #  v5 = fuzzy logo reject (Columbu), strip stray prefix (I Kainat), drop code-junk
 # v9 = JOINS-ONLY (no leaves), allow short names (Sam/Ali), looser filter = more guests caught
-CHAPTER_LOGIC_VERSION = 9
+# v10 = audio fallback also joins-only (drop "leaves" from LLM output)
+CHAPTER_LOGIC_VERSION = 10
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
@@ -200,17 +201,16 @@ def llm_enrich(title, segments):
         '  "tags": array of 4-8 short topic tags,\n'
         '  "chapters": array of {"time": SECONDS_INT, "label": "short title"}.\n\n'
         "CHAPTER RULES — FOLLOW EXACTLY, DO NOT ADD ANYTHING ELSE:\n"
-        " 1. The chapters must be ONLY about guests/callers joining and leaving.\n"
+        " 1. The chapters must be ONLY about guests/callers JOINING. (joins only —\n"
+        "    do NOT add any 'leaves' / 'left' / 'removed' chapters at all.)\n"
         "    - When a guest or caller JOINS / is introduced / starts speaking, add a\n"
         "      chapter labelled like 'NAME joins' (use their real name if mentioned,\n"
         "      otherwise 'Caller joins' or 'Guest joins'; add a country/topic if\n"
         "      clearly stated, e.g. 'Caller from India joins').\n"
-        "    - When that guest/caller LEAVES / is removed / the host moves on to the\n"
-        "      next person, add a chapter labelled like 'NAME leaves'.\n"
-        " 2. Use the REAL second value from the snippet where the join/leave happens.\n"
+        " 2. Use the REAL second value from the snippet where the join happens.\n"
         "    NEVER use round guesses like 0, 300, 600, 900.\n"
         " 3. Do NOT create chapters for topics, sub-topics, side discussions, intros,\n"
-        "    outros, breaks, or anything that is not a guest joining or leaving.\n"
+        "    outros, breaks, leaving, or anything that is not a guest JOINING.\n"
         " 4. SPECIAL CASE — if the stream has NO guests/callers at all (it is just the\n"
         "    host talking or answering questions), then INSTEAD create chapters for\n"
         "    each distinct question answered by Muslims, labelled like\n"
@@ -349,6 +349,12 @@ def main():
                             return True
                         new_chapters = [c for c in new_chapters
                                         if _label_ok(c.get("label", ""))]
+                        # JOINS-ONLY: drop any "leaves/left/removed" chapters the
+                        # LLM may still produce, so the audio fallback matches the
+                        # OCR path (joins only).
+                        new_chapters = [c for c in new_chapters
+                                        if not re.search(r"\b(leaves|left|removed|leaving)\b",
+                                                         c.get("label", ""), re.I)]
                         # Upload transcript so the player can offer captions.
                         t_url = upload_to_archive(
                             ident, "transcript.json",
