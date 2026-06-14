@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: "📥 Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "📦 Install tools"
         run: |
