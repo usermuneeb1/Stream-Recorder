@@ -41,7 +41,7 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 #  v3 = OCR on-screen-name guest detection (primary) + audio Q&A fallback; NO summary
 #  v4 = refined OCR: rejects shirt logos / donations / chat, 1.5x upscale, 30s step
 #  v5 = fuzzy logo reject (Columbu), strip stray prefix (I Kainat), drop code-junk
-CHAPTER_LOGIC_VERSION = 5
+CHAPTER_LOGIC_VERSION = 6
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
@@ -336,6 +336,18 @@ def main():
                         log(f"   transcript: {len(text)} chars, {len(segments)} segments")
                         enrich = llm_enrich(rec.get("title", ""), segments)
                         new_chapters = enrich.get("chapters", []) or []
+                        # Sanitize: drop chapters whose label contains a code-like
+                        # junk token (e.g. "az-fy3mp") that Whisper sometimes
+                        # invents from garbled audio usernames.
+                        def _label_ok(lbl):
+                            import re as _re
+                            for tok in _re.findall(r"[A-Za-z0-9-]+", lbl):
+                                if _re.search(r"[a-z][0-9]|[0-9][a-z]", tok) or \
+                                   ("-" in tok and any(ch.isdigit() for ch in tok)):
+                                    return False
+                            return True
+                        new_chapters = [c for c in new_chapters
+                                        if _label_ok(c.get("label", ""))]
                         # Upload transcript so the player can offer captions.
                         t_url = upload_to_archive(
                             ident, "transcript.json",
