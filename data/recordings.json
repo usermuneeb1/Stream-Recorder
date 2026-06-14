@@ -21,45 +21,31 @@
     "archive_node": "https://ia800409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
     "mega_link": "https://mega.nz/#!tc1iwC7I!eKgBCS8sA_Ab3bE7PuvBkaovYxM1VP3P2HtHIzSxBm8",
     "gofile_link": "https://gofile.io/d/J4FK97",
-    "ai_summary": "Muhammed Ali hosts a live Q&A session, answering questions from non-Muslims about Islam. Various topics are discussed, including the nature of God, the role of Jesus, and the concept of sin. The conversation is informal and open, with participants sharing their perspectives and engaging in respectful dialogue.",
-    "ai_tags": [
-      "Islam",
-      "Q&A",
-      "Non-Muslims",
-      "Muhammed Ali",
-      "Religion",
-      "Debate",
-      "Live Stream"
-    ],
     "ai_chapters": [
       {
         "time": 0,
         "label": "Stream starts"
       },
       {
-        "time": 1089,
-        "label": "Makashif joins"
+        "time": 3330,
+        "label": "Mira joins"
       },
       {
-        "time": 3123,
-        "label": "Caller from India joins"
+        "time": 6300,
+        "label": "Mira leaves"
       },
       {
-        "time": 6361,
-        "label": "Paul joins"
+        "time": 9315,
+        "label": "Josh Bandeira joins"
       },
       {
-        "time": 8645,
-        "label": "Fan joins"
-      },
-      {
-        "time": 10321,
-        "label": "Matthew joins"
+        "time": 10845,
+        "label": "Josh Bandeira leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-vSKAJZkhuq4-1778975061/transcript.json",
-    "ai_enriched_at": "2026-06-13T11:49:55Z",
-    "chapter_logic_version": 2,
+    "ai_enriched_at": "2026-06-14T04:50:02Z",
+    "chapter_logic_version": 3,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4"
   },
@@ -85,41 +71,23 @@
     "archive_node": "https://ia800802.us.archive.org/16/items/tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "mega_link": "https://mega.nz/#!uDIR0BgA!X3Evqi3jxQiO3QFcRyvPhFeur8co7AqQT0X5qwM_O7w",
     "gofile_link": "https://gofile.io/d/MFEBBX",
-    "ai_summary": "Muhammed Ali hosts a live Q&A session, addressing various questions and topics related to Islam. The discussion covers a range of subjects, including the existence of a creator, morality, and comparisons between different religious figures. The conversation is interactive, with the host engaging with callers and responding to their queries.",
-    "ai_tags": [
-      "Islam",
-      "Q&A",
-      "Morality",
-      "Creator",
-      "Religion",
-      "Debate",
-      "Muhammed Ali"
-    ],
     "ai_chapters": [
       {
         "time": 0,
         "label": "Stream starts"
       },
       {
-        "time": 2400,
-        "label": "Sam joins"
+        "time": 6210,
+        "label": "Odens joins"
       },
       {
-        "time": 6125,
-        "label": "Guest joins"
-      },
-      {
-        "time": 6842,
-        "label": "Brother joins"
-      },
-      {
-        "time": 7088,
-        "label": "Brother leaves"
+        "time": 7740,
+        "label": "Odens leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-lQySsXx00Io-1778454605/transcript.json",
-    "ai_enriched_at": "2026-06-13T11:51:06Z",
-    "chapter_logic_version": 2,
+    "ai_enriched_at": "2026-06-14T04:53:20Z",
+    "chapter_logic_version": 3,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4"
   },
@@ -145,49 +113,23 @@
     "archive_node": "https://ia800900.us.archive.org/31/items/tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
     "mega_link": "https://mega.nz/#!SDQUWaCI!mTXG0wBKfHXrVFxPhEJVAWtDxo7aFCC_SZBzocF9wao",
     "gofile_link": "https://gofile.io/d/Gpsi6b",
-    "ai_summary": "Muhammed Ali hosts a live Q&A session, addressing various questions and topics related to Islam. The discussion covers a range of subjects, from worship and zakat to wudu and da'wah. The host engages with callers and chat participants, providing insights and clarifications on Islamic principles.",
-    "ai_tags": [
-      "Islam",
-      "Q&A",
-      "Muhammed Ali",
-      "Worship",
-      "Zakat",
-      "Wudu",
-      "Da'wah"
-    ],
     "ai_chapters": [
       {
         "time": 0,
         "label": "Stream starts"
       },
       {
-        "time": 3600,
-        "label": "Sister in chat joins"
+        "time": 180,
+        "label": "Columbia joins"
       },
       {
-        "time": 3840,
-        "label": "Lucid joins"
-      },
-      {
-        "time": 4081,
-        "label": "Brother joins"
-      },
-      {
-        "time": 4441,
-        "label": "Christian caller joins"
-      },
-      {
-        "time": 4680,
-        "label": "Caller leaves"
-      },
-      {
-        "time": 4800,
-        "label": "Stream ends"
+        "time": 1665,
+        "label": "Columbia leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-LT7jTHW_e8Y-1777157490/transcript.json",
-    "ai_enriched_at": "2026-06-13T11:51:37Z",
-    "chapter_logic_version": 2,
+    "ai_enriched_at": "2026-06-14T04:55:23Z",
+    "chapter_logic_version": 3,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4"
   },
@@ -213,65 +155,47 @@
     "archive_node": "https://ia802907.us.archive.org/11/items/tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "mega_link": "https://mega.nz/#!T5IQHarY!EiIHbSHC0fZx3ZrF-qgXdmWDOw8ArDFrQj-mjjWvL70",
     "gofile_link": "https://gofile.io/d/8hMp0e",
-    "ai_summary": "The video 'Non-Muslims Question Islam Live! Muhammed Ali' features a live Q&A session where non-Muslims ask questions about Islam. The host, Muhammed Ali, responds to various questions and engages in discussions with callers. The conversation covers a range of topics, including Islamic principles, marriage, and faith.",
-    "ai_tags": [
-      "Islam",
-      "Q&A",
-      "Non-Muslims",
-      "Muhammed Ali",
-      "Islamic Principles",
-      "Marriage",
-      "Faith"
-    ],
     "ai_chapters": [
       {
         "time": 0,
         "label": "Stream starts"
       },
       {
-        "time": 1084,
-        "label": "Caller joins"
+        "time": 1125,
+        "label": "Najeeb quranist joins"
       },
       {
-        "time": 2284,
-        "label": "Non-Muslims join"
+        "time": 1980,
+        "label": "Najeeb quranist leaves"
       },
       {
-        "time": 2522,
-        "label": "Callers removed"
+        "time": 3240,
+        "label": "Asel Siikriye joins"
+      },
+      {
+        "time": 3600,
+        "label": "Asel Siikriye leaves"
       },
       {
         "time": 3960,
-        "label": "Caller joins"
+        "label": "Kainat joins"
       },
       {
-        "time": 4927,
-        "label": "Caller speaks"
+        "time": 8010,
+        "label": "Kainat leaves"
       },
       {
-        "time": 6120,
-        "label": "New topic starts"
+        "time": 8100,
+        "label": "Ron Brailey joins"
       },
       {
-        "time": 7200,
-        "label": "Caller leaves"
-      },
-      {
-        "time": 8043,
-        "label": "New caller joins"
-      },
-      {
-        "time": 8881,
-        "label": "Caller asks question"
-      },
-      {
-        "time": 9721,
-        "label": "Lulu person removed"
+        "time": 9315,
+        "label": "Ron Brailey leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776554397/transcript.json",
-    "ai_enriched_at": "2026-06-13T11:52:40Z",
-    "chapter_logic_version": 2,
+    "ai_enriched_at": "2026-06-14T04:59:29Z",
+    "chapter_logic_version": 3,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4"
   },
@@ -297,16 +221,6 @@
     "archive_node": "https://ia800808.us.archive.org/0/items/tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "mega_link": "https://mega.nz/#!BJMxVboA!zMHvsF4NTTsD6QwMWrmP0iPSPa00a095UraBacb16nY",
     "gofile_link": "https://gofile.io/d/0CiUnF",
-    "ai_summary": "Muhammed Ali hosts a live Q&A session, addressing various questions and topics from non-Muslims. The discussion covers a range of issues, including Islamic principles and practices. The host engages with callers and provides insights into the Islamic faith.",
-    "ai_tags": [
-      "Islam",
-      "Q&A",
-      "Non-Muslims",
-      "Muhammed Ali",
-      "Live Stream",
-      "Islamic Principles",
-      "Faith"
-    ],
     "ai_chapters": [
       {
         "time": 0,
@@ -317,24 +231,24 @@
         "label": "Caller joins"
       },
       {
-        "time": 1562,
+        "time": 1446,
         "label": "Caller leaves"
       },
       {
-        "time": 1681,
-        "label": "Lebanese caller joins"
+        "time": 1562,
+        "label": "Guest joins"
       },
       {
-        "time": 1800,
-        "label": "Lebanese caller leaves"
+        "time": 1681,
+        "label": "Guest leaves"
       },
       {
         "time": 2042,
-        "label": "Brother joins"
+        "label": "Caller from Syria joins"
       },
       {
-        "time": 2163,
-        "label": "Brother leaves"
+        "time": 2282,
+        "label": "Caller from Syria leaves"
       },
       {
         "time": 2400,
@@ -346,8 +260,8 @@
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776546681/transcript.json",
-    "ai_enriched_at": "2026-06-13T11:53:03Z",
-    "chapter_logic_version": 2,
+    "ai_enriched_at": "2026-06-14T05:01:52Z",
+    "chapter_logic_version": 3,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4"
   }
