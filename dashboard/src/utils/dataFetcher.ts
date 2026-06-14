@@ -103,7 +103,10 @@ function buildSources(links: any) {
   return s;
 }
 
-function parseLinks(text: string): StreamData[] {
+// Legacy links.txt parser — kept for reference but no longer called (recordings
+// .json is now the single source of truth). Prefixed with _ to mark intentionally
+// unused without deleting the (still-valid) implementation.
+function _parseLinks(text: string): StreamData[] {
   const out: StreamData[] = [];
   for (const block of text.split(/={10,}/)) {
     const b = block.trim();

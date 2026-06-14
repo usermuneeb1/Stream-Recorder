@@ -297,7 +297,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
   const [iframeSrc, setIframeSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const [, setFailedSources] = useState<string[]>([]);
 
   // Apply external seek requests (e.g. clicking an AI chapter).
   // Vidstack exposes seeking on the player INSTANCE (player.currentTime), not on
