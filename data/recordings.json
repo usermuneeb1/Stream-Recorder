@@ -27,33 +27,21 @@
         "label": "Stream starts"
       },
       {
-        "time": 1080,
+        "time": 1070,
         "label": "Rocco Donofrio joins"
       },
       {
-        "time": 1120,
-        "label": "Rocco Donofrio leaves"
-      },
-      {
-        "time": 3520,
+        "time": 3510,
         "label": "Mira joins"
       },
       {
-        "time": 6240,
-        "label": "Mira leaves"
-      },
-      {
-        "time": 9240,
+        "time": 9230,
         "label": "Josh Bandeira joins"
-      },
-      {
-        "time": 10880,
-        "label": "Josh Bandeira leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-vSKAJZkhuq4-1778975061/transcript.json",
-    "ai_enriched_at": "2026-06-14T07:45:45Z",
-    "chapter_logic_version": 8,
+    "ai_enriched_at": "2026-06-14T11:35:34Z",
+    "chapter_logic_version": 9,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4"
   },
@@ -85,17 +73,13 @@
         "label": "Stream starts"
       },
       {
-        "time": 7600,
+        "time": 7590,
         "label": "Odens joins"
-      },
-      {
-        "time": 7660,
-        "label": "Odens leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-lQySsXx00Io-1778454605/transcript.json",
-    "ai_enriched_at": "2026-06-14T07:55:29Z",
-    "chapter_logic_version": 8,
+    "ai_enriched_at": "2026-06-14T11:45:25Z",
+    "chapter_logic_version": 9,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4"
   },
@@ -128,19 +112,19 @@
       },
       {
         "time": 3600,
-        "label": "Sister joins"
+        "label": "Sister in chat joins"
       },
       {
         "time": 3840,
         "label": "Lucid joins"
       },
       {
-        "time": 4322,
-        "label": "Christian caller joins"
+        "time": 4081,
+        "label": "Brother joins"
       },
       {
-        "time": 4680,
-        "label": "Caller leaves"
+        "time": 4564,
+        "label": "Last caller joins"
       },
       {
         "time": 4800,
@@ -148,8 +132,8 @@
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-LT7jTHW_e8Y-1777157490/transcript.json",
-    "ai_enriched_at": "2026-06-14T08:03:34Z",
-    "chapter_logic_version": 8,
+    "ai_enriched_at": "2026-06-14T11:52:32Z",
+    "chapter_logic_version": 9,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4"
   },
@@ -181,49 +165,29 @@
         "label": "Stream starts"
       },
       {
-        "time": 1120,
+        "time": 1110,
         "label": "Najeeb quranist joins"
       },
       {
-        "time": 1960,
-        "label": "Najeeb quranist leaves"
-      },
-      {
-        "time": 3280,
+        "time": 3270,
         "label": "Asel Sikriye joins"
       },
       {
-        "time": 3660,
-        "label": "Asel Sikriye leaves"
-      },
-      {
-        "time": 3960,
+        "time": 3950,
         "label": "Kainat joins"
       },
       {
-        "time": 4340,
+        "time": 4330,
         "label": "Kris joins"
       },
       {
-        "time": 4660,
-        "label": "Kris leaves"
-      },
-      {
-        "time": 8000,
-        "label": "Kainat leaves"
-      },
-      {
-        "time": 8080,
+        "time": 8070,
         "label": "Ron Brailey joins"
-      },
-      {
-        "time": 9360,
-        "label": "Ron Brailey leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776554397/transcript.json",
-    "ai_enriched_at": "2026-06-14T08:15:54Z",
-    "chapter_logic_version": 8,
+    "ai_enriched_at": "2026-06-14T12:04:54Z",
+    "chapter_logic_version": 9,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4"
   },
@@ -264,19 +228,19 @@
       },
       {
         "time": 1562,
-        "label": "Guest joins"
+        "label": "Caller joins"
       },
       {
-        "time": 1681,
-        "label": "Guest leaves"
+        "time": 1920,
+        "label": "Caller leaves"
       },
       {
         "time": 2042,
-        "label": "Caller from Syria joins"
+        "label": "Caller joins"
       },
       {
-        "time": 2163,
-        "label": "Caller from Syria leaves"
+        "time": 2282,
+        "label": "Caller leaves"
       },
       {
         "time": 2400,
@@ -284,12 +248,12 @@
       },
       {
         "time": 2524,
-        "label": "New caller leaves"
+        "label": "Caller leaves"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776546681/transcript.json",
-    "ai_enriched_at": "2026-06-14T08:19:44Z",
-    "chapter_logic_version": 8,
+    "ai_enriched_at": "2026-06-14T12:08:14Z",
+    "chapter_logic_version": 9,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4"
   }
