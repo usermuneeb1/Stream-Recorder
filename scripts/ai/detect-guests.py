@@ -11,9 +11,9 @@
 # ║    2. OCR each frame (tesseract) to read the name-caption boxes              ║
 # ║    3. Drop the host's own name + chat/garbage lines                          ║
 # ║    4. Fuzzy-merge OCR variants of the same guest name                        ║
-# ║    5. Emit YouTube-style chapters: "<Guest> joins" / "<Guest> leaves"        ║
-# ║       (if NO guests are ever found, emit nothing — caller leaves chapters    ║
-# ║        to the audio Q&A fallback)                                            ║
+# ║    5. Emit JOINS-ONLY chapters: "<Guest> joins" (no "leaves" — keeps it      ║
+# ║       simple and clean). If NO guests are found, emit nothing so the audio    ║
+# ║       Q&A fallback can take over.                                            ║
 # ║                                                                              ║
 # ║  Requires: ffmpeg, tesseract-ocr   (installed in the workflow)               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -77,20 +77,18 @@ def _has_vowel(w: str) -> bool:
 
 
 def _looks_like_name(c: str) -> bool:
-    if not (3 <= len(c) <= 28):
+    if not (2 <= len(c) <= 28):
         return False
     if not re.search(r"[A-Za-z]", c):
         return False
 
     words = c.split()
-    if len(words) > 4:                     # full sentences = chat messages
+    if len(words) > 5:                     # full sentences = chat messages
         return False
 
     letters = sum(ch.isalpha() for ch in c)
-    if letters / max(len(c), 1) < 0.65:    # too much OCR garbage / symbols
+    if letters / max(len(c), 1) < 0.6:     # too much OCR garbage / symbols
         return False
-
-    low = c.lower()
 
     # Reject money / donation overlays (e.g. "@RANDOM €2.49", "$5.00").
     if re.search(r"[€$£₹]\s?\d|\d+[.,]\d{2}\b", c):
@@ -101,27 +99,20 @@ def _looks_like_name(c: str) -> bool:
     if any(_is_denied(w) for w in words):
         return False
 
-    # A real caption name has at least 3 letters in its main token and is not a
-    # lone ALL-CAPS spam token. Single-word logos like "Columbia" are rejected
-    # unless they look like a proper @handle.
     if len(words) == 1:
         w = words[0]
         if w.startswith("@"):
-            # Real YouTube handles: letters/digits/dot/underscore only (NO dash).
-            # Real ones are usually a name followed by trailing digits
-            # (e.g. @albinamirzaeva2070). Garbage like "az-fy3mp" has dashes or
-            # digits mixed INTO the letters — reject those.
             handle = w[1:]
             if not re.fullmatch(r"[A-Za-z0-9._]{3,30}", handle):
                 return False
-            # Strip trailing digits (allowed), then the rest must be clean letters.
             core = re.sub(r"\d+$", "", handle)
             if re.search(r"[0-9]", core):          # digits mixed mid-handle = junk
                 return False
-            return len(core) >= 3 and _has_vowel(core)
-        # single plain word: Capitalised, 4-18 chars, has a vowel, not denied,
+            return len(core) >= 2 and _has_vowel(core)
+        # single plain word: Capitalised, 3-18 chars, has a vowel, not denied,
         # and not a code-like token (mix of letters+digits+dashes = garbage).
-        if not (w[:1].isupper() and 4 <= len(w) <= 18):
+        # (3 chars so short real names like "Sam", "Ali" are NOT rejected.)
+        if not (w[:1].isupper() and 3 <= len(w) <= 18):
             return False
         if not _has_vowel(w):
             return False
@@ -283,7 +274,10 @@ def detect(url: str, duration: int = 0):
         if len(_norm(nm)) > len(g["key"]):
             g["key"] = _norm(nm)
 
-    # 3. Build join/leave chapters for groups seen enough times to be real.
+    # 3. Build JOINS-ONLY chapters (user wants only "<Guest> joins", no leaves).
+    #    The join time is the FIRST frame the name appeared on screen, then
+    #    nudged back toward the previous sample so the chapter starts a touch
+    #    before the caption (feels accurate, never late).
     chapters = []
     for g in groups:
         if len(g["times"]) < MIN_HITS:
@@ -293,14 +287,10 @@ def detect(url: str, duration: int = 0):
         if not display or _is_host(display):
             continue
         times = sorted(g["times"])
-        join_t = times[0]
-        # "leave" = one sample step after the last time we saw them (they're gone
-        # by the next sample). Cap at the video end.
-        leave_t = min(times[-1] + SAMPLE_STEP, duration)
+        # First sighting; back off ~half a sample step (the guest joined sometime
+        # between the previous empty sample and this one), but never below 0.
+        join_t = max(0, times[0] - SAMPLE_STEP // 2)
         chapters.append({"time": join_t, "label": f"{display} joins"})
-        # Only add a "leaves" if they actually disappeared before the end.
-        if leave_t < duration - SAMPLE_STEP:
-            chapters.append({"time": leave_t, "label": f"{display} leaves"})
 
     chapters.sort(key=lambda c: c["time"])
 
