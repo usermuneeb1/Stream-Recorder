@@ -65,7 +65,7 @@ jobs:
       - name: "📦 Install deps (ffmpeg + python)"
         if: steps.gate.outputs.run == 'true'
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg tesseract-ocr
           pip3 install --quiet -r scripts/ai/requirements.txt
 
       - name: "🧠 Run enrichment"

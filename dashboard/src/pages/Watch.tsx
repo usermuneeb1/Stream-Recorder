@@ -667,19 +667,6 @@ export default function Watch() {
             {currentOption ? <PremiumVideoPlayer stream={stream} option={currentOption} archiveId={archiveId} onTime={setPlayerTime} seekTo={seekRequest} /> : <div className="w-full h-full flex items-center justify-center text-white">No player available</div>}
           </div>
           <div><h1 className="text-2xl sm:text-3xl font-bold font-display leading-tight mb-3">{stream.title}</h1><div className="flex flex-wrap items-center gap-4 text-sm text-dark-500 dark:text-dark-400 font-medium"><span className="flex items-center gap-1.5"><Clock size={16} /> {stream.date} • {stream.duration}</span>{stream.size && <span className="flex items-center gap-1.5"><HardDrive size={16} /> {stream.size}</span>}</div><div className="flex flex-wrap items-center gap-3 mt-6 pb-6 border-b border-dark-200 dark:border-dark-800"><button onClick={handleAddBookmark} className="btn-secondary flex items-center gap-2"><Bookmark size={18} /> Bookmark</button><button onClick={handleShare} className="btn-secondary flex items-center gap-2">{copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}{copied ? 'Copied!' : 'Share'}</button>{downloadLinks.length > 0 && <button onClick={() => setShowDownloads(true)} className="btn-primary flex items-center gap-2 bg-brand-600 hover:bg-brand-500"><Download size={18} /> Download</button>}<button onClick={() => setShowShortcuts(true)} className="btn-secondary flex items-center gap-2 ml-auto"><Keyboard size={16} /> Shortcuts</button></div></div>
-          {stream.aiSummary && (
-            <div className="glass-panel p-5 rounded-2xl border border-dark-200 dark:border-dark-800">
-              <h3 className="font-bold mb-2 text-base flex items-center gap-2">✨ AI Summary</h3>
-              <p className="text-sm leading-relaxed text-dark-600 dark:text-dark-300">{stream.aiSummary}</p>
-              {stream.aiTags && stream.aiTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {stream.aiTags.map((t) => (
-                    <span key={t} className="px-2.5 py-1 rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-300 text-xs font-semibold border border-brand-200/50 dark:border-brand-800/50">#{t}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           {relatedStreams.length > 0 && <div><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-bold font-display">More Recordings</h3><Link to="/gallery" className="text-sm text-brand-500 font-medium flex items-center gap-1">View All <ChevronRight size={14} /></Link></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{relatedStreams.map(rs => <Link key={rs.videoId} to={`/watch/${rs.videoId}`} state={{ stream: rs }} className="group"><div className="relative aspect-video rounded-xl overflow-hidden bg-dark-200 dark:bg-dark-800 mb-2"><img src={rs.thumbnail} alt={rs.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}thumbnail.jpg`; }} /></div><h4 className="text-xs font-semibold line-clamp-2 group-hover:text-brand-500 transition-colors">{rs.title}</h4></Link>)}</div></div>}
         </div>
         <div className="space-y-5">

@@ -37,7 +37,9 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 
 # Bump this whenever the chapter PROMPT/logic changes, so a forced re-run knows
 # which recordings still need regenerating with the new logic.
-CHAPTER_LOGIC_VERSION = 2  # v2 = guests join/leave only (or Q&A if no guests)
+#  v2 = audio LLM guests join/leave (or Q&A if no guests)
+#  v3 = OCR on-screen-name guest detection (primary) + audio Q&A fallback; NO summary
+CHAPTER_LOGIC_VERSION = 3
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
@@ -77,6 +79,27 @@ def groq_post(path, *, data=None, files=None, headers=None):
 def archive_audio_url(rec):
     """Best direct media URL for the recording (audio extracted from video)."""
     return rec.get("archive_node") or rec.get("archive_direct") or ""
+
+
+def video_url(rec):
+    """Best direct VIDEO URL for OCR frame sampling. Prefer the fast GitHub
+    Release mirror (Azure CDN), then Archive node/direct."""
+    return (rec.get("github_direct") or rec.get("github_release")
+            or rec.get("archive_node") or rec.get("archive_direct") or "")
+
+
+def detect_guests_ocr(url):
+    """Run the OCR on-screen-name guest detector. Returns chapter list or []."""
+    try:
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "detect-guests.py")
+        spec = importlib.util.spec_from_file_location("detect_guests", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.detect(url)
+    except Exception as e:
+        log(f"   ⚠️ OCR guest detection failed: {e}")
+        return []
 
 
 def extract_audio(src_url, out_wav):
@@ -256,8 +279,9 @@ def main():
     def needs_enrich(r):
         if not archive_audio_url(r):
             return False
-        if not r.get("ai_summary"):
-            return True            # never enriched
+        # "enriched" now means it has chapters from the CURRENT logic version.
+        if r.get("chapter_logic_version") != CHAPTER_LOGIC_VERSION:
+            return True
         if not FORCE:
             return False
         # FORCE: regenerate chapters with the current prompt. The chapter
@@ -277,47 +301,58 @@ def main():
     for rec in todo:
         ident = (rec.get("archive_link") or "").split("/details/")[-1]
         log(f"\n──── {rec.get('date')} {ident} ────")
-        src = archive_audio_url(rec)
-        with tempfile.TemporaryDirectory() as tmp:
-            wav = os.path.join(tmp, "audio.wav")
-            log("   extracting audio...")
-            if not extract_audio(src, wav):
-                log("   ⏭️ audio extraction failed, skipping")
-                continue
-            chunks = split_audio(wav, tmp) or [wav]
-            segments, text = transcribe(chunks)
-            if not text:
-                log("   ⏭️ transcription empty, skipping")
-                continue
-            log(f"   transcript: {len(text)} chars, {len(segments)} segments")
+        # ── STEP 1: OCR guest detection (PRIMARY) ─────────────────────────────
+        # Read the on-screen name captions from the video frames. This is far
+        # more reliable than guessing guest names from audio.
+        vurl = video_url(rec)
+        ocr_chapters = []
+        if vurl:
+            log("   👁️ detecting guests from on-screen names (OCR)...")
+            ocr_chapters = detect_guests_ocr(vurl)
+            log(f"   OCR found {len(ocr_chapters)} chapter(s)")
 
-            enrich = llm_enrich(rec.get("title", ""), segments)
-            transcript_obj = {"segments": segments, "text": text}
+        # A "real guest" result = more than just the opening "Stream starts".
+        has_guests = any(c.get("label", "").lower() not in ("stream starts",)
+                         for c in ocr_chapters)
 
-            # Upload transcript + srt to Archive
-            t_url = upload_to_archive(ident, "transcript.json",
-                                      json.dumps(transcript_obj).encode(), "application/json")
-            upload_to_archive(ident, "subtitles.srt",
-                              segments_to_srt(segments).encode(), "text/plain")
+        new_chapters = []
+        if has_guests:
+            new_chapters = ocr_chapters
+            log("   ✅ using OCR guest chapters")
+        else:
+            # ── STEP 2: audio Q&A fallback (only when NO guests on screen) ─────
+            # No guests detected on screen → fall back to audio so the video
+            # still gets useful "Q:" question chapters.
+            log("   no on-screen guests — falling back to audio Q&A chapters...")
+            src = archive_audio_url(rec)
+            with tempfile.TemporaryDirectory() as tmp:
+                wav = os.path.join(tmp, "audio.wav")
+                if extract_audio(src, wav):
+                    chunks = split_audio(wav, tmp) or [wav]
+                    segments, text = transcribe(chunks)
+                    if text:
+                        log(f"   transcript: {len(text)} chars, {len(segments)} segments")
+                        enrich = llm_enrich(rec.get("title", ""), segments)
+                        new_chapters = enrich.get("chapters", []) or []
+                        # Upload transcript so the player can offer captions.
+                        t_url = upload_to_archive(
+                            ident, "transcript.json",
+                            json.dumps({"segments": segments, "text": text}).encode(),
+                            "application/json")
+                        if t_url:
+                            rec["transcript_url"] = t_url
 
-            # SAFETY: only overwrite existing AI fields when the new result is
-            # actually valid. A failed/rate-limited LLM call returns {} — never
-            # let that wipe previously-good summaries/chapters.
-            new_summary = enrich.get("summary", "")
-            new_chapters = enrich.get("chapters", [])
-            if new_summary:
-                rec["ai_summary"] = new_summary
-                rec["ai_tags"] = enrich.get("tags", [])
-                if new_chapters:
-                    rec["ai_chapters"] = new_chapters
-                if t_url:
-                    rec["transcript_url"] = t_url
-                if new_chapters:
-                    rec["chapter_logic_version"] = CHAPTER_LOGIC_VERSION
-                rec["ai_enriched_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
-                log(f"   ✅ summary + {len(rec.get('ai_tags', []))} tags + {len(rec.get('ai_chapters', []))} chapters")
-            else:
-                log("   ⚠️ LLM returned no summary — keeping existing AI data, not overwriting")
+        # ── SAFETY: only overwrite when we actually got chapters ──────────────
+        if new_chapters:
+            rec["ai_chapters"] = new_chapters
+            rec["chapter_logic_version"] = CHAPTER_LOGIC_VERSION
+            rec["ai_enriched_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            # Remove the AI summary/tags — user wants chapters only.
+            rec.pop("ai_summary", None)
+            rec.pop("ai_tags", None)
+            log(f"   ✅ {len(new_chapters)} chapters (summary removed)")
+        else:
+            log("   ⚠️ no chapters produced — keeping existing data, not overwriting")
 
         # Save after each item so partial progress persists
         with open(RECORDINGS, "w") as f:
