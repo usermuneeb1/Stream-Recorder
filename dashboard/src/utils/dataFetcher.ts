@@ -1,7 +1,7 @@
 export interface StreamSource {
   label: string;
   url: string;
-  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'odysee' | 'rumble' | 'buzzheavier' | 'github';
+  type: 'archive' | 'mega' | 'pixeldrain' | 'gofile' | 'odysee' | 'rumble' | 'buzzheavier' | 'github' | 'youtube' | 'gdrive';
   // Optional precomputed direct media URL (e.g. the exact Archive .mp4). When
   // present the player streams it instantly without a metadata lookup.
   directUrl?: string;
@@ -71,6 +71,12 @@ function isTML(ch?: string) {
 
 function ytId(u?: string) {
   const m = (u || '').match(/(?:v=|\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : '';
+}
+function ytIdFromUrl(u?: string): string {
+  if (!u) return '';
+  // Match: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID, youtube.com/shorts/ID
+  const m = u.match(/(?:v=|youtu\.be\/|embed\/|\/shorts\/)([a-zA-Z0-9_-]{11})/);
   return m ? m[1] : '';
 }
 
@@ -263,6 +269,23 @@ function mergeData(list: StreamData[], recs: any[]): StreamData[] {
     }
     if (r.mega_link && r.mega_link.includes('mega.nz')) s.sources.mega = { label: '🔴 MEGA.nz', url: r.mega_link, type: 'mega' };
     if (r.gofile_link) s.sources.gofile = { label: '📁 Gofile', url: r.gofile_link, type: 'gofile' };
+    // Google Drive Hydra — download mirror (GDrive blocks hotlinking, download only)
+    if (r.gdrive_link || r.gdrive_file_id) {
+      const gdUrl = r.gdrive_link || `https://drive.google.com/uc?export=download&id=${r.gdrive_file_id}`;
+      s.sources.gdrive = { label: '🟢 Google Drive', url: gdUrl, type: 'gdrive' };
+    }
+    // YouTube Ghost-Host unlisted mirror — played via Invidious proxy (/api/yt/<id>)
+    if (r.youtube_id || r.youtube_unlisted) {
+      const ytId = r.youtube_id || ytIdFromUrl(r.youtube_unlisted);
+      if (ytId) {
+        s.sources.youtube = {
+          label: '▶️ YouTube (Unlisted)',
+          url: `https://youtu.be/${ytId}`,
+          type: 'youtube',
+          directUrl: `/api/yt/${ytId}`,
+        };
+      }
+    }
     
     if (r.chat_url && !s.chatUrl) s.chatUrl = r.chat_url;
     // AI-enriched metadata (optional)

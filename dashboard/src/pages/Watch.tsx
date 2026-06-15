@@ -20,7 +20,7 @@ import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/l
 import { StreamData, StreamSource, fetchStreams } from '../utils/dataFetcher';
 
 const PLAYER_NAMES = ['R3AL', 'B3ING', 'Jatt', 'Helicopter'];
-const SOURCE_PRIORITY = ['github', 'archive', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
+const SOURCE_PRIORITY = ['github', 'archive', 'youtube', 'archiveSmall', 'buzz', 'pixel', 'odysee', 'rumble'];
 
 // ── Pixeldrain "fast playback" configuration ──
 // EVERYTHING goes through our OWN Vercel proxy (/api/pd/<id>). The proxy fetches
@@ -155,7 +155,7 @@ function sortSourceEntries(sources: Record<string, StreamSource>): [string, Stre
     // proxy cannot solve (it needs a human CAPTCHA), so embedded playback breaks
     // unpredictably. It stays available as a Download link only. Archive (dxture)
     // is the reliable player. MEGA/Gofile are download-only (not embeddable).
-    .filter(([key]) => key !== 'mega' && key !== 'gofile' && key !== 'pixel' && key !== 'pixeldrain')
+    .filter(([key]) => key !== 'mega' && key !== 'gofile' && key !== 'pixel' && key !== 'pixeldrain' && key !== 'gdrive')
     .sort(([a], [b]) => {
     const ai = SOURCE_PRIORITY.indexOf(a);
     const bi = SOURCE_PRIORITY.indexOf(b);
@@ -357,7 +357,7 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
       setFailedSources([]);
       try {
         let direct: DirectSource[] = [];
-        if (option.source.type === 'archive' || option.source.type === 'github') {
+        if (option.source.type === 'archive' || option.source.type === 'github' || option.source.type === 'youtube') {
           // Fast path: stream the precomputed direct URL instantly.
           // - github: the Release asset URL (Azure CDN, fast + permanent). We
           //   append the Archive direct URL as a silent fallback so playback
@@ -368,8 +368,8 @@ function PremiumVideoPlayer({ stream, option, archiveId, onTime, seekTo }: { str
           if (option.source.fallbackUrl && option.source.fallbackUrl !== option.source.directUrl) {
             fast.push({ id: 'src-backup', quality: 'Backup', url: option.source.fallbackUrl, mime: 'video/mp4' });
           }
-          // Cross-source safety net for GitHub: add Archive as a final fallback.
-          if (option.source.type === 'github') {
+          // Cross-source safety net: add Archive as a final fallback.
+          if (option.source.type === 'github' || option.source.type === 'youtube') {
             const archiveFallback = stream.sources.archive?.directUrl || stream.sources.archiveSmall?.directUrl;
             if (archiveFallback && !fast.some(f => f.url === archiveFallback)) {
               fast.push({ id: 'archive-fallback', quality: 'Backup', url: archiveFallback, mime: 'video/mp4' });
@@ -638,6 +638,7 @@ export default function Watch() {
     stream.sources.buzz && { label: 'Buzzheavier', url: stream.sources.buzz.url, note: 'Fast direct download' },
     stream.sources.pixel && { label: 'Pixeldrain', url: stream.sources.pixel.url, note: 'Open Pixeldrain to download' },
     stream.sources.mega && { label: 'MEGA.nz', url: stream.sources.mega.url, note: 'Encrypted storage mirror' },
+    stream.sources.gdrive && { label: 'Google Drive', url: stream.sources.gdrive.url, note: 'Shared drive mirror (download)' },
   ].filter((item) => item && item.url) as { label: string; url: string; note: string }[];
 
   const handleAddBookmark = () => { const timeStr = prompt('Enter timestamp to bookmark (e.g., 01:23:45):'); if (!timeStr) return; const newBms = [...bookmarks, { time: Date.now(), note: `Bookmark at ${timeStr}` }]; setBookmarks(newBms); localStorage.setItem(`bookmarks_${id}`, JSON.stringify(newBms)); };

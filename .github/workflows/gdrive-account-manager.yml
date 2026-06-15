@@ -1,0 +1,80 @@
+name: "🟢 GDrive Account Manager"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - generate
+          - integrate
+      sa_count:
+        description: "Number of SAs to create"
+        required: false
+        default: "5"
+        type: string
+  schedule:
+    - cron: "0 6 1 * *"
+
+env:
+  GCP_ADMIN_KEY: ${{ secrets.GCP_ADMIN_KEY }}
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+  GDRIVE_SA_COUNT: ${{ github.event.inputs.sa_count || '5' }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
+
+permissions:
+  contents: write
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: "📦 Install"
+        run: pip3 install --quiet google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2
+      - name: "🔑 Check creds"
+        id: check
+        run: |
+          if [[ -z "$GCP_ADMIN_KEY" || -z "$GDRIVE_FOLDER_ID" || -z "$GCP_PROJECT_ID" ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "❌ Missing secrets (GCP_ADMIN_KEY/GDRIVE_FOLDER_ID/GCP_PROJECT_ID)"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      - name: "🟢 Run"
+        if: steps.check.outputs.skip != 'true'
+        run: python3 scripts/gdrive/generate_accounts.py "${{ github.event.inputs.action || 'both' }}"
+      - name: "💾 Commit"
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          if [[ -n "$(git status -s scripts/gdrive/)" ]]; then
+            git config user.name "GDrive Bot"
+            git config user.email "gdrive@stream-recorder.local"
+            git add scripts/gdrive/accounts.csv
+            git commit -m "🟢 GDrive: update SA registry"
+            git push
+          fi
+      - name: "📡 Discord"
+        if: always()
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+          SKIP="${{ steps.check.outputs.skip }}"
+          if [[ "$SKIP" == "true" ]]; then
+            COLOR=16744448; DESC="> GCP/GDrive secrets not configured"
+          else
+            COLOR=5763757; DESC="> Action: ${{ github.event.inputs.action || 'both' }}"
+          fi
+          curl -s -o /dev/null -H "Content-Type: application/json" \
+            -d "$(jq -n --arg t "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --argjson c "$COLOR" --arg d "$DESC" \
+              '{username:"🟢 GDrive",embeds:[{title:"🟢 GDrive Account Manager",description:$d,color:$c,timestamp:$t}]}')" \
+            "$WEBHOOK"
