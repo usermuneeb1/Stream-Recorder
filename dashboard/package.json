@@ -1,7 +1,7 @@
 {
   "name": "muslim-lantern-archive",
   "private": true,
-  "version": "5.0.0",
+  "version": "6.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vidstack/react": "^1.15.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
