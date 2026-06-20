@@ -1,5 +1,3 @@
-// ── Data Types ───────────────────────────────────────────────────────────────
-
 export interface Recording {
   videoId: string;
   title: string;
@@ -12,8 +10,6 @@ export interface Recording {
   sizeGb: number;
   resolution: string;
   thumbnail: string;
-
-  // Sources
   archiveLink?: string;
   archiveDirect?: string;
   archiveNode?: string;
@@ -25,40 +21,26 @@ export interface Recording {
   gdriveLink?: string;
   telegramLink?: string;
   r2Link?: string;
-
-  // AI
   aiChapters?: { time: number; label: string }[];
   transcriptUrl?: string;
   chatUrl?: string;
-  clips?: { label: string; url: string; type: string; start_sec: number; duration_sec: number; size_mb: number }[];
 }
 
-export interface Stats {
-  totalStreams: number;
-  totalHours: number;
-  totalGb: number;
-}
+// ── Data source (obfuscated) ─────────────────────────────────────────────────
+const _S = [
+  atob('aHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L2doL3VzZXJtdW5lZWIxL1N0cmVhbS1SZWNvcmRlckBtYWlu'),
+  atob('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3VzZXJtdW5lZWIxL1N0cmVhbS1SZWNvcmRlci9tYWlu'),
+];
 
-// ── Fetch ────────────────────────────────────────────────────────────────────
-
-const CDN = 'https://cdn.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main';
-const RAW = 'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main';
-
-async function fetchFile(path: string): Promise<string | null> {
-  for (const base of [CDN, RAW]) {
-    try {
-      const res = await fetch(`${base}/${path}?t=${Date.now()}`);
-      if (res.ok) return await res.text();
-    } catch { /* next */ }
+async function _f(path: string): Promise<string | null> {
+  for (const b of _S) {
+    try { const r = await fetch(`${b}/${path}?_=${Date.now()}`); if (r.ok) return await r.text(); } catch {}
   }
   return null;
 }
 
 function cleanTitle(t: string): string {
-  return (t || '')
-    .replace(/\s+\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\s*$/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  return (t || '').replace(/\s+\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\s*$/g, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 function fmtDuration(fmt: string): string {
@@ -70,45 +52,41 @@ function fmtDuration(fmt: string): string {
 
 function thumbUrl(videoId: string, thumb?: string): string {
   if (thumb && thumb.startsWith('http')) return thumb;
-  // YouTube thumbnail
   const ytId = videoId?.match?.(/^[a-zA-Z0-9_-]{11}$/);
   if (ytId) return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   return '/thumbnail.jpg';
 }
 
-// ── Deduplicate: keep only the entry with the most links per YouTube video ID ─
 function dedup(recs: Recording[]): Recording[] {
   const map = new Map<string, Recording>();
   for (const r of recs) {
-    // Derive YouTube video ID from videoUrl if the videoId is an archive identifier
     const ytMatch = r.videoUrl?.match?.(/(?:v=|\/)([\w-]{11})/);
     const key = ytMatch ? ytMatch[1] : r.videoId;
-
     const existing = map.get(key);
     if (!existing) {
       map.set(key, { ...r, videoId: key });
     } else {
-      // Merge: keep whichever has more links / better data
-      const merged = { ...existing };
-      if (!merged.archiveDirect && r.archiveDirect) merged.archiveDirect = r.archiveDirect;
-      if (!merged.archiveNode && r.archiveNode) merged.archiveNode = r.archiveNode;
-      if (!merged.archiveLink && r.archiveLink) merged.archiveLink = r.archiveLink;
-      if (!merged.megaLink && r.megaLink) merged.megaLink = r.megaLink;
-      if (!merged.pixeldrainLink && r.pixeldrainLink) merged.pixeldrainLink = r.pixeldrainLink;
-      if (!merged.gofileLink && r.gofileLink) merged.gofileLink = r.gofileLink;
-      if (!merged.githubRelease && r.githubRelease) merged.githubRelease = r.githubRelease;
-      if (!merged.githubDirect && r.githubDirect) merged.githubDirect = r.githubDirect;
-      if (!merged.aiChapters?.length && r.aiChapters?.length) merged.aiChapters = r.aiChapters;
-      if (!merged.transcriptUrl && r.transcriptUrl) merged.transcriptUrl = r.transcriptUrl;
-      if (!merged.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) merged.thumbnail = r.thumbnail;
-      map.set(key, merged);
+      const m = { ...existing };
+      if (!m.archiveDirect && r.archiveDirect) m.archiveDirect = r.archiveDirect;
+      if (!m.archiveNode && r.archiveNode) m.archiveNode = r.archiveNode;
+      if (!m.archiveLink && r.archiveLink) m.archiveLink = r.archiveLink;
+      if (!m.megaLink && r.megaLink) m.megaLink = r.megaLink;
+      if (!m.pixeldrainLink && r.pixeldrainLink) m.pixeldrainLink = r.pixeldrainLink;
+      if (!m.gofileLink && r.gofileLink) m.gofileLink = r.gofileLink;
+      if (!m.githubRelease && r.githubRelease) m.githubRelease = r.githubRelease;
+      if (!m.githubDirect && r.githubDirect) m.githubDirect = r.githubDirect;
+      if (!m.aiChapters?.length && r.aiChapters?.length) m.aiChapters = r.aiChapters;
+      if (!m.transcriptUrl && r.transcriptUrl) m.transcriptUrl = r.transcriptUrl;
+      if (!m.chatUrl && r.chatUrl) m.chatUrl = r.chatUrl;
+      if (!m.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) m.thumbnail = r.thumbnail;
+      map.set(key, m);
     }
   }
   return Array.from(map.values());
 }
 
 export async function fetchRecordings(): Promise<Recording[]> {
-  const text = await fetchFile('data/recordings.json');
+  const text = await _f('data/recordings.json');
   if (!text) return [];
   try {
     const raw: any[] = JSON.parse(text);
@@ -140,25 +118,7 @@ export async function fetchRecordings(): Promise<Recording[]> {
         aiChapters: r.ai_chapters || [],
         transcriptUrl: r.transcript_url || '',
         chatUrl: r.chat_url || '',
-        clips: r.clips || [],
       }));
     return dedup(recs).sort((a, b) => b.date.localeCompare(a.date));
-  } catch {
-    return [];
-  }
-}
-
-export async function fetchStats(): Promise<Stats> {
-  const text = await fetchFile('stats.json');
-  if (!text) return { totalStreams: 0, totalHours: 0, totalGb: 0 };
-  try {
-    const s = JSON.parse(text);
-    return {
-      totalStreams: s.total_streams || 0,
-      totalHours: Math.round((s.total_hours || 0) * 10) / 10,
-      totalGb: Math.round((s.total_gb || 0) * 10) / 10,
-    };
-  } catch {
-    return { totalStreams: 0, totalHours: 0, totalGb: 0 };
-  }
+  } catch { return []; }
 }
