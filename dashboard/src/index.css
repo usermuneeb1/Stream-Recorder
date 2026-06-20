@@ -7,43 +7,47 @@
 :root {
   --bg-primary: #0f0f0f;
   --bg-secondary: #181818;
-  --bg-tertiary: #212121;
-  --bg-hover: #272727;
-  --bg-elevated: #2a2a2a;
+  --bg-tertiary: #222222;
+  --bg-hover: #2a2a2a;
+  --bg-elevated: #303030;
   --text-primary: #f1f1f1;
   --text-secondary: #aaaaaa;
   --text-muted: #717171;
-  --border: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.1);
   --accent: #cc0000;
   --accent-hover: #e60000;
 }
 
 .light {
   --bg-primary: #ffffff;
-  --bg-secondary: #f9f9f9;
-  --bg-tertiary: #f0f0f0;
-  --bg-hover: #e8e8e8;
-  --bg-elevated: #e5e5e5;
+  --bg-secondary: #f2f2f2;
+  --bg-tertiary: #e8e8e8;
+  --bg-hover: #dedede;
+  --bg-elevated: #d4d4d4;
   --text-primary: #0f0f0f;
   --text-secondary: #606060;
   --text-muted: #909090;
-  --border: rgba(0,0,0,0.08);
+  --border: rgba(0,0,0,0.1);
   --accent: #cc0000;
-  --accent-hover: #b30000;
+  --accent-hover: #a30000;
 }
 
 body {
-  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
-  transition: background 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--bg-elevated); }
+::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 5px; border: 2px solid var(--bg-primary); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+::selection { background: var(--accent); color: #fff; }
 
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -52,9 +56,21 @@ body {
 .skeleton {
   background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 12px;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: 16px;
 }
 
-/* Vidstack overrides for larger player */
-media-player { --media-font-family: inherit; }
+/* Vidstack — make player larger and more premium */
+media-player {
+  --media-font-family: inherit;
+  --media-controls-color: #fff;
+}
+media-player[data-view-type="video"] {
+  border-radius: 16px;
+}
+
+/* Smooth page transitions */
+main, footer, header { transition: background 0.3s ease; }
+
+/* Better focus for accessibility */
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
