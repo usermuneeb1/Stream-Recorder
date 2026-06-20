@@ -5,72 +5,57 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg-primary: #0f0f0f;
-  --bg-secondary: #181818;
-  --bg-tertiary: #222222;
-  --bg-hover: #2a2a2a;
-  --bg-elevated: #303030;
-  --text-primary: #f1f1f1;
-  --text-secondary: #aaaaaa;
-  --text-muted: #717171;
-  --border: rgba(255,255,255,0.1);
-  --accent: #cc0000;
-  --accent-hover: #e60000;
+  --bg: #0a0a0a;
+  --bg-card: #141414;
+  --bg-card-hover: #1a1a1a;
+  --bg-elevated: #1e1e1e;
+  --bg-input: #1a1a1a;
+  --text: #e8e8e8;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666;
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --red: #c41e1e;
+  --red-glow: rgba(196,30,30,0.15);
 }
-
 .light {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f2f2f2;
-  --bg-tertiary: #e8e8e8;
-  --bg-hover: #dedede;
-  --bg-elevated: #d4d4d4;
-  --text-primary: #0f0f0f;
-  --text-secondary: #606060;
-  --text-muted: #909090;
-  --border: rgba(0,0,0,0.1);
-  --accent: #cc0000;
-  --accent-hover: #a30000;
+  --bg: #fafafa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f5f5f5;
+  --bg-elevated: #f0f0f0;
+  --bg-input: #f0f0f0;
+  --text: #111;
+  --text-secondary: #555;
+  --text-muted: #999;
+  --border: rgba(0,0,0,0.06);
+  --border-strong: rgba(0,0,0,0.12);
+  --red: #c41e1e;
+  --red-glow: rgba(196,30,30,0.08);
 }
 
+html { scroll-behavior: smooth; }
 body {
-  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition: background 0.3s ease, color 0.3s ease;
+  transition: background .25s, color .25s;
 }
 
-::-webkit-scrollbar { width: 10px; }
+::selection { background: var(--red); color: #fff; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 5px; border: 2px solid var(--bg-primary); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 
-::selection { background: var(--accent); color: #fff; }
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
+@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+  background: linear-gradient(90deg, var(--bg-card) 30%, var(--bg-elevated) 50%, var(--bg-card) 70%);
   background-size: 200% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
-  border-radius: 16px;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 12px;
 }
+@keyframes fade-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.fade-in { animation: fade-in .4s ease-out both; }
 
-/* Vidstack — make player larger and more premium */
-media-player {
-  --media-font-family: inherit;
-  --media-controls-color: #fff;
-}
-media-player[data-view-type="video"] {
-  border-radius: 16px;
-}
-
-/* Smooth page transitions */
-main, footer, header { transition: background 0.3s ease; }
-
-/* Better focus for accessibility */
-*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+/* Native video player — full control */
+video::-webkit-media-controls-panel { background: linear-gradient(transparent, rgba(0,0,0,.7)); }
