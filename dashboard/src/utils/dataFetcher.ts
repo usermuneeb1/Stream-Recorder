@@ -26,7 +26,6 @@ export interface Recording {
   chatUrl?: string;
 }
 
-// ── Data source (obfuscated) ─────────────────────────────────────────────────
 const _S = [
   atob('aHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L2doL3VzZXJtdW5lZWIxL1N0cmVhbS1SZWNvcmRlckBtYWlu'),
   atob('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3VzZXJtdW5lZWIxL1N0cmVhbS1SZWNvcmRlci9tYWlu'),
@@ -52,8 +51,7 @@ function fmtDuration(fmt: string): string {
 
 function thumbUrl(videoId: string, thumb?: string): string {
   if (thumb && thumb.startsWith('http')) return thumb;
-  const ytId = videoId?.match?.(/^[a-zA-Z0-9_-]{11}$/);
-  if (ytId) return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  if (videoId?.match?.(/^[a-zA-Z0-9_-]{11}$/)) return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   return '/thumbnail.jpg';
 }
 
@@ -67,17 +65,10 @@ function dedup(recs: Recording[]): Recording[] {
       map.set(key, { ...r, videoId: key });
     } else {
       const m = { ...existing };
-      if (!m.archiveDirect && r.archiveDirect) m.archiveDirect = r.archiveDirect;
-      if (!m.archiveNode && r.archiveNode) m.archiveNode = r.archiveNode;
-      if (!m.archiveLink && r.archiveLink) m.archiveLink = r.archiveLink;
-      if (!m.megaLink && r.megaLink) m.megaLink = r.megaLink;
-      if (!m.pixeldrainLink && r.pixeldrainLink) m.pixeldrainLink = r.pixeldrainLink;
-      if (!m.gofileLink && r.gofileLink) m.gofileLink = r.gofileLink;
-      if (!m.githubRelease && r.githubRelease) m.githubRelease = r.githubRelease;
-      if (!m.githubDirect && r.githubDirect) m.githubDirect = r.githubDirect;
+      for (const k of ['archiveDirect','archiveNode','archiveLink','megaLink','pixeldrainLink','gofileLink','githubRelease','githubDirect','transcriptUrl','chatUrl'] as const) {
+        if (!m[k] && r[k]) (m as any)[k] = r[k];
+      }
       if (!m.aiChapters?.length && r.aiChapters?.length) m.aiChapters = r.aiChapters;
-      if (!m.transcriptUrl && r.transcriptUrl) m.transcriptUrl = r.transcriptUrl;
-      if (!m.chatUrl && r.chatUrl) m.chatUrl = r.chatUrl;
       if (!m.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) m.thumbnail = r.thumbnail;
       map.set(key, m);
     }
@@ -90,35 +81,36 @@ export async function fetchRecordings(): Promise<Recording[]> {
   if (!text) return [];
   try {
     const raw: any[] = JSON.parse(text);
-    const recs: Recording[] = raw
-      .filter((r: any) => (r.channel || '').toLowerCase().includes('muslim lantern'))
-      .map((r: any) => ({
-        videoId: r.video_id || '',
-        title: cleanTitle(r.title || ''),
-        channel: r.channel || '',
-        date: r.date || '',
-        videoUrl: r.video_url || '',
-        durationSec: r.duration_sec || 0,
-        durationFmt: fmtDuration(r.duration_fmt || ''),
-        sizeHuman: r.size_human || '',
-        sizeGb: r.size_gb || 0,
-        resolution: r.resolution || '',
-        thumbnail: thumbUrl(r.video_id, r.thumbnail),
-        archiveLink: r.archive_link || '',
-        archiveDirect: r.archive_direct || '',
-        archiveNode: r.archive_node || '',
-        megaLink: r.mega_link || '',
-        pixeldrainLink: r.pixeldrain_link || '',
-        gofileLink: r.gofile_link || '',
-        githubRelease: r.github_release || '',
-        githubDirect: r.github_direct || '',
-        gdriveLink: r.gdrive_link || '',
-        telegramLink: r.telegram_link || '',
-        r2Link: r.r2_link || '',
-        aiChapters: r.ai_chapters || [],
-        transcriptUrl: r.transcript_url || '',
-        chatUrl: r.chat_url || '',
-      }));
-    return dedup(recs).sort((a, b) => b.date.localeCompare(a.date));
+    return dedup(
+      raw
+        .filter((r: any) => (r.channel || '').toLowerCase().includes('muslim lantern'))
+        .map((r: any): Recording => ({
+          videoId: r.video_id || '',
+          title: cleanTitle(r.title || ''),
+          channel: r.channel || '',
+          date: r.date || '',
+          videoUrl: r.video_url || '',
+          durationSec: r.duration_sec || 0,
+          durationFmt: fmtDuration(r.duration_fmt || ''),
+          sizeHuman: r.size_human || '',
+          sizeGb: r.size_gb || 0,
+          resolution: r.resolution || '',
+          thumbnail: thumbUrl(r.video_id, r.thumbnail),
+          archiveLink: r.archive_link || '',
+          archiveDirect: r.archive_direct || '',
+          archiveNode: r.archive_node || '',
+          megaLink: r.mega_link || '',
+          pixeldrainLink: r.pixeldrain_link || '',
+          gofileLink: r.gofile_link || '',
+          githubRelease: r.github_release || '',
+          githubDirect: r.github_direct || '',
+          gdriveLink: r.gdrive_link || '',
+          telegramLink: r.telegram_link || '',
+          r2Link: r.r2_link || '',
+          aiChapters: r.ai_chapters || [],
+          transcriptUrl: r.transcript_url || '',
+          chatUrl: r.chat_url || '',
+        }))
+    ).sort((a, b) => b.date.localeCompare(a.date));
   } catch { return []; }
 }
