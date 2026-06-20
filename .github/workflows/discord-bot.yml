@@ -1,0 +1,54 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ 🤖 DISCORD BOT — Scheduled Status & Manual Commands                       ║
+# ║                                                                            ║
+# ║ Runs every 6 hours to post system status to Discord.                      ║
+# ║ Can also be triggered manually with a specific command.                    ║
+# ║                                                                            ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: 🤖 Discord Bot
+
+on:
+  schedule:
+    # Post status every 6 hours
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Bot command to run"
+        required: true
+        type: choice
+        options:
+          - status
+          - latest
+          - accounts
+          - record
+          - refresh
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install dependencies
+        run: pip install requests
+
+      - name: 🤖 Run command
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          COMMAND="${{ github.event.inputs.command || 'status' }}"
+          echo "🤖 Running command: ${COMMAND}"
+          python3 scripts/discord_bot.py "$COMMAND"

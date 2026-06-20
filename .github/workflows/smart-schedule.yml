@@ -1,0 +1,71 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ 📅 SMART SCHEDULE — Predict stream times + check for upcoming streams     ║
+# ║                                                                            ║
+# ║ Runs daily:                                                                ║
+# ║ 1. Analyzes past recordings to predict stream schedule                     ║
+# ║ 2. Scrapes YouTube for scheduled/upcoming streams                          ║
+# ║ 3. If a stream is scheduled, sends Discord alert with countdown            ║
+# ║ 4. Writes prediction data to data/ for the dashboard                       ║
+# ║                                                                            ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: 📅 Smart Schedule
+
+on:
+  schedule:
+    # Run twice daily (morning + evening PKT)
+    - cron: "0 4,14 * * *"
+  workflow_dispatch:
+
+jobs:
+  schedule:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: 📦 Install yt-dlp
+        run: |
+          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+          sudo chmod a+rx /usr/local/bin/yt-dlp
+
+      - name: 🧠 Predict stream schedule
+        run: python3 scripts/smart-schedule/predict_stream.py
+
+      - name: 📅 Check for upcoming streams
+        env:
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+        run: python3 scripts/smart-schedule/yt_schedule_scraper.py
+
+      - name: 📢 Discord alert for upcoming stream
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [[ -f data/upcoming-streams.json ]]; then
+            HAS_UPCOMING=$(jq -r '.has_upcoming' data/upcoming-streams.json)
+            if [[ "$HAS_UPCOMING" == "true" ]]; then
+              TITLE=$(jq -r '.upcoming[0].title // "Upcoming Stream"' data/upcoming-streams.json)
+              SCHEDULED=$(jq -r '.upcoming[0].scheduled_utc // "TBD"' data/upcoming-streams.json)
+              
+              curl -s -H "Content-Type: application/json" \
+                -d "{\"embeds\":[{\"title\":\"📅 Upcoming Stream Detected!\",\"description\":\"**${TITLE}**\n\nScheduled: ${SCHEDULED}\",\"color\":3447003}]}" \
+                "$DISCORD_WEBHOOK_URL" || true
+            fi
+          fi
+
+      - name: 📤 Commit predictions
+        run: |
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/predicted-schedule.json data/upcoming-streams.json 2>/dev/null || true
+          git diff --cached --quiet || {
+            git commit -m "📅 Update stream schedule predictions"
+            git push
+          }

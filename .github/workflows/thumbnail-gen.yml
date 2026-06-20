@@ -1,0 +1,58 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ 🎨 THUMBNAIL GENERATOR — Auto-generate branded thumbnails                 ║
+# ║                                                                            ║
+# ║ Extracts a frame from each recording, adds title/branding overlay,         ║
+# ║ uploads to Catbox as a permanent custom thumbnail.                         ║
+# ║                                                                            ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: 🎨 Thumbnail Generator
+
+on:
+  workflow_run:
+    workflows: ["📡 Stream Recorder"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      max_items:
+        description: "Max thumbnails to generate"
+        required: false
+        default: "2"
+
+concurrency:
+  group: thumbnail-gen
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: 📦 Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: 🎨 Generate thumbnails
+        env:
+          THUMB_MAX_ITEMS: ${{ github.event.inputs.max_items || '2' }}
+        run: python3 scripts/thumbnail-ai/generate_thumbnail.py
+
+      - name: 📤 Commit changes
+        run: |
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/recordings.json
+          git diff --cached --quiet || {
+            git commit -m "🎨 Auto-generated custom thumbnails"
+            git push
+          }

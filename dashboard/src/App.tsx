@@ -1,153 +1,101 @@
-import React, { useState } from 'react';
-import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
-import { Layout } from './components/Layout';
-import { useAuth } from './contexts/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Home as HomeIcon, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
-import { CommandPalette } from './components/CommandPalette';
-import { ParticleField } from './components/ParticleField';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { RouteEffects } from './components/RouteEffects';
+import { useState, useEffect, useCallback } from 'react';
+import { fetchRecordings, fetchStats, type Recording, type Stats } from './utils/dataFetcher';
+import { Header } from './components/Header';
+import { StreamCard } from './components/StreamCard';
+import { WatchModal } from './components/WatchModal';
+import { Footer } from './components/Footer';
+import { StatsBar } from './components/StatsBar';
 
-import Home from './pages/Home';
-import Gallery from './pages/Gallery';
-import Watch from './pages/Watch';
-import CommandCenter from './pages/CommandCenter';
+export default function App() {
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [stats, setStats] = useState<Stats>({ totalStreams: 0, totalHours: 0, totalGb: 0 });
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [activeVideo, setActiveVideo] = useState<Recording | null>(null);
 
-function AdminLogin() {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const { login, role } = useAuth();
-  const navigate = useNavigate();
+  useEffect(() => {
+    Promise.all([fetchRecordings(), fetchStats()]).then(([recs, st]) => {
+      setRecordings(recs);
+      setStats({ ...st, totalStreams: recs.length || st.totalStreams });
+      setLoading(false);
+    });
+  }, []);
 
-  if (role === 'admin') {
-    return <Navigate to="/command-center" replace />;
-  }
+  // Handle hash-based routing for direct watch links
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash;
+      const watchMatch = hash.match(/^#\/watch\/(.+)$/);
+      if (watchMatch && recordings.length) {
+        const id = decodeURIComponent(watchMatch[1]);
+        const rec = recordings.find(r => r.videoId === id);
+        if (rec) setActiveVideo(rec);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, [recordings]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (await login(password)) {
-      navigate('/command-center', { replace: true });
-    } else {
-      setError(true);
-      setTimeout(() => setError(false), 2200);
-    }
-  };
+  const openWatch = useCallback((rec: Recording) => {
+    setActiveVideo(rec);
+    window.location.hash = `/watch/${rec.videoId}`;
+  }, []);
+
+  const closeWatch = useCallback(() => {
+    setActiveVideo(null);
+    window.location.hash = '';
+  }, []);
+
+  const filtered = recordings.filter(r => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      r.title.toLowerCase().includes(q) ||
+      r.date.includes(q) ||
+      r.aiChapters?.some(c => c.label.toLowerCase().includes(q))
+    );
+  });
 
   return (
-    <div className="min-h-[75vh] flex items-center justify-center px-4 relative overflow-hidden">
-      <ParticleField count={20} color="rgba(239,68,68,0.16)" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[420px] h-[420px] bg-brand-500/10 rounded-full blur-[130px] pointer-events-none" />
+    <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
+      <Header search={search} onSearch={setSearch} />
+      <StatsBar stats={stats} loading={loading} />
 
-      <motion.div
-        initial={{ opacity: 0, y: 28, scale: 0.96, filter: 'blur(10px)' }}
-        animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-        transition={{ type: 'spring', stiffness: 180, damping: 22 }}
-        className="glass-panel p-8 sm:p-10 rounded-3xl max-w-sm w-full text-center relative z-10 border border-white/20 dark:border-white/5 shadow-2xl"
-      >
-        <motion.div
-          animate={{ y: [-4, 4, -4] }}
-          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-          className="relative mx-auto mb-7 w-fit"
-        >
-          <div className="absolute inset-0 bg-brand-500/25 rounded-full blur-2xl -m-4" />
-          <div className="relative w-20 h-20 rounded-3xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
-            <ShieldCheck size={34} className="text-brand-500" />
+      {/* ── Stream Grid ──────────────────────────────────────────────────── */}
+      <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 pb-12">
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="space-y-3">
+                <div className="skeleton w-full aspect-video rounded-xl" />
+                <div className="skeleton h-4 w-3/4 rounded" />
+                <div className="skeleton h-3 w-1/2 rounded" />
+              </div>
+            ))}
           </div>
-        </motion.div>
-
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Lock size={18} className="text-brand-500" />
-          <h2 className="text-2xl font-bold font-display">Admin Access</h2>
-        </div>
-        <p className="text-dark-500 mb-7 text-sm">Public browsing is open. This passphrase is only for archive administration.</p>
-
-        <motion.form onSubmit={handleSubmit}>
-          <div className="relative mb-4">
-            <motion.input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Admin passphrase"
-              animate={error ? { x: [-10, 10, -10, 10, 0] } : {}}
-              transition={{ duration: 0.4, type: 'spring', stiffness: 500 }}
-              className={`w-full px-4 py-3.5 rounded-2xl bg-dark-100 dark:bg-dark-900 border-2 transition-all duration-300 text-center tracking-widest font-mono focus:outline-none ${
-                error
-                  ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.2)]'
-                  : 'border-dark-200 dark:border-dark-700 focus:border-brand-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.1)]'
-              }`}
-              required
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-dark-400 hover:text-dark-600 transition-colors"
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-32 text-[#717171]">
+            <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <p className="text-lg">No streams found{search ? ` for "${search}"` : ''}</p>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8 mt-6">
+            {filtered.map(rec => (
+              <StreamCard key={rec.videoId} rec={rec} onClick={() => openWatch(rec)} />
+            ))}
+          </div>
+        )}
+      </main>
 
-          <AnimatePresence>
-            {error && (
-              <motion.p
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="text-red-500 text-xs font-medium mb-3"
-              >
-                Incorrect admin passphrase.
-              </motion.p>
-            )}
-          </AnimatePresence>
+      <Footer />
 
-          <button type="submit" className="w-full btn-primary py-3.5 text-base font-bold">
-            Unlock Admin Tools
-          </button>
-        </motion.form>
-      </motion.div>
+      {/* ── Watch Modal ──────────────────────────────────────────────────── */}
+      {activeVideo && (
+        <WatchModal rec={activeVideo} onClose={closeWatch} allRecordings={filtered} onNavigate={openWatch} />
+      )}
     </div>
   );
 }
-
-function NotFound() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-      >
-        <div className="text-8xl font-display font-bold text-gradient-animated mb-4">404</div>
-        <h2 className="text-2xl font-bold font-display mb-3">Page Not Found</h2>
-        <p className="text-dark-500 mb-8 max-w-md">The page you're looking for doesn't exist or has been moved.</p>
-        <Link to="/" className="btn-primary inline-flex items-center gap-2">
-          <HomeIcon size={18} /> Back to Home
-        </Link>
-      </motion.div>
-    </div>
-  );
-}
-
-function App() {
-  const { role } = useAuth();
-
-  return (
-    <ErrorBoundary>
-      <RouteEffects />
-      <Layout>
-        <CommandPalette />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/gallery" element={<Gallery />} />
-          <Route path="/watch/:id" element={<Watch />} />
-          <Route path="/admin" element={<AdminLogin />} />
-          <Route path="/command-center" element={role === 'admin' ? <CommandCenter /> : <AdminLogin />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Layout>
-    </ErrorBoundary>
-  );
-}
-
-export default App;

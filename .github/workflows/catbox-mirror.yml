@@ -1,0 +1,92 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ 🐱 CATBOX MIRROR — Upload thumbnails/transcripts to Catbox.moe            ║
+# ║                                                                            ║
+# ║ Catbox = permanent, no account, direct hotlinks.                           ║
+# ║ Perfect for thumbnails, subtitles, chat logs (all < 200MB).               ║
+# ║ For videos > 200MB, uses Litterbox (72h temp) as warm-up CDN.             ║
+# ║                                                                            ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: 🐱 Catbox Mirror
+
+on:
+  workflow_run:
+    workflows: ["📡 Stream Recorder"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: catbox-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐱 Upload thumbnails to Catbox
+        run: |
+          source scripts/catbox/upload_to_catbox.sh
+
+          # Find recordings with YouTube thumbnails but no catbox thumbnail
+          python3 -c "
+          import json, subprocess, sys
+
+          with open('data/recordings.json') as f:
+              recs = json.load(f)
+
+          updated = False
+          for r in recs:
+              if r.get('catbox_thumbnail'):
+                  continue
+              # Try to get thumbnail from YouTube
+              vid = r.get('video_id', '')
+              thumb_url = r.get('thumbnail', '')
+              if not thumb_url and vid:
+                  thumb_url = f'https://img.youtube.com/vi/{vid}/maxresdefault.jpg'
+
+              if thumb_url:
+                  # Download thumbnail
+                  import urllib.request
+                  try:
+                      tmp_path = f'/tmp/thumb_{vid}.jpg'
+                      urllib.request.urlretrieve(thumb_url, tmp_path)
+                      # Upload to catbox
+                      result = subprocess.run(
+                          ['bash', '-c', f'source scripts/catbox/upload_to_catbox.sh && upload_to_catbox {tmp_path}'],
+                          capture_output=True, text=True, timeout=60
+                      )
+                      for line in result.stdout.split('\n'):
+                          if line.strip().startswith('https://files.catbox.moe/'):
+                              r['catbox_thumbnail'] = line.strip()
+                              updated = True
+                              print(f'  ✅ {vid} → {line.strip()}')
+                              break
+                  except Exception as e:
+                      print(f'  ⚠️ Failed for {vid}: {e}')
+
+          if updated:
+              with open('data/recordings.json', 'w') as f:
+                  json.dump(recs, f, indent=2)
+              print('📋 Updated recordings.json')
+          else:
+              print('📋 No updates needed')
+          "
+
+      - name: 📤 Commit changes
+        run: |
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/recordings.json
+          git diff --cached --quiet || {
+            git commit -m "🐱 Add Catbox thumbnail mirrors"
+            git push
+          }
