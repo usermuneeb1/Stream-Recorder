@@ -2,7 +2,7 @@ export function Header({q,setQ,theme,toggle}:{q:string;setQ:(v:string)=>void;the
   return(
     <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{background:'var(--glass)',borderColor:'var(--bd)'}}>
       <div className="max-w-[1400px] mx-auto flex items-center gap-5 px-4 sm:px-6 lg:px-10 h-20">
-        <a href="#" onClick={()=>{window.location.hash='';}} className="shrink-0 -ml-1"><img src="/logo.png" alt="Muslim Lantern Archive" className="h-14 sm:h-[60px] object-contain"/></a>
+        <a href="#" onClick={()=>{window.location.hash='';}} className="shrink-0"><img src="/logo.png" alt="Muslim Lantern Archive" className="h-14 sm:h-[60px] object-contain"/></a>
         <div className="flex-1"/>
         <div className="relative w-full max-w-[240px]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{color:'var(--tx3)'}} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
