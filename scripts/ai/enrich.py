@@ -44,7 +44,7 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 #  v5 = fuzzy logo reject (Columbu), strip stray prefix (I Kainat), drop code-junk
 # v9 = JOINS-ONLY (no leaves), allow short names (Sam/Ali), looser filter = more guests caught
 # v10 = audio fallback also joins-only (drop "leaves" from LLM output)
-CHAPTER_LOGIC_VERSION = 11
+CHAPTER_LOGIC_VERSION = 12
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
@@ -369,9 +369,8 @@ def main():
                         # JOINS-ONLY: drop any "leaves/left/removed" chapters the
                         # LLM may still produce, so the audio fallback matches the
                         # OCR path (joins only).
-                        new_chapters = [c for c in new_chapters
-                                        if not re.search(r"\b(leaves|left|removed|leaving)\b",
-                                                         c.get("label", ""), re.I)]
+                        # Keep both joins AND leaves chapters
+                        pass
                         # Upload transcript so the player can offer captions.
                         t_url = upload_to_archive(
                             ident, "transcript.json",

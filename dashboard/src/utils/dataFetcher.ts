@@ -55,7 +55,7 @@ export async function fetchRecordings():Promise<Recording[]>{
           megaLink:r.mega_link||'',pixeldrainLink:r.pixeldrain_link||'',gofileLink:r.gofile_link||'',
           githubRelease:r.github_release||'',githubDirect:r.github_direct||'',
           gdriveLink:r.gdrive_link||'',telegramLink:r.telegram_link||'',r2Link:r.r2_link||'',
-          aiChapters:(r.ai_chapters||[]).filter((c:any)=>!c.label?.toLowerCase().includes('leave')),
+          aiChapters:(r.ai_chapters||[]),
           transcriptUrl:r.transcript_url||'',chatUrl:r.chat_url||''
         }))
     ).sort((a,b)=>b.date.localeCompare(a.date));

@@ -27,7 +27,7 @@ from difflib import SequenceMatcher
 
 # ── Tunables (env-overridable) ────────────────────────────────────────────────
 SAMPLE_STEP = int(os.environ.get("GUEST_SAMPLE_STEP", "20"))   # seconds between frames
-MIN_HITS = int(os.environ.get("GUEST_MIN_HITS", "2"))          # appearances to be "real"
+MIN_HITS = int(os.environ.get("GUEST_MIN_HITS", "3"))  # 3+ appearances = real guest          # appearances to be "real"
 # The name caption sits in the BOTTOM band of each tile. Only text below this
 # fraction of frame height is read — rejects mid-frame logos/posters/background.
 NAME_BAND_FRAC = float(os.environ.get("GUEST_NAME_BAND_FRAC", "0.62"))
@@ -54,9 +54,20 @@ def _clean(s: str) -> str:
 # that the OCR picks up from the host's shirt or on-screen overlays. Matched
 # FUZZILY so OCR misreads (e.g. "Columbu" for "Columbia") are still caught.
 _DENY_WORDS = {
-    "columbia", "montrail", "montrad", "nike", "adidas", "youtube", "subscribe",
-    "live", "chat", "superchat", "super", "donation", "member", "joined",
-    "themuslimlantern", "muslimlantern", "lantern", "verified", "loading",
+    # Clothing/brands
+    "columbia", "montrail", "montrad", "nike", "adidas",
+    # YouTube UI
+    "youtube", "subscribe", "live", "chat", "superchat", "super", "donation",
+    "member", "joined", "verified", "loading", "stream", "viewers", "watching",
+    "commentaries", "dictionaries", "learn", "more", "reply", "pinned",
+    # Host
+    "themuslimlantern", "muslimlantern", "lantern",
+    # Religious text that OCR picks up from Quran displays
+    "allah", "prophet", "muhammad", "messenger", "merciful", "gracious",
+    "believers", "believed", "disbelievers", "quran", "torah", "gospel",
+    "emigrants", "righteous", "paradise", "forgiveness", "prayer", "worship",
+    "indeed", "promised", "hereafter", "revelation", "among", "themselves",
+    "knowledge", "boasting", "killed", "pleasure", "description", "sign",
 }
 
 
@@ -83,7 +94,7 @@ def _looks_like_name(c: str) -> bool:
         return False
 
     words = c.split()
-    if len(words) > 5:                     # full sentences = chat messages
+    if len(words) > 3:                     # real names are 1-3 words max
         return False
 
     letters = sum(ch.isalpha() for ch in c)
@@ -102,13 +113,10 @@ def _looks_like_name(c: str) -> bool:
     if len(words) == 1:
         w = words[0]
         if w.startswith("@"):
-            handle = w[1:]
-            if not re.fullmatch(r"[A-Za-z0-9._]{3,30}", handle):
-                return False
-            core = re.sub(r"\d+$", "", handle)
-            if re.search(r"[0-9]", core):          # digits mixed mid-handle = junk
-                return False
-            return len(core) >= 2 and _has_vowel(core)
+            return False  # ALL @handles are chat users, never video call guests
+        # Reject all-lowercase words — these are YouTube chat usernames
+        if w == w.lower():
+            return False
         # single plain word: Capitalised, 3-18 chars, has a vowel, not denied,
         # and not a code-like token (mix of letters+digits+dashes = garbage).
         # (3 chars so short real names like "Sam", "Ali" are NOT rejected.)
@@ -292,6 +300,29 @@ def detect(url: str, duration: int = 0):
         join_t = max(0, times[0] - SAMPLE_STEP // 2)
         chapters.append({"time": join_t, "label": f"{display} joins"})
 
+    # Post-filter: reject any chapter label containing common non-name words
+    _BAD_WORDS = {"the", "and", "for", "who", "those", "they", "have", "will",
+                  "you", "are", "was", "were", "has", "had", "been", "did",
+                  "their", "them", "with", "from", "after", "also", "only",
+                  "give", "gave", "came", "come", "more", "most", "all",
+                  "indeed", "among", "promised", "killed", "boasting",
+                  "merciful", "gracious", "ourselves", "themselves",
+                  "not", "but", "our", "his", "her"}
+    def _is_real_name(label):
+        name = label.replace(" joins", "").strip()
+        words = name.lower().split()
+        # If ANY word is a common English/religious word, it's not a name
+        if any(w in _BAD_WORDS for w in words):
+            return False
+        # If the name has more than 3 words, it's a phrase not a name
+        if len(words) > 3:
+            return False
+        # If the name contains digits, it's a username
+        if any(c.isdigit() for c in name):
+            return False
+        return True
+
+    chapters = [c for c in chapters if c["label"] == "Stream starts" or _is_real_name(c["label"])]
     chapters.sort(key=lambda c: c["time"])
 
     # Always have a first marker at/near 0 for clean UX.
