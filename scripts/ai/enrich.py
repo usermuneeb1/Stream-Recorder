@@ -43,7 +43,7 @@ FORCE = os.environ.get("AI_FORCE", "false").lower() == "true"
 #  v5 = fuzzy logo reject (Columbu), strip stray prefix (I Kainat), drop code-junk
 # v9 = JOINS-ONLY (no leaves), allow short names (Sam/Ali), looser filter = more guests caught
 # v10 = audio fallback also joins-only (drop "leaves" from LLM output)
-CHAPTER_LOGIC_VERSION = 10
+CHAPTER_LOGIC_VERSION = 11
 
 GROQ_BASE = "https://api.groq.com/openai/v1"
 WHISPER_MODEL = "whisper-large-v3-turbo"
@@ -90,6 +90,22 @@ def video_url(rec):
     Release mirror (Azure CDN), then Archive node/direct."""
     return (rec.get("github_direct") or rec.get("github_release")
             or rec.get("archive_node") or rec.get("archive_direct") or "")
+
+
+def detect_guests_gemini(url):
+    """Try Gemini Flash vision-based guest detection. Returns chapters or None."""
+    try:
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "detect-guests-gemini.py")
+        if not os.path.exists(path):
+            return None
+        spec = importlib.util.spec_from_file_location("detect_guests_gemini", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.detect(url)
+    except Exception as e:
+        log(f"   ⚠️ Gemini guest detection failed: {e}")
+        return None
 
 
 def detect_guests_ocr(url):

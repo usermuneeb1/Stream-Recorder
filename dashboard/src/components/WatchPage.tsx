@@ -5,11 +5,20 @@ import'@vidstack/react/player/styles/default/theme.css';
 import'@vidstack/react/player/styles/default/layouts/video.css';
 import type{Recording}from'../utils/dataFetcher';
 interface P{rec:Recording;onClose:()=>void;all:Recording[];onNav:(r:Recording)=>void;theme:string;onTheme:()=>void}
-// archive_direct serves video/mp4 with CORS — works for streaming
-// GitHub serves application/octet-stream — Vidstack can't play it
-function getSrc(r:Recording){const s:{l:string;u:string}[]=[];if(r.archiveDirect)s.push({l:'B3ING',u:r.archiveDirect});if(r.archiveNode&&r.archiveNode!==r.archiveDirect)s.push({l:'B3ING-2',u:r.archiveNode});if(r.telegramLink)s.push({l:'JAGUAR',u:r.telegramLink});if(!s.length&&r.archiveLink)s.push({l:'B3ING',u:r.archiveLink.replace('/details/','/download/')+'/'});return s;}
-function getDL(r:Recording){const d:{l:string;u:string;c:string}[]=[];if(r.githubRelease)d.push({l:'R3AL ⚡',u:r.githubRelease,c:'#333'});if(r.megaLink)d.push({l:'MEGA',u:r.megaLink,c:'#c62828'});if(r.pixeldrainLink)d.push({l:'Pixeldrain',u:r.pixeldrainLink,c:'#7c3aed'});if(r.gofileLink)d.push({l:'Gofile',u:r.gofileLink,c:'#2563eb'});return d;}
+
+function getSrc(r:Recording){
+  const s:{l:string;u:string}[]=[];
+  // R3AL = GitHub CDN (fastest). Vidstack can play octet-stream without crossOrigin.
+  if(r.githubDirect||r.githubRelease) s.push({l:'R3AL',u:(r.githubDirect||r.githubRelease)});
+  // B3ING = Archive (video/mp4, has CORS)
+  if(r.archiveDirect) s.push({l:'B3ING',u:r.archiveDirect});
+  if(r.telegramLink) s.push({l:'JAGUAR',u:r.telegramLink});
+  if(!s.length&&r.archiveNode) s.push({l:'B3ING',u:r.archiveNode});
+  return s;
+}
+function getDL(r:Recording){const d:{l:string;u:string;c:string}[]=[];if(r.megaLink)d.push({l:'MEGA',u:r.megaLink,c:'#c62828'});if(r.pixeldrainLink)d.push({l:'Pixeldrain',u:r.pixeldrainLink,c:'#7c3aed'});if(r.gofileLink)d.push({l:'Gofile',u:r.gofileLink,c:'#2563eb'});return d;}
 function ft(s:number){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`:`${m}:${String(sc).padStart(2,'0')}`;}
+
 export function WatchPage({rec,onClose,all,onNav,theme,onTheme}:P){
   const pr=useRef<MediaPlayerInstance>(null);const chatR=useRef<HTMLDivElement>(null);
   const src=getSrc(rec),dl=getDL(rec),ch=rec.aiChapters||[];
