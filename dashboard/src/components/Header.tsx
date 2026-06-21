@@ -1,7 +1,7 @@
 export function Header({q,setQ,theme,toggle}:{q:string;setQ:(v:string)=>void;theme:string;toggle:()=>void}){
   return(
     <header className="sticky top-0 z-50 backdrop-blur-2xl border-b" style={{background:'var(--glass)',borderColor:'var(--bd)'}}>
-      <div className="max-w-[1400px] mx-auto flex items-center gap-5 px-4 sm:px-6 lg:px-10 h-20">
+      <div className="max-w-[1400px] mx-auto flex items-center gap-5 pl-2 sm:pl-3 pr-4 sm:pr-6 lg:pr-10 h-20">
         <a href="#" onClick={()=>{window.location.hash='';}} className="shrink-0"><img src="/logo.png" alt="Muslim Lantern Archive" className="h-14 sm:h-[60px] object-contain"/></a>
         <div className="flex-1"/>
         <div className="relative w-full max-w-[240px]">
