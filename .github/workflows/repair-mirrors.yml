@@ -24,6 +24,11 @@ on:
         required: false
         default: "gofile,pixeldrain,mega"
         type: string
+      force_repair:
+        description: "Force re-upload ALL mirrors (ignore alive checks)"
+        required: false
+        default: "true"
+        type: boolean
       dry_run:
         description: "Check only; do not download/upload/update"
         required: false
@@ -55,6 +60,7 @@ env:
   DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  FORCE_REPAIR: ${{ github.event.inputs.force_repair || 'false' }}
   TZ: Asia/Karachi
 
 jobs:

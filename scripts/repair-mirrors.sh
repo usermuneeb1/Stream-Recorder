@@ -11,19 +11,33 @@ source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/upload-clouds.sh"
 
 REPAIR_DIR="${REPAIR_DIR:-/tmp/stream-repair}"
+# FORCE=true skips all "alive" checks — always re-uploads every mirror.
+# Useful when links appear alive (HTTP 200) but are actually expired.
+FORCE_REPAIR="${FORCE_REPAIR:-false}"
 mkdir -p "$REPAIR_DIR"
 
 _is_gofile_alive() {
     local url="$1"
     [[ -z "$url" ]] && return 1
-    local code
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --range 0-1023 -L "$url" 2>/dev/null) || return 1
-    [[ "$code" =~ ^(2|3)[0-9]{2}$ ]]
+    # FORCE mode = always consider dead (force re-upload)
+    [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
+    # Gofile pages return HTTP 200 even when expired. Check actual content.
+    local page
+    page=$(curl -sL --max-time 20 "$url" 2>/dev/null) || return 1
+    # If page contains "not found" or "expired" or lacks download button, it's dead
+    if echo "$page" | grep -qiE "not found|file.*(removed|expired|deleted)|contentnotfound"; then
+        return 1
+    fi
+    # Also check if the page is basically empty / error page
+    local size=${#page}
+    (( size < 500 )) && return 1
+    return 0
 }
 
 _is_pixeldrain_alive() {
     local url="$1"
     [[ -z "$url" ]] && return 1
+    [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
     local id
     id=$(grep -oE 'pixeldrain\.com/u/[A-Za-z0-9_-]+' <<< "$url" | cut -d/ -f3 | head -1)
     [[ -z "$id" ]] && return 1
@@ -161,7 +175,7 @@ repair_mirrors() {
             _is_pixeldrain_alive "$pixel_old" || need_pixel=true
         fi
         if [[ "$destinations" == *mega* ]]; then
-            [[ -n "$mega_old" && "$mega_old" == *mega.nz* ]] || need_mega=true
+            if [[ "${FORCE_REPAIR:-false}" == "true" ]] || [[ -z "$mega_old" ]] || [[ "$mega_old" != *mega.nz* ]]; then need_mega=true; fi
         fi
 
         if [[ "$need_gofile" != true && "$need_pixel" != true && "$need_mega" != true ]]; then
