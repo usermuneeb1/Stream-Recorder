@@ -8,15 +8,15 @@ interface P{rec:Recording;onClose:()=>void;all:Recording[];onNav:(r:Recording)=>
 
 function getSrc(r:Recording){
   const s:{l:string;u:string}[]=[];
-  // Auto = GitHub CDN (always first = default)
+  // Auto = GitHub (default playback)
   if(r.githubDirect||r.githubRelease) s.push({l:'Auto',u:(r.githubDirect||r.githubRelease)});
-  // R3AL = Archive direct
+  // R3AL = Archive (alternative)
   if(r.archiveDirect) s.push({l:'R3AL',u:r.archiveDirect});
-  // B3ING = Archive node (different server)
-  if(r.archiveNode&&r.archiveNode!==r.archiveDirect) s.push({l:'B3ING',u:r.archiveNode});
+  // B3ING = second GitHub link (if both exist) or archive node as backup
+  if(r.githubDirect&&r.githubRelease&&r.githubDirect!==r.githubRelease) s.push({l:'B3ING',u:r.githubRelease});
+  else if(r.archiveNode&&r.archiveNode!==r.archiveDirect) s.push({l:'B3ING',u:r.archiveNode});
   // JAGUAR = Telegram
   if(r.telegramLink) s.push({l:'JAGUAR',u:r.telegramLink});
-  // Fallback
   if(!s.length&&r.archiveLink) s.push({l:'Auto',u:r.archiveLink.replace('/details/','/download/')+'/'});
   return s;
 }
@@ -28,20 +28,18 @@ export function WatchPage({rec,onClose,all,onNav,theme,onTheme}:P){
   const src=getSrc(rec),dl=getDL(rec),ch=rec.aiChapters||[];
   const[si,setSi]=useState(0);const[ci,setCi]=useState(0);const[t,setT]=useState(0);
   const[chat,setChat]=useState<any[]>([]);const[hasChat,setHasChat]=useState(false);
-  // initialLoad = true ONLY on first load, set to false permanently once video plays
-  const[initialLoad,setInitialLoad]=useState(true);
-  const hasPlayedOnce=useRef(false);
+  const[ready,setReady]=useState(false);
+  const played=useRef(false);
   const others=all.filter(x=>x.videoId!==rec.videoId).slice(0,6);
 
-  useEffect(()=>{setSi(0);setCi(0);setT(0);setInitialLoad(true);hasPlayedOnce.current=false;setChat([]);setHasChat(false);if(!rec.chatUrl)return;fetch(rec.chatUrl).then(r=>{if(!r.ok)throw 0;return r.text();}).then(tx=>{try{const a=JSON.parse(tx);if(Array.isArray(a)&&a.length){setChat(a);setHasChat(true);}}catch{const l=tx.split('\n').map((x:string)=>{try{return JSON.parse(x);}catch{return null;}}).filter(Boolean);if(l.length){setChat(l);setHasChat(true);}}}).catch(()=>{});},[rec.videoId,rec.chatUrl]);
+  useEffect(()=>{setSi(0);setCi(0);setT(0);setReady(false);played.current=false;setChat([]);setHasChat(false);if(!rec.chatUrl)return;fetch(rec.chatUrl).then(r=>{if(!r.ok)throw 0;return r.text();}).then(tx=>{try{const a=JSON.parse(tx);if(Array.isArray(a)&&a.length){setChat(a);setHasChat(true);}}catch{const l=tx.split('\n').map((x:string)=>{try{return JSON.parse(x);}catch{return null;}}).filter(Boolean);if(l.length){setChat(l);setHasChat(true);}}}).catch(()=>{});},[rec.videoId,rec.chatUrl]);
   useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[onClose]);
   useEffect(()=>{
     const p=pr.current;if(!p)return;
     const onTime=()=>{const ct=p.currentTime||0;setT(ct);for(let i=ch.length-1;i>=0;i--){if(ct>=ch[i].time){setCi(i);break;}}};
-    // Once video plays for the first time, hide loading forever
-    const onFirstPlay=()=>{if(!hasPlayedOnce.current){hasPlayedOnce.current=true;setInitialLoad(false);}};
-    p.addEventListener('time-update',onTime);p.addEventListener('playing',onFirstPlay);p.addEventListener('can-play',onFirstPlay);
-    return()=>{p.removeEventListener('time-update',onTime);p.removeEventListener('playing',onFirstPlay);p.removeEventListener('can-play',onFirstPlay);};
+    const onGo=()=>{if(!played.current){played.current=true;setReady(true);}};
+    p.addEventListener('time-update',onTime);p.addEventListener('playing',onGo);p.addEventListener('can-play',onGo);
+    return()=>{p.removeEventListener('time-update',onTime);p.removeEventListener('playing',onGo);p.removeEventListener('can-play',onGo);};
   },[ch,si]);
   useEffect(()=>{if(!chatR.current||!chat.length)return;const kids=chatR.current.children;for(let i=kids.length-1;i>=0;i--){if(parseFloat((kids[i] as HTMLElement).dataset.t||'99999')<=t){kids[i].scrollIntoView({block:'nearest',behavior:'smooth'});break;}}},[Math.floor(t/3)]);
   const seek=useCallback((s:number)=>{const p=pr.current;if(p){p.currentTime=s;p.play().catch(()=>{});}},[]);
@@ -57,19 +55,17 @@ export function WatchPage({rec,onClose,all,onNav,theme,onTheme}:P){
         <div className="flex-1 min-w-0">
           <div className="xl:p-4 xl:pb-0 relative">
             <style>{`media-player [data-media-buffering-indicator],media-player [part~="buffering-indicator"]{display:none!important}`}</style>
-            {url?(<MediaPlayer key={url} ref={pr} src={url} viewType="video" streamType="on-demand" playsInline autoPlay className="w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl"><MediaProvider/><DefaultVideoLayout icons={defaultLayoutIcons}/></MediaPlayer>):(<div className="w-full aspect-video xl:rounded-xl bg-black"/>)}
-            {/* Premium loading — ONLY on first load, never shows again */}
-            {initialLoad&&url&&(
-              <div className="absolute inset-0 xl:top-4 xl:left-4 xl:right-4 flex items-center justify-center pointer-events-none z-20 transition-opacity duration-500">
+            {url&&<MediaPlayer key={url} ref={pr} src={url} viewType="video" streamType="on-demand" playsInline autoPlay className="w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl"><MediaProvider/><DefaultVideoLayout icons={defaultLayoutIcons}/></MediaPlayer>}
+            {/* SOLID BLACK overlay — covers player completely until video is ready */}
+            {!ready&&(
+              <div className="absolute inset-0 xl:top-4 xl:left-4 xl:right-4 xl:rounded-xl z-20 flex items-center justify-center" style={{background:'#000'}}>
                 <div className="flex flex-col items-center">
-                  <div className="relative w-16 h-16 mb-5">
-                    <div className="absolute inset-0 rounded-full border-[3px] border-white/5"/>
-                    <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-red-500 animate-spin"/>
-                    <div className="absolute inset-2 rounded-full border-[2px] border-transparent border-b-red-500/50 animate-spin" style={{animationDirection:'reverse',animationDuration:'1.5s'}}/>
-                    <div className="absolute inset-0 flex items-center justify-center"><svg className="w-5 h-5 text-white/80" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+                  <div className="relative w-12 h-12 mb-4">
+                    <div className="absolute inset-0 rounded-full border-2 border-white/10"/>
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--red)] animate-spin"/>
                   </div>
-                  <p className="text-white/90 text-[15px] font-semibold tracking-wide">Preparing Stream</p>
-                  <p className="text-white/30 text-[11px] mt-1.5 tracking-wider">This may take a moment</p>
+                  <p className="text-white/70 text-sm font-medium">Preparing Stream</p>
+                  <p className="text-white/25 text-[10px] mt-1">Please wait</p>
                 </div>
               </div>
             )}
