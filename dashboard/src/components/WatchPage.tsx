@@ -6,19 +6,24 @@ import'@vidstack/react/player/styles/default/layouts/video.css';
 import type{Recording}from'../utils/dataFetcher';
 interface P{rec:Recording;onClose:()=>void;all:Recording[];onNav:(r:Recording)=>void;theme:string;onTheme:()=>void}
 
+// Auto = fastest source. Speed test: archive_node > github > archive_direct
+// But archive_node has no CORS for Vidstack crossOrigin (removed, so OK now)
+// GitHub sends octet-stream but Vidstack plays it without crossOrigin
 function getSrc(r:Recording){
   const s:{l:string;u:string}[]=[];
-  // Auto = GitHub (default playback)
-  if(r.githubDirect||r.githubRelease) s.push({l:'Auto',u:(r.githubDirect||r.githubRelease)});
-  // R3AL = Archive (alternative)
-  if(r.archiveDirect) s.push({l:'R3AL',u:r.archiveDirect});
-  // B3ING = second GitHub link (if both exist) or archive node as backup
-  if(r.githubDirect&&r.githubRelease&&r.githubDirect!==r.githubRelease) s.push({l:'B3ING',u:r.githubRelease});
-  else if(r.archiveNode&&r.archiveNode!==r.archiveDirect) s.push({l:'B3ING',u:r.archiveNode});
+  // Auto = pick the fastest available
+  if(r.archiveNode) s.push({l:'Auto',u:r.archiveNode});
+  else if(r.githubDirect||r.githubRelease) s.push({l:'Auto',u:(r.githubDirect||r.githubRelease)});
+  else if(r.archiveDirect) s.push({l:'Auto',u:r.archiveDirect});
+  // R3AL = GitHub CDN
+  if(r.githubDirect||r.githubRelease) s.push({l:'R3AL',u:(r.githubDirect||r.githubRelease)});
+  // B3ING = Archive /download/
+  if(r.archiveDirect) s.push({l:'B3ING',u:r.archiveDirect});
   // JAGUAR = Telegram
   if(r.telegramLink) s.push({l:'JAGUAR',u:r.telegramLink});
-  if(!s.length&&r.archiveLink) s.push({l:'Auto',u:r.archiveLink.replace('/details/','/download/')+'/'});
-  return s;
+  // Dedup — remove if Auto URL matches R3AL or B3ING
+  const auto=s[0]?.u;
+  return s.filter((x,i)=>i===0||x.u!==auto);
 }
 function getDL(r:Recording){const d:{l:string;u:string;c:string}[]=[];if(r.megaLink)d.push({l:'MEGA',u:r.megaLink,c:'#c62828'});if(r.pixeldrainLink)d.push({l:'Pixeldrain',u:r.pixeldrainLink,c:'#7c3aed'});if(r.gofileLink)d.push({l:'Gofile',u:r.gofileLink,c:'#2563eb'});return d;}
 function ft(s:number){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`:`${m}:${String(sc).padStart(2,'0')}`;}
@@ -28,23 +33,14 @@ export function WatchPage({rec,onClose,all,onNav,theme,onTheme}:P){
   const src=getSrc(rec),dl=getDL(rec),ch=rec.aiChapters||[];
   const[si,setSi]=useState(0);const[ci,setCi]=useState(0);const[t,setT]=useState(0);
   const[chat,setChat]=useState<any[]>([]);const[hasChat,setHasChat]=useState(false);
-  const[ready,setReady]=useState(false);
-  const played=useRef(false);
+  const[ready,setReady]=useState(false);const played=useRef(false);
   const others=all.filter(x=>x.videoId!==rec.videoId).slice(0,6);
-
   useEffect(()=>{setSi(0);setCi(0);setT(0);setReady(false);played.current=false;setChat([]);setHasChat(false);if(!rec.chatUrl)return;fetch(rec.chatUrl).then(r=>{if(!r.ok)throw 0;return r.text();}).then(tx=>{try{const a=JSON.parse(tx);if(Array.isArray(a)&&a.length){setChat(a);setHasChat(true);}}catch{const l=tx.split('\n').map((x:string)=>{try{return JSON.parse(x);}catch{return null;}}).filter(Boolean);if(l.length){setChat(l);setHasChat(true);}}}).catch(()=>{});},[rec.videoId,rec.chatUrl]);
   useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[onClose]);
-  useEffect(()=>{
-    const p=pr.current;if(!p)return;
-    const onTime=()=>{const ct=p.currentTime||0;setT(ct);for(let i=ch.length-1;i>=0;i--){if(ct>=ch[i].time){setCi(i);break;}}};
-    const onGo=()=>{if(!played.current){played.current=true;setReady(true);}};
-    p.addEventListener('time-update',onTime);p.addEventListener('playing',onGo);p.addEventListener('can-play',onGo);
-    return()=>{p.removeEventListener('time-update',onTime);p.removeEventListener('playing',onGo);p.removeEventListener('can-play',onGo);};
-  },[ch,si]);
+  useEffect(()=>{const p=pr.current;if(!p)return;const onTime=()=>{const ct=p.currentTime||0;setT(ct);for(let i=ch.length-1;i>=0;i--){if(ct>=ch[i].time){setCi(i);break;}}};const onGo=()=>{if(!played.current){played.current=true;setReady(true);}};p.addEventListener('time-update',onTime);p.addEventListener('playing',onGo);p.addEventListener('can-play',onGo);return()=>{p.removeEventListener('time-update',onTime);p.removeEventListener('playing',onGo);p.removeEventListener('can-play',onGo);};},[ch,si]);
   useEffect(()=>{if(!chatR.current||!chat.length)return;const kids=chatR.current.children;for(let i=kids.length-1;i>=0;i--){if(parseFloat((kids[i] as HTMLElement).dataset.t||'99999')<=t){kids[i].scrollIntoView({block:'nearest',behavior:'smooth'});break;}}},[Math.floor(t/3)]);
   const seek=useCallback((s:number)=>{const p=pr.current;if(p){p.currentTime=s;p.play().catch(()=>{});}},[]);
   const url=src[si]?.u||'';
-
   return(
     <div className="min-h-screen" style={{background:'var(--bg)',color:'var(--tx)'}}>
       <nav className="flex items-center justify-between px-4 sm:px-6 h-14 border-b" style={{borderColor:'var(--bd)'}}>
@@ -56,19 +52,7 @@ export function WatchPage({rec,onClose,all,onNav,theme,onTheme}:P){
           <div className="xl:p-4 xl:pb-0 relative">
             <style>{`media-player [data-media-buffering-indicator],media-player [part~="buffering-indicator"]{display:none!important}`}</style>
             {url&&<MediaPlayer key={url} ref={pr} src={url} viewType="video" streamType="on-demand" playsInline autoPlay className="w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl"><MediaProvider/><DefaultVideoLayout icons={defaultLayoutIcons}/></MediaPlayer>}
-            {/* SOLID BLACK overlay — covers player completely until video is ready */}
-            {!ready&&(
-              <div className="absolute inset-0 xl:top-4 xl:left-4 xl:right-4 xl:rounded-xl z-20 flex items-center justify-center" style={{background:'#000'}}>
-                <div className="flex flex-col items-center">
-                  <div className="relative w-12 h-12 mb-4">
-                    <div className="absolute inset-0 rounded-full border-2 border-white/10"/>
-                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--red)] animate-spin"/>
-                  </div>
-                  <p className="text-white/70 text-sm font-medium">Preparing Stream</p>
-                  <p className="text-white/25 text-[10px] mt-1">Please wait</p>
-                </div>
-              </div>
-            )}
+            {!ready&&(<div className="absolute inset-0 xl:top-4 xl:left-4 xl:right-4 xl:rounded-xl z-20 flex items-center justify-center" style={{background:'#000'}}><div className="flex flex-col items-center"><div className="w-10 h-10 mb-3 rounded-full border-2 border-transparent border-t-[#c62828] animate-spin"/><p className="text-white/60 text-[13px] font-medium tracking-wide">Preparing Stream</p></div></div>)}
           </div>
           <div className="px-4 sm:px-5 xl:px-4 pt-4 pb-6 space-y-3">
             <div><h1 className="text-base sm:text-lg font-bold leading-snug">{rec.title}</h1><p className="text-[11px] mt-1" style={{color:'var(--tx3)'}}>{rec.date} · {rec.durationFmt} · {rec.sizeHuman}{rec.resolution?.includes('1080')?' · 1080p':''}</p></div>

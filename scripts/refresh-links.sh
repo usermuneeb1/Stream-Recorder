@@ -298,12 +298,12 @@ refresh_links() {
     local refresh_start
     refresh_start=$(now_epoch)
     
-    # ── Read links.txt ───────────────────────────────────────────────────────
-    log_step "Reading links.txt..."
+    # ── Read recordings.json (canonical source of truth) ─────────────────────
+    log_step "Reading recordings.json..."
     
     local links_content
-    links_content=$(github_api_read_content "links.txt" 2>/dev/null) || {
-        log_warn "Could not read links.txt — nothing to refresh"
+    links_content=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
+        log_warn "Could not read recordings.json — nothing to refresh"
         return 0
     }
     
@@ -316,7 +316,15 @@ refresh_links() {
     log_step "Parsing stream entries..."
     
     local entries_json
-    entries_json=$(parse_entries_from_links "$links_content")
+    entries_json=$(# Parse recordings.json directly with jq
+    echo "$links_content" | jq -c '[.[] | {
+        title: .title,
+        msg_id: "",
+        gofile: (.gofile_link // ""),
+        pixeldrain: (.pixeldrain_link // ""),
+        archive: (.archive_link // ""),
+        mega: (.mega_link // "")
+    }]' 2>/dev/null || parse_entries_from_links "$links_content")
     
     local entry_count
     entry_count=$(echo "$entries_json" | jq 'length' 2>/dev/null || echo "0")
