@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchRecordings, type Recording } from './utils/dataFetcher';
 import { Header } from './components/Header';
-import { Hero } from './components/Hero';
 import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
 import { Footer } from './components/Footer';
@@ -31,23 +30,17 @@ export default function App() {
 
   if (av) return <WatchPage rec={av} onClose={close} all={fl} onNav={open} theme={th} onTheme={tog} />;
 
-  const totalH = recs.reduce((a,r)=>a+r.durationSec,0)/3600;
   return (
     <div style={{background:'var(--bg)'}} className="min-h-screen flex flex-col">
       <Header q={q} setQ={setQ} theme={th} toggle={tog} />
-      <Hero latest={recs[0]} onPlay={open} total={recs.length} loading={ld} totalHours={totalH} />
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pb-20">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-lg font-bold" style={{color:'var(--tx)'}}>All Recordings</h2>
-          <span className="text-xs font-bold px-3 py-1 rounded-full" style={{background:'var(--rg)',color:'var(--red)'}}>{fl.length} streams</span>
-        </div>
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-8 pb-20">
         {ld?(
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{[...Array(6)].map((_,i)=><div key={i}><div className="skel aspect-video w-full"/><div className="skel h-5 w-3/4 mt-4"/><div className="skel h-4 w-1/2 mt-2"/></div>)}</div>
         ):fl.length===0?(
           <div className="flex flex-col items-center py-24 opacity-30"><p className="text-lg">No streams found</p></div>
         ):(
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
-            {fl.map((r,i)=><StreamCard key={r.videoId} rec={r} onClick={()=>open(r)} delay={i*80}/>)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-8">
+            {fl.map((r,i)=><StreamCard key={r.videoId} rec={r} onClick={()=>open(r)} delay={i*60}/>)}
           </div>
         )}
       </main>
