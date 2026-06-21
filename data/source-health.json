@@ -1,19 +1,19 @@
 {
-  "updated_at": "2026-06-20T08:37:21.000Z",
+  "updated_at": "2026-06-21T09:31:44.000Z",
   "dry_run": false,
   "totals": {
-    "checked": 4,
-    "alive": 4,
-    "refreshed": 4,
+    "checked": 0,
+    "alive": 0,
+    "refreshed": 0,
     "dead": 0,
     "discord_messages_edited": 0
   },
   "providers": {
     "gofile": {
-      "total": 2
+      "total": 0
     },
     "pixeldrain": {
-      "total": 2
+      "total": 0
     },
     "archive": {
       "permanent": true
