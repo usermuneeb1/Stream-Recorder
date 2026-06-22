@@ -1,263 +1,148 @@
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  👻 YouTube Ghost-Host — Morph + Upload Unlisted Mirror                     ║
-# ║                                                                             ║
-# ║  Takes an already-recorded video (from Archive.org), optionally morphs it   ║
-# ║  to defeat Content ID, uploads it as UNLISTED to YouTube, and saves the     ║
-# ║  resulting YouTube video ID into data/recordings.json so the website can    ║
-# ║  play it as a fallback source via the Invidious proxy (/api/yt/<id>).       ║
-# ║                                                                             ║
-# ║  Privacy: Uploads are UNLISTED — not searchable, not in recommendations,    ║
-# ║  not in YouTube's algorithm. Only people with the direct link can see it.   ║
-# ║                                                                             ║
-# ║  Requires secrets:  YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET,               ║
-# ║                     YOUTUBE_REFRESH_TOKEN                                   ║
-# ║                                                                             ║
-# ║  To get these: run scripts/youtube-oauth-setup.py locally.                  ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
-
 name: "👻 YouTube Ghost-Host"
 
 on:
   workflow_dispatch:
     inputs:
-      video_id:
-        description: "video_id from data/recordings.json (e.g., tml-2026-05-vSKAJZkhuq4-1778975061)"
-        required: true
-        type: string
       skip_morph:
-        description: "Skip morphing (upload clean unlisted video)"
+        description: "Skip morphing (upload clean)"
         required: false
         default: false
         type: boolean
-      max_duration_seconds:
-        description: "Max seconds to download (0 = full video)"
-        required: false
-        default: "0"
-        type: string
 
 env:
   GH_PAT: ${{ secrets.GH_PAT }}
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
   ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
-  DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   TZ: Asia/Karachi
 
 permissions:
   contents: write
 
 jobs:
-  ghost:
-    name: "👻 Morph & Upload to YouTube"
+  ghost-all:
+    name: "👻 Morph & Upload ALL"
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
 
     steps:
-      - name: "📥 Checkout"
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: "📦 Install Tools"
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg jq curl python3-pip
+          sudo apt-get install -y -qq ffmpeg jq curl python3-pip aria2
           pip3 install --quiet google-auth-oauthlib google-auth-httplib2 google-api-python-client
-          echo "✅ Tools installed"
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
 
-      - name: "🔎 Resolve Recording"
-        id: resolve
-        run: |
-          VIDEO_ID="${{ github.event.inputs.video_id }}"
-          echo "video_id=$VIDEO_ID" >> $GITHUB_OUTPUT
-
-          # Find the recording in data/recordings.json
-          REC=$(jq -r --arg vid "$VIDEO_ID" \
-            '.[] | select(.video_id == $vid) | {title, archive_node, archive_direct, archive_link, size_gb}' \
-            data/recordings.json 2>/dev/null)
-
-          TITLE=$(echo "$REC" | jq -r '.title // empty')
-          ARCHIVE_URL=$(echo "$REC" | jq -r '.archive_node // .archive_direct // empty')
-          ARCHIVE_LINK=$(echo "$REC" | jq -r '.archive_link // empty')
-          SIZE_GB=$(echo "$REC" | jq -r '.size_gb // "unknown"')
-
-          if [[ -z "$ARCHIVE_URL" ]]; then
-            echo "❌ Recording not found: $VIDEO_ID"
-            echo "   Available video_ids:"
-            jq -r '.[] | .video_id' data/recordings.json
-            exit 1
-          fi
-
-          echo "📺 Recording: $TITLE"
-          echo "🔗 Archive: $ARCHIVE_LINK"
-          echo "📦 Size: $SIZE_GB GB"
-          echo "⬇️  Source: $ARCHIVE_URL"
-
-          echo "title=$TITLE" >> $GITHUB_OUTPUT
-          echo "archive_url=$ARCHIVE_URL" >> $GITHUB_OUTPUT
-
-      - name: "⬇️ Download from Archive.org"
-        id: download
-        run: |
-          URL="${{ steps.resolve.outputs.archive_url }}"
-          MAX_DUR="${{ github.event.inputs.max_duration_seconds }}"
-
-          echo "⬇️ Downloading from Archive.org..."
-          
-          if [[ "$MAX_DUR" != "0" && -n "$MAX_DUR" ]]; then
-            echo "   Truncating to ${MAX_DUR}s"
-            ffmpeg -y -i "$URL" -t "$MAX_DUR" -c copy -movflags +faststart input_video.mp4
-          else
-            aria2c -x 4 -s 4 --max-tries=3 --dir=. --out=input_video.mp4 "$URL"
-          fi
-
-          if [[ ! -f input_video.mp4 ]]; then
-            echo "❌ Download failed"
-            exit 1
-          fi
-
-          SIZE=$(stat -c %s input_video.mp4)
-          DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 input_video.mp4)
-          echo "✅ Downloaded: $(echo "scale=1; $SIZE/1024/1024" | bc) MB, ${DUR%.*}s"
-          echo "input_size=$SIZE" >> $GITHUB_OUTPUT
-          echo "input_duration=${DUR%.*}" >> $GITHUB_OUTPUT
-
-      - name: "👻 Morph Video (optional)"
-        id: morph
-        run: |
-          SKIP="${{ github.event.inputs.skip_morph }}"
-
-          if [[ "$SKIP" == "true" ]]; then
-            echo "⏭️  skip_morph=true — copying clean"
-            export SKIP_MORPH=true
-          else
-            echo "👻 Morphing video (gentle: 0.5° rotate, 0.8% pitch, level-3 noise)"
-            export SKIP_MORPH=false
-          fi
-
-          python3 scripts/morph_video.py input_video.mp4 morphed_video.mp4
-
-          if [[ ! -f morphed_video.mp4 ]]; then
-            echo "❌ Morphing failed"
-            exit 1
-          fi
-
-          MORPHED_SIZE=$(stat -c %s morphed_video.mp4)
-          echo "✅ Output: $(echo "scale=1; $MORPHED_SIZE/1024/1024" | bc) MB"
-          echo "morphed_size=$MORPHED_SIZE" >> $GITHUB_OUTPUT
-
-      - name: "📤 Upload to YouTube (Unlisted)"
-        id: upload
+      - name: "👻 Process ALL recordings"
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          YOUTUBE_MORPHED: ${{ github.event.inputs.skip_morph == 'false' && 'true' || 'false' }}
-          YOUTUBE_UPLOAD_TITLE: "Archive Backup — ${{ steps.resolve.outputs.title }}"
+          SKIP_MORPH: ${{ github.event.inputs.skip_morph }}
         run: |
-          # Check if secrets are configured
           if [[ -z "$YOUTUBE_REFRESH_TOKEN" ]]; then
-            echo "❌ YOUTUBE_REFRESH_TOKEN not configured."
-            echo "   Run scripts/youtube-oauth-setup.py locally to get one."
-            echo "youtube_id=" >> $GITHUB_OUTPUT
-            echo "upload_status=skipped" >> $GITHUB_OUTPUT
-            exit 0  # Don't fail the workflow — it's a config issue, not a crash
+            echo "❌ YOUTUBE_REFRESH_TOKEN not set. Run youtube-oauth-setup.py first."
+            exit 1
           fi
 
-          python3 scripts/upload_to_youtube.py morphed_video.mp4 | tee upload_output.txt
+          python3 << 'PYSCRIPT'
+          import json, os, subprocess, sys
 
-          # Extract the VIDEO_ID from the output
-          YT_ID=$(grep "^VIDEO_ID=" upload_output.txt | tail -1 | cut -d= -f2)
-          
-          if [[ -n "$YT_ID" ]]; then
-            echo "youtube_id=$YT_ID" >> $GITHUB_OUTPUT
-            echo "upload_status=success" >> $GITHUB_OUTPUT
-            echo "✅ YouTube upload successful: https://youtu.be/$YT_ID"
-          else
-            echo "youtube_id=" >> $GITHUB_OUTPUT
-            echo "upload_status=failed" >> $GITHUB_OUTPUT
-          fi
+          with open("data/recordings.json") as f:
+              recs = json.load(f)
 
-      - name: "💾 Update recordings.json with YouTube ID"
-        id: update_db
-        if: steps.upload.outputs.upload_status == 'success'
+          # Find recordings without youtube_unlisted
+          todo = [r for r in recs if not r.get("youtube_unlisted") and not r.get("youtube_id")
+                  and (r.get("archive_node") or r.get("archive_direct") or r.get("archive_link"))]
+
+          if not todo:
+              print("✅ All recordings already have YouTube mirrors")
+              sys.exit(0)
+
+          print(f"👻 Found {len(todo)} recordings to ghost-host\n")
+          skip = os.environ.get("SKIP_MORPH", "false") == "true"
+
+          for i, rec in enumerate(todo):
+              title = rec.get("title", "Recording")
+              vid = rec.get("video_id", "")
+              url = rec.get("archive_node") or rec.get("archive_direct") or ""
+              if not url and rec.get("archive_link"):
+                  url = rec["archive_link"].replace("/details/", "/download/") + "/"
+
+              print(f"\n{'='*60}")
+              print(f"👻 [{i+1}/{len(todo)}] {title}")
+
+              # Download
+              print(f"   📥 Downloading...")
+              dl = subprocess.run(["aria2c", "-x", "4", "-s", "4", "--max-tries=3",
+                                   "--dir=/tmp", "--out=input_video.mp4", url], capture_output=True)
+              if dl.returncode != 0:
+                  subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600",
+                                  "-o", "/tmp/input_video.mp4", url], capture_output=True)
+
+              if not os.path.exists("/tmp/input_video.mp4") or os.path.getsize("/tmp/input_video.mp4") < 10000:
+                  print(f"   ❌ Download failed")
+                  continue
+
+              size = os.path.getsize("/tmp/input_video.mp4")
+              print(f"   📦 Downloaded: {size/1024/1024:.0f} MB")
+
+              # Morph
+              env = os.environ.copy()
+              if skip:
+                  env["SKIP_MORPH"] = "true"
+              print(f"   👻 {'Skipping morph' if skip else 'Morphing'}...")
+              subprocess.run(["python3", "scripts/morph_video.py",
+                              "/tmp/input_video.mp4", "/tmp/morphed_video.mp4"], env=env)
+
+              if not os.path.exists("/tmp/morphed_video.mp4"):
+                  print(f"   ❌ Morph failed")
+                  try: os.remove("/tmp/input_video.mp4")
+                  except: pass
+                  continue
+
+              # Upload
+              print(f"   📤 Uploading to YouTube (unlisted)...")
+              env["YOUTUBE_UPLOAD_TITLE"] = f"Archive Backup — {title}"
+              up = subprocess.run(["python3", "scripts/upload_to_youtube.py", "/tmp/morphed_video.mp4"],
+                                  env=env, capture_output=True, text=True)
+
+              yt_id = ""
+              for line in up.stdout.split("\n"):
+                  if line.startswith("VIDEO_ID="):
+                      yt_id = line.split("=", 1)[1].strip()
+
+              if yt_id:
+                  for r in recs:
+                      if r.get("video_id") == vid:
+                          r["youtube_id"] = yt_id
+                          r["youtube_unlisted"] = f"https://youtu.be/{yt_id}"
+                          break
+                  with open("data/recordings.json", "w") as f:
+                      json.dump(recs, f, indent=2)
+                  print(f"   ✅ Uploaded: https://youtu.be/{yt_id}")
+              else:
+                  print(f"   ❌ Upload failed")
+                  if up.stdout: print(f"   stdout: {up.stdout[:300]}")
+                  if up.stderr: print(f"   stderr: {up.stderr[:300]}")
+
+              # Cleanup
+              for f in ["/tmp/input_video.mp4", "/tmp/morphed_video.mp4"]:
+                  try: os.remove(f)
+                  except: pass
+
+          print(f"\n{'='*60}\n✅ Ghost-Host complete")
+          PYSCRIPT
+
+      - name: "📤 Push"
         run: |
-          YT_ID="${{ steps.upload.outputs.youtube_id }}"
-          VIDEO_ID="${{ steps.resolve.outputs.video_id }}"
-
-          echo "📝 Updating data/recordings.json with youtube_id=$YT_ID"
-
-          # Use jq to inject the youtube_id field into the matching recording
-          jq --arg vid "$VIDEO_ID" --arg ytid "$YT_ID" \
-            '(.[] | select(.video_id == $vid) | .youtube_id) = $ytid' \
-            data/recordings.json > tmp_recordings.json
-
-          # Also add the invidious source URL
-          jq --arg vid "$VIDEO_ID" --arg ytid "$YT_ID" \
-            '(.[] | select(.video_id == $vid) | .youtube_unlisted) = "https://youtu.be/\($ytid)"' \
-            tmp_recordings.json > data/recordings.json
-          rm -f tmp_recordings.json
-
-          echo "✅ recordings.json updated"
-
-      - name: "⬆️ Commit changes"
-        if: steps.upload.outputs.upload_status == 'success'
-        run: |
-          if [[ -n "$(git status -s data/recordings.json)" ]]; then
-            git config user.name "YouTube Ghost-Host Bot"
-            git config user.email "ghost@stream-recorder.local"
-            git add data/recordings.json
-            git commit -m "👻 Add YouTube unlisted mirror for ${{ steps.resolve.outputs.video_id }}"
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/recordings.json
+          git diff --cached --quiet || {
+            git commit -m "👻 YouTube Ghost-Host: uploaded all recordings"
             git push
-            echo "✅ Committed to repository"
-          else
-            echo "No changes to commit"
-          fi
-
-      - name: "📡 Discord Notification"
-        if: always()
-        run: |
-          WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
-          [[ -z "$WEBHOOK" ]] && exit 0
-
-          YT_ID="${{ steps.upload.outputs.youtube_id }}"
-          STATUS="${{ steps.upload.outputs.upload_status }}"
-          MORPH_SKIPPED="${{ github.event.inputs.skip_morph }}"
-          TITLE="${{ steps.resolve.outputs.title }}"
-          VIDEO_ID="${{ steps.resolve.outputs.video_id }}"
-          TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-
-          if [[ "$STATUS" == "success" ]]; then
-            COLOR=5763757  # Green
-            DESC="> Unlisted YouTube mirror created\\n> Title: \`$TITLE\`\\n> Morphing: $([ "$MORPH_SKIPPED" == "true" ] && echo 'Skipped (clean)' || echo 'Applied (gentle)')\\n> [▶ Watch on YouTube](https://youtu.be/$YT_ID)"
-          elif [[ "$STATUS" == "skipped" ]]; then
-            COLOR=16744448  # Orange
-            DESC="> YouTube upload SKIPPED — no refresh token configured\\n> Run \`scripts/youtube-oauth-setup.py\` locally to set up."
-          else
-            COLOR=15158332  # Red
-            DESC="> YouTube upload FAILED\\n> Check workflow logs for details."
-          fi
-
-          PAYLOAD=$(jq -n \
-            --arg username "👻 Ghost-Host" \
-            --arg timestamp "$TIMESTAMP" \
-            --argjson color "$COLOR" \
-            --arg desc "$DESC" \
-            --arg title "YouTube Ghost-Host: $TITLE" \
-            '{
-              username: $username,
-              embeds: [{
-                title: "👻 YouTube Ghost-Host",
-                description: ("**" + $title + "**\n\n" + $desc),
-                color: $color,
-                fields: [
-                  {name: "📺 Video ID", value: $title, inline: true},
-                  {name: "🎬 YouTube ID", value: $YT_ID, inline: true}
-                ],
-                footer: {text: "👻 Ghost-Host Pipeline"},
-                timestamp: $timestamp
-              }]
-            }')
-
-          curl -s -o /dev/null -w "Discord: HTTP %{http_code}\n" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" "$WEBHOOK"
+          }
