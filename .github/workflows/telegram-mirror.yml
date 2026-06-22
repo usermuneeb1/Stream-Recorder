@@ -1,17 +1,3 @@
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 📱 TELEGRAM MIRROR — Upload recordings to Telegram (infinite storage)     ║
-# ║                                                                            ║
-# ║ Triggers: after stream-recorder completes, or manual dispatch.             ║
-# ║ Downloads from Archive.org → uploads to Telegram channel.                 ║
-# ║ Updates recordings.json with telegram_link.                                ║
-# ║                                                                            ║
-# ║ Required secrets:                                                          ║
-# ║   TELEGRAM_BOT_TOKEN  — from @BotFather                                   ║
-# ║   TELEGRAM_CHAT_ID    — channel/group ID                                  ║
-# ║                                                                            ║
-# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
-
 name: 📱 Telegram Mirror
 
 on:
@@ -19,119 +5,114 @@ on:
     workflows: ["📡 Stream Recorder"]
     types: [completed]
   workflow_dispatch:
-    inputs:
-      archive_id:
-        description: "Archive.org identifier (e.g. tml-2026-06-xxx)"
-        required: false
 
 concurrency:
   group: telegram-mirror
   cancel-in-progress: false
 
 jobs:
-  upload:
+  upload-all:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    timeout-minutes: 120
+    timeout-minutes: 300
 
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install requests
 
-      - name: 📦 Install dependencies
-        run: pip install requests
-
-      - name: 🔍 Find latest recording without Telegram link
-        id: find
-        run: |
-          # Find the first recording that doesn't have a telegram_link
-          RECORD=$(python3 -c "
-          import json
-          with open('data/recordings.json') as f:
-              recs = json.load(f)
-          archive_id = '${{ github.event.inputs.archive_id }}'
-          for r in recs:
-              if archive_id and archive_id in r.get('video_id', ''):
-                  print(json.dumps(r))
-                  break
-              elif not archive_id and not r.get('telegram_link'):
-                  if r.get('archive_direct') or r.get('archive_link'):
-                      print(json.dumps(r))
-                      break
-          ")
-          if [[ -z "$RECORD" ]]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "📱 No recordings need Telegram upload"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "record=$RECORD" >> "$GITHUB_OUTPUT"
-            TITLE=$(echo "$RECORD" | jq -r '.title')
-            ARCHIVE_DIRECT=$(echo "$RECORD" | jq -r '.archive_direct // .archive_link')
-            VIDEO_ID=$(echo "$RECORD" | jq -r '.video_id')
-            echo "title=$TITLE" >> "$GITHUB_OUTPUT"
-            echo "archive_url=$ARCHIVE_DIRECT" >> "$GITHUB_OUTPUT"
-            echo "video_id=$VIDEO_ID" >> "$GITHUB_OUTPUT"
-            echo "📱 Will upload: $TITLE"
-          fi
-
-      - name: 📥 Download from Archive.org
-        if: steps.find.outputs.skip != 'true'
-        run: |
-          ARCHIVE_URL="${{ steps.find.outputs.archive_url }}"
-          TITLE="${{ steps.find.outputs.title }}"
-          SAFE_NAME=$(echo "$TITLE" | sed 's/[^a-zA-Z0-9._-]/_/g').mp4
-
-          echo "📥 Downloading from Archive.org..."
-          curl -L --retry 3 --max-time 3600 \
-            -o "/tmp/${SAFE_NAME}" \
-            "$ARCHIVE_URL"
-
-          FILE_SIZE=$(stat -c%s "/tmp/${SAFE_NAME}" 2>/dev/null || echo "0")
-          echo "📦 Downloaded: $(numfmt --to=iec $FILE_SIZE)"
-          echo "file_path=/tmp/${SAFE_NAME}" >> "$GITHUB_ENV"
-          echo "safe_name=${SAFE_NAME}" >> "$GITHUB_ENV"
-
-      - name: 📤 Upload to Telegram
-        if: steps.find.outputs.skip != 'true'
+      - name: 📱 Upload ALL recordings to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 scripts/telegram/upload_to_telegram.py \
-            "$file_path" \
-            "${{ steps.find.outputs.title }}"
+          python3 << 'PYSCRIPT'
+          import json, os, subprocess, sys
 
-      - name: 🗂️ Update recordings.json
-        if: steps.find.outputs.skip != 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VIDEO_ID="${{ steps.find.outputs.video_id }}"
-          TG_LINK="${{ steps.upload.outputs.telegram_link }}"
-
-          if [[ -n "$TG_LINK" ]]; then
-            python3 -c "
-          import json
-          with open('data/recordings.json') as f:
+          with open("data/recordings.json") as f:
               recs = json.load(f)
-          for r in recs:
-              if r.get('video_id') == '${VIDEO_ID}':
-                  r['telegram_link'] = '${TG_LINK}'
-                  break
-          with open('data/recordings.json', 'w') as f:
-              json.dump(recs, f, indent=2)
-          "
-            git config user.name "Stream Recorder Bot"
-            git config user.email "bot@stream-recorder"
-            git add data/recordings.json
-            git commit -m "📱 Add Telegram mirror link: ${VIDEO_ID}" || true
-            git push || true
-            echo "✅ Updated recordings.json with Telegram link"
-          fi
+
+          # Find all recordings without telegram_link
+          todo = [r for r in recs if not r.get("telegram_link") and (r.get("archive_direct") or r.get("archive_node") or r.get("archive_link"))]
+
+          if not todo:
+              print("✅ All recordings already have Telegram links")
+              sys.exit(0)
+
+          print(f"📱 Found {len(todo)} recordings to upload to Telegram\n")
+
+          for i, rec in enumerate(todo):
+              title = rec.get("title", "Recording")
+              vid = rec.get("video_id", "")
+              # Best download URL
+              url = rec.get("archive_direct") or rec.get("archive_node") or ""
+              if not url and rec.get("archive_link"):
+                  url = rec["archive_link"].replace("/details/", "/download/") + "/"
+
+              print(f"\n{'='*60}")
+              print(f"📱 [{i+1}/{len(todo)}] {title}")
+              print(f"   Source: {url[:80]}...")
+
+              # Download
+              safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title[:60]) + ".mp4"
+              path = f"/tmp/{safe}"
+              print(f"   📥 Downloading...")
+              dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url],
+                                  capture_output=True)
+              if dl.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) < 10000:
+                  print(f"   ❌ Download failed")
+                  continue
+
+              size = os.path.getsize(path)
+              print(f"   📦 Downloaded: {size/1024/1024:.0f} MB")
+
+              # Upload
+              env = os.environ.copy()
+              env["GITHUB_OUTPUT"] = f"/tmp/tg_out_{i}.txt"
+              open(env["GITHUB_OUTPUT"], "w").close()
+
+              up = subprocess.run(
+                  ["python3", "scripts/telegram/upload_to_telegram.py", path, title],
+                  env=env, capture_output=False)
+
+              # Read output
+              tg_link = ""
+              try:
+                  for line in open(env["GITHUB_OUTPUT"]):
+                      if line.startswith("telegram_link="):
+                          tg_link = line.strip().split("=", 1)[1]
+              except: pass
+
+              if tg_link:
+                  # Update recordings.json
+                  for r in recs:
+                      if r.get("video_id") == vid:
+                          r["telegram_link"] = tg_link
+                          break
+                  with open("data/recordings.json", "w") as f:
+                      json.dump(recs, f, indent=2)
+                  print(f"   ✅ Uploaded → {tg_link}")
+              else:
+                  print(f"   ⚠️ Uploaded but no link captured")
+
+              # Cleanup
+              try: os.remove(path)
+              except: pass
+
+          print(f"\n{'='*60}")
+          print(f"✅ Telegram upload complete")
+          PYSCRIPT
+
+      - name: 📤 Push updated recordings.json
+        run: |
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/recordings.json
+          git diff --cached --quiet || {
+            git commit -m "📱 Telegram mirror: uploaded all recordings"
+            git push
+          }

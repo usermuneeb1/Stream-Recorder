@@ -1,67 +1,129 @@
-name: "🟢 GDrive Upload"
+name: 🟢 GDrive Upload
 
 on:
+  workflow_run:
+    workflows: ["📡 Stream Recorder"]
+    types: [completed]
   workflow_dispatch:
-    inputs:
-      video_id:
-        description: "video_id from data/recordings.json"
-        required: true
-        type: string
 
-env:
-  GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-  TZ: Asia/Karachi
-
-permissions:
-  contents: write
+concurrency:
+  group: gdrive-upload
+  cancel-in-progress: false
 
 jobs:
-  upload:
+  upload-all:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 300
+
     steps:
       - uses: actions/checkout@v4
-      - name: "📦 Install"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install google-api-python-client google-auth
+
+      - name: 🟢 Upload ALL recordings to GDrive
+        env:
+          GDRIVE_SA_KEY: ${{ secrets.GDRIVE_SA_KEY }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg jq curl aria2 python3-pip
-          pip3 install --quiet google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2
-      - name: "🔎 Resolve"
-        id: resolve
+          python3 << 'PYSCRIPT'
+          import json, os, subprocess, sys, tempfile
+
+          SA_KEY = os.environ.get("GDRIVE_SA_KEY", "")
+          FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID", "")
+
+          if not SA_KEY or not FOLDER_ID:
+              print("⏭️ GDRIVE_SA_KEY or GDRIVE_FOLDER_ID not set — skipping")
+              sys.exit(0)
+
+          # Write SA key to temp file
+          key_file = "/tmp/gdrive_sa.json"
+          with open(key_file, "w") as f:
+              f.write(SA_KEY)
+
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          creds = service_account.Credentials.from_service_account_file(
+              key_file, scopes=["https://www.googleapis.com/auth/drive.file"])
+          drive = build("drive", "v3", credentials=creds)
+
+          with open("data/recordings.json") as f:
+              recs = json.load(f)
+
+          todo = [r for r in recs if not r.get("gdrive_link") and (r.get("archive_direct") or r.get("archive_node") or r.get("archive_link"))]
+
+          if not todo:
+              print("✅ All recordings already have GDrive links")
+              sys.exit(0)
+
+          print(f"🟢 Found {len(todo)} recordings to upload to GDrive\n")
+
+          for i, rec in enumerate(todo):
+              title = rec.get("title", "Recording")
+              vid = rec.get("video_id", "")
+              url = rec.get("archive_direct") or rec.get("archive_node") or ""
+              if not url and rec.get("archive_link"):
+                  url = rec["archive_link"].replace("/details/", "/download/") + "/"
+
+              print(f"\n{'='*60}")
+              print(f"🟢 [{i+1}/{len(todo)}] {title}")
+
+              safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title[:60]) + ".mp4"
+              path = f"/tmp/{safe}"
+
+              # Download
+              print(f"   📥 Downloading...")
+              dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url], capture_output=True)
+              if dl.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) < 10000:
+                  print(f"   ❌ Download failed"); continue
+
+              size = os.path.getsize(path)
+              print(f"   📦 Downloaded: {size/1024/1024:.0f} MB")
+
+              # Upload to GDrive
+              print(f"   ☁️ Uploading to Google Drive...")
+              try:
+                  media = MediaFileUpload(path, mimetype="video/mp4", resumable=True)
+                  file_meta = {"name": safe, "parents": [FOLDER_ID]}
+                  gfile = drive.files().create(body=file_meta, media_body=media, fields="id,webViewLink").execute()
+                  glink = gfile.get("webViewLink", "")
+
+                  # Make it viewable by anyone with link
+                  drive.permissions().create(
+                      fileId=gfile["id"],
+                      body={"role": "reader", "type": "anyone"}
+                  ).execute()
+
+                  if glink:
+                      for r in recs:
+                          if r.get("video_id") == vid:
+                              r["gdrive_link"] = glink; break
+                      with open("data/recordings.json", "w") as f:
+                          json.dump(recs, f, indent=2)
+                      print(f"   ✅ Uploaded → {glink}")
+                  else:
+                      print(f"   ⚠️ Uploaded but no link")
+              except Exception as e:
+                  print(f"   ❌ GDrive error: {e}")
+
+              try: os.remove(path)
+              except: pass
+
+          print(f"\n✅ GDrive upload complete")
+          PYSCRIPT
+
+      - name: 📤 Push updated recordings.json
         run: |
-          VID="${{ github.event.inputs.video_id }}"
-          echo "video_id=$VID" >> $GITHUB_OUTPUT
-          URL=$(jq -r --arg v "$VID" '.[] | select(.video_id == $v) | (.archive_node // .archive_direct // empty)' data/recordings.json)
-          TITLE=$(jq -r --arg v "$VID" '.[] | select(.video_id == $v) | .title // "Unknown"' data/recordings.json)
-          if [[ -z "$URL" ]]; then echo "❌ Not found: $VID"; jq -r '.[]|.video_id' data/recordings.json; exit 1; fi
-          echo "archive_url=$URL" >> $GITHUB_OUTPUT; echo "title=$TITLE" >> $GITHUB_OUTPUT
-      - name: "⬇️ Download"
-        run: aria2c -x 4 -s 4 --max-tries=3 --dir=. --out=input.mp4 "${{ steps.resolve.outputs.archive_url }}"
-      - name: "🟢 Upload to GDrive"
-        id: upload
-        run: |
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            KEY_VAR="GDRIVE_SA_KEY_$i"; KEY="${!KEY_VAR}"
-            [[ -z "$KEY" ]] && continue
-            export GDRIVE_SA_KEY="$KEY"
-            python3 scripts/gdrive/upload_to_gdrive.py input.mp4 > gup.txt 2>&1
-            FID=$(grep -oP 'File ID: \K[a-zA-Z0-9_-]+' gup.txt)
-            if [[ -n "$FID" ]]; then
-              echo "gdrive_file_id=$FID" >> $GITHUB_OUTPUT; echo "upload_status=success" >> $GITHUB_OUTPUT
-              echo "✅ Uploaded with SA #$i"; break
-            fi
-          done
-          [[ -z "${FID:-}" ]] && echo "upload_status=failed" >> $GITHUB_OUTPUT
-      - name: "💾 Update recordings.json"
-        if: steps.upload.outputs.upload_status == 'success'
-        run: |
-          FID="${{ steps.upload.outputs.gdrive_file_id }}"
-          LINK="https://drive.google.com/uc?export=download&id=${FID}"
-          jq --arg v "${{ steps.resolve.outputs.video_id }}" --arg l "$LINK" --arg f "$FID" \
-            '(.[] | select(.video_id == $v) | .gdrive_link) = $l | (.[] | select(.video_id == $v) | .gdrive_file_id) = $f' \
-            data/recordings.json > tmp.json && mv tmp.json data/recordings.json
-      - name: "⬆️ Commit"
-        if: steps.upload.outputs.upload_status == 'success'
-        run: |
-          git config user.name "GDrive Bot"; git config user.email "gdrive@stream-recorder.local"
-          git add data/recordings.json && git commit -m "🟢 GDrive: ${{ steps.resolve.outputs.video_id }}" && git push || echo "No changes"
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/recordings.json
+          git diff --cached --quiet || {
+            git commit -m "🟢 GDrive mirror: uploaded all recordings"
+            git push
+          }
