@@ -21,6 +21,8 @@ function getSrc(r:Recording){
   if(r.archiveDirect) s.push({l:'B3ING',u:r.archiveDirect});
   // JAGUAR = Telegram
   if(r.telegramLink) s.push({l:'JAGUAR',u:r.telegramLink});
+  // CF = Cloudflare Worker proxy (cached globally, fastest)
+  if((r as any).cf_stream) s.unshift({l:'Auto',u:(r as any).cf_stream});
   // Dedup — remove if Auto URL matches R3AL or B3ING
   const auto=s[0]?.u;
   return s.filter((x,i)=>i===0||x.u!==auto);

@@ -129,6 +129,11 @@ def main():
             link = f"https://t.me/c/{cid}/{msg.id}"
             with open(gh_out, "a") as f:
                 f.write(f"telegram_link={link}\n")
+                # Save file_id for Cloudflare Worker proxy
+                try:
+                    fid = msg.document.file_id
+                    f.write(f"telegram_file_id={fid}\n")
+                except: pass
             log("🔗", f"Link: {link}")
 
     except Exception as e:

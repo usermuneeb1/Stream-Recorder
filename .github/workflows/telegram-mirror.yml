@@ -34,6 +34,7 @@ jobs:
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
           python3 << 'PYSCRIPT'
           import json, os, subprocess, sys
@@ -88,10 +89,21 @@ jobs:
                           tg_link = line.strip().split("=", 1)[1]
               except: pass
 
+              # Also read file_id
+              tg_file_id = ""
+              try:
+                  for line in open(env["GITHUB_OUTPUT"]):
+                      if line.startswith("telegram_file_id="):
+                          tg_file_id = line.strip().split("=", 1)[1]
+              except: pass
+
               if tg_link:
                   for r in recs:
                       if r.get("video_id") == vid:
                           r["telegram_link"] = tg_link
+                          if tg_file_id:
+                              r["telegram_file_id"] = tg_file_id
+                              r["cf_stream"] = f"https://tg-stream.isthatdxture.workers.dev/?file_id={tg_file_id}&bot=" + os.environ.get("TELEGRAM_BOT_TOKEN", "")
                           break
                   with open("data/recordings.json", "w") as f:
                       json.dump(recs, f, indent=2)

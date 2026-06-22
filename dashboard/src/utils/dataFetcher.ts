@@ -56,7 +56,7 @@ export async function fetchRecordings():Promise<Recording[]>{
           githubRelease:r.github_release||'',githubDirect:r.github_direct||'',
           gdriveLink:r.gdrive_link||'',telegramLink:r.telegram_link||'',r2Link:r.r2_link||'',
           aiChapters:(r.ai_chapters||[]),
-          transcriptUrl:r.transcript_url||'',chatUrl:r.chat_url||''
+          transcriptUrl:r.transcript_url||'',chatUrl:r.chat_url||'',cf_stream:r.cf_stream||''
         }))
     ).sort((a,b)=>b.date.localeCompare(a.date));
   }catch{return[];}
