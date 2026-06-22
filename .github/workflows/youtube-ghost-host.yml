@@ -6,13 +6,9 @@ on:
       skip_morph:
         description: "Skip morphing (upload clean)"
         required: false
-        default: false
-        type: boolean
+        default: "false"
 
 env:
-  GH_PAT: ${{ secrets.GH_PAT }}
-  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
-  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   TZ: Asia/Karachi
 
@@ -21,179 +17,103 @@ permissions:
 
 jobs:
   ghost-all:
-    name: "👻 Morph & Upload ALL"
     runs-on: ubuntu-latest
     timeout-minutes: 360
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: "📦 Install Tools"
+      - name: Install tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg jq curl python3-pip aria2
           pip3 install --quiet google-auth-oauthlib google-auth-httplib2 google-api-python-client
-          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
-          chmod +x scripts/*.sh
 
-      - name: "🔑 Extract YouTube credentials"
+      - name: Extract YouTube credentials
         id: creds
         env:
           YT_CLIENT_SECRETS: ${{ secrets.YOUTUBE_CLIENT_SECRETS }}
           YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
-        run: |
-          python3 << 'CREDPY'
-          import json, os, sys
+        run: python3 scripts/youtube_extract_creds.py
 
-          def extract_creds():
-              cs = os.environ.get("YT_CLIENT_SECRETS", "").strip()
-              tk = os.environ.get("YT_TOKEN", "").strip()
-              
-              client_id = ""
-              client_secret = ""
-              refresh_token = ""
-              
-              # Parse client_secrets
-              if cs:
-                  try:
-                      d = json.loads(cs)
-                      # Try installed, web, or flat
-                      for key in ["installed", "web"]:
-                          if key in d:
-                              client_id = d[key].get("client_id", "")
-                              client_secret = d[key].get("client_secret", "")
-                              break
-                      if not client_id:
-                          client_id = d.get("client_id", "")
-                          client_secret = d.get("client_secret", "")
-                      print(f"✅ client_id: {client_id[:20]}...")
-                  except Exception as e:
-                      print(f"❌ Failed to parse YOUTUBE_CLIENT_SECRETS: {e}")
-                      print(f"   First 100 chars: {cs[:100]}")
-              
-              # Parse token
-              if tk:
-                  try:
-                      t = json.loads(tk)
-                      refresh_token = t.get("refresh_token", "") or t.get("_refresh_token", "")
-                      print(f"✅ refresh_token: {refresh_token[:20]}...")
-                  except Exception as e:
-                      print(f"❌ Failed to parse YOUTUBE_TOKEN: {e}")
-                      print(f"   First 100 chars: {tk[:100]}")
-              
-              if not all([client_id, client_secret, refresh_token]):
-                  print("❌ Missing credentials!")
-                  if not cs: print("   YOUTUBE_CLIENT_SECRETS is empty")
-                  if not tk: print("   YOUTUBE_TOKEN is empty")
-                  sys.exit(1)
-              
-              # Write to GITHUB_OUTPUT
-              out = os.environ.get("GITHUB_OUTPUT", "")
-              if out:
-                  with open(out, "a") as f:
-                      f.write(f"client_id={client_id}
-")
-                      f.write(f"client_secret={client_secret}
-")
-                      f.write(f"refresh_token={refresh_token}
-")
-              print("✅ All credentials extracted")
-          
-          extract_creds()
-          CREDPY
-
-      - name: "👻 Process ALL recordings"
+      - name: Upload ALL recordings
         env:
-          YOUTUBE_CLIENT_ID: ${{ steps.creds.outputs.client_id || secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ steps.creds.outputs.client_secret || secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ steps.creds.outputs.refresh_token || secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CLIENT_ID: ${{ steps.creds.outputs.client_id }}
+          YOUTUBE_CLIENT_SECRET: ${{ steps.creds.outputs.client_secret }}
+          YOUTUBE_REFRESH_TOKEN: ${{ steps.creds.outputs.refresh_token }}
           SKIP_MORPH: ${{ github.event.inputs.skip_morph }}
         run: |
-          python3 << 'PYSCRIPT'
+          python3 -c "
           import json, os, subprocess, sys
 
-          with open("data/recordings.json") as f:
+          with open('data/recordings.json') as f:
               recs = json.load(f)
 
-          todo = [r for r in recs if not r.get("youtube_unlisted") and not r.get("youtube_id")
-                  and (r.get("archive_node") or r.get("archive_direct") or r.get("archive_link"))]
+          todo = [r for r in recs if not r.get('youtube_unlisted') and not r.get('youtube_id')
+                  and (r.get('archive_node') or r.get('archive_direct') or r.get('archive_link'))]
 
           if not todo:
-              print("✅ All recordings already have YouTube mirrors")
+              print('All recordings already have YouTube mirrors')
               sys.exit(0)
 
-          print(f"👻 Found {len(todo)} recordings to ghost-host\n")
-          skip = os.environ.get("SKIP_MORPH", "false") == "true"
+          print(f'Found {len(todo)} recordings to ghost-host')
+          skip = os.environ.get('SKIP_MORPH', 'false') == 'true'
 
           for i, rec in enumerate(todo):
-              title = rec.get("title", "Recording")
-              vid = rec.get("video_id", "")
-              url = rec.get("archive_node") or rec.get("archive_direct") or ""
-              if not url and rec.get("archive_link"):
-                  url = rec["archive_link"].replace("/details/", "/download/") + "/"
+              title = rec.get('title', 'Recording')
+              vid = rec.get('video_id', '')
+              url = rec.get('archive_node') or rec.get('archive_direct') or ''
+              if not url and rec.get('archive_link'):
+                  url = rec['archive_link'].replace('/details/', '/download/') + '/'
 
-              print(f"\n{'='*60}")
-              print(f"👻 [{i+1}/{len(todo)}] {title}")
+              print(f'\n{\"=\"*60}')
+              print(f'[{i+1}/{len(todo)}] {title}')
+              print(f'   Downloading...')
+              subprocess.run(['curl', '-L', '--retry', '3', '--max-time', '3600', '-o', '/tmp/input.mp4', url], capture_output=True)
 
-              print(f"   📥 Downloading...")
-              dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600",
-                                   "-o", "/tmp/input_video.mp4", url], capture_output=True)
+              if not os.path.exists('/tmp/input.mp4') or os.path.getsize('/tmp/input.mp4') < 10000:
+                  print('   Download failed'); continue
 
-              if not os.path.exists("/tmp/input_video.mp4") or os.path.getsize("/tmp/input_video.mp4") < 10000:
-                  print(f"   ❌ Download failed"); continue
-
-              size = os.path.getsize("/tmp/input_video.mp4")
-              print(f"   📦 Downloaded: {size/1024/1024:.0f} MB")
+              print(f'   Downloaded: {os.path.getsize(\"/tmp/input.mp4\")/1024/1024:.0f} MB')
 
               env = os.environ.copy()
-              if skip: env["SKIP_MORPH"] = "true"
-              print(f"   👻 {'Skipping morph' if skip else 'Morphing'}...")
-              subprocess.run(["python3", "scripts/morph_video.py",
-                              "/tmp/input_video.mp4", "/tmp/morphed_video.mp4"], env=env)
+              if skip: env['SKIP_MORPH'] = 'true'
+              print(f'   Morphing...')
+              subprocess.run(['python3', 'scripts/morph_video.py', '/tmp/input.mp4', '/tmp/morphed.mp4'], env=env)
 
-              if not os.path.exists("/tmp/morphed_video.mp4"):
-                  print(f"   ❌ Morph failed")
-                  try: os.remove("/tmp/input_video.mp4")
-                  except: pass
-                  continue
+              if not os.path.exists('/tmp/morphed.mp4'):
+                  print('   Morph failed'); os.remove('/tmp/input.mp4'); continue
 
-              print(f"   📤 Uploading to YouTube (unlisted)...")
-              env["YOUTUBE_UPLOAD_TITLE"] = f"Archive Backup — {title}"
-              up = subprocess.run(["python3", "scripts/upload_to_youtube.py", "/tmp/morphed_video.mp4"],
-                                  env=env, capture_output=True, text=True)
+              print('   Uploading to YouTube...')
+              env['YOUTUBE_UPLOAD_TITLE'] = f'Archive Backup - {title}'
+              up = subprocess.run(['python3', 'scripts/upload_to_youtube.py', '/tmp/morphed.mp4'], env=env, capture_output=True, text=True)
 
-              yt_id = ""
-              for line in (up.stdout or "").split("\n"):
-                  if line.startswith("VIDEO_ID="):
-                      yt_id = line.split("=", 1)[1].strip()
+              yt_id = ''
+              for line in (up.stdout or '').split('\n'):
+                  if line.startswith('VIDEO_ID='): yt_id = line.split('=', 1)[1].strip()
 
               if yt_id:
                   for r in recs:
-                      if r.get("video_id") == vid:
-                          r["youtube_id"] = yt_id
-                          r["youtube_unlisted"] = f"https://youtu.be/{yt_id}"
-                          break
-                  with open("data/recordings.json", "w") as f:
+                      if r.get('video_id') == vid:
+                          r['youtube_id'] = yt_id
+                          r['youtube_unlisted'] = f'https://youtu.be/{yt_id}'
+                  with open('data/recordings.json', 'w') as f:
                       json.dump(recs, f, indent=2)
-                  print(f"   ✅ Uploaded: https://youtu.be/{yt_id}")
+                  print(f'   Uploaded: https://youtu.be/{yt_id}')
               else:
-                  print(f"   ❌ Upload failed")
-                  if up.stdout: print(f"   stdout: {up.stdout[:500]}")
-                  if up.stderr: print(f"   stderr: {up.stderr[:500]}")
+                  print('   Upload failed')
+                  if up.stdout: print(f'   {up.stdout[:300]}')
+                  if up.stderr: print(f'   {up.stderr[:300]}')
 
-              for f in ["/tmp/input_video.mp4", "/tmp/morphed_video.mp4"]:
+              for f in ['/tmp/input.mp4', '/tmp/morphed.mp4']:
                   try: os.remove(f)
                   except: pass
 
-          print(f"\n{'='*60}\n✅ Ghost-Host complete")
-          PYSCRIPT
+          print('Done')
+          "
 
-      - name: "📤 Push"
+      - name: Push
         run: |
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
           git add data/recordings.json
-          git diff --cached --quiet || {
-            git commit -m "👻 YouTube Ghost-Host: uploaded all recordings"
-            git push
-          }
+          git diff --cached --quiet || { git commit -m "👻 YouTube Ghost-Host: all recordings" && git push; }
