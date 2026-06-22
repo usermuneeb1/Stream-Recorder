@@ -11,19 +11,16 @@ interface P{rec:Recording;onClose:()=>void;all:Recording[];onNav:(r:Recording)=>
 // GitHub sends octet-stream but Vidstack plays it without crossOrigin
 function getSrc(r:Recording){
   const s:{l:string;u:string}[]=[];
-  // Auto = pick the fastest available
+  // Auto = archive node (fastest, 3.9 MB/s)
   if(r.archiveNode) s.push({l:'Auto',u:r.archiveNode});
   else if(r.githubDirect||r.githubRelease) s.push({l:'Auto',u:(r.githubDirect||r.githubRelease)});
-  else if(r.archiveDirect) s.push({l:'Auto',u:r.archiveDirect});
-  // R3AL = GitHub CDN
-  if(r.githubDirect||r.githubRelease) s.push({l:'R3AL',u:(r.githubDirect||r.githubRelease)});
-  // B3ING = Archive /download/
-  if(r.archiveDirect) s.push({l:'B3ING',u:r.archiveDirect});
+  // B3ING = GitHub CDN
+  if(r.githubDirect||r.githubRelease) s.push({l:'B3ING',u:(r.githubDirect||r.githubRelease)});
   // JAGUAR = Telegram
   if(r.telegramLink) s.push({l:'JAGUAR',u:r.telegramLink});
   // CF = Cloudflare Worker proxy (cached globally, fastest)
   if((r as any).cf_stream) s.unshift({l:'Auto',u:(r as any).cf_stream});
-  // Dedup — remove if Auto URL matches R3AL or B3ING
+  // Dedup
   const auto=s[0]?.u;
   return s.filter((x,i)=>i===0||x.u!==auto);
 }
