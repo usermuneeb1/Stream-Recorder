@@ -6,7 +6,7 @@ on:
       skip_morph:
         description: "Skip morphing (upload clean)"
         required: false
-        default: "false"
+        default: "true"
 
 env:
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -56,7 +56,7 @@ jobs:
               sys.exit(0)
 
           print(f'Found {len(todo)} recordings to ghost-host')
-          skip = os.environ.get('SKIP_MORPH', 'false') == 'true'
+          skip = os.environ.get('SKIP_MORPH', 'true') == 'true'
 
           for i, rec in enumerate(todo):
               title = rec.get('title', 'Recording')
