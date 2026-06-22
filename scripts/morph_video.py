@@ -75,7 +75,7 @@ def morph(input_path: str, output_path: str):
         "-i", input_path,
         "-vf", "rotate=0.5*PI/180:fillcolor=black,noise=alls=3:allf=t+u",
         "-af", "asetrate=44100*1.008,aresample=44100",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         "-max_muxing_queue_size", "4096",
