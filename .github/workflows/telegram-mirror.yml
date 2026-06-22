@@ -23,11 +23,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install requests
+      - run: pip install pyrogram
 
       - name: 📱 Upload ALL recordings to Telegram
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python3 << 'PYSCRIPT'
@@ -36,33 +38,29 @@ jobs:
           with open("data/recordings.json") as f:
               recs = json.load(f)
 
-          # Find all recordings without telegram_link
           todo = [r for r in recs if not r.get("telegram_link") and (r.get("archive_direct") or r.get("archive_node") or r.get("archive_link"))]
 
           if not todo:
               print("✅ All recordings already have Telegram links")
               sys.exit(0)
 
-          print(f"📱 Found {len(todo)} recordings to upload to Telegram\n")
+          print(f"📱 Found {len(todo)} recordings to upload\n")
 
           for i, rec in enumerate(todo):
               title = rec.get("title", "Recording")
               vid = rec.get("video_id", "")
-              # Best download URL
               url = rec.get("archive_direct") or rec.get("archive_node") or ""
               if not url and rec.get("archive_link"):
                   url = rec["archive_link"].replace("/details/", "/download/") + "/"
 
               print(f"\n{'='*60}")
               print(f"📱 [{i+1}/{len(todo)}] {title}")
-              print(f"   Source: {url[:80]}...")
 
-              # Download
               safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title[:60]) + ".mp4"
               path = f"/tmp/{safe}"
+
               print(f"   📥 Downloading...")
-              dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url],
-                                  capture_output=True)
+              dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url], capture_output=True)
               if dl.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) < 10000:
                   print(f"   ❌ Download failed")
                   continue
@@ -77,7 +75,7 @@ jobs:
 
               up = subprocess.run(
                   ["python3", "scripts/telegram/upload_to_telegram.py", path, title],
-                  env=env, capture_output=False)
+                  env=env)
 
               # Read output
               tg_link = ""
@@ -88,31 +86,26 @@ jobs:
               except: pass
 
               if tg_link:
-                  # Update recordings.json
                   for r in recs:
                       if r.get("video_id") == vid:
                           r["telegram_link"] = tg_link
                           break
                   with open("data/recordings.json", "w") as f:
                       json.dump(recs, f, indent=2)
-                  print(f"   ✅ Uploaded → {tg_link}")
-              else:
-                  print(f"   ⚠️ Uploaded but no link captured")
+                  print(f"   ✅ Link: {tg_link}")
 
-              # Cleanup
               try: os.remove(path)
               except: pass
 
-          print(f"\n{'='*60}")
-          print(f"✅ Telegram upload complete")
+          print(f"\n{'='*60}\n✅ Done")
           PYSCRIPT
 
-      - name: 📤 Push updated recordings.json
+      - name: 📤 Push
         run: |
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
           git add data/recordings.json
           git diff --cached --quiet || {
-            git commit -m "📱 Telegram mirror: uploaded all recordings"
+            git commit -m "📱 Telegram: uploaded all recordings"
             git push
           }
