@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload recordings to Telegram using Pyrogram (up to 2GB per file, no chunks)."""
+"""Upload recordings to Telegram using Pyrogram (up to 2GB, no chunks)."""
 
 import json
 import os
@@ -10,11 +10,6 @@ API_ID = os.environ.get("TELEGRAM_API_ID", "")
 API_HASH = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION = os.environ.get("TELEGRAM_SESSION_STRING", "")
 CHAT_ID_RAW = os.environ.get("TELEGRAM_CHAT_ID", "0")
-# Pyrogram needs -100 prefix for channels
-if not CHAT_ID_RAW.startswith("-100") and len(CHAT_ID_RAW) > 5:
-    CHAT_ID = int(f"-100{CHAT_ID_RAW}")
-else:
-    CHAT_ID = int(CHAT_ID_RAW)
 
 
 def log(e, m):
@@ -33,6 +28,45 @@ def progress(current, total):
         print(f"     {pct:.0f}% ({fmt(current)} / {fmt(total)})", end="\r", flush=True)
 
 
+def resolve_chat(app):
+    """Try multiple formats to resolve the channel."""
+    raw = CHAT_ID_RAW.strip()
+
+    # Try formats in order
+    candidates = []
+    if raw.startswith("-100"):
+        candidates.append(int(raw))
+    elif raw.lstrip("-").isdigit():
+        candidates.append(int(f"-100{raw}"))
+        candidates.append(int(raw))
+        candidates.append(int(f"-{raw}"))
+
+    for cid in candidates:
+        try:
+            chat = app.get_chat(cid)
+            log("✅", f"Resolved channel: {chat.title} (ID: {cid})")
+            return cid
+        except Exception as e:
+            log("⚠️", f"ID {cid} failed: {e}")
+
+    # Last resort: try to find it by listing dialogs
+    log("🔍", "Searching dialogs for the channel...")
+    try:
+        for dialog in app.get_dialogs():
+            chat = dialog.chat
+            chat_id_str = str(chat.id).replace("-100", "")
+            if chat_id_str == raw or str(chat.id) == raw:
+                log("✅", f"Found via dialogs: {chat.title} (ID: {chat.id})")
+                return chat.id
+            if hasattr(chat, 'title') and chat.title and "archive" in chat.title.lower():
+                log("✅", f"Found by name: {chat.title} (ID: {chat.id})")
+                return chat.id
+    except Exception as e:
+        log("⚠️", f"Dialog search failed: {e}")
+
+    return None
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 upload_to_telegram.py <file> [title]")
@@ -45,7 +79,7 @@ def main():
         log("❌", f"File not found: {path}")
         sys.exit(1)
 
-    if not all([API_ID, API_HASH, SESSION, CHAT_ID]):
+    if not all([API_ID, API_HASH, SESSION]):
         log("⏭️", "Telegram credentials not set — skipping")
         sys.exit(0)
 
@@ -65,11 +99,18 @@ def main():
     app.start()
 
     try:
+        # Resolve the channel ID
+        chat_id = resolve_chat(app)
+        if not chat_id:
+            log("❌", f"Could not resolve channel ID: {CHAT_ID_RAW}")
+            log("💡", "Make sure the bot/account is a member of the channel")
+            sys.exit(1)
+
         caption = f"📡 **{title}**\n💾 {fmt(fsize)}\n☪️ Stream Archive"
         start = time.time()
 
         msg = app.send_document(
-            chat_id=CHAT_ID,
+            chat_id=chat_id,
             document=path,
             caption=caption,
             file_name=os.path.basename(path),
@@ -78,18 +119,13 @@ def main():
 
         elapsed = time.time() - start
         speed = fsize / elapsed if elapsed > 0 else 0
+        print()
         log("✅", f"Uploaded in {elapsed:.0f}s ({fmt(speed)}/s)")
-        log("📎", f"Message ID: {msg.id}")
 
-        # Write output for workflow
+        # Build link
         gh_out = os.environ.get("GITHUB_OUTPUT", "")
         if gh_out:
-            # Build link — for private channels use c/ format
-            chat_str = str(CHAT_ID)
-            if chat_str.startswith("-100"):
-                cid = chat_str[4:]
-            else:
-                cid = chat_str
+            cid = str(chat_id).replace("-100", "")
             link = f"https://t.me/c/{cid}/{msg.id}"
             with open(gh_out, "a") as f:
                 f.write(f"telegram_link={link}\n")
@@ -97,6 +133,8 @@ def main():
 
     except Exception as e:
         log("❌", f"Upload failed: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     finally:
         app.stop()
