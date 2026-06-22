@@ -36,35 +36,71 @@ jobs:
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh
 
-      - name: "🔑 Extract YouTube credentials from JSON secrets"
+      - name: "🔑 Extract YouTube credentials"
         id: creds
         env:
           YT_CLIENT_SECRETS: ${{ secrets.YOUTUBE_CLIENT_SECRETS }}
           YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
         run: |
-          # Extract client_id and client_secret from client_secrets.json
-          if [[ -n "$YT_CLIENT_SECRETS" ]]; then
-            CLIENT_ID=$(echo "$YT_CLIENT_SECRETS" | python3 -c "import sys,json; d=json.load(sys.stdin); k=list(d.keys())[0]; print(d[k]['client_id'])" 2>/dev/null)
-            CLIENT_SECRET=$(echo "$YT_CLIENT_SECRETS" | python3 -c "import sys,json; d=json.load(sys.stdin); k=list(d.keys())[0]; print(d[k]['client_secret'])" 2>/dev/null)
-            echo "client_id=$CLIENT_ID" >> $GITHUB_OUTPUT
-            echo "client_secret=$CLIENT_SECRET" >> $GITHUB_OUTPUT
-            echo "✅ Extracted client_id + client_secret"
-          fi
+          python3 << 'CREDPY'
+          import json, os, sys
 
-          # Extract refresh_token from youtube_token.json
-          if [[ -n "$YT_TOKEN" ]]; then
-            REFRESH_TOKEN=$(echo "$YT_TOKEN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('refresh_token',''))" 2>/dev/null)
-            echo "refresh_token=$REFRESH_TOKEN" >> $GITHUB_OUTPUT
-            echo "✅ Extracted refresh_token"
-          fi
-
-          # Check if we have everything
-          if [[ -z "$CLIENT_ID" ]] || [[ -z "$REFRESH_TOKEN" ]]; then
-            echo "❌ Missing YouTube credentials."
-            echo "   Need secrets: YOUTUBE_CLIENT_SECRETS + YOUTUBE_TOKEN"
-            echo "   Or: YOUTUBE_CLIENT_ID + YOUTUBE_CLIENT_SECRET + YOUTUBE_REFRESH_TOKEN"
-            exit 1
-          fi
+          def extract_creds():
+              cs = os.environ.get("YT_CLIENT_SECRETS", "").strip()
+              tk = os.environ.get("YT_TOKEN", "").strip()
+              
+              client_id = ""
+              client_secret = ""
+              refresh_token = ""
+              
+              # Parse client_secrets
+              if cs:
+                  try:
+                      d = json.loads(cs)
+                      # Try installed, web, or flat
+                      for key in ["installed", "web"]:
+                          if key in d:
+                              client_id = d[key].get("client_id", "")
+                              client_secret = d[key].get("client_secret", "")
+                              break
+                      if not client_id:
+                          client_id = d.get("client_id", "")
+                          client_secret = d.get("client_secret", "")
+                      print(f"✅ client_id: {client_id[:20]}...")
+                  except Exception as e:
+                      print(f"❌ Failed to parse YOUTUBE_CLIENT_SECRETS: {e}")
+                      print(f"   First 100 chars: {cs[:100]}")
+              
+              # Parse token
+              if tk:
+                  try:
+                      t = json.loads(tk)
+                      refresh_token = t.get("refresh_token", "") or t.get("_refresh_token", "")
+                      print(f"✅ refresh_token: {refresh_token[:20]}...")
+                  except Exception as e:
+                      print(f"❌ Failed to parse YOUTUBE_TOKEN: {e}")
+                      print(f"   First 100 chars: {tk[:100]}")
+              
+              if not all([client_id, client_secret, refresh_token]):
+                  print("❌ Missing credentials!")
+                  if not cs: print("   YOUTUBE_CLIENT_SECRETS is empty")
+                  if not tk: print("   YOUTUBE_TOKEN is empty")
+                  sys.exit(1)
+              
+              # Write to GITHUB_OUTPUT
+              out = os.environ.get("GITHUB_OUTPUT", "")
+              if out:
+                  with open(out, "a") as f:
+                      f.write(f"client_id={client_id}
+")
+                      f.write(f"client_secret={client_secret}
+")
+                      f.write(f"refresh_token={refresh_token}
+")
+              print("✅ All credentials extracted")
+          
+          extract_creds()
+          CREDPY
 
       - name: "👻 Process ALL recordings"
         env:
