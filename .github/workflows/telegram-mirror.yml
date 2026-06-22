@@ -10,6 +10,9 @@ concurrency:
   group: telegram-mirror
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   upload-all:
     runs-on: ubuntu-latest
