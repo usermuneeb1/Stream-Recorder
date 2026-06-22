@@ -9,7 +9,12 @@ import time
 API_ID = os.environ.get("TELEGRAM_API_ID", "")
 API_HASH = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION = os.environ.get("TELEGRAM_SESSION_STRING", "")
-CHAT_ID = int(os.environ.get("TELEGRAM_CHAT_ID", "0"))
+CHAT_ID_RAW = os.environ.get("TELEGRAM_CHAT_ID", "0")
+# Pyrogram needs -100 prefix for channels
+if not CHAT_ID_RAW.startswith("-100") and len(CHAT_ID_RAW) > 5:
+    CHAT_ID = int(f"-100{CHAT_ID_RAW}")
+else:
+    CHAT_ID = int(CHAT_ID_RAW)
 
 
 def log(e, m):
