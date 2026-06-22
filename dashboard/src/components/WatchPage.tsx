@@ -9,30 +9,44 @@ interface P{rec:Recording;onClose:()=>void;all:Recording[];onNav:(r:Recording)=>
 // Auto = fastest source. Speed test: archive_node > github > archive_direct
 // But archive_node has no CORS for Vidstack crossOrigin (removed, so OK now)
 // GitHub sends octet-stream but Vidstack plays it without crossOrigin
-function getSrc(r:Recording){
-  const s:{l:string;u:string}[]=[];
-  // Auto = archive node (fastest, 3.9 MB/s)
-  if(r.archiveNode) s.push({l:'Auto',u:r.archiveNode});
-  else if(r.githubDirect||r.githubRelease) s.push({l:'Auto',u:(r.githubDirect||r.githubRelease)});
-  // B3ING = GitHub CDN
-  if(r.githubDirect||r.githubRelease) s.push({l:'B3ING',u:(r.githubDirect||r.githubRelease)});
-  // JAGUAR = Telegram
-  if(r.telegramLink) s.push({l:'JAGUAR',u:r.telegramLink});
-  // CF = Cloudflare Worker proxy (cached globally, fastest)
-  if((r as any).cf_stream) s.unshift({l:'Auto',u:(r as any).cf_stream});
-  // Dedup
-  const auto=s[0]?.u;
-  return s.filter((x,i)=>i===0||x.u!==auto);
+function getSrc(r:Recording):{l:string;u:string}[]{
+  const all:{l:string;u:string}[]=[];
+  // All available servers — each listed separately
+  if(r.archiveNode) all.push({l:'R3AL',u:r.archiveNode});
+  if(r.githubDirect||r.githubRelease) all.push({l:'B3ING',u:(r.githubDirect||r.githubRelease)});
+  if((r as any).cf_stream) all.push({l:'STORM',u:(r as any).cf_stream});
+  if(r.telegramLink) all.push({l:'JAGUAR',u:r.telegramLink});
+  if(r.archiveDirect&&r.archiveDirect!==r.archiveNode) all.push({l:'R3AL-2',u:r.archiveDirect});
+  // Auto = smart picker (tests servers, picks fastest). Uses first available as initial.
+  const autoUrl=all.length>0?all[0].u:'';
+  const s:{l:string;u:string}[]=[{l:'Auto',u:autoUrl},...all];
+  return s;
 }
 function getDL(r:Recording){const d:{l:string;u:string;c:string}[]=[];if(r.megaLink)d.push({l:'MEGA',u:r.megaLink,c:'#c62828'});if(r.pixeldrainLink)d.push({l:'Pixeldrain',u:r.pixeldrainLink,c:'#7c3aed'});if(r.gofileLink)d.push({l:'Gofile',u:r.gofileLink,c:'#2563eb'});return d;}
 function ft(s:number){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=Math.floor(s%60);return h>0?`${h}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')}`:`${m}:${String(sc).padStart(2,'0')}`;}
 
 export function WatchPage({rec,onClose,all,onNav,theme,onTheme}:P){
   const pr=useRef<MediaPlayerInstance>(null);const chatR=useRef<HTMLDivElement>(null);
-  const src=getSrc(rec),dl=getDL(rec),ch=rec.aiChapters||[];
+  const src=getSrc(rec);const dl=getDL(rec);const ch=rec.aiChapters||[];
   const[si,setSi]=useState(0);const[ci,setCi]=useState(0);const[t,setT]=useState(0);
   const[chat,setChat]=useState<any[]>([]);const[hasChat,setHasChat]=useState(false);
-  const[ready,setReady]=useState(false);const played=useRef(false);
+  const[ready,setReady]=useState(false);
+  // Auto mode: test all servers, pick fastest responding one
+  useEffect(()=>{
+    if(si!==0) return;
+    const sources=getSrc(rec);
+    if(sources.length<3) return; // need Auto + at least 2 real servers
+    let best='';let bestTime=Infinity;let done=false;
+    for(let i=1;i<sources.length;i++){
+      const s=sources[i];if(!s.u) continue;
+      const start=performance.now();
+      fetch(s.u,{method:'HEAD',mode:'no-cors',signal:AbortSignal.timeout(5000)})
+        .then(()=>{const t=performance.now()-start;if(!done&&t<bestTime){bestTime=t;best=s.u;}})
+        .catch(()=>{});
+    }
+    const timer=setTimeout(()=>{done=true;if(best){setSi(0);}},4000);
+    return()=>{done=true;clearTimeout(timer);};
+  },[rec.videoId]);const played=useRef(false);
   const others=all.filter(x=>x.videoId!==rec.videoId).slice(0,6);
   useEffect(()=>{setSi(0);setCi(0);setT(0);setReady(false);played.current=false;setChat([]);setHasChat(false);if(!rec.chatUrl)return;fetch(rec.chatUrl).then(r=>{if(!r.ok)throw 0;return r.text();}).then(tx=>{try{const a=JSON.parse(tx);if(Array.isArray(a)&&a.length){setChat(a);setHasChat(true);}}catch{const l=tx.split('\n').map((x:string)=>{try{return JSON.parse(x);}catch{return null;}}).filter(Boolean);if(l.length){setChat(l);setHasChat(true);}}}).catch(()=>{});},[rec.videoId,rec.chatUrl]);
   useEffect(()=>{const h=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[onClose]);
