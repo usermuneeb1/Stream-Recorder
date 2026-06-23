@@ -132,13 +132,32 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   // ── Esc closes / shortcuts ───────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ignore shortcuts while user is typing in a form field (comments etc).
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (t && t.isContentEditable)) return;
+
       if (e.key === 'Escape' && !shareOpen && !showHelp) onClose();
       if (e.key === 'Escape' && (shareOpen || showHelp)) { setShareOpen(false); setShowHelp(false); }
       if (e.key === '?') { e.preventDefault(); setShowHelp(s => !s); }
+
+      // FEATURE: 0/1/2/3/4/5 to switch source.
+      // 0 = Auto, 1..N = sources[i-1]. Plays nicely with the existing UI.
+      if (/^[0-5]$/.test(e.key)) {
+        const n = parseInt(e.key, 10);
+        if (n === 0) {
+          setSi(0);
+          onToast('Source: Auto');
+        } else if (n <= sources.length) {
+          setSi(n);
+          played.current = false; setReady(false);
+          onToast(`Source: ${sources[n - 1].label}`);
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, shareOpen, showHelp]);
+  }, [onClose, shareOpen, showHelp, sources, onToast]);
 
   // ── Player events ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -203,10 +222,20 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     const m = hash.match(/\?t=(\d+)/);
     if (m) { seek(parseInt(m[1])); setResumeShown(true); return; }
     const saved = loadPosition(rec.videoId);
-    if (saved && saved.t > 30) setResumeAt(saved.t);
+    // FIX #26 — if user clicked "Continue watching", auto-resume silently.
+    const cameFromContinue = (window as any).__mlaContinueResume === rec.videoId;
+    if (cameFromContinue) { (window as any).__mlaContinueResume = null; }
+    if (saved && saved.t > 30) {
+      if (cameFromContinue) {
+        seek(saved.t);
+        onToast(`Resumed at ${Math.floor(saved.t / 60)}:${String(Math.floor(saved.t) % 60).padStart(2, '0')}`);
+      } else {
+        setResumeAt(saved.t);
+      }
+    }
     setResumeShown(true);
     pushHistory(rec.videoId);
-  }, [ready, seek, rec.videoId, resumeShown]);
+  }, [ready, seek, rec.videoId, resumeShown, onToast]);
 
   // ── Persist position every 5s ────────────────────────────────────────────
   useEffect(() => {
@@ -474,6 +503,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 ['Mute',               'M'],
                 ['Fullscreen',         'F'],
                 ['Picture-in-Picture', 'I'],
+                ['Switch source',      '0–5'],
                 ['Close player',       'Esc'],
                 ['Show this help',     '?'],
               ].map(([l, k]) => (
