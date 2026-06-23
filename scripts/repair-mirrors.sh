@@ -199,11 +199,19 @@ repair_mirrors() {
         local new_gofile="" new_pixel="" new_mega=""
         if [[ "$need_gofile" == true ]]; then
             GOFILE_LINKS=()
-            upload_to_gofile "$file" "HD" && new_gofile=$(printf '%s' "${GOFILE_LINKS[0]:-}" | cut -d'|' -f2) || true
+            if upload_to_gofile "$file" "HD"; then
+                new_gofile=$(printf '%s' "${GOFILE_LINKS[0]:-}" | cut -d'|' -f2 || true)
+            else
+                log_warn "  Gofile upload failed for ${video_id}"
+            fi
         fi
         if [[ "$need_pixel" == true ]]; then
             PIXELDRAIN_LINKS=()
-            upload_to_pixeldrain "$file" "HD" && new_pixel=$(printf '%s' "${PIXELDRAIN_LINKS[0]:-}" | cut -d'|' -f2) || true
+            if upload_to_pixeldrain "$file" "HD"; then
+                new_pixel=$(printf '%s' "${PIXELDRAIN_LINKS[0]:-}" | cut -d'|' -f2 || true)
+            else
+                log_warn "  Pixeldrain upload failed for ${video_id}"
+            fi
         fi
         if [[ "$need_mega" == true ]]; then
             MEGA_LINKS=()
@@ -214,7 +222,11 @@ repair_mirrors() {
                 source "$SCRIPT_DIR/mega-rotate.sh"
                 select_mega_account || true
             fi
-            upload_to_mega "$file" "HD" && new_mega=$(printf '%s' "${MEGA_LINKS[0]:-}" | cut -d'|' -f2) || true
+            if upload_to_mega "$file" "HD"; then
+                new_mega=$(printf '%s' "${MEGA_LINKS[0]:-}" | cut -d'|' -f2 || true)
+            else
+                log_warn "  MEGA upload failed for ${video_id}"
+            fi
         fi
 
         if [[ -n "$new_gofile$new_pixel$new_mega" ]]; then

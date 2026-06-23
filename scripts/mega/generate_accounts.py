@@ -18,8 +18,7 @@ import argparse
 from faker import Faker
 
 from email_providers import (
-    get_temp_email, wait_for_verification, find_url,
-    GmailnatorProvider, MailTmProvider, MailGwProvider, OneSecMailProvider,
+    wait_for_verification, find_url,
     PROVIDERS
 )
 
@@ -99,7 +98,7 @@ def try_create_account(name, password, provider_classes=None):
         if not email_body:
             print(f"> [{email}]: ❌ No verification email via {provider.name} — marking as unreliable")
             failed_providers.add(provider.name)
-            print(f"🔄 Retrying this account with next provider...")
+            print("🔄 Retrying this account with next provider...")
             continue
 
         # Step 4: Extract verification link
@@ -180,13 +179,13 @@ if __name__ == "__main__":
 
     provider_names = " → ".join([p.name for p in PROVIDERS])
 
-    print(f"═══════════════════════════════════════")
-    print(f"🔴 MEGA Account Generator — Multi-Provider")
-    print(f"═══════════════════════════════════════")
+    print("═══════════════════════════════════════")
+    print("🔴 MEGA Account Generator — Multi-Provider")
+    print("═══════════════════════════════════════")
     print(f"📊 Generating {args.number} accounts...")
     print(f"📧 Providers: {provider_names}")
-    print(f"🔄 Auto-fallback: if verification fails, retries with next provider")
-    print(f"═══════════════════════════════════════")
+    print("🔄 Auto-fallback: if verification fails, retries with next provider")
+    print("═══════════════════════════════════════")
 
     success_count = 0
     for i in range(args.number):

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Extract YouTube OAuth credentials from JSON secrets."""
-import json, os, sys
+import json
+import os
+import sys
 
 cs = os.environ.get("YT_CLIENT_SECRETS", "").strip()
 tk = os.environ.get("YT_TOKEN", "").strip()

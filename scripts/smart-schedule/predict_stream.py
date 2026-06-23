@@ -198,12 +198,12 @@ def main():
     
     schedule = generate_schedule(patterns)
     
-    log(f"Generated optimized schedule:")
+    log("Generated optimized schedule:")
     for tier_name, tier in schedule["tiers"].items():
         log(f"  {tier_name.upper()}: every {tier['frequency_minutes']}min — {tier['description']}")
     log(f"Estimated workflow run savings: ~{schedule['estimated_savings_percent']}%")
     
-    log(f"Recommended crons:")
+    log("Recommended crons:")
     for cron in schedule["recommended_crons"]:
         log(f"  - {cron}")
     

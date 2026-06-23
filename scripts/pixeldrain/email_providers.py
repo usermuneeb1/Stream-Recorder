@@ -16,7 +16,6 @@ import requests
 import time
 import random
 import re
-import json
 import os
 import html
 
@@ -473,7 +472,7 @@ if __name__ == "__main__":
     if email:
         print(f"\n✅ Success! Email: {email}")
         print(f"   Provider: {provider.name}")
-        print(f"\n⏳ Waiting 30s for any incoming email...")
+        print("\n⏳ Waiting 30s for any incoming email...")
         body = wait_for_verification(provider, subject_contains="", timeout=30)
         if body:
             print(f"\n📨 Email body:\n{body[:500]}")

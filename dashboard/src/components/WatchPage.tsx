@@ -3,6 +3,7 @@ import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
+import { TranscriptViewer } from './TranscriptViewer';
 import type { Recording } from '../utils/dataFetcher';
 import { fmtTime, fmtRelative, copyText, shareLinks } from '../utils/format';
 
@@ -424,6 +425,11 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 })}
               </div>
             </Panel>
+          )}
+
+          {/* Transcript */}
+          {rec.transcriptUrl && (
+            <TranscriptViewer url={rec.transcriptUrl} currentTime={t} onSeek={seek} />
           )}
 
           {/* Chat */}

@@ -18,7 +18,7 @@ concurrency:
 jobs:
   deploy:
     name: "Publish GitHub Pages"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -30,6 +30,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: "📡 Generate RSS / podcast / sitemap feeds"
+        run: python3 scripts/generate-feeds.py
 
       - name: "📦 Install & Build Command Center"
         working-directory: dashboard

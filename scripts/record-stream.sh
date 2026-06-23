@@ -524,7 +524,8 @@ record_method_i() {
 attempt_recording() {
     local video_url="$1"
     local attempt_num="$2"
-    local output_base="${SEGMENTS_DIR}/segment_$(printf '%03d' "$attempt_num").mp4"
+    local output_base
+    output_base="${SEGMENTS_DIR}/segment_$(printf '%03d' "$attempt_num").mp4"
     
     log_step "Recording attempt ${attempt_num}/${MAX_RECORD_ATTEMPTS:-3}"
     log_info "  URL: ${video_url}"

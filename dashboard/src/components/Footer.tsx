@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchStatus, type SystemStatus } from '../utils/dataFetcher';
 import { fmtRelative } from '../utils/format';
 
-export function Footer() {
+export function Footer({ onAbout }: { onAbout?: () => void } = {}) {
   const [s, setS] = useState<SystemStatus | null>(null);
   useEffect(() => { fetchStatus().then(setS); }, []);
 
@@ -28,9 +28,12 @@ export function Footer() {
 
           <div className="grid grid-cols-2 gap-8 md:gap-12">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[.2em] mb-3" style={{ color: 'var(--tx3)' }}>Channel</p>
+              <p className="text-[10px] font-bold uppercase tracking-[.2em] mb-3" style={{ color: 'var(--tx3)' }}>Links</p>
               <ul className="space-y-1.5 text-[12px]">
-                <li><a href="https://youtube.com/@TheMuslimLantern" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx2)' }}>YouTube</a></li>
+                <li><a href="https://youtube.com/@TheMuslimLantern" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx2)' }}>YouTube channel</a></li>
+                {onAbout && <li><button onClick={onAbout} className="hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx2)' }}>About</button></li>}
+                <li><a href="/feed.xml" className="hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx2)' }}>RSS feed</a></li>
+                <li><a href="/podcast.xml" className="hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx2)' }}>Podcast</a></li>
                 <li><a href="https://github.com/usermuneeb1/Stream-Recorder" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx2)' }}>Source code</a></li>
               </ul>
             </div>

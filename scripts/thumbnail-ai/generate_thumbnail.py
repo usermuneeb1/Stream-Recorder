@@ -159,7 +159,7 @@ def main():
                 log(f"  Frame extracted at {frame_time}s")
 
                 if add_text_overlay(raw_frame, final_thumb, title, date_str):
-                    log(f"  Text overlay added")
+                    log("  Text overlay added")
 
                     url = upload_to_catbox(final_thumb)
                     if url:
@@ -167,11 +167,11 @@ def main():
                         updated = True
                         log(f"  ✅ Uploaded → {url}")
                     else:
-                        log(f"  ❌ Upload failed")
+                        log("  ❌ Upload failed")
                 else:
-                    log(f"  ❌ Overlay failed")
+                    log("  ❌ Overlay failed")
             else:
-                log(f"  ❌ Frame extraction failed")
+                log("  ❌ Frame extraction failed")
 
     if updated:
         with open(RECORDINGS, "w") as f:

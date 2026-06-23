@@ -39,7 +39,7 @@ env:
 jobs:
   refresh:
     name: "🔗 Refresh Cloud Links"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
 
     steps:

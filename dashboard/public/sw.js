@@ -1,86 +1,82 @@
 /**
- * 🚀 Muslim Lantern Archive — Service Worker (APP SHELL ONLY)
+ * 🚀 Muslim Lantern Archive — Service Worker v4
  *
- * IMPORTANT: This worker deliberately does NOT cache video.
- * Caching ranged media (HTTP 206 partial responses) through the Cache API is
- * unreliable and was causing the player to spin forever — so video requests are
- * left 100% untouched and stream straight from the network as normal.
+ * Strategy:
+ *   1. Network-first for the HTML shell (so updates land instantly).
+ *   2. Stale-while-revalidate for fonts and immutable build assets.
+ *   3. Cache-first for the static logo / thumbnail images.
+ *   4. NEVER intercept video (range requests + Cache API don't play well).
  *
- * What it DOES do: cache the website shell (HTML/JS/CSS/icons) so the PAGE opens
- * instantly on repeat visits. Browsers already cache the actual video bytes in
- * their own HTTP media cache, so re-watching a video you just played is still
- * fast — without us risking playback by intercepting it.
- *
- * Safe by design: any failure falls straight through to the network.
+ * Any failure falls straight through to the network — the page works the
+ * same with or without this worker installed.
  */
 
-const APP_CACHE = 'mla-app-v3';
+const VERSION = 'mla-v4';
+const SHELL_CACHE = `${VERSION}-shell`;
+const ASSET_CACHE = `${VERSION}-assets`;
 
-self.addEventListener('install', () => {
+const SHELL_URLS = ['/', '/index.html', '/logo.png', '/logo-vertical.pn.jpg', '/site.webmanifest'];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(SHELL_CACHE).then(c => c.addAll(SHELL_URLS)).catch(() => {}));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    (async () => {
-      // Remove ALL old caches (including the broken video cache from v1/v2).
-      const keys = await caches.keys();
-      await Promise.all(keys.filter((k) => k !== APP_CACHE).map((k) => caches.delete(k)));
-      await self.clients.claim();
-    })(),
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => !k.startsWith(VERSION)).map(k => caches.delete(k))
+    )),
   );
+  self.clients.claim();
 });
 
-// Hosts/paths that serve VIDEO bytes — we must NEVER intercept these.
-function isMediaRequest(url) {
-  try {
-    const u = new URL(url);
-    if (u.origin === self.location.origin && /^\/api\/(pd|bh)\//i.test(u.pathname)) return true;
-    return /(\.archive\.org|pixeldrain\.com|pixeldrain\.eu\.cc|buzzheavier\.com|bzzhr\.co)$/i.test(u.hostname);
-  } catch {
-    return false;
-  }
+function isVideo(req) {
+  const url = new URL(req.url);
+  if (req.headers.get('range')) return true;
+  return /\.(mp4|m4a|m4s|webm|mkv|mov|ts|m3u8)(\?|$)/i.test(url.pathname);
 }
 
-async function handleAppShell(request) {
-  const cache = await caches.open(APP_CACHE);
-  const cached = await cache.match(request);
-  const network = fetch(request)
-    .then((resp) => {
-      if (resp && resp.status === 200 && resp.type === 'basic') {
-        cache.put(request, resp.clone()).catch(() => {});
-      }
-      return resp;
-    })
-    .catch(() => cached);
-  return cached || network;
+function isImmutableAsset(url) {
+  return /\/assets\/.+-[A-Za-z0-9_]{6,}\.(js|css|woff2?|ttf)/.test(url.pathname);
 }
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
+function isFont(url) {
+  return url.hostname.endsWith('gstatic.com') || url.hostname.endsWith('googleapis.com');
+}
 
-  // Only handle simple GET navigations/assets.
-  if (request.method !== 'GET') return;
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
 
-  const url = new URL(request.url);
+  // 1. NEVER intercept video bytes
+  if (isVideo(req)) return;
 
-  // 1. NEVER touch video — let it stream straight from the network.
-  if (isMediaRequest(request.url)) return;
-
-  // 2. NEVER cache data files — chapters/AI must stay fresh.
-  if (
-    /recordings\.json|system-status|\/data\//i.test(url.pathname) ||
-    url.hostname.includes('githubusercontent') ||
-    url.hostname.includes('jsdelivr')
-  ) {
+  // 2. HTML shell — network-first, fall back to cache
+  if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
+    e.respondWith(
+      fetch(req).then(r => {
+        const copy = r.clone();
+        caches.open(SHELL_CACHE).then(c => c.put('/', copy)).catch(() => {});
+        return r;
+      }).catch(() => caches.match('/') || caches.match(req)),
+    );
     return;
   }
 
-  // 3. Range requests (media) — leave alone as an extra safety net.
-  if (request.headers.has('range')) return;
-
-  // 4. App shell only (same-origin HTML/JS/CSS/icons).
-  if (url.origin === self.location.origin) {
-    event.respondWith(handleAppShell(request));
+  // 3. Immutable build assets — stale-while-revalidate
+  if (isImmutableAsset(url) || isFont(url)) {
+    e.respondWith(
+      caches.open(ASSET_CACHE).then(async cache => {
+        const cached = await cache.match(req);
+        const fresh = fetch(req).then(r => {
+          if (r.ok) cache.put(req, r.clone());
+          return r;
+        }).catch(() => cached);
+        return cached || fresh;
+      }),
+    );
+    return;
   }
 });

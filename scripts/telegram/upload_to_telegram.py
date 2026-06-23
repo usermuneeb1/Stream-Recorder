@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Upload recordings to Telegram using Pyrogram (up to 2GB, no chunks)."""
 
-import json
 import os
 import sys
 import time
@@ -131,9 +130,19 @@ def main():
                 f.write(f"telegram_link={link}\n")
                 # Save file_id for Cloudflare Worker proxy
                 try:
-                    fid = msg.document.file_id
-                    f.write(f"telegram_file_id={fid}\n")
-                except: pass
+                    fid = (
+                        getattr(getattr(msg, "document", None), "file_id", None)
+                        or getattr(getattr(msg, "video", None), "file_id", None)
+                        or getattr(getattr(msg, "audio", None), "file_id", None)
+                        or getattr(getattr(msg, "animation", None), "file_id", None)
+                    )
+                    if fid:
+                        f.write(f"telegram_file_id={fid}\n")
+                        log("🆔", f"file_id captured: {fid[:16]}…")
+                    else:
+                        log("⚠️", f"Could not extract file_id from {type(msg).__name__}")
+                except Exception as e:
+                    log("⚠️", f"file_id capture failed: {e}")
             log("🔗", f"Link: {link}")
 
     except Exception as e:

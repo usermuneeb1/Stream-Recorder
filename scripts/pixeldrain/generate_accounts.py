@@ -126,7 +126,7 @@ def login_with_link(session, email, uid, lid):
         data = r.json()
         key = data.get("auth_key")
         if key:
-            print(f"   ✅ verified + API key obtained")
+            print("   ✅ verified + API key obtained")
             return key
         print(f"   ❌ link login failed: {data.get('value')} — {data.get('message', '')[:120]}")
         return None
@@ -263,7 +263,7 @@ def main():
                 time.strftime("%Y-%m-%d"),
             ])
             created += 1
-            print(f"   💾 saved to accounts.csv")
+            print("   💾 saved to accounts.csv")
         else:
             print("   ❌ account creation failed")
         time.sleep(random.uniform(2, 5))

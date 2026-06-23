@@ -23,7 +23,6 @@
 import json
 import os
 import sys
-import time
 
 # ── Google API imports ─────────────────────────────────────────────────────────
 # These are pip-installed in the workflow step before running this script.
@@ -133,7 +132,7 @@ def upload_video(file_path: str) -> str:
                     last_progress = progress
 
         video_id = response.get("id", "")
-        log(f"   ✅ Upload complete!")
+        log("   ✅ Upload complete!")
         log(f"   🆔 YouTube Video ID: {video_id}")
         log(f"   🔗 URL: https://youtu.be/{video_id}")
 

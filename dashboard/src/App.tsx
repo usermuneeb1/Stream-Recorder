@@ -1,23 +1,31 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchRecordings, type Recording } from './utils/dataFetcher';
+import { initAnalytics, track } from './utils/analytics';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
 import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
 import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
+import { AboutPage } from './components/AboutPage';
+import { NotFoundPage } from './components/NotFoundPage';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
+
+type Route =
+  | { kind: 'home' }
+  | { kind: 'watch'; rec: Recording }
+  | { kind: 'about' }
+  | { kind: 'notfound' };
 
 export default function App() {
   const [recs, setRecs] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  const [active, setActive] = useState<Recording | null>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'dark';
-    return (localStorage.getItem('t') as 'dark' | 'light') || 'dark';
-  });
+  const [route, setRoute] = useState<Route>({ kind: 'home' });
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    typeof window !== 'undefined' ? ((localStorage.getItem('t') as 'dark' | 'light') || 'dark') : 'dark',
+  );
   const [sort, setSort] = useState<SortKey>(() => (localStorage.getItem('sort') as SortKey) || 'newest');
   const [filter, setFilter] = useState<FilterKey>(() => (localStorage.getItem('filter') as FilterKey) || 'all');
   const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('view') as 'grid' | 'list') || 'grid');
@@ -29,33 +37,39 @@ export default function App() {
     document.documentElement.className = theme === 'light' ? 'light' : '';
     localStorage.setItem('t', theme);
   }, [theme]);
-
   useEffect(() => { localStorage.setItem('sort', sort); }, [sort]);
   useEffect(() => { localStorage.setItem('filter', filter); }, [filter]);
   useEffect(() => { localStorage.setItem('view', view); }, [view]);
 
-  // Load
+  // Analytics
+  useEffect(() => { initAnalytics(); }, []);
+
+  // Load data
   useEffect(() => {
     fetchRecordings().then(r => { setRecs(r); setLoading(false); });
   }, []);
 
-  // Route handling (#/watch/<videoId>[?t=N])
+  // Route handling
   useEffect(() => {
-    const h = () => {
-      const m = window.location.hash.match(/^#\/watch\/([^?]+)/);
-      if (m && recs.length) {
+    const sync = () => {
+      const h = window.location.hash || '';
+      if (h.startsWith('#/about')) { setRoute({ kind: 'about' }); return; }
+      const m = h.match(/^#\/watch\/([^?]+)/);
+      if (m) {
+        if (!recs.length) return; // wait for data
         const id = decodeURIComponent(m[1]);
         const r = recs.find(x => x.videoId === id);
-        if (r) { setActive(r); return; }
+        setRoute(r ? { kind: 'watch', rec: r } : { kind: 'notfound' });
+        return;
       }
-      if (!window.location.hash || window.location.hash === '#') setActive(null);
+      setRoute({ kind: 'home' });
     };
-    h();
-    window.addEventListener('hashchange', h);
-    return () => window.removeEventListener('hashchange', h);
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
   }, [recs]);
 
-  // Global Cmd/Ctrl+K
+  // Global ⌘K / Ctrl+K
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -68,12 +82,13 @@ export default function App() {
   }, []);
 
   const open = useCallback((r: Recording) => {
-    setActive(r);
     window.location.hash = `/watch/${encodeURIComponent(r.videoId)}`;
     window.scrollTo(0, 0);
+    track('watch', { id: r.videoId });
   }, []);
 
-  const close = useCallback(() => { setActive(null); window.location.hash = ''; }, []);
+  const goHome = useCallback(() => { window.location.hash = ''; }, []);
+  const goAbout = useCallback(() => { window.location.hash = '/about'; }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
 
   // Apply search + filter + sort
@@ -100,12 +115,24 @@ export default function App() {
     return xs;
   }, [recs, q, filter, sort]);
 
-  if (active) {
+  // ── Render by route ─────────────────────────────────────────────────────
+  if (route.kind === 'about') {
+    return (
+      <>
+        <AboutPage onClose={goHome} theme={theme} onTheme={toggleTheme} />
+        <Toast msg={toast} onDone={() => setToast('')} />
+      </>
+    );
+  }
+  if (route.kind === 'notfound') {
+    return <NotFoundPage onHome={goHome} />;
+  }
+  if (route.kind === 'watch') {
     return (
       <>
         <WatchPage
-          rec={active}
-          onClose={close}
+          rec={route.rec}
+          onClose={goHome}
           all={filtered.length ? filtered : recs}
           onNav={open}
           theme={theme}
@@ -117,6 +144,7 @@ export default function App() {
     );
   }
 
+  // ── Home ────────────────────────────────────────────────────────────────
   return (
     <div style={{ background: 'var(--bg)' }} className="min-h-screen flex flex-col">
       <Header
@@ -125,6 +153,7 @@ export default function App() {
         theme={theme}
         toggleTheme={toggleTheme}
         onOpenCmd={() => setCmdOpen(true)}
+        onAbout={goAbout}
         recordingsCount={recs.length}
       />
 
@@ -154,7 +183,7 @@ export default function App() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-24 opacity-50 text-center px-6">
+          <div className="flex flex-col items-center py-24 opacity-60 text-center px-6">
             <svg className="w-12 h-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -179,7 +208,7 @@ export default function App() {
         )}
       </main>
 
-      <Footer />
+      <Footer onAbout={goAbout} />
 
       <CommandPalette
         open={cmdOpen}

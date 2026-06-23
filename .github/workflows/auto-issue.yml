@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   ticket:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: "🎫 Open/close issue based on workflow result"
         uses: actions/github-script@v7

@@ -94,7 +94,7 @@ env:
 jobs:
   record:
     name: "🎬 Detect & Record"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360   # 6 hours max
 
     permissions:

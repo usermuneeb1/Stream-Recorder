@@ -31,7 +31,7 @@ concurrency:
 jobs:
   backend-scripts:
     name: "🐚 Bash / Workflow Hygiene"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: "📥 Checkout"
@@ -80,7 +80,7 @@ jobs:
 
   dashboard:
     name: "🖥️ Dashboard Lint + Build"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:

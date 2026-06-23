@@ -26,7 +26,6 @@
 
 import os
 import sys
-import json
 import requests
 from datetime import datetime, timezone
 

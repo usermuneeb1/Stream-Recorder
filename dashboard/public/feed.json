@@ -1,0 +1,120 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "The Muslim Lantern — Stream Archive",
+  "home_page_url": "https://muslim-lantern-archive.vercel.app",
+  "feed_url": "https://muslim-lantern-archive.vercel.app/feed.json",
+  "description": "Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.",
+  "icon": "https://muslim-lantern-archive.vercel.app/logo.png",
+  "favicon": "https://muslim-lantern-archive.vercel.app/logo-vertical.pn.jpg",
+  "authors": [
+    {
+      "name": "Muneeb Ahmad"
+    }
+  ],
+  "language": "en",
+  "items": [
+    {
+      "id": "PYkqrEBc_zY",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/PYkqrEBc_zY",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18",
+      "image": "https://i.ytimg.com/vi/PYkqrEBc_zY/hqdefault.jpg",
+      "date_published": "2026-06-17T22:28:47+00:00",
+      "tags": [
+        "Creedence joins"
+      ],
+      "attachments": [
+        {
+          "url": "https://ia902900.us.archive.org/5/items/tml-2026-06-PYkqrEBc_zY-1781734865/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-06-18.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 601490174,
+          "duration_in_seconds": 10109
+        }
+      ]
+    },
+    {
+      "id": "vSKAJZkhuq4",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/vSKAJZkhuq4",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "image": "https://i.ytimg.com/vi/vSKAJZkhuq4/hqdefault.jpg",
+      "date_published": "2026-05-17T00:00:00+00:00",
+      "tags": [
+        "Mira joins",
+        "Josh Bandeira joins"
+      ],
+      "attachments": [
+        {
+          "url": "https://ia800409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 632857397,
+          "duration_in_seconds": 11265
+        }
+      ]
+    },
+    {
+      "id": "lQySsXx00Io",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/lQySsXx00Io",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "image": "https://i.ytimg.com/vi/lQySsXx00Io/hqdefault.jpg",
+      "date_published": "2026-05-11T00:00:00+00:00",
+      "tags": [
+        "Odens joins"
+      ],
+      "attachments": [
+        {
+          "url": "https://ia800802.us.archive.org/16/items/tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 438927360,
+          "duration_in_seconds": 7839
+        }
+      ]
+    },
+    {
+      "id": "LT7jTHW_e8Y",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/LT7jTHW_e8Y",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "image": "https://i.ytimg.com/vi/LT7jTHW_e8Y/hqdefault.jpg",
+      "date_published": "2026-04-26T00:00:00+00:00",
+      "tags": [
+        "Sister in chat joins",
+        "Lucid joins",
+        "Brother joins",
+        "Last caller joins"
+      ],
+      "attachments": [
+        {
+          "url": "https://ia800900.us.archive.org/31/items/tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 268115000,
+          "duration_in_seconds": 4935
+        }
+      ]
+    },
+    {
+      "id": "1-Rb7AkebH4",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/1-Rb7AkebH4",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "image": "https://i.ytimg.com/vi/1-Rb7AkebH4/hqdefault.jpg",
+      "date_published": "2026-04-19T00:00:00+00:00",
+      "tags": [
+        "Najeeb quranist joins",
+        "Asel Sikriye joins",
+        "Kainat joins",
+        "Kris joins",
+        "Ron Brailey joins"
+      ],
+      "attachments": [
+        {
+          "url": "https://ia802907.us.archive.org/11/items/tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 479200000,
+          "duration_in_seconds": 9852
+        }
+      ]
+    }
+  ]
+}

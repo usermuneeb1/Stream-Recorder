@@ -1,0 +1,10 @@
+name = "tg-stream"
+main = "worker.js"
+compatibility_date = "2026-06-22"
+
+# Free tier — no paid features used
+workers_dev = true
+
+# Set the bot token AFTER deploy:
+#   wrangler secret put BOT_TOKEN
+# (paste the token when prompted; it never lives in this file)
