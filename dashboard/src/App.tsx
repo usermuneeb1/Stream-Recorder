@@ -3,10 +3,10 @@ import { fetchRecordings, type Recording } from './utils/dataFetcher';
 import { initAnalytics, track } from './utils/analytics';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
+import { ContinueWatching } from './components/ContinueWatching';
 import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
 import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
-import { AboutPage } from './components/AboutPage';
 import { NotFoundPage } from './components/NotFoundPage';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
@@ -15,7 +15,6 @@ import { CommandPalette } from './components/CommandPalette';
 type Route =
   | { kind: 'home' }
   | { kind: 'watch'; rec: Recording }
-  | { kind: 'about' }
   | { kind: 'notfound' };
 
 export default function App() {
@@ -31,6 +30,13 @@ export default function App() {
   const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('view') as 'grid' | 'list') || 'grid');
   const [toast, setToast] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 600);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Theme persistence
   useEffect(() => {
@@ -53,7 +59,6 @@ export default function App() {
   useEffect(() => {
     const sync = () => {
       const h = window.location.hash || '';
-      if (h.startsWith('#/about')) { setRoute({ kind: 'about' }); return; }
       const m = h.match(/^#\/watch\/([^?]+)/);
       if (m) {
         if (!recs.length) return; // wait for data
@@ -88,7 +93,6 @@ export default function App() {
   }, []);
 
   const goHome = useCallback(() => { window.location.hash = ''; }, []);
-  const goAbout = useCallback(() => { window.location.hash = '/about'; }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
 
   // Apply search + filter + sort
@@ -116,14 +120,6 @@ export default function App() {
   }, [recs, q, filter, sort]);
 
   // ── Render by route ─────────────────────────────────────────────────────
-  if (route.kind === 'about') {
-    return (
-      <>
-        <AboutPage onClose={goHome} theme={theme} onTheme={toggleTheme} />
-        <Toast msg={toast} onDone={() => setToast('')} />
-      </>
-    );
-  }
   if (route.kind === 'notfound') {
     return <NotFoundPage onHome={goHome} />;
   }
@@ -147,18 +143,19 @@ export default function App() {
   // ── Home ────────────────────────────────────────────────────────────────
   return (
     <div style={{ background: 'var(--bg)' }} className="min-h-screen flex flex-col">
+      {loading && <div className="top-bar" />}
       <Header
         q={q}
         setQ={setQ}
         theme={theme}
         toggleTheme={toggleTheme}
         onOpenCmd={() => setCmdOpen(true)}
-        onAbout={goAbout}
         recordingsCount={recs.length}
       />
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12">
         <StatsBar recs={recs} />
+        {!q.trim() && filter === 'all' && <ContinueWatching recs={recs} onOpen={open} />}
         <FilterBar
           sort={sort}
           setSort={setSort}
@@ -208,7 +205,7 @@ export default function App() {
         )}
       </main>
 
-      <Footer onAbout={goAbout} />
+      <Footer />
 
       <CommandPalette
         open={cmdOpen}
@@ -218,6 +215,18 @@ export default function App() {
         toggleTheme={toggleTheme}
       />
       <Toast msg={toast} onDone={() => setToast('')} />
+      {scrolled && (
+        <button
+          className="fab pop-in"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Back to top"
+          title="Back to top"
+        >
+          <svg className="w-5 h-5 m-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

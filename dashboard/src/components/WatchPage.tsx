@@ -6,6 +6,7 @@ import '@vidstack/react/player/styles/default/layouts/video.css';
 import { TranscriptViewer } from './TranscriptViewer';
 import type { Recording } from '../utils/dataFetcher';
 import { fmtTime, fmtRelative, copyText, shareLinks } from '../utils/format';
+import { savePosition, loadPosition, pushHistory } from '../utils/history';
 
 interface P {
   rec: Recording;
@@ -17,15 +18,26 @@ interface P {
   onToast: (m: string) => void;
 }
 
-interface Source { label: string; url: string; tag: string; tone: string }
+interface Source { label: string; url: string; tone: string }
+
+// GHOST is our YouTube unlisted re-upload played through the Vercel
+// resolver (302 → direct .mp4) so it works in our native player
+// without an iframe. We hard-code the Vercel host so the dashboard
+// still works when served from GitHub Pages or jsDelivr.
+const GHOST_HOST = 'https://muslim-lantern-archive.vercel.app';
+function ghostUrl(r: Recording): string {
+  const id = r.youtubeId || (r.youtubeUnlisted.match(/(?:youtu\.be\/|v=)([\w-]{11})/) || [])[1];
+  return id ? `${GHOST_HOST}/api/yt/${id}` : '';
+}
 
 function getSources(r: Recording): Source[] {
   const out: Source[] = [];
-  if (r.archiveNode)   out.push({ label: 'Archive',   url: r.archiveNode,   tag: 'fastest', tone: 'red'    });
-  if (r.githubDirect || r.githubRelease) out.push({ label: 'GitHub',    url: (r.githubDirect || r.githubRelease), tag: 'CDN',    tone: 'gold'   });
-  if (r.cfStream)      out.push({ label: 'CF Edge',   url: r.cfStream,      tag: 'cached', tone: 'sky'    });
-  if (r.telegramLink && /\.mp4|\.webm/i.test(r.telegramLink)) out.push({ label: 'Telegram', url: r.telegramLink, tag: 'mirror', tone: 'violet' });
-  if (r.archiveDirect && r.archiveDirect !== r.archiveNode)   out.push({ label: 'Archive-2', url: r.archiveDirect, tag: 'mirror', tone: 'red' });
+  const ghost = ghostUrl(r);
+  if (ghost)                                              out.push({ label: 'GHOST',  url: ghost,            tone: 'red'    });
+  if (r.archiveNode)                                      out.push({ label: 'R3AL',   url: r.archiveNode,    tone: 'gold'   });
+  if (r.githubDirect || r.githubRelease)                  out.push({ label: 'B3ING',  url: (r.githubDirect || r.githubRelease), tone: 'sky' });
+  if (r.cfStream)                                         out.push({ label: 'STORM',  url: r.cfStream,       tone: 'violet' });
+  if (r.archiveDirect && r.archiveDirect !== r.archiveNode) out.push({ label: 'BUNNY',  url: r.archiveDirect,  tone: 'emerald' });
   return out;
 }
 
@@ -35,18 +47,9 @@ function getDownloads(r: Recording): Dl[] {
   if (r.megaLink)        d.push({ label: 'MEGA',       url: r.megaLink,        bg: '#d9272e' });
   if (r.pixeldrainLink)  d.push({ label: 'Pixeldrain', url: r.pixeldrainLink,  bg: '#7c3aed' });
   if (r.gofileLink)      d.push({ label: 'Gofile',     url: r.gofileLink,      bg: '#2563eb' });
-  if (r.archiveLink)     d.push({ label: 'Archive.org',url: r.archiveLink,     bg: '#0a8a4f' });
-  if (r.telegramLink)    d.push({ label: 'Telegram',   url: r.telegramLink,    bg: '#26a5e4' });
-  if (r.youtubeUnlisted) d.push({ label: 'Mirror',     url: r.youtubeUnlisted, bg: '#ef4444' });
+  if (r.githubDirect || r.githubRelease) d.push({ label: 'Direct', url: (r.githubDirect || r.githubRelease), bg: '#0a8a4f' });
   return d;
 }
-
-const toneCss: Record<string, string> = {
-  red:    'var(--red)',
-  gold:   'var(--gold)',
-  sky:    'var(--sky)',
-  violet: 'var(--violet)',
-};
 
 export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }: P) {
   const playerRef = useRef<MediaPlayerInstance>(null);
@@ -186,13 +189,30 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     copyText(url).then(ok => onToast(ok ? 'Link copied!' : 'Copy failed'));
   }, [rec.videoId, onToast]);
 
-  // Honor ?t=NNN from URL on first load
+  // Honor ?t=NNN from URL OR resume from saved position
+  const [resumeShown, setResumeShown] = useState(false);
+  const [resumeAt, setResumeAt] = useState<number | null>(null);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || resumeShown) return;
     const hash = window.location.hash;
     const m = hash.match(/\?t=(\d+)/);
-    if (m) seek(parseInt(m[1]));
-  }, [ready, seek]);
+    if (m) { seek(parseInt(m[1])); setResumeShown(true); return; }
+    const saved = loadPosition(rec.videoId);
+    if (saved && saved.t > 30) { setResumeAt(saved.t); }
+    setResumeShown(true);
+    pushHistory(rec.videoId);
+  }, [ready, seek, rec.videoId, resumeShown]);
+
+  // Persist position every 5 s
+  useEffect(() => {
+    if (!ready) return;
+    const p = playerRef.current;
+    if (!p) return;
+    const i = setInterval(() => {
+      savePosition(rec.videoId, p.currentTime || 0, p.duration || rec.durationSec);
+    }, 5000);
+    return () => clearInterval(i);
+  }, [ready, rec.videoId, rec.durationSec]);
 
   const url = si === 0 ? (autoUrl || sources[0]?.url || '') : (sources[si - 1]?.url || '');
   const guests = chapters.filter(c => c.label?.toLowerCase().includes('joins')).map(c => c.label.replace(/\s*joins.*/i, '').trim());
@@ -267,7 +287,23 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 mb-3 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: 'var(--red)' }} />
                   <p className="text-white/60 text-[13px] font-medium tracking-wide">Preparing stream</p>
-                  <p className="text-white/30 text-[11px] mt-1">{sources[si]?.label || 'Auto'} source</p>
+                  <p className="text-white/30 text-[11px] mt-1">{si === 0 ? 'Auto' : sources[si - 1]?.label || 'Auto'} source</p>
+                </div>
+              </div>
+            )}
+
+            {/* Resume-from-position banner */}
+            {ready && resumeAt !== null && (
+              <div className="absolute bottom-16 sm:bottom-20 left-4 right-4 xl:left-8 xl:right-8 z-30 flex items-center justify-between gap-3 rounded-xl border glass-strong px-4 py-3 pop-in" style={{ borderColor: 'var(--bd2)', boxShadow: 'var(--shadow-lg)' }}>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold" style={{ color: 'var(--tx) ' }}>
+                    Continue from <span className="font-mono tabular-nums" style={{ color: 'var(--red)' }}>{fmtTime(resumeAt)}</span>?
+                  </p>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: 'var(--tx3)' }}>You were last watching at this position</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button onClick={() => setResumeAt(null)} className="btn !py-1.5 !text-[11px]">Start over</button>
+                  <button onClick={() => { seek(resumeAt); setResumeAt(null); }} className="btn btn-primary !py-1.5 !text-[11px]">Resume</button>
                 </div>
               </div>
             )}

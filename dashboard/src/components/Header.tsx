@@ -6,11 +6,10 @@ interface P {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   onOpenCmd: () => void;
-  onAbout: () => void;
   recordingsCount: number;
 }
 
-export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, onAbout, recordingsCount }: P) {
+export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount }: P) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // "/" focuses search (when not already in an input)
@@ -81,20 +80,6 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, onAbout, record
             <rect x="14" y="3" width="7" height="7" rx="1.5" />
             <rect x="3" y="14" width="7" height="7" rx="1.5" />
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
-          </svg>
-        </button>
-
-        {/* About */}
-        <button
-          onClick={onAbout}
-          className="btn-ghost btn !px-2.5 !py-2 hidden sm:inline-flex"
-          title="About this project"
-          aria-label="About"
-        >
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="9" />
-            <line x1="12" y1="8" x2="12" y2="8.01" />
-            <path strokeLinecap="round" d="M11 12h1v4h1" />
           </svg>
         </button>
 

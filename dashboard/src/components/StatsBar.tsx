@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Recording } from '../utils/dataFetcher';
 
-interface Stats { label: string; value: string; sub?: string; accent?: string }
+interface Stats { label: string; value: string }
 
 function calc(recs: Recording[]): Stats[] {
   const totalSec = recs.reduce((a, r) => a + (r.durationSec || 0), 0);
@@ -12,13 +12,12 @@ function calc(recs: Recording[]): Stats[] {
       guests.add(c.label.replace(/\s*joins.*/i, '').trim());
     }
   }
-  const enriched = recs.filter(r => r.aiChapters && r.aiChapters.length > 0).length;
   const hours = totalSec / 3600;
   return [
-    { label: 'Recordings', value: String(recs.length), sub: `${enriched} AI-enriched` },
-    { label: 'Total Hours', value: hours >= 100 ? hours.toFixed(0) : hours.toFixed(1), sub: 'of content archived' },
-    { label: 'Storage',  value: totalGb >= 100 ? `${(totalGb / 1024).toFixed(2)}TB` : `${totalGb.toFixed(1)}GB`, sub: 'across 6 mirrors' },
-    { label: 'Guests Featured', value: String(guests.size), sub: 'unique speakers' },
+    { label: 'Recordings',      value: String(recs.length) },
+    { label: 'Total Hours',     value: hours >= 100 ? hours.toFixed(0) : hours.toFixed(1) },
+    { label: 'Library',         value: totalGb >= 100 ? `${(totalGb / 1024).toFixed(2)} TB` : `${totalGb.toFixed(1)} GB` },
+    { label: 'Guests Featured', value: String(guests.size) },
   ];
 }
 
@@ -35,8 +34,7 @@ export function StatsBar({ recs }: { recs: Recording[] }) {
             Preserving daʿwah, one stream at a time.
           </h1>
           <p className="text-sm mt-2 max-w-xl" style={{ color: 'var(--tx2)' }}>
-            Every live broadcast recorded, mirrored to 6+ providers, transcribed and chaptered by AI —
-            so nothing important is ever lost.
+            Every live broadcast, kept forever — searchable, chaptered, free to watch.
           </p>
         </div>
       </div>
@@ -53,9 +51,6 @@ export function StatsBar({ recs }: { recs: Recording[] }) {
             <div className="font-display text-2xl sm:text-[28px] font-bold tabular-nums leading-none" style={{ color: 'var(--tx)' }}>
               {s.value}
             </div>
-            {s.sub && (
-              <div className="text-[11px] mt-1.5" style={{ color: 'var(--tx3)' }}>{s.sub}</div>
-            )}
           </div>
         ))}
       </div>

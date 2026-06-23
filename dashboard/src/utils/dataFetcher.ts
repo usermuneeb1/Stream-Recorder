@@ -26,6 +26,7 @@ export interface Recording {
   cfStream: string;
   // Other re-uploads
   youtubeUnlisted: string;
+  youtubeId: string;
   // Enrichment
   aiChapters: Chapter[];
   aiEnrichedAt: string;
@@ -110,7 +111,7 @@ function dedupAndMerge(records: Recording[]): Recording[] {
     const fields: (keyof Recording)[] = [
       'archiveDirect','archiveNode','archiveLink','megaLink','pixeldrainLink',
       'gofileLink','githubRelease','githubDirect','transcriptUrl','chatUrl',
-      'telegramLink','cfStream','youtubeUnlisted','aiEnrichedAt',
+      'telegramLink','cfStream','youtubeUnlisted','youtubeId','aiEnrichedAt',
     ];
     for (const f of fields) if (!merged[f] && (r as any)[f]) merged[f] = (r as any)[f];
     if (!merged.aiChapters?.length && r.aiChapters?.length) merged.aiChapters = r.aiChapters;
@@ -152,6 +153,7 @@ export async function fetchRecordings(): Promise<Recording[]> {
         telegramLink:   r.telegram_link || '',
         cfStream:       sanitizeCfStream(r.cf_stream || ''),
         youtubeUnlisted:r.youtube_unlisted || '',
+        youtubeId:      r.youtube_id || '',
         aiChapters:     Array.isArray(r.ai_chapters) ? r.ai_chapters : [],
         aiEnrichedAt:   r.ai_enriched_at || '',
         transcriptUrl:  r.transcript_url || '',
