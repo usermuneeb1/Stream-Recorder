@@ -1,6 +1,13 @@
 name: "👻 YouTube Ghost-Host"
 
 on:
+  # AUTO-TRIGGER: after every successful Stream Recorder run, attempt to
+  # ghost-host any new recordings that landed in data/recordings.json.
+  # The script itself skips anything that already has a youtube_id, so
+  # this is safe to run on every recording event — never re-uploads.
+  workflow_run:
+    workflows: ["☪️ The Muslim Lantern — Stream Recorder"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       skip_morph:
@@ -31,6 +38,11 @@ jobs:
   ghost-all:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    # Skip the auto-trigger when the parent Stream Recorder failed —
+    # there's nothing new to ghost-host. Always allow manual dispatch.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     steps:
       - uses: actions/checkout@v7
 
