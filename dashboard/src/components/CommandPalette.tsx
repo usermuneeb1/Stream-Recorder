@@ -23,7 +23,7 @@ export function CommandPalette({ open, onClose, recs, onOpenRec, toggleTheme }: 
     const s = q.toLowerCase();
     return r.title.toLowerCase().includes(s)
       || r.date.includes(s)
-      || (r.aiChapters || []).some(c => c.label.toLowerCase().includes(s));
+      ;
   }).slice(0, 8);
 
   const actions = [

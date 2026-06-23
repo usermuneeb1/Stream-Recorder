@@ -1,5 +1,9 @@
 export type SortKey   = 'newest' | 'oldest' | 'longest' | 'shortest' | 'largest';
-export type FilterKey = 'all' | 'chapters' | 'guests' | 'hd';
+// FIX (user request): dropped 'chapters' and 'guests' filters — they relied
+// on AI-enrichment that hasn't run on most recordings, so the filter chips
+// always showed an empty result and confused users. 'hd' stays because every
+// recording has a resolution field.
+export type FilterKey = 'all' | 'hd';
 
 interface P {
   sort: SortKey;
@@ -20,10 +24,8 @@ const SORTS: { id: SortKey; label: string }[] = [
   { id: 'largest',  label: 'Largest' },
 ];
 const FILTERS: { id: FilterKey; label: string }[] = [
-  { id: 'all',      label: 'All' },
-  { id: 'chapters', label: 'With chapters' },
-  { id: 'guests',   label: 'With guests' },
-  { id: 'hd',       label: 'HD only' },
+  { id: 'all', label: 'All' },
+  { id: 'hd',  label: 'HD only' },
 ];
 
 export function FilterBar({ sort, setSort, filter, setFilter, view, setView, total, shown }: P) {

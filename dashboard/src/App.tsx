@@ -44,7 +44,12 @@ export default function App() {
     typeof window !== 'undefined' ? ((localStorage.getItem('t') as 'dark' | 'light') || 'dark') : 'dark',
   );
   const [sort, setSort] = useState<SortKey>(() => (localStorage.getItem('sort') as SortKey) || 'newest');
-  const [filter, setFilter] = useState<FilterKey>(() => (localStorage.getItem('filter') as FilterKey) || 'all');
+  const [filter, setFilter] = useState<FilterKey>(() => {
+    // Migration: chapters/guests filters were removed; reset to 'all' so
+    // users who had them selected don't end up seeing zero recordings.
+    const stored = localStorage.getItem('filter') as string | null;
+    return stored === 'all' || stored === 'hd' ? (stored as FilterKey) : 'all';
+  });
   const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('view') as 'grid' | 'list') || 'grid');
   const [toast, setToast] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -136,12 +141,9 @@ export default function App() {
       const s = qDebounced.toLowerCase();
       xs = xs.filter(r =>
         r.title.toLowerCase().includes(s)
-        || r.date.includes(s)
-        || (r.aiChapters || []).some(c => c.label.toLowerCase().includes(s)));
+        || r.date.includes(s));
     }
-    if (filter === 'chapters') xs = xs.filter(r => r.aiChapters?.length > 0);
-    if (filter === 'guests')   xs = xs.filter(r => (r.aiChapters || []).some(c => c.label.toLowerCase().includes('joins')));
-    if (filter === 'hd')       xs = xs.filter(r => /1080|1440|2160|4k/i.test(r.resolution));
+    if (filter === 'hd') xs = xs.filter(r => /1080|1440|2160|4k/i.test(r.resolution));
     xs = [...xs];
     switch (sort) {
       case 'oldest':   xs.sort((a, b) => a.date.localeCompare(b.date)); break;
