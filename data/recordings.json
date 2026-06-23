@@ -66,7 +66,18 @@
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAwtqOOt7ayhyZswAAQyF0ud1Q53NxSgAAuEaAAJ4sclRwBe9pPeTTz0eBA",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/",
     "youtube_id": "4lm1J3wiPKY",
-    "youtube_unlisted": "https://youtu.be/4lm1J3wiPKY"
+    "youtube_unlisted": "https://youtu.be/4lm1J3wiPKY",
+    "storyboard": {
+      "url": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-06-PYkqrEBc_zY-1781734865.jpg",
+      "vtt": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-06-PYkqrEBc_zY-1781734865.vtt",
+      "interval": 30,
+      "cols": 10,
+      "rows": 34,
+      "n_frames": 336,
+      "w": 120,
+      "h": 68,
+      "generated_at": "2026-06-23T16:00:57Z"
+    }
   },
   {
     "video_id": "tml-2026-05-vSKAJZkhuq4-1778975061",
@@ -113,7 +124,18 @@
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAwxqOOwI2SGnARFz8YbsyEgQPWQa5wAC4xoAAnixyVHV_NJ9XRhckx4E",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/",
     "youtube_id": "SWdH7F0JYcc",
-    "youtube_unlisted": "https://youtu.be/SWdH7F0JYcc"
+    "youtube_unlisted": "https://youtu.be/SWdH7F0JYcc",
+    "storyboard": {
+      "url": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-05-vSKAJZkhuq4-1778975061.jpg",
+      "vtt": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-05-vSKAJZkhuq4-1778975061.vtt",
+      "interval": 30,
+      "cols": 10,
+      "rows": 38,
+      "n_frames": 375,
+      "w": 120,
+      "h": 68,
+      "generated_at": "2026-06-23T16:07:14Z"
+    }
   },
   {
     "video_id": "tml-2026-05-lQySsXx00Io-1778454605",
@@ -156,7 +178,18 @@
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAw1qOOxydMsVepBnvPtPApU74FZ9MwAC5RoAAnixyVFIo5sJAAFuclMeBA",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/",
     "youtube_id": "rMVa1cfW22U",
-    "youtube_unlisted": "https://youtu.be/rMVa1cfW22U"
+    "youtube_unlisted": "https://youtu.be/rMVa1cfW22U",
+    "storyboard": {
+      "url": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-05-lQySsXx00Io-1778454605.jpg",
+      "vtt": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-05-lQySsXx00Io-1778454605.vtt",
+      "interval": 30,
+      "cols": 10,
+      "rows": 27,
+      "n_frames": 261,
+      "w": 120,
+      "h": 68,
+      "generated_at": "2026-06-23T16:11:26Z"
+    }
   },
   {
     "video_id": "tml-2026-04-LT7jTHW_e8Y-1777157490",
@@ -215,7 +248,18 @@
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAw5qOOyhILkAAXkv0n4PUacS9jyESAgAAuYaAAJ4sclR5y4oYOoUP0QeBA",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/",
     "youtube_id": "VFX5dybhyiw",
-    "youtube_unlisted": "https://youtu.be/VFX5dybhyiw"
+    "youtube_unlisted": "https://youtu.be/VFX5dybhyiw",
+    "storyboard": {
+      "url": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-04-LT7jTHW_e8Y-1777157490.jpg",
+      "vtt": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-04-LT7jTHW_e8Y-1777157490.vtt",
+      "interval": 30,
+      "cols": 10,
+      "rows": 17,
+      "n_frames": 164,
+      "w": 120,
+      "h": 68,
+      "generated_at": "2026-06-23T16:13:47Z"
+    }
   },
   {
     "video_id": "tml-2026-04-1-Rb7AkebH4-1776546681",
@@ -286,7 +330,18 @@
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAw9qOOzACcuO0DglbV130QY79ooSlAAC5xoAAnixyVEVeLGnoW6ijB4E",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/",
     "youtube_id": "84lG-ZjxCGI",
-    "youtube_unlisted": "https://youtu.be/84lG-ZjxCGI"
+    "youtube_unlisted": "https://youtu.be/84lG-ZjxCGI",
+    "storyboard": {
+      "url": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-04-1-Rb7AkebH4-1776546681.jpg",
+      "vtt": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-04-1-Rb7AkebH4-1776546681.vtt",
+      "interval": 30,
+      "cols": 10,
+      "rows": 9,
+      "n_frames": 84,
+      "w": 120,
+      "h": 68,
+      "generated_at": "2026-06-23T16:14:41Z"
+    }
   },
   {
     "video_id": "tml-2026-04-1-Rb7AkebH4-1776554397",
@@ -345,6 +400,17 @@
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAxBqOO0jgo37jlOjQ_ETZYDPOLgy6gAC6BoAAnixyVFEK33TsBzSZx4E",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/",
     "youtube_id": "PxvA8q6CNaY",
-    "youtube_unlisted": "https://youtu.be/PxvA8q6CNaY"
+    "youtube_unlisted": "https://youtu.be/PxvA8q6CNaY",
+    "storyboard": {
+      "url": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-04-1-Rb7AkebH4-1776554397.jpg",
+      "vtt": "https://archive.org/download/muslim-lantern-storyboards-v1/tml-2026-04-1-Rb7AkebH4-1776554397.vtt",
+      "interval": 30,
+      "cols": 10,
+      "rows": 33,
+      "n_frames": 328,
+      "w": 120,
+      "h": 68,
+      "generated_at": "2026-06-23T16:19:22Z"
+    }
   }
 ]
