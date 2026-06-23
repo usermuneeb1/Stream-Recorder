@@ -198,6 +198,34 @@ jobs:
                   if line.startswith('VIDEO_ID='): yt_id = line.split('=', 1)[1].strip()
 
               if yt_id:
+                  # VERIFY the upload actually exists. YouTube sometimes accepts
+                  # an upload + returns a VIDEO_ID, then silently rejects it
+                  # minutes later (typical for: account not phone-verified,
+                  # video too long for tier, content-id violation, etc).
+                  # Without this check, we'd save a dead youtube_id and the
+                  # dashboard's GHOST tile would 404 for every viewer.
+                  import time as _t
+                  ok = False
+                  for attempt in range(6):  # up to ~60s
+                      _t.sleep(10)
+                      try:
+                          r2 = subprocess.run(
+                              ['curl', '-sS', '-o', '/dev/null', '-w', '%{http_code}',
+                               f'https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={yt_id}&format=json'],
+                              capture_output=True, text=True, timeout=15,
+                          )
+                          if (r2.stdout or '').strip() == '200':
+                              ok = True
+                              break
+                      except Exception:
+                          pass
+                  if not ok:
+                      print(f'   ⚠️  Upload {yt_id} did not become reachable within 60s — discarding')
+                      print('       (YouTube likely rejected the video after accepting it.')
+                      print('        Will retry on next ghost-host run.)')
+                      yt_id = ''
+
+              if yt_id:
                   for r in recs:
                       if r.get('video_id') == vid:
                           r['youtube_id'] = yt_id
