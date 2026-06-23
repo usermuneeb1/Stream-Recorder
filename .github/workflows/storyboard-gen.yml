@@ -1,0 +1,75 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ 🎞️  STORYBOARD GENERATOR — Hover-preview tiles for the player              ║
+# ║                                                                            ║
+# ║ For each new recording, builds a sprite sheet (1 frame every 10s) and a    ║
+# ║ WebVTT cues file, uploads them to Catbox (permanent CDN), and writes       ║
+# ║ the URLs back to recordings.json. The dashboard player picks them up and   ║
+# ║ shows a YouTube-style preview when you hover the seek bar.                 ║
+# ║                                                                            ║
+# ║ SAFE: Standalone, additive. Does NOT modify other workflows.               ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: 🎞️ Storyboard Generator
+
+on:
+  workflow_run:
+    workflows: ["☪️ The Muslim Lantern — Stream Recorder"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      max_items:
+        description: "Max recordings to process this run (default 3)"
+        required: false
+        default: "3"
+      force:
+        description: "Regenerate even if storyboard already exists"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: storyboard-gen
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 25
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 📦 Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: 🎞️ Generate storyboards
+        env:
+          STORYBOARD_MAX_ITEMS: ${{ github.event.inputs.max_items || '3' }}
+          STORYBOARD_FORCE:     ${{ github.event.inputs.force || 'false' }}
+        run: python3 scripts/storyboard/generate_storyboard.py
+
+      - name: 📤 Commit storyboard URLs
+        run: |
+          git config user.name  "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder"
+          git add data/recordings.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "🎞️ Auto-generated storyboard hover-previews"
+            for attempt in 1 2 3; do
+              if git pull --rebase origin main && git push; then
+                exit 0
+              fi
+              echo "Push retry $attempt..."
+              sleep $((attempt * 5))
+            done
+            exit 1
+          fi

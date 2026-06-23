@@ -11,6 +11,17 @@
 
 export interface Chapter { time: number; label: string }
 
+export interface Storyboard {
+  url: string;       // sprite-sheet JPEG (Catbox)
+  vtt: string;       // WebVTT cues pointing into the sprite
+  interval?: number;
+  cols?: number;
+  rows?: number;
+  n_frames?: number;
+  w?: number;
+  h?: number;
+}
+
 export interface Recording {
   videoId: string;
   title: string;
@@ -40,6 +51,7 @@ export interface Recording {
   aiEnrichedAt: string;
   transcriptUrl: string;
   chatUrl: string;
+  storyboard?: Storyboard;
 }
 
 const SOURCES = [
@@ -132,6 +144,7 @@ function dedupAndMerge(records: Recording[]): Recording[] {
     ];
     for (const f of fields) if (!merged[f] && (r as any)[f]) merged[f] = (r as any)[f];
     if (!merged.aiChapters?.length && r.aiChapters?.length) merged.aiChapters = r.aiChapters;
+    if (!merged.storyboard && r.storyboard) merged.storyboard = r.storyboard;
     if (!merged.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) merged.thumbnail = r.thumbnail;
     // #5 — always upgrade to the highest resolution available
     if (resHeight(r.resolution) > resHeight(merged.resolution)) merged.resolution = r.resolution;
@@ -182,6 +195,18 @@ export async function fetchRecordings(): Promise<Recording[]> {
       aiEnrichedAt:   r.ai_enriched_at || '',
       transcriptUrl:  r.transcript_url || '',
       chatUrl:        r.chat_url || '',
+      storyboard:     r.storyboard && r.storyboard.url && r.storyboard.vtt
+        ? {
+            url: r.storyboard.url,
+            vtt: r.storyboard.vtt,
+            interval: r.storyboard.interval,
+            cols: r.storyboard.cols,
+            rows: r.storyboard.rows,
+            n_frames: r.storyboard.n_frames,
+            w: r.storyboard.w,
+            h: r.storyboard.h,
+          }
+        : undefined,
     }));
   return dedupAndMerge(mapped).sort((a, b) => b.date.localeCompare(a.date));
 }

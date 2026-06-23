@@ -286,7 +286,14 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 className="w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl"
               >
                 <MediaProvider />
-                <DefaultVideoLayout icons={defaultLayoutIcons} />
+                {/* FIX (feature): hover-preview thumbnails. When the recording
+                    has a generated storyboard, Vidstack reads the WebVTT
+                    cues and shows a YouTube-style frame preview as the
+                    user hovers the seek bar. */}
+                <DefaultVideoLayout
+                  icons={defaultLayoutIcons}
+                  thumbnails={rec.storyboard?.vtt || undefined}
+                />
               </MediaPlayer>
             )}
             {!ready && (
