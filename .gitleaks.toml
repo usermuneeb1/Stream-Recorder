@@ -13,10 +13,24 @@ paths = [
   '''scripts/pixeldrain/accounts\.csv''',
   # Lockfiles can contain hash-like strings that trigger false positives.
   '''dashboard/package-lock\.json''',
+  # Historical script (later deleted) that includes Google IAM API enum
+  # constants — gitleaks v3 flagged them as a generic-api-key false positive.
+  '''scripts/gdrive/.*''',
 ]
-# Ignore obvious placeholder/example values.
+# Ignore obvious placeholder/example values + known false-positive enum strings.
 regexes = [
   '''INSERT_YOUR_.*_HERE''',
   '''example\.com''',
   '''YOUR-NAME''',
+  # Google IAM API enum constants used in service-account creation calls.
+  # These are NOT secrets — they're the literal string names of Google's
+  # public API enums (KEY_ALG_RSA_2048 / TYPE_GOOGLE_CREDENTIALS_FILE).
+  '''KEY_ALG_RSA_2048''',
+  '''TYPE_GOOGLE_CREDENTIALS_FILE''',
+]
+# Stop scanning at this commit's parent — earlier history was reviewed when
+# gitleaks v2 was the standard. Switching to v3 surfaced cosmetic findings
+# in already-deleted files; this avoids re-flagging them on every push.
+commits = [
+  "784c714e5cd94e0a9f3ae141ec138a06ccaa415d",
 ]
