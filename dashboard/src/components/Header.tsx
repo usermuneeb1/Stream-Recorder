@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface P {
   q: string;
@@ -11,6 +11,31 @@ interface P {
 
 export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount }: P) {
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // FEATURE: hide-on-scroll-down, reveal-on-scroll-up (like iOS Safari /
+  // Medium / Substack). The header slides up out of view when the user
+  // scrolls down past 200px, and slides back in instantly when they scroll
+  // up. Idle/scrolled-to-top always shows.
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const goingDown = y > lastY;
+        if (y < 100) setHidden(false);
+        else if (goingDown && y - lastY > 5) setHidden(true);
+        else if (!goingDown && lastY - y > 5) setHidden(false);
+        lastY = y;
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // "/" focuses search (when not already in an input)
   useEffect(() => {
@@ -27,8 +52,11 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount
 
   return (
     <header
-      className="sticky top-0 z-50 glass border-b no-select"
-      style={{ borderColor: 'var(--bd)' }}
+      className="sticky top-0 z-50 glass border-b no-select transition-transform duration-300"
+      style={{
+        borderColor: 'var(--bd)',
+        transform: hidden ? 'translateY(-100%)' : 'translateY(0)',
+      }}
     >
       <div className="max-w-[1400px] mx-auto flex items-center gap-3 sm:gap-5 px-4 sm:px-6 lg:px-10 h-[88px] sm:h-[104px]">
         {/* Logo */}
