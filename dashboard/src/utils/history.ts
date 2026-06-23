@@ -42,6 +42,14 @@ export function pushHistory(id: string) {
   write(HIST_KEY, list);
 }
 
+// Remove a single id from the recently-watched history. Used by the
+// 'X' button on each Continue-Watching tile so dismissing actually hides it.
+export function removeFromHistory(id: string) {
+  if (!id) return;
+  const list = read<HistItem[]>(HIST_KEY, []).filter(x => x.id !== id);
+  write(HIST_KEY, list);
+}
+
 export function getHistory(): string[] {
   return read<HistItem[]>(HIST_KEY, []).map(x => x.id);
 }
