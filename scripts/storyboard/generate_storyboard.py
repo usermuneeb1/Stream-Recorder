@@ -45,13 +45,20 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 RECS = ROOT / "data" / "recordings.json"
 
 MAX_ITEMS      = int(os.environ.get("STORYBOARD_MAX_ITEMS", "3"))
-INTERVAL_SEC   = int(os.environ.get("STORYBOARD_INTERVAL_SEC", "10"))
-COLS           = int(os.environ.get("STORYBOARD_COLS", "5"))
-THUMB_W        = int(os.environ.get("STORYBOARD_THUMB_W", "160"))
-THUMB_H        = int(os.environ.get("STORYBOARD_THUMB_H", "90"))
+# 30s interval (was 10s) — 3× fewer frames means 3× faster ffmpeg pass.
+# Long streams (3h) still get ~360 frames, plenty for hover previews.
+INTERVAL_SEC   = int(os.environ.get("STORYBOARD_INTERVAL_SEC", "30"))
+COLS           = int(os.environ.get("STORYBOARD_COLS", "10"))
+# Smaller tiles (was 160×90 → 120×68) — half the pixels, much faster to
+# encode and a smaller final JPEG to upload to free hosts.
+THUMB_W        = int(os.environ.get("STORYBOARD_THUMB_W", "120"))
+THUMB_H        = int(os.environ.get("STORYBOARD_THUMB_H", "68"))
 MIN_DURATION   = int(os.environ.get("STORYBOARD_MIN_DURATION_SEC", "600"))
 FORCE          = os.environ.get("STORYBOARD_FORCE", "false").lower() in ("1", "true", "yes")
-FFMPEG_TIMEOUT = int(os.environ.get("STORYBOARD_FFMPEG_TIMEOUT", "240"))
+# 8-minute ceiling (was 4) — long streams need more time to download frames
+# from Archive.org over the network. ffmpeg itself is fast; the I/O is the
+# bottleneck.
+FFMPEG_TIMEOUT = int(os.environ.get("STORYBOARD_FFMPEG_TIMEOUT", "480"))
 
 
 def log(msg: str) -> None:
@@ -173,11 +180,12 @@ def upload_catbox(path: pathlib.Path) -> Optional[str]:
     """Upload a file to catbox.moe and return the permanent URL."""
     try:
         out = subprocess.run(
-            ["curl", "-sS", "--max-time", "60",
+            ["curl", "-sS", "--max-time", "120",
+             "-A", "Mozilla/5.0 (X11; Linux x86_64) Stream-Recorder/1.0",
              "-F", "reqtype=fileupload",
              "-F", f"fileToUpload=@{path}",
              "https://catbox.moe/user/api.php"],
-            capture_output=True, text=True, timeout=90,
+            capture_output=True, text=True, timeout=150,
         )
         url = (out.stdout or "").strip()
         if url.startswith("https://"):
@@ -185,6 +193,41 @@ def upload_catbox(path: pathlib.Path) -> Optional[str]:
         log(f"catbox returned: {url[:120]}")
     except Exception as e:
         log(f"catbox upload error: {e}")
+    return None
+
+
+def upload_0x0(path: pathlib.Path) -> Optional[str]:
+    """Upload to 0x0.st as a fallback when Catbox rejects."""
+    try:
+        out = subprocess.run(
+            ["curl", "-sS", "--max-time", "120",
+             "-A", "Stream-Recorder/1.0 (storyboard generator)",
+             "-F", f"file=@{path}",
+             "-F", "expires=8760",   # 1 year retention (max for 0x0.st)
+             "https://0x0.st"],
+            capture_output=True, text=True, timeout=150,
+        )
+        url = (out.stdout or "").strip()
+        if url.startswith("https://0x0.st/"):
+            return url
+        log(f"0x0.st returned: {url[:120]}")
+    except Exception as e:
+        log(f"0x0.st upload error: {e}")
+    return None
+
+
+def upload_anywhere(path: pathlib.Path) -> Optional[str]:
+    """Try every supported anonymous file host until one accepts the upload.
+    Catbox is preferred (truly permanent, well-known); 0x0.st is the
+    fallback (also permanent for 1y, more lenient on user-agents and IPs).
+    """
+    url = upload_catbox(path)
+    if url:
+        return url
+    log("  catbox rejected — trying 0x0.st fallback")
+    url = upload_0x0(path)
+    if url:
+        return url
     return None
 
 
@@ -236,18 +279,18 @@ def main() -> int:
                 log("  ✗ sprite generation failed — skipping")
                 continue
 
-            sprite_url = upload_catbox(sprite_path)
+            sprite_url = upload_anywhere(sprite_path)
             if not sprite_url:
-                log("  ✗ sprite upload failed — skipping")
+                log("  ✗ sprite upload failed on every host — skipping")
                 continue
             log(f"  ✓ sprite uploaded: {sprite_url}")
 
             vtt_text = build_vtt(meta, sprite_url, duration)
             vtt_path = tmp / f"{vid}.vtt"
             vtt_path.write_text(vtt_text)
-            vtt_url = upload_catbox(vtt_path)
+            vtt_url = upload_anywhere(vtt_path)
             if not vtt_url:
-                log("  ✗ vtt upload failed — skipping")
+                log("  ✗ vtt upload failed on every host — skipping")
                 continue
             log(f"  ✓ vtt uploaded:    {vtt_url}")
 
