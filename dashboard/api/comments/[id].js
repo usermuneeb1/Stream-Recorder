@@ -123,6 +123,11 @@ async function appendWithRetry(path, catboxUrl, message, maxAttempts = 5) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const { sha, list } = await ghGetFile(path);
     list.push(catboxUrl);
+    // FIX #18 — warn (in Vercel logs) when the rolling 5000-comment cap
+    // starts dropping old comments. Once you see this, set up archival.
+    if (list.length > 5000) {
+      console.warn(`[comments] index ${path} hit 5000-cap; dropping ${list.length - 5000} oldest`);
+    }
     const trimmed = list.slice(-5000);
     const r = await ghPutFile(path, sha, trimmed, message);
     if (r.ok) return;
