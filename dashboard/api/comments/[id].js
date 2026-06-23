@@ -1,25 +1,14 @@
 /**
- * 💬 Comments API — Vercel Serverless Function
+ * 💬 Comments API — FIXED VERSION
  *
- * GET  /api/comments/<videoId>
- *   → returns the comment index from data/comments/<videoId>.json
- *      (a list of catbox URLs that each hold one comment JSON body)
+ * Fixes:
+ *   #7  unescape() is removed (deprecated, throws in modern Vercel Edge).
+ *       Replaced with TextEncoder + Uint8Array → base64.
+ *   #8  ghPutFile() now retries up to 5 times when GitHub returns 409
+ *       Conflict (another POST stole our SHA). Each retry refetches the
+ *       latest SHA + list and re-appends.
  *
- * POST /api/comments/<videoId>
- *   body: { author, body, parentId? }
- *   → uploads the comment JSON to catbox.moe (permanent URL)
- *   → appends the catbox URL to data/comments/<videoId>.json in the repo
- *      via the GitHub Contents API
- *
- * Env vars required (Vercel project settings):
- *   GH_TOKEN     — fine-grained PAT with Contents: read/write on the repo
- *   GH_REPO      — usermuneeb1/Stream-Recorder
- *   GH_BRANCH    — main
- *
- * Anti-abuse:
- *   • Per-IP rate limit (5 / minute) via in-memory map (best-effort on edge)
- *   • Body length cap (2000 chars)
- *   • Server-side regex for obvious slurs / spam patterns
+ * Drop-in replacement for dashboard/api/comments/[id].js
  */
 
 export const config = { runtime: 'edge' };
@@ -32,7 +21,6 @@ const ID_RE   = /^[\w-]{8,40}$/;
 const MAX_BODY = 2000;
 const MAX_AUTHOR = 40;
 
-// Very small in-memory rate-limit (per-edge instance; best-effort)
 const rate = new Map();
 function rateLimited(ip) {
   const now = Date.now();
@@ -69,7 +57,20 @@ function sanitize(str, max) {
     .slice(0, max);
 }
 
-// ── catbox upload ──────────────────────────────────────────────────────────
+// ── #7 FIX ── UTF-8 safe base64 without unescape/escape ────────────────────
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64decode(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
 async function uploadToCatbox(jsonStr) {
   const form = new FormData();
   form.append('reqtype', 'fileupload');
@@ -81,7 +82,6 @@ async function uploadToCatbox(jsonStr) {
   return txt;
 }
 
-// ── GitHub Contents API helpers ────────────────────────────────────────────
 async function ghGetFile(path) {
   const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}?ref=${BRANCH}`, {
     headers: {
@@ -93,8 +93,11 @@ async function ghGetFile(path) {
   if (r.status === 404) return { sha: null, list: [] };
   if (!r.ok) throw new Error(`github get: ${r.status}`);
   const j = await r.json();
-  const decoded = atob(j.content.replace(/\n/g, ''));
-  return { sha: j.sha, list: JSON.parse(decoded) };
+  const decoded = b64decode((j.content || '').replace(/\n/g, ''));
+  let list;
+  try { list = JSON.parse(decoded); } catch { list = []; }
+  if (!Array.isArray(list)) list = [];
+  return { sha: j.sha, list };
 }
 
 async function ghPutFile(path, sha, list, message) {
@@ -107,18 +110,32 @@ async function ghPutFile(path, sha, list, message) {
     },
     body: JSON.stringify({
       message,
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(list, null, 0) + '\n'))),
+      content: b64encode(JSON.stringify(list, null, 0) + '\n'),
       sha: sha || undefined,
       branch: BRANCH,
     }),
   });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error(`github put: ${r.status} ${t.slice(0, 200)}`);
-  }
+  return r;
 }
 
-// ── Handler ────────────────────────────────────────────────────────────────
+// ── #8 FIX ── CAS retry: append + PUT, retry up to 5x on 409 ────────────────
+async function appendWithRetry(path, catboxUrl, message, maxAttempts = 5) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { sha, list } = await ghGetFile(path);
+    list.push(catboxUrl);
+    const trimmed = list.slice(-5000);
+    const r = await ghPutFile(path, sha, trimmed, message);
+    if (r.ok) return;
+    if (r.status !== 409 && r.status !== 422) {
+      const txt = await r.text();
+      throw new Error(`github put ${r.status}: ${txt.slice(0, 200)}`);
+    }
+    // 409 = SHA mismatch; 422 = also a CAS conflict in practice. Backoff + retry.
+    await new Promise(res => setTimeout(res, 150 * attempt));
+  }
+  throw new Error('CAS retry exhausted after 5 attempts');
+}
+
 export default async function handler(request) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors() });
@@ -130,10 +147,8 @@ export default async function handler(request) {
 
   const indexPath = `data/comments/${videoId}.json`;
 
-  // ── GET: return the index of catbox URLs ─────────────────────────────────
   if (request.method === 'GET') {
     if (!GH_TOKEN) {
-      // Best-effort fallback: try reading from jsDelivr (no auth needed)
       try {
         const r = await fetch(`https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/${indexPath}?_=${Date.now()}`);
         if (r.ok) {
@@ -146,15 +161,12 @@ export default async function handler(request) {
     try {
       const { list } = await ghGetFile(indexPath);
       return json(200, { urls: list }, { 'Cache-Control': 'public, max-age=15, s-maxage=15' });
-    } catch (e) {
-      return json(200, { urls: [] }); // empty if file missing
+    } catch {
+      return json(200, { urls: [] });
     }
   }
 
-  // ── POST: add a comment ──────────────────────────────────────────────────
-  if (request.method !== 'POST') {
-    return json(405, { error: 'Method not allowed' });
-  }
+  if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
   if (!GH_TOKEN) return json(500, { error: 'Comments backend not configured' });
 
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
@@ -180,18 +192,12 @@ export default async function handler(request) {
     createdAt: new Date().toISOString(),
   };
 
-  // 1. Upload to catbox
   let catboxUrl;
   try { catboxUrl = await uploadToCatbox(JSON.stringify(comment)); }
   catch (e) { return json(502, { error: `catbox: ${e.message}` }); }
 
-  // 2. Append to GitHub index
   try {
-    const { sha, list } = await ghGetFile(indexPath);
-    list.push(catboxUrl);
-    // Keep at most 5000 comments per video
-    const trimmed = list.slice(-5000);
-    await ghPutFile(indexPath, sha, trimmed, `💬 Comment on ${videoId}`);
+    await appendWithRetry(indexPath, catboxUrl, `💬 Comment on ${videoId}`);
   } catch (e) {
     return json(502, { error: `github: ${e.message}` });
   }
