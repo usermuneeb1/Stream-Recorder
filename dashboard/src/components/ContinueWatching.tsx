@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Recording } from '../utils/dataFetcher';
-import { getHistory, loadPosition, clearPosition } from '../utils/history';
+import { getHistory, loadPosition, clearPosition, removeFromHistory } from '../utils/history';
 
 interface P { recs: Recording[]; onOpen: (r: Recording) => void }
 
@@ -51,7 +51,16 @@ export function ContinueWatching({ recs, onOpen }: P) {
                   <div className="h-full" style={{ width: `${pct}%`, background: 'var(--red)' }} />
                 </div>
                 <button
-                  onClick={(e) => { e.stopPropagation(); clearPosition(rec.videoId); setTick(t => t + 1); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    // FIX: also remove from history, not just clear the saved
+                    // position — otherwise the tile re-appears with 0% progress
+                    // because the videoId is still in mla_hist_v1.
+                    clearPosition(rec.videoId);
+                    removeFromHistory(rec.videoId);
+                    setTick(t => t + 1);
+                  }}
                   className="absolute top-1.5 right-1.5 p-1 rounded-md glass opacity-0 group-hover:opacity-100 transition-opacity hover:!bg-black/80"
                   style={{ color: '#fff' }}
                   title="Remove from list"

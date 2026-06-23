@@ -85,11 +85,16 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     let winner = -1;
     let bestTime = Infinity;
 
-    // FIX #3 — real reachability probes instead of no-cors (which returns
-    // opaque success even on 404/403). For mp4 we Range-fetch 2 bytes and
-    // get a real status code. For GHOST we hit our own /api/yt resolver
-    // which only returns 302 when an Invidious/Piped instance actually
-    // has the video — proves playability, not just DNS reachability.
+    // Reachability probes are advisory only — they inform the Auto picker's
+    // ranking, but never block the user from manually selecting a source.
+    // Real failures come from Vidstack's `error` event (errorFallbackIdx).
+    //
+    // We use `mode: 'no-cors'` for mp4s because cross-origin Range GETs to
+    // archive.org / pixeldrain / etc are blocked by CORS even though the
+    // video plays fine via <video src=...> (browsers exempt media tags).
+    // no-cors gives an opaque response — we treat 'no exception' as "the
+    // host is up" and time-rank by latency. For GHOST we still hit our own
+    // /api/yt (same-origin) since it gives a real status code.
     Promise.allSettled(sources.map(async (s, idx) => {
       if (errorFallbackIdx.has(idx)) { health[idx] = -1; return; }
       const start = performance.now();
@@ -102,14 +107,11 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
             ok = r.status === 302 || r.status === 200;
           }
         } else {
-          const r = await fetch(s.url, {
-            method: 'GET',
-            headers: { Range: 'bytes=0-1' },
-            signal: ctrl.signal,
-            cache: 'no-store',
-          });
-          try { r.body?.cancel(); } catch { /* noop */ }
-          ok = r.status === 200 || r.status === 206;
+          // no-cors: lies about content, but accurate enough to detect "host
+          // is reachable AND responding within budget". DNS-failed / dead
+          // hosts throw, which we catch as ok=false.
+          await fetch(s.url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
+          ok = true;
         }
       } catch { ok = false; }
       const dt = ok ? (performance.now() - start) : -1;
@@ -430,10 +432,24 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                   <SourceBtn
                     key={i}
                     active={si === i + 1}
-                    onClick={() => { setSi(i + 1); played.current = false; setReady(false); }}
+                    // ALWAYS clickable. Reset ready/played so the player
+                    // re-mounts even if user clicks the already-failed source
+                    // (treat as a manual retry).
+                    onClick={() => {
+                      setSi(i + 1);
+                      played.current = false;
+                      setReady(false);
+                      // If user is trying a previously-failed source, give it
+                      // another chance by removing it from the fail-set.
+                      setErrorFallbackIdx(prev => {
+                        if (!prev.has(i)) return prev;
+                        const next = new Set(prev); next.delete(i); return next;
+                      });
+                    }}
                     label={s.label}
                     tone={s.tone}
-                    ms={errorFallbackIdx.has(i) ? -1 : (sourceHealth[i] > 0 ? sourceHealth[i] : (sourceHealth[i] === -1 ? -1 : undefined))}
+                    ms={sourceHealth[i]}
+                    failed={errorFallbackIdx.has(i)}
                   />
                 ))}
               </div>
@@ -545,23 +561,40 @@ const toneMap: Record<string, string> = {
   violet:  'var(--violet)',
 };
 
-function SourceBtn({ active, onClick, label, tone, ms, best }: {
-  active: boolean; onClick: () => void; label: string; tone: string; ms?: number; best?: boolean;
+function SourceBtn({ active, onClick, label, tone, ms, best, failed }: {
+  active: boolean; onClick: () => void; label: string; tone: string;
+  ms?: number; best?: boolean;
+  // `failed` = Vidstack actually raised an error event on this source.
+  // ONLY this should disable the button — probe failures are advisory.
+  failed?: boolean;
 }) {
   const color = toneMap[tone] || 'var(--tx2)';
-  const status = ms === undefined ? 'idle' : ms === -1 ? 'fail' : ms < 300 ? 'fast' : ms < 1200 ? 'ok' : 'slow';
-  const dotColor = status === 'fail' ? 'var(--red)' : status === 'fast' ? 'var(--emerald)' : status === 'ok' ? 'var(--gold)' : status === 'slow' ? 'var(--tx3)' : 'var(--tx4)';
+  const probeFailed = ms === -1;
+  const status =
+    failed ? 'fail'
+    : ms === undefined ? 'idle'
+    : probeFailed ? 'slow'   // probe failed ≠ source is dead; show as "slow/unknown" not red
+    : ms < 300 ? 'fast'
+    : ms < 1200 ? 'ok'
+    : 'slow';
+  const dotColor =
+    status === 'fail' ? 'var(--red)'
+    : status === 'fast' ? 'var(--emerald)'
+    : status === 'ok' ? 'var(--gold)'
+    : status === 'slow' ? 'var(--tx3)'
+    : 'var(--tx4)';
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center justify-between px-2.5 py-2 rounded-md text-[11.5px] font-bold transition-all ring-focus"
+      title={failed ? 'This source failed during playback — click anyway to retry' : undefined}
+      className="inline-flex items-center justify-between px-2.5 py-2 rounded-md text-[11.5px] font-bold transition-all ring-focus cursor-pointer"
       style={{
         background: active ? color : 'var(--bg3)',
         color: active ? '#fff' : 'var(--tx)',
         border: '1px solid', borderColor: active ? color : 'var(--bd2)',
-        opacity: ms === -1 ? .5 : 1,
+        opacity: failed ? .55 : 1,
+        textDecoration: failed ? 'line-through' : 'none',
       }}
-      disabled={ms === -1}
     >
       <span className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? '#fff' : dotColor }} />
