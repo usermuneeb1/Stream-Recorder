@@ -53,9 +53,11 @@ interface P {
   delay?: number;
   view: 'grid' | 'list';
   onToast?: (m: string) => void;
+  // Newest recording — gets a subtle premium gold ring animation
+  featured?: boolean;
 }
 
-export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
+export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }: P) {
   const [err, setErr] = useState(false);
   const [hover, setHover] = useState(false);
   const isHD = /1080|1440|2160|4k/i.test(rec.resolution);
@@ -156,7 +158,7 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
       style={{ animationDelay: `${delay}ms` }}
     >
       <div
-        className="relative aspect-video rounded-xl overflow-hidden ring-1 transition-all duration-300 group-hover:ring-[var(--red)]/50"
+        className={`relative aspect-video rounded-xl overflow-hidden ring-1 transition-all duration-300 group-hover:ring-[var(--red)]/50 ${featured ? 'featured-ring' : ''}`}
         style={{ background: 'var(--bg2)', boxShadow: hover ? 'var(--shadow-lg)' : 'none', '--tw-ring-color': 'var(--bd2)' } as any}
       >
         {!err
@@ -187,12 +189,23 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
           />
         )}
 
-        {/* HD badge */}
-        {isHD && (
-          <div className="absolute top-2.5 left-2.5">
+        {/* HD + NEWEST badges (premium polish) */}
+        <div className="absolute top-2.5 left-2.5 flex gap-1.5">
+          {featured && (
+            <span
+              className="text-[9px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+              style={{ background: 'linear-gradient(135deg, var(--gold), #f59e0b)', color: '#1a1300' }}
+            >
+              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6L12 2z" />
+              </svg>
+              NEWEST
+            </span>
+          )}
+          {isHD && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--red)', color: '#fff' }}>HD</span>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Duration badge */}
         {rec.durationFmt && (

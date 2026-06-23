@@ -2,6 +2,7 @@ export function Footer() {
   return (
     <footer className="border-t mt-20 no-select" style={{ borderColor: 'var(--bd)', background: 'var(--bg2)' }}>
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-10">
+        {/* Top row — brand + CTA */}
         <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-6">
           <div className="flex items-center gap-3.5">
             <img src="/logo-vertical.pn.jpg" alt="" className="w-12 h-12 rounded-lg object-cover" />
@@ -29,9 +30,20 @@ export function Footer() {
           </a>
         </div>
 
-        <div className="mt-8 pt-5 border-t flex items-center justify-center" style={{ borderColor: 'var(--bd)' }}>
-          <p className="text-[11px]" style={{ color: 'var(--tx3)' }}>
-            © {new Date().getFullYear()} The Muslim Lantern Archive
+        {/* Bottom — copyright + author credit */}
+        <div className="mt-8 pt-5 border-t flex flex-col sm:flex-row items-center justify-between gap-3" style={{ borderColor: 'var(--bd)' }}>
+          <p className="text-[11.5px] tabular-nums" style={{ color: 'var(--tx3)' }}>
+            © {new Date().getFullYear()} <span className="font-semibold" style={{ color: 'var(--tx2)' }}>Muneeb Ahmad</span> · All rights reserved.
+          </p>
+          <p className="text-[11.5px] flex items-center gap-1.5" style={{ color: 'var(--tx3)' }}>
+            Made with
+            <span className="inline-block" style={{ color: 'var(--red)' }} aria-label="love">
+              {/* Animated heart */}
+              <svg className="w-3.5 h-3.5 inline animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z" />
+              </svg>
+            </span>
+            by <span className="font-semibold" style={{ color: 'var(--tx2)' }}>Muneeb Ahmad</span>
           </p>
         </div>
       </div>

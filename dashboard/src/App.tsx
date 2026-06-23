@@ -239,13 +239,13 @@ export default function App() {
         ) : view === 'list' ? (
           <div className="space-y-3">
             {filtered.map((r, i) => (
-              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 30} view="list" onToast={setToast} />
+              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 30} view="list" onToast={setToast} featured={i === 0 && sort === 'newest' && !qDebounced.trim() && filter === 'all'} />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-8">
             {filtered.map((r, i) => (
-              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 40} view="grid" onToast={setToast} />
+              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 40} view="grid" onToast={setToast} featured={i === 0 && sort === 'newest' && !qDebounced.trim() && filter === 'all'} />
             ))}
           </div>
         )}
