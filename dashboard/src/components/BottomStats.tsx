@@ -26,7 +26,7 @@ export function BottomStats({ recs }: { recs: Recording[] }) {
   const total = recs.length;
 
   return (
-    <section className="max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pb-10 -mt-2">
+    <section className="mt-10 px-4 sm:px-6 pb-12">
       {/* Top divider with eyebrow label */}
       <div className="flex items-center gap-4 mb-5">
         <span className="text-[10px] uppercase tracking-[.25em] font-bold whitespace-nowrap" style={{ color: 'var(--tx3)' }}>
