@@ -67,6 +67,10 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   const [autoIdx, setAutoIdx] = useState(0);  // resolved index when in Auto
   const [t, setT] = useState(0);
   const [ready, setReady] = useState(false);
+  // Separate flag: true only when the YouTube iframe is actually rendering
+  // video frames (not just initialising). Used to mask YouTube's branding
+  // logo flash that happens during the first ~1-2s of iframe init.
+  const [ghostReady, setGhostReady] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [sourceHealth, setSourceHealth] = useState<Record<number, number>>({});
@@ -77,7 +81,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
 
   // ── Reset on recording change ────────────────────────────────────────────
   useEffect(() => {
-    setSi(0); setAutoIdx(0); setT(0); setReady(false);
+    setSi(0); setAutoIdx(0); setT(0); setReady(false); setGhostReady(false);
     setSourceHealth({}); setErrorFallbackIdx(new Set());
     played.current = false;
   }, [rec.videoId]);
@@ -148,7 +152,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
           onToast('Source: Auto');
         } else if (n <= sources.length) {
           setSi(n);
-          played.current = false; setReady(false);
+          played.current = false; setReady(false); setGhostReady(false);
           onToast(`Source: ${sources[n - 1].label}`);
         }
       }
@@ -169,6 +173,11 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     // to swap our black "Preparing stream" overlay for the real player UI,
     // which itself shows Vidstack's native loading spinner (much nicer).
     const onGo = () => { if (!played.current) { played.current = true; setReady(true); } };
+    // The ghost-mask CSS only un-hides the YouTube iframe AFTER actual
+    // video frames are playing. Hooked to 'playing' (fires once stream
+    // is decoding) — by then the YouTube logo / play button overlay
+    // has been replaced by the real video frames.
+    const onActualPlay = () => { setGhostReady(true); };
     const onErr = () => {
       // FIX #2 — previously read `errorFallbackIdx` from a stale closure
       // and could pick the same dead source again. Now we compute the next
@@ -204,6 +213,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     p.addEventListener('loaded-metadata', onGo);    // ~100-500ms after src set
     p.addEventListener('loaded-data', onGo);        // first frame decoded
     p.addEventListener('playing', onGo);            // actual playback started
+    p.addEventListener('playing', onActualPlay);    // ghost-mask reveal
     p.addEventListener('can-play', onGo);           // fully buffered enough
     p.addEventListener('error', onErr);
     // Hard timeout: if NOTHING fired in 800ms, drop the black overlay anyway.
@@ -220,6 +230,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
       p.removeEventListener('loaded-metadata', onGo);
       p.removeEventListener('loaded-data', onGo);
       p.removeEventListener('playing', onGo);
+      p.removeEventListener('playing', onActualPlay);
       p.removeEventListener('can-play', onGo);
       p.removeEventListener('error', onErr);
       clearTimeout(forceShow);
@@ -394,7 +405,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 // looks identical to every other source (own brand, no
                 // YouTube watermark / channel art / video-title bar).
                 poster={rec.thumbnail}
-                className={`w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl ${activeSrc.kind === 'youtube' ? 'ghost-mask' : ''}`}
+                className={`w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl ${activeSrc.kind === 'youtube' ? 'ghost-mask' : ''} ${ghostReady ? 'ghost-ready' : ''}`}
               >
                 <MediaProvider />
                 {/* Hover-preview thumbnails on the seek bar — only shown when
