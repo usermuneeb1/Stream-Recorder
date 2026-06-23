@@ -68,6 +68,18 @@ export default function App() {
   // Analytics
   useEffect(() => { initAnalytics(); }, []);
 
+  // FEATURE: First-visit hint nudges the user to the ⌘K command palette.
+  // Shown exactly once per browser (localStorage flag).
+  useEffect(() => {
+    const FLAG = 'mla_seen_cmdk_hint_v1';
+    if (localStorage.getItem(FLAG)) return;
+    const id = window.setTimeout(() => {
+      setToast('💡 Tip — press ⌘K (or Ctrl+K) for the command palette');
+      localStorage.setItem(FLAG, '1');
+    }, 4000);
+    return () => clearTimeout(id);
+  }, []);
+
   // Load data
   useEffect(() => {
     fetchRecordings().then(r => { setRecs(r); setLoading(false); });

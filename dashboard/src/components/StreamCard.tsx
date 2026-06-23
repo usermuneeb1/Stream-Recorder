@@ -1,6 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Recording } from '../utils/dataFetcher';
 import { fmtDate, fmtRelative, copyText } from '../utils/format';
+
+// FEATURE: Netflix-style hover preview. When the user hovers a card that has
+// a storyboard, animate through 6 evenly-spaced sprite tiles to give a
+// rich preview of the recording's content (instead of a static thumbnail).
+function useSpritePreview(rec: Recording, hover: boolean) {
+  const sb = rec.storyboard;
+  const [tile, setTile] = useState(0);
+  const interval = useRef<number | null>(null);
+  const PREVIEW_TILES = 6;
+
+  useEffect(() => {
+    if (!sb || !hover) {
+      if (interval.current) { clearInterval(interval.current); interval.current = null; }
+      setTile(0);
+      return;
+    }
+    setTile(0);
+    interval.current = window.setInterval(() => {
+      setTile(t => (t + 1) % PREVIEW_TILES);
+    }, 700);
+    return () => {
+      if (interval.current) { clearInterval(interval.current); interval.current = null; }
+    };
+  }, [hover, sb]);
+
+  if (!sb) return null;
+  // Pick PREVIEW_TILES tiles evenly spaced from across the whole sheet.
+  const total = sb.n_frames || (sb.cols! * sb.rows!);
+  const stepFrac = total / PREVIEW_TILES;
+  const idx = Math.min(total - 1, Math.floor(tile * stepFrac));
+  const cols = sb.cols || 5;
+  const col = idx % cols;
+  const row = Math.floor(idx / cols);
+  const w = sb.w || 160;
+  const h = sb.h || 90;
+  return {
+    backgroundImage: `url(${sb.url})`,
+    backgroundPosition: `-${col * w}px -${row * h}px`,
+    backgroundSize: `${cols * w}px auto`,
+    width: '100%',
+    height: '100%',
+    imageRendering: 'auto' as const,
+  };
+}
 
 interface P {
   rec: Recording;
@@ -14,6 +58,7 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
   const [err, setErr] = useState(false);
   const [hover, setHover] = useState(false);
   const isHD = /1080|1440|2160|4k/i.test(rec.resolution);
+  const spriteStyle = useSpritePreview(rec, hover);
 
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -105,6 +150,20 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
             </div>}
+
+        {/* FEATURE: Storyboard preview — fades over the static thumbnail
+            while hovering, cycles through 6 frames from across the video. */}
+        {spriteStyle && (
+          <div
+            className="absolute inset-0 transition-opacity duration-300 pointer-events-none"
+            style={{
+              ...spriteStyle,
+              backgroundRepeat: 'no-repeat',
+              opacity: hover ? 1 : 0,
+            }}
+            aria-hidden="true"
+          />
+        )}
 
         {/* HD badge */}
         {isHD && (
