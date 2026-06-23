@@ -38,7 +38,10 @@ export function ContinueWatching({ recs, onOpen }: P) {
           return (
             <button
               key={rec.videoId}
-              onClick={() => onOpen(rec)}
+              // FIX #26 — tag the navigation so WatchPage auto-resumes
+              // without flashing the "Continue from X:XX?" banner — the
+              // user clicked "Continue watching", they already opted in.
+              onClick={() => { (window as any).__mlaContinueResume = rec.videoId; onOpen(rec); }}
               className="group shrink-0 w-[230px] sm:w-[260px] text-left snap-start ring-focus rounded-lg"
             >
               <div className="relative aspect-video rounded-lg overflow-hidden" style={{ background: 'var(--bg3)' }}>

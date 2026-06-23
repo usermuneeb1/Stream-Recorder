@@ -295,6 +295,18 @@ post_process() {
     base_name=$(basename "$raw_file" | sed 's/_raw\././')
     local processed_file="${RECORD_DIR}/${base_name}"
     
+    # ── Stage 0: Pre-flight integrity check (FIX #13) ────────────────────────
+    # If yt-dlp was killed by SIGTERM mid-fragment with --no-part, the raw
+    # file may have a damaged moov atom — ffmpeg -c copy will "succeed" on
+    # it but produce a non-seekable output. Try to recover BEFORE remux.
+    if ! is_valid_video "$raw_file"; then
+        log_warn "Raw file failed pre-flight validation — attempting recovery"
+        if ! recover_broken_video "$raw_file"; then
+            log_error "Raw file is structurally damaged beyond recovery — cannot continue"
+            return 1
+        fi
+    fi
+
     # ── Stage 1: Repair & Optimize ───────────────────────────────────────────
     log_separator
     if ! repair_and_optimize "$raw_file" "$processed_file"; then

@@ -154,6 +154,15 @@ def upload_video(file_path: str) -> str:
         elif reason == "insufficientPermissions":
             log("   💡 Your OAuth token doesn't have youtube.upload scope.")
             log("      Delete and re-authorize with the correct scopes.")
+        elif reason in ("videoNotEligibleForUpload", "uploadLimitExceeded",
+                        "tooLong", "videoTooLong"):
+            # YouTube returns one of these when the file exceeds the 15-min
+            # cap on unverified accounts. The actual message is usually
+            # 'Account must be verified to upload videos longer than 15 minutes.'
+            log("   🔒 This account is NOT verified by phone.")
+            log("      Unverified accounts can only upload videos up to 15 minutes.")
+            log("      Verify at: https://www.youtube.com/verify")
+            log("      After verifying, set repo Variable YOUTUBE_VERIFIED=true.")
         return ""
 
     except Exception as e:

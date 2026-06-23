@@ -67,12 +67,15 @@ export function Comments({ videoId, onToast }: P) {
   useEffect(() => { load(); }, [load]);
 
   const submit = useCallback(async () => {
-    const a = author.trim() || 'Anonymous';
+    const typedNick = author.trim();
+    const a = typedNick || 'Anonymous';
     const b = body.trim();
     if (b.length < 2) { onToast('Comment is too short'); return; }
     if (b.length > 2000) { onToast('Comment is too long (max 2000 chars)'); return; }
     setSubmitting(true);
-    localStorage.setItem(NICK_KEY, a);
+    // FIX #6 — only persist a nickname the user actually typed, so the
+    // input doesn't auto-fill with 'Anonymous' on every future visit.
+    if (typedNick) localStorage.setItem(NICK_KEY, typedNick);
     try {
       const r = await fetch(`${API}/${videoId}`, {
         method: 'POST',

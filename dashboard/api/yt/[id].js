@@ -1,21 +1,17 @@
 /**
- * 🎬 YouTube → direct .mp4 resolver (Vercel Edge Function)
+ * 🎬 YouTube resolver — FIXED VERSION
  *
- * Route: /api/yt/<youtubeId>  → 302 to direct .mp4 stream URL
+ * Fixes:
+ *   #9   Replaces the sequential for-loop (up to 66s) with a Promise.any
+ *        race across ALL Piped + Invidious instances in parallel.
+ *   #10  Drops 302 cache TTL from 1800s → 300s so an expired YouTube
+ *        signature can't be served from Vercel's edge cache for half an hour.
  *
- * Tries (in order):
- *   1. Piped API (multi-instance, with failover)
- *   2. Invidious API (multi-instance, with failover)
- *
- * Both backends expose the underlying YouTube CDN URL, which the browser then
- * fetches directly. Because the redirect comes from this Vercel domain, CORS
- * is satisfied for the <video> element. The Vercel Edge cache holds the
- * resolution for 30 min so repeat viewers don't pay the resolution cost.
+ * Drop-in replacement for dashboard/api/yt/[id].js
  */
 
 export const config = { runtime: 'edge' };
 
-// Verified working as of June 2026. Order matters — fastest first.
 const PIPED = [
   'https://pipedapi.kavin.rocks',
   'https://pipedapi.adminforge.de',
@@ -40,34 +36,32 @@ function cors(extra = {}) {
   };
 }
 
-// ── Backend probes ─────────────────────────────────────────────────────────
-async function fromPiped(instance, id) {
-  try {
-    const r = await fetch(`${instance}/streams/${id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 yt-resolver/2' },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    // Combined streams (video+audio in one URL)
-    const combined = (j.videoStreams || []).filter(s => s.videoOnly === false);
-    combined.sort((a, b) => (b.height || 0) - (a.height || 0));
-    return combined[0]?.url || null;
-  } catch { return null; }
+async function fromPiped(instance, id, signal) {
+  const r = await fetch(`${instance}/streams/${id}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 yt-resolver/3' },
+    signal,
+  });
+  if (!r.ok) throw new Error('not ok');
+  const j = await r.json();
+  const combined = (j.videoStreams || []).filter(s => s.videoOnly === false);
+  combined.sort((a, b) => (b.height || 0) - (a.height || 0));
+  const url = combined[0]?.url;
+  if (!url) throw new Error('no stream');
+  return url;
 }
 
-async function fromInvidious(instance, id) {
-  try {
-    const r = await fetch(`${instance}/api/v1/videos/${id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 yt-resolver/2' },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    const combined = (j.formatStreams || []).slice();
-    combined.sort((a, b) => (parseInt(b.size) || 0) - (parseInt(a.size) || 0));
-    return combined[0]?.url || null;
-  } catch { return null; }
+async function fromInvidious(instance, id, signal) {
+  const r = await fetch(`${instance}/api/v1/videos/${id}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 yt-resolver/3' },
+    signal,
+  });
+  if (!r.ok) throw new Error('not ok');
+  const j = await r.json();
+  const combined = (j.formatStreams || []).slice();
+  combined.sort((a, b) => (parseInt(b.size) || 0) - (parseInt(a.size) || 0));
+  const url = combined[0]?.url;
+  if (!url) throw new Error('no stream');
+  return url;
 }
 
 export default async function handler(request) {
@@ -76,7 +70,8 @@ export default async function handler(request) {
   }
 
   const url = new URL(request.url);
-  const id = (url.pathname.split('/').filter(Boolean).pop() || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 11);
+  const id = (url.pathname.split('/').filter(Boolean).pop() || '')
+    .replace(/[^A-Za-z0-9_-]/g, '').slice(0, 11);
 
   if (!id || id.length !== 11) {
     return new Response(JSON.stringify({ error: 'Invalid YouTube id' }), {
@@ -84,21 +79,21 @@ export default async function handler(request) {
     });
   }
 
+  // ── #9 FIX ── Race every instance in parallel, take the first success.
+  // AbortController cancels the losers as soon as a winner resolves.
+  const ctrl = new AbortController();
+  const signal = AbortSignal.any([ctrl.signal, AbortSignal.timeout(8000)]);
+
+  const probes = [
+    ...PIPED.map(inst => fromPiped(inst, id, signal)),
+    ...INVIDIOUS.map(inst => fromInvidious(inst, id, signal)),
+  ];
+
   let streamUrl = null;
-
-  // Try Piped first (more reliable in 2026)
-  for (const inst of PIPED) {
-    streamUrl = await fromPiped(inst, id);
-    if (streamUrl) break;
-  }
-
-  // Fallback to Invidious
-  if (!streamUrl) {
-    for (const inst of INVIDIOUS) {
-      streamUrl = await fromInvidious(inst, id);
-      if (streamUrl) break;
-    }
-  }
+  try {
+    streamUrl = await Promise.any(probes);
+  } catch { /* all failed */ }
+  ctrl.abort();
 
   if (!streamUrl) {
     return new Response(JSON.stringify({
@@ -108,12 +103,13 @@ export default async function handler(request) {
     }), { status: 502, headers: cors({ 'Content-Type': 'application/json' }) });
   }
 
-  // 302 with edge cache so repeat views don't re-resolve
+  // ── #10 FIX ── 5-minute edge cache instead of 30, so expired YT
+  // signatures don't get served from cache long after they break.
   return new Response(null, {
     status: 302,
     headers: cors({
       Location: streamUrl,
-      'Cache-Control': 'public, max-age=1800, s-maxage=1800',
+      'Cache-Control': 'public, max-age=300, s-maxage=300',
     }),
   });
 }

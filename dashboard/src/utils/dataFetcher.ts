@@ -1,19 +1,40 @@
+// ───────────────────────────────────────────────────────────────────────────
+// dataFetcher.ts — FIXED VERSION
+//
+// Fixes applied:
+//   #4  fetchFirst() now try-parses JSON; falls through to the next mirror on
+//       malformed responses (jsDelivr 200-OK stub HTML page).
+//   #5  dedupAndMerge() now keeps the HIGHEST resolution, not the lowest.
+//
+// Drop-in replacement for dashboard/src/utils/dataFetcher.ts.
+// ───────────────────────────────────────────────────────────────────────────
+
 export interface Chapter { time: number; label: string }
+
+export interface Storyboard {
+  url: string;       // sprite-sheet JPEG (Catbox)
+  vtt: string;       // WebVTT cues pointing into the sprite
+  interval?: number;
+  cols?: number;
+  rows?: number;
+  n_frames?: number;
+  w?: number;
+  h?: number;
+}
 
 export interface Recording {
   videoId: string;
   title: string;
   channel: string;
-  date: string;            // YYYY-MM-DD
-  recordedAt: string;      // ISO
+  date: string;
+  recordedAt: string;
   videoUrl: string;
   durationSec: number;
-  durationFmt: string;     // h:mm:ss
-  sizeHuman: string;       // "573.62 MB"
+  durationFmt: string;
+  sizeHuman: string;
   sizeGb: number;
-  resolution: string;      // "1920x1080"
+  resolution: string;
   thumbnail: string;
-  // Mirrors (playback)
   archiveLink: string;
   archiveDirect: string;
   archiveNode: string;
@@ -24,33 +45,43 @@ export interface Recording {
   githubDirect: string;
   telegramLink: string;
   cfStream: string;
-  // Other re-uploads
   youtubeUnlisted: string;
   youtubeId: string;
-  // Enrichment
   aiChapters: Chapter[];
   aiEnrichedAt: string;
   transcriptUrl: string;
   chatUrl: string;
+  storyboard?: Storyboard;
 }
 
-// ── Mirror sources for recordings.json ─────────────────────────────────────
 const SOURCES = [
   'https://cdn.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main',
   'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main',
 ];
 
-async function fetchFirst(path: string): Promise<string | null> {
+// ── #4 fix: try-parse JSON inside fetchFirst, fall through on bad payloads ──
+async function fetchFirstJson<T = unknown>(path: string): Promise<T | null> {
   for (const base of SOURCES) {
     try {
       const r = await fetch(`${base}/${path}?_=${Date.now()}`);
-      if (r.ok) return r.text();
-    } catch { /* try next mirror */ }
+      if (!r.ok) continue;
+      const txt = await r.text();
+      // jsDelivr sometimes serves a stub HTML page with 200 during propagation;
+      // detect non-JSON early so we fall through to raw.githubusercontent.
+      if (!txt || txt.trimStart().startsWith('<')) continue;
+      try {
+        return JSON.parse(txt) as T;
+      } catch {
+        // malformed JSON — try the next mirror
+        continue;
+      }
+    } catch {
+      // network/DNS — try next
+    }
   }
   return null;
 }
 
-// Clean trailing "YYYY-MM-DD HH:MM" from titles (yt-dlp adds them to live streams)
 function cleanTitle(t: string): string {
   return (t || '')
     .replace(/\s+\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?\s*$/g, '')
@@ -74,18 +105,11 @@ function thumb(id: string, t?: string): string {
   return '/thumbnail.jpg';
 }
 
-// ── SECURITY: strip the leaked bot token from cf_stream URLs ──────────────
-// Older recordings.json entries contain `?bot=<TELEGRAM_BOT_TOKEN>` in the
-// cf_stream URL — a serious credential leak. The dashboard refuses to serve
-// any cf_stream URL with the `bot` parameter so a viewer's browser never
-// transmits the token. The Cloudflare Worker must be updated to use only
-// env.BOT_TOKEN; until then cf_stream is disabled.
 function sanitizeCfStream(raw: string): string {
   if (!raw) return '';
   try {
     const u = new URL(raw);
-    if (u.searchParams.has('bot')) return ''; // leaked token — refuse
-    // Also refuse the legacy ?url= open-proxy form
+    if (u.searchParams.has('bot')) return '';
     if (u.searchParams.has('url')) return '';
     return u.toString();
   } catch {
@@ -93,8 +117,14 @@ function sanitizeCfStream(raw: string): string {
   }
 }
 
+// ── #5 fix: compare resolutions by *height*, keep the larger one ──
+function resHeight(res: string): number {
+  if (!res) return 0;
+  const m = res.match(/(\d{3,4})\s*[xp]/i) || res.match(/^(\d{3,4})$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 function dedupAndMerge(records: Recording[]): Recording[] {
-  // Group entries by their YouTube video ID; merge to get the richest record
   const map = new Map<string, Recording>();
   for (const r of records) {
     const m = r.videoUrl?.match?.(/(?:v=|\/)([\w-]{11})/);
@@ -106,7 +136,6 @@ function dedupAndMerge(records: Recording[]): Recording[] {
       map.set(ytId, { ...r, videoId: ytId });
       continue;
     }
-    // Merge: prefer non-empty fields from either
     const merged: any = { ...ex };
     const fields: (keyof Recording)[] = [
       'archiveDirect','archiveNode','archiveLink','megaLink','pixeldrainLink',
@@ -115,57 +144,73 @@ function dedupAndMerge(records: Recording[]): Recording[] {
     ];
     for (const f of fields) if (!merged[f] && (r as any)[f]) merged[f] = (r as any)[f];
     if (!merged.aiChapters?.length && r.aiChapters?.length) merged.aiChapters = r.aiChapters;
+    if (!merged.storyboard && r.storyboard) merged.storyboard = r.storyboard;
     if (!merged.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) merged.thumbnail = r.thumbnail;
-    if (r.resolution?.includes('1080') && !merged.resolution?.includes('1080')) merged.resolution = r.resolution;
+    // #5 — always upgrade to the highest resolution available
+    if (resHeight(r.resolution) > resHeight(merged.resolution)) merged.resolution = r.resolution;
+    // Same for duration — keep the longest (most-complete) recording
+    if ((r.durationSec || 0) > (merged.durationSec || 0)) {
+      merged.durationSec = r.durationSec;
+      merged.durationFmt = r.durationFmt;
+      merged.sizeHuman = r.sizeHuman || merged.sizeHuman;
+      merged.sizeGb = r.sizeGb || merged.sizeGb;
+    }
     map.set(ytId, merged);
   }
   return [...map.values()];
 }
 
 export async function fetchRecordings(): Promise<Recording[]> {
-  const txt = await fetchFirst('data/recordings.json');
-  if (!txt) return [];
-  try {
-    const raw = JSON.parse(txt) as any[];
-    const mapped: Recording[] = raw
-      .filter(r => (r.channel || '').toLowerCase().includes('muslim lantern'))
-      .map(r => ({
-        videoId:        r.video_id || '',
-        title:          cleanTitle(r.title || ''),
-        channel:        r.channel || '',
-        date:           r.date || '',
-        recordedAt:     r.recorded_at || '',
-        videoUrl:       r.video_url || '',
-        durationSec:    r.duration_sec || 0,
-        durationFmt:    fmtDuration(r.duration_fmt || ''),
-        sizeHuman:      r.size_human || '',
-        sizeGb:         r.size_gb || 0,
-        resolution:     r.resolution || '',
-        thumbnail:      thumb(r.video_id, r.thumbnail),
-        archiveLink:    r.archive_link || '',
-        archiveDirect:  r.archive_direct || '',
-        archiveNode:    r.archive_node || '',
-        megaLink:       r.mega_link || '',
-        pixeldrainLink: r.pixeldrain_link || '',
-        gofileLink:     r.gofile_link || '',
-        githubRelease:  r.github_release || '',
-        githubDirect:   r.github_direct || '',
-        telegramLink:   r.telegram_link || '',
-        cfStream:       sanitizeCfStream(r.cf_stream || ''),
-        youtubeUnlisted:r.youtube_unlisted || '',
-        youtubeId:      r.youtube_id || '',
-        aiChapters:     Array.isArray(r.ai_chapters) ? r.ai_chapters : [],
-        aiEnrichedAt:   r.ai_enriched_at || '',
-        transcriptUrl:  r.transcript_url || '',
-        chatUrl:        r.chat_url || '',
-      }));
-    return dedupAndMerge(mapped).sort((a, b) => b.date.localeCompare(a.date));
-  } catch {
-    return [];
-  }
+  const raw = await fetchFirstJson<any[]>('data/recordings.json');
+  if (!raw || !Array.isArray(raw)) return [];
+
+  const mapped: Recording[] = raw
+    .filter(r => (r.channel || '').toLowerCase().includes('muslim lantern'))
+    .map(r => ({
+      videoId:        r.video_id || '',
+      title:          cleanTitle(r.title || ''),
+      channel:        r.channel || '',
+      date:           r.date || '',
+      recordedAt:     r.recorded_at || '',
+      videoUrl:       r.video_url || '',
+      durationSec:    r.duration_sec || 0,
+      durationFmt:    fmtDuration(r.duration_fmt || ''),
+      sizeHuman:      r.size_human || '',
+      sizeGb:         r.size_gb || 0,
+      resolution:     r.resolution || '',
+      thumbnail:      thumb(r.video_id, r.thumbnail),
+      archiveLink:    r.archive_link || '',
+      archiveDirect:  r.archive_direct || '',
+      archiveNode:    r.archive_node || '',
+      megaLink:       r.mega_link || '',
+      pixeldrainLink: r.pixeldrain_link || '',
+      gofileLink:     r.gofile_link || '',
+      githubRelease:  r.github_release || '',
+      githubDirect:   r.github_direct || '',
+      telegramLink:   r.telegram_link || '',
+      cfStream:       sanitizeCfStream(r.cf_stream || ''),
+      youtubeUnlisted:r.youtube_unlisted || '',
+      youtubeId:      r.youtube_id || '',
+      aiChapters:     Array.isArray(r.ai_chapters) ? r.ai_chapters : [],
+      aiEnrichedAt:   r.ai_enriched_at || '',
+      transcriptUrl:  r.transcript_url || '',
+      chatUrl:        r.chat_url || '',
+      storyboard:     r.storyboard && r.storyboard.url && r.storyboard.vtt
+        ? {
+            url: r.storyboard.url,
+            vtt: r.storyboard.vtt,
+            interval: r.storyboard.interval,
+            cols: r.storyboard.cols,
+            rows: r.storyboard.rows,
+            n_frames: r.storyboard.n_frames,
+            w: r.storyboard.w,
+            h: r.storyboard.h,
+          }
+        : undefined,
+    }));
+  return dedupAndMerge(mapped).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-// ── System status (footer health badge) ───────────────────────────────────
 export interface SystemStatus {
   updatedAt: string;
   recordingsTotal: number;
@@ -178,23 +223,18 @@ export interface SystemStatus {
 }
 
 export async function fetchStatus(): Promise<SystemStatus | null> {
-  const txt = await fetchFirst('data/system-status.json');
-  if (!txt) return null;
-  try {
-    const j = JSON.parse(txt);
-    const updated = new Date(j.updated_at || 0).getTime();
-    const ageH = (Date.now() - updated) / 3.6e6;
-    return {
-      updatedAt:        j.updated_at || '',
-      recordingsTotal:  j.recordings_total || 0,
-      totalSizeGb:      j.total_size_gb || 0,
-      totalHours:       j.total_hours || 0,
-      ytSubscribers:    j.youtube?.subscribers || '',
-      ytViews:          j.youtube?.views || '',
-      ytVideos:         j.youtube?.videos || 0,
-      ok:               ageH < 48,
-    };
-  } catch {
-    return null;
-  }
+  const j = await fetchFirstJson<any>('data/system-status.json');
+  if (!j) return null;
+  const updated = new Date(j.updated_at || 0).getTime();
+  const ageH = (Date.now() - updated) / 3.6e6;
+  return {
+    updatedAt:        j.updated_at || '',
+    recordingsTotal:  j.recordings_total || 0,
+    totalSizeGb:      j.total_size_gb || 0,
+    totalHours:       j.total_hours || 0,
+    ytSubscribers:    j.youtube?.subscribers || '',
+    ytViews:          j.youtube?.views || '',
+    ytVideos:         j.youtube?.videos || 0,
+    ok:               ageH < 48,
+  };
 }

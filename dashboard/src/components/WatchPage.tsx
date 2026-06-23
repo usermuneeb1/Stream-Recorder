@@ -30,7 +30,8 @@ function ghostId(r: Recording): string {
 function getSources(r: Recording): Source[] {
   const out: Source[] = [];
   const gid = ghostId(r);
-  if (gid)                                                  out.push({ label: 'GHOST', url: `youtube/${gid}`,     tone: 'red',     kind: 'youtube' });
+  // FIX #1 — Vidstack's YouTubeProvider needs a real URL, not a `youtube/<id>` path.
+  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}`, tone: 'red',     kind: 'youtube' });
   if (r.archiveNode)                                        out.push({ label: 'R3AL',  url: r.archiveNode,         tone: 'gold',    kind: 'mp4'    });
   if (r.githubDirect || r.githubRelease)                    out.push({ label: 'B3ING', url: (r.githubDirect || r.githubRelease), tone: 'sky', kind: 'mp4' });
   if (r.cfStream)                                           out.push({ label: 'STORM', url: r.cfStream,            tone: 'violet',  kind: 'mp4'    });
@@ -84,22 +85,36 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     let winner = -1;
     let bestTime = Infinity;
 
+    // FIX #3 — real reachability probes instead of no-cors (which returns
+    // opaque success even on 404/403). For mp4 we Range-fetch 2 bytes and
+    // get a real status code. For GHOST we hit our own /api/yt resolver
+    // which only returns 302 when an Invidious/Piped instance actually
+    // has the video — proves playability, not just DNS reachability.
     Promise.allSettled(sources.map(async (s, idx) => {
       if (errorFallbackIdx.has(idx)) { health[idx] = -1; return; }
       const start = performance.now();
+      let ok = false;
       try {
         if (s.kind === 'youtube') {
-          const id = s.url.split('/')[1];
-          await fetch(`https://i.ytimg.com/vi/${id}/default.jpg`, {
-            method: 'GET', mode: 'no-cors', signal: ctrl.signal,
-          });
+          const id = s.url.match(/v=([\w-]{11})/)?.[1] || '';
+          if (id) {
+            const r = await fetch(`/api/yt/${id}`, { method: 'HEAD', redirect: 'manual', signal: ctrl.signal });
+            ok = r.status === 302 || r.status === 200;
+          }
         } else {
-          await fetch(s.url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
+          const r = await fetch(s.url, {
+            method: 'GET',
+            headers: { Range: 'bytes=0-1' },
+            signal: ctrl.signal,
+            cache: 'no-store',
+          });
+          try { r.body?.cancel(); } catch { /* noop */ }
+          ok = r.status === 200 || r.status === 206;
         }
-        const dt = performance.now() - start;
-        health[idx] = dt;
-        if (dt < bestTime) { bestTime = dt; winner = idx; }
-      } catch { health[idx] = -1; }
+      } catch { ok = false; }
+      const dt = ok ? (performance.now() - start) : -1;
+      health[idx] = dt;
+      if (dt > 0 && dt < bestTime) { bestTime = dt; winner = idx; }
       setSourceHealth({ ...health });
     }));
 
@@ -117,13 +132,32 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   // ── Esc closes / shortcuts ───────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ignore shortcuts while user is typing in a form field (comments etc).
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (t && t.isContentEditable)) return;
+
       if (e.key === 'Escape' && !shareOpen && !showHelp) onClose();
       if (e.key === 'Escape' && (shareOpen || showHelp)) { setShareOpen(false); setShowHelp(false); }
       if (e.key === '?') { e.preventDefault(); setShowHelp(s => !s); }
+
+      // FEATURE: 0/1/2/3/4/5 to switch source.
+      // 0 = Auto, 1..N = sources[i-1]. Plays nicely with the existing UI.
+      if (/^[0-5]$/.test(e.key)) {
+        const n = parseInt(e.key, 10);
+        if (n === 0) {
+          setSi(0);
+          onToast('Source: Auto');
+        } else if (n <= sources.length) {
+          setSi(n);
+          played.current = false; setReady(false);
+          onToast(`Source: ${sources[n - 1].label}`);
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, shareOpen, showHelp]);
+  }, [onClose, shareOpen, showHelp, sources, onToast]);
 
   // ── Player events ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -132,25 +166,35 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     const onTime = () => setT(p.currentTime || 0);
     const onGo = () => { if (!played.current) { played.current = true; setReady(true); } };
     const onErr = () => {
-      // Current playing source failed. Mark it as failed and switch Auto's pick.
+      // FIX #2 — previously read `errorFallbackIdx` from a stale closure
+      // and could pick the same dead source again. Now we compute the next
+      // candidate inside the functional setState, using the just-built Set.
       const failedIdx = si === 0 ? autoIdx : si - 1;
-      if (failedIdx >= 0 && failedIdx < sources.length) {
-        setErrorFallbackIdx(prev => {
-          if (prev.has(failedIdx)) return prev;
-          const next = new Set(prev); next.add(failedIdx);
-          onToast(`${sources[failedIdx].label} failed — switching source`);
-          return next;
-        });
-        // Find next available
+      if (failedIdx < 0 || failedIdx >= sources.length) return;
+
+      setErrorFallbackIdx(prev => {
+        if (prev.has(failedIdx)) return prev;
+        const next = new Set(prev); next.add(failedIdx);
+
+        let pick = -1;
         for (let i = 0; i < sources.length; i++) {
-          if (i !== failedIdx && !errorFallbackIdx.has(i)) {
-            if (si === 0) setAutoIdx(i);
-            else setSi(i + 1);
-            played.current = false; setReady(false);
-            break;
-          }
+          if (i !== failedIdx && !next.has(i)) { pick = i; break; }
         }
-      }
+
+        if (pick !== -1) {
+          onToast(`${sources[failedIdx].label} failed — switching to ${sources[pick].label}`);
+          // Defer so React commits the new Set before src changes.
+          queueMicrotask(() => {
+            if (si === 0) setAutoIdx(pick);
+            else setSi(pick + 1);
+            played.current = false;
+            setReady(false);
+          });
+        } else {
+          onToast(`All ${sources.length} sources failed for this recording`);
+        }
+        return next;
+      });
     };
     p.addEventListener('time-update', onTime);
     p.addEventListener('playing', onGo);
@@ -178,10 +222,20 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     const m = hash.match(/\?t=(\d+)/);
     if (m) { seek(parseInt(m[1])); setResumeShown(true); return; }
     const saved = loadPosition(rec.videoId);
-    if (saved && saved.t > 30) setResumeAt(saved.t);
+    // FIX #26 — if user clicked "Continue watching", auto-resume silently.
+    const cameFromContinue = (window as any).__mlaContinueResume === rec.videoId;
+    if (cameFromContinue) { (window as any).__mlaContinueResume = null; }
+    if (saved && saved.t > 30) {
+      if (cameFromContinue) {
+        seek(saved.t);
+        onToast(`Resumed at ${Math.floor(saved.t / 60)}:${String(Math.floor(saved.t) % 60).padStart(2, '0')}`);
+      } else {
+        setResumeAt(saved.t);
+      }
+    }
     setResumeShown(true);
     pushHistory(rec.videoId);
-  }, [ready, seek, rec.videoId, resumeShown]);
+  }, [ready, seek, rec.videoId, resumeShown, onToast]);
 
   // ── Persist position every 5s ────────────────────────────────────────────
   useEffect(() => {
@@ -261,7 +315,14 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 className="w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl"
               >
                 <MediaProvider />
-                <DefaultVideoLayout icons={defaultLayoutIcons} />
+                {/* FIX (feature): hover-preview thumbnails. When the recording
+                    has a generated storyboard, Vidstack reads the WebVTT
+                    cues and shows a YouTube-style frame preview as the
+                    user hovers the seek bar. */}
+                <DefaultVideoLayout
+                  icons={defaultLayoutIcons}
+                  thumbnails={rec.storyboard?.vtt || undefined}
+                />
               </MediaPlayer>
             )}
             {!ready && (
@@ -442,6 +503,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 ['Mute',               'M'],
                 ['Fullscreen',         'F'],
                 ['Picture-in-Picture', 'I'],
+                ['Switch source',      '0–5'],
                 ['Close player',       'Esc'],
                 ['Show this help',     '?'],
               ].map(([l, k]) => (

@@ -11,7 +11,12 @@
  * same with or without this worker installed.
  */
 
-const VERSION = 'mla-v4';
+// FIX #21 — version stamp includes a build timestamp so each new deploy
+// instantly invalidates the previous shell cache. Without this, a user on
+// the old SW could see an old index.html that references hashed asset
+// filenames no longer on the server → white screen.
+const BUILD_ID = '__BUILD_ID__'; // replaced at build time; falls back to literal in dev
+const VERSION = `mla-v5-${BUILD_ID === '__BUILD_ID__' ? Date.now() : BUILD_ID}`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 

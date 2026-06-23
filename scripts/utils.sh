@@ -397,7 +397,8 @@ github_api_write() {
     local message="${3:-📡 Auto-update: $filepath [$(now_pkt)]}"
     local repo="${GITHUB_REPOSITORY:-}"
     local token="${GH_PAT:-}"
-    
+    local max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}"
+
     if [[ -z "$repo" ]]; then
         log_error "GITHUB_REPOSITORY not set"
         return 1
@@ -406,112 +407,99 @@ github_api_write() {
         log_error "GH_PAT not set"
         return 1
     fi
-    
-    # Get current file SHA (required for updates)
-    local sha=""
-    local existing
-    existing=$(curl -s \
-        -H "Authorization: token $token" \
-        -H "Accept: application/vnd.github.v3+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
-    sha=$(echo "$existing" | jq -r '.sha // empty' 2>/dev/null)
-    
-    # ── Step 1: Write raw content to a temp file ──
-    # Using a temp file avoids shell variable corruption, pipe issues, and
-    # CRLF injection that caused the persistent "Problems parsing JSON" error.
-    local tmp_content tmp_b64 tmp_payload
+
+    # ── Encode content once, outside the retry loop ──
+    local tmp_content tmp_b64
     tmp_content=$(mktemp /tmp/gh_content_XXXX)
     tmp_b64=$(mktemp /tmp/gh_b64_XXXX)
-    tmp_payload=$(mktemp /tmp/gh_payload_XXXX)
-    
-    # Write content — use printf to avoid echo adding newlines
     printf '%s' "$content" > "$tmp_content"
-    
-    # ── Step 2: Base64 encode — strip ALL whitespace from output ──
     base64 -w 0 < "$tmp_content" | tr -d '\r\n\t ' > "$tmp_b64"
     rm -f "$tmp_content"
-    
-    # Check base64 file is not empty
+
     if [[ ! -s "$tmp_b64" ]]; then
         log_error "Base64 encoding produced empty output for $filepath"
-        rm -f "$tmp_b64" "$tmp_payload"
+        rm -f "$tmp_b64"
         return 1
     fi
-    
-    # ── Step 3: Build JSON payload with jq → write directly to file ──
-    # Use --rawfile to read base64 from file directly, avoiding shell variable corruption
-    if [[ -n "$sha" ]]; then
-        jq -n --compact-output \
-            --arg msg     "$message" \
-            --rawfile b64 "$tmp_b64" \
-            --arg sha     "$sha" \
-            '{message: $msg, content: ($b64 | gsub("\\s"; "")), sha: $sha}' > "$tmp_payload" 2>/dev/null
-    else
-        jq -n --compact-output \
-            --arg msg     "$message" \
-            --rawfile b64 "$tmp_b64" \
-            '{message: $msg, content: ($b64 | gsub("\\s"; ""))}' > "$tmp_payload" 2>/dev/null
-    fi
-    rm -f "$tmp_b64"
 
-    # Validate JSON was produced
-    if [[ ! -s "$tmp_payload" ]]; then
-        log_error "jq failed to build payload for $filepath"
-        rm -f "$tmp_payload"
-        return 1
-    fi
-    
-    if ! jq -e . "$tmp_payload" >/dev/null 2>&1; then
-        log_error "Payload is invalid JSON for $filepath"
-        rm -f "$tmp_payload"
-        return 1
-    fi
-    
-    local payload_size
-    payload_size=$(wc -c < "$tmp_payload" | tr -d ' ')
-    log_debug "  Payload size: ${payload_size} bytes for $filepath"
-    
-    # ── Step 4: Send to GitHub API ──
-    # Use -d @file (NOT --data-binary) to let curl handle the file reading
-    local response http_code
-    local tmp_response
-    tmp_response=$(mktemp /tmp/gh_resp_XXXX)
-    
-    http_code=$(curl -s -o "$tmp_response" -w '%{http_code}' \
-        -X PUT \
-        -H "Authorization: token $token" \
-        -H "Accept: application/vnd.github.v3+json" \
-        -H "Content-Type: application/json; charset=utf-8" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        -d "@${tmp_payload}" 2>/dev/null)
-    
-    response=$(cat "$tmp_response" 2>/dev/null)
-    rm -f "$tmp_payload" "$tmp_response"
-    
-    local commit_sha
-    commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)
-    
-    if [[ -n "$commit_sha" ]]; then
-        log_ok "File written to GitHub: $filepath (commit: ${commit_sha:0:7})"
-        return 0
-    else
-        local err_msg
-        err_msg=$(echo "$response" | jq -r '.message // empty' 2>/dev/null)
-        log_error "Failed to write file to GitHub: $filepath"
-        log_error "  HTTP status: $http_code"
-        if [[ -n "$err_msg" ]]; then
-            log_error "  GitHub API error: $err_msg"
-            if [[ "$err_msg" == *"not accessible"* ]] || [[ "$err_msg" == *"Resource not accessible"* ]]; then
-                log_error "  FIX: Your GH_PAT needs 'Contents: Read and write' permission"
-            fi
+    # ── Retry loop: fetch SHA → PUT → on 409 (conflict), sleep + retry ──
+    local attempt=1
+    while (( attempt <= max_attempts )); do
+        local sha="" existing tmp_payload tmp_response
+        existing=$(curl -s \
+            -H "Authorization: token $token" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
+        sha=$(echo "$existing" | jq -r '.sha // empty' 2>/dev/null)
+
+        tmp_payload=$(mktemp /tmp/gh_payload_XXXX)
+        if [[ -n "$sha" ]]; then
+            jq -n --compact-output \
+                --arg msg     "$message" \
+                --rawfile b64 "$tmp_b64" \
+                --arg sha     "$sha" \
+                '{message: $msg, content: ($b64 | gsub("\\s"; "")), sha: $sha}' \
+                > "$tmp_payload" 2>/dev/null
+        else
+            jq -n --compact-output \
+                --arg msg     "$message" \
+                --rawfile b64 "$tmp_b64" \
+                '{message: $msg, content: ($b64 | gsub("\\s"; ""))}' \
+                > "$tmp_payload" 2>/dev/null
         fi
-        # Dump first 500 chars of response for debugging
-        log_debug "  Response (first 500 chars): ${response:0:500}"
+
+        if [[ ! -s "$tmp_payload" ]] || ! jq -e . "$tmp_payload" >/dev/null 2>&1; then
+            log_error "jq failed to build valid JSON for $filepath (attempt $attempt)"
+            rm -f "$tmp_payload"
+            sleep $(( attempt * 2 ))
+            (( attempt++ ))
+            continue
+        fi
+
+        tmp_response=$(mktemp /tmp/gh_resp_XXXX)
+        local http_code response
+        http_code=$(curl -s -o "$tmp_response" -w '%{http_code}' \
+            -X PUT \
+            -H "Authorization: token $token" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${repo}/contents/${filepath}" \
+            -d "@${tmp_payload}" 2>/dev/null)
+        response=$(cat "$tmp_response" 2>/dev/null)
+        rm -f "$tmp_payload" "$tmp_response"
+
+        if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]]; then
+            local commit_sha
+            commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)
+            log_ok "File written to GitHub: $filepath (commit: ${commit_sha:0:7}) [attempt $attempt]"
+            rm -f "$tmp_b64"
+            return 0
+        fi
+
+        # 409 Conflict (CAS), 422 (no-op or conflict), or 5xx → backoff + retry
+        if [[ "$http_code" == "409" ]] || [[ "$http_code" == "422" ]] || [[ "$http_code" =~ ^5 ]]; then
+            local backoff=$(( attempt * attempt ))   # 1, 4, 9, 16, 25 s
+            log_warn "GitHub returned ${http_code} for $filepath — retry $((attempt+1))/${max_attempts} in ${backoff}s"
+            sleep "$backoff"
+            (( attempt++ ))
+            continue
+        fi
+
+        # Anything else (400, 401, 403, 404) is fatal — don't retry
+        local err_msg
+        err_msg=$(echo "$response" | jq -r '.message // .error // "unknown"' 2>/dev/null)
+        log_error "GitHub write failed (${http_code}): ${err_msg}"
+        rm -f "$tmp_b64"
         return 1
-    fi
+    done
+
+    log_error "GitHub write exhausted ${max_attempts} retries for $filepath"
+    rm -f "$tmp_b64"
+    return 1
 }
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NETWORK UTILITIES
@@ -589,21 +577,75 @@ get_file_size() {
     stat -c %s "$file" 2>/dev/null || echo "0"
 }
 
-# Check if a file is a valid video (has video stream)
+# Check if a file is a valid video (has video stream AND a readable duration).
+# A file that yt-dlp got SIGTERM'd mid-fragment often has a video codec stream
+# but no/zero duration — those crash the player and confuse the splitter.
 is_valid_video() {
     local file="$1"
     local min_size="${2:-102400}"  # 100 KB default minimum
-    
+
     # Check file exists
     [[ ! -f "$file" ]] && return 1
-    
+
     # Check minimum size
     local size
     size=$(get_file_size "$file")
     (( size < min_size )) && return 1
-    
+
     # Check for video stream
-    ffprobe -v quiet -show_streams "$file" 2>/dev/null | grep -q "codec_type=video"
+    ffprobe -v quiet -show_streams "$file" 2>/dev/null | grep -q "codec_type=video" || return 1
+
+    # FIX #13 — must also have a readable, non-zero duration. If it doesn't,
+    # the file is structurally damaged (missing moov atom is the usual cause
+    # when timeout SIGTERM'd yt-dlp mid-fragment with --no-part). The caller
+    # should then try a recovery remux.
+    local dur
+    dur=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$file" 2>/dev/null | head -1)
+    dur="${dur%.*}"
+    [[ -z "$dur" ]] && return 1
+    [[ ! "$dur" =~ ^[0-9]+$ ]] && return 1
+    (( dur < 5 )) && return 1
+
+    return 0
+}
+
+# Attempt to recover a structurally damaged video file (missing/broken moov
+# atom from a killed recorder). Runs in-place: writes to <file>.recovered.mp4
+# and swaps if successful. Returns 0 on success, 1 if unrecoverable.
+recover_broken_video() {
+    local file="$1"
+    [[ ! -f "$file" ]] && return 1
+
+    local recovered="${file%.mp4}.recovered.mp4"
+    log_warn "  recover_broken_video: attempting moov-atom recovery on $(basename "$file")"
+
+    # ffmpeg with -err_detect ignore_err + -fflags +genpts can often rebuild
+    # a seekable container from a truncated stream. We also force re-mux
+    # (-c copy) so we don't pay re-encode cost.
+    if ffmpeg -y -err_detect ignore_err -fflags +genpts -i "$file" \
+        -c copy -movflags +faststart -avoid_negative_ts make_zero \
+        "$recovered" 2>/dev/null && is_valid_video "$recovered"; then
+        mv -f "$recovered" "$file"
+        log_ok "  recover_broken_video: ✓ recovered"
+        return 0
+    fi
+    rm -f "$recovered"
+
+    # Last resort: force re-encode (slow, but rebuilds container from scratch)
+    log_warn "  recover_broken_video: copy-remux failed, trying full re-encode"
+    if ffmpeg -y -err_detect ignore_err -fflags +genpts -i "$file" \
+        -c:v libx264 -preset veryfast -crf 23 \
+        -c:a aac -b:a 160k \
+        -movflags +faststart \
+        "$recovered" 2>/dev/null && is_valid_video "$recovered"; then
+        mv -f "$recovered" "$file"
+        log_ok "  recover_broken_video: ✓ recovered via re-encode"
+        return 0
+    fi
+    rm -f "$recovered"
+
+    log_error "  recover_broken_video: ✗ unrecoverable"
+    return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

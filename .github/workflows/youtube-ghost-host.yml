@@ -7,10 +7,22 @@ on:
         description: "Skip morphing (upload clean)"
         required: false
         default: "true"
+      force_upload_long:
+        description: "Upload videos > 15min even if YOUTUBE_VERIFIED is false (will fail if account not phone-verified)"
+        required: false
+        default: "false"
+        type: boolean
 
 env:
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   TZ: Asia/Karachi
+  # 🔐 Phone-verified YouTube accounts can upload up to 12h / 256 GB per video.
+  # Unverified accounts are capped at 15 minutes per upload.
+  # Set repo Variable YOUTUBE_VERIFIED=true once your channel is phone-verified
+  # (Settings → Variables → Actions → New repository variable).
+  # Until then, this workflow will skip videos > 15min instead of trying and
+  # failing silently — which is what was happening before.
+  YOUTUBE_VERIFIED: ${{ vars.YOUTUBE_VERIFIED || 'false' }}
 
 permissions:
   contents: write
@@ -41,6 +53,8 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ steps.creds.outputs.client_secret }}
           YOUTUBE_REFRESH_TOKEN: ${{ steps.creds.outputs.refresh_token }}
           SKIP_MORPH: ${{ github.event.inputs.skip_morph }}
+          YOUTUBE_VERIFIED: ${{ env.YOUTUBE_VERIFIED }}
+          FORCE_UPLOAD_LONG: ${{ github.event.inputs.force_upload_long || 'false' }}
         run: |
           python3 -c "
           import json, os, subprocess, sys
@@ -48,11 +62,46 @@ jobs:
           with open('data/recordings.json') as f:
               recs = json.load(f)
 
-          todo = [r for r in recs if not r.get('youtube_unlisted') and not r.get('youtube_id')
-                  and (r.get('archive_node') or r.get('archive_direct') or r.get('archive_link'))]
+          # ── Duration gating ─────────────────────────────────────────────
+          # Unverified YouTube accounts: 15 min hard cap per upload.
+          # Phone-verified accounts:     up to 12 hours per upload.
+          # See https://support.google.com/youtube/answer/71673
+          VERIFIED = os.environ.get('YOUTUBE_VERIFIED', 'false').lower() in ('true', '1', 'yes')
+          FORCE    = os.environ.get('FORCE_UPLOAD_LONG', 'false').lower() in ('true', '1', 'yes')
+          MAX_SEC_UNVERIFIED = 15 * 60          # 15 min
+          MAX_SEC_VERIFIED   = 12 * 3600        # 12 h (YouTube's actual ceiling)
+          duration_cap = MAX_SEC_VERIFIED if VERIFIED else MAX_SEC_UNVERIFIED
 
+          print(f'YOUTUBE_VERIFIED={VERIFIED}   duration_cap={duration_cap//60}min')
+
+          eligible = []
+          skipped_too_long = []
+          for r in recs:
+              if r.get('youtube_unlisted') or r.get('youtube_id'):
+                  continue
+              if not (r.get('archive_node') or r.get('archive_direct') or r.get('archive_link')):
+                  continue
+              dur = int(r.get('duration_sec', 0) or 0)
+              if dur > duration_cap and not FORCE:
+                  skipped_too_long.append((r.get('video_id',''), r.get('title','')[:60], dur//60))
+                  continue
+              eligible.append(r)
+
+          if skipped_too_long:
+              print(f'\\n⚠️  Skipping {len(skipped_too_long)} recording(s) — too long for current account verification:')
+              for vid, t, m in skipped_too_long[:20]:
+                  print(f'    • {vid}  ({m} min)  {t}')
+              if not VERIFIED:
+                  print('\\n   To unlock long uploads:')
+                  print('   1. Verify your YouTube channel by phone:')
+                  print('      https://www.youtube.com/verify')
+                  print('   2. In this repo: Settings → Variables → Actions →')
+                  print('      New repository variable → YOUTUBE_VERIFIED = true')
+                  print('   3. Re-run this workflow.\\n')
+
+          todo = eligible
           if not todo:
-              print('All recordings already have YouTube mirrors')
+              print('Nothing eligible to ghost-host this run.')
               sys.exit(0)
 
           print(f'Found {len(todo)} recordings to ghost-host')
