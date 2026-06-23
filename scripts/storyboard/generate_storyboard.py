@@ -43,13 +43,27 @@ from typing import Optional
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 RECS = ROOT / "data" / "recordings.json"
-# Sprites + VTTs live in the dashboard's public folder so Vercel serves
-# them statically from its edge CDN. No third-party host needed — Catbox
-# and 0x0.st both stopped accepting uploads from GitHub Actions IPs.
-STORYBOARDS_DIR = ROOT / "dashboard" / "public" / "storyboards"
-# jsDelivr serves any file in the repo for free with global CDN caching.
-# Use this as the public URL so dev environments work without Vercel too.
-JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main/dashboard/public/storyboards"
+
+# STORAGE STRATEGY
+# ────────────────
+# Storyboards used to be committed to dashboard/public/storyboards/ but that
+# burns through GitHub's 1 GB soft repo limit fast (~500 KB per recording ×
+# growing back-catalogue).
+#
+# Now we upload sprites + VTTs to a single shared Archive.org item, which
+# gives us unlimited free storage with a global CDN. The item is bucketed
+# by year-month so the file count per item stays manageable.
+#
+# Auth uses the same ARCHIVE_ACCESS_KEY / ARCHIVE_SECRET_KEY that the rest
+# of the pipeline already has as repo secrets.
+ARCHIVE_ACCESS_KEY = os.environ.get("ARCHIVE_ACCESS_KEY", "").strip()
+ARCHIVE_SECRET_KEY = os.environ.get("ARCHIVE_SECRET_KEY", "").strip()
+# Single permanent bucket — every storyboard sprite lives here under
+# the video_id as filename. Saves on Archive.org item-creation rate limits.
+ARCHIVE_ITEM = os.environ.get(
+    "STORYBOARD_ARCHIVE_ITEM",
+    "muslim-lantern-storyboards-v1",
+)
 
 MAX_ITEMS      = int(os.environ.get("STORYBOARD_MAX_ITEMS", "3"))
 # 30s interval (was 10s) — 3× fewer frames means 3× faster ffmpeg pass.
@@ -183,58 +197,42 @@ def build_vtt(meta: dict, sprite_url: str, duration: int) -> str:
     return "\n".join(out)
 
 
-def upload_catbox(path: pathlib.Path) -> Optional[str]:
-    """Upload a file to catbox.moe and return the permanent URL."""
-    try:
-        out = subprocess.run(
-            ["curl", "-sS", "--max-time", "120",
-             "-A", "Mozilla/5.0 (X11; Linux x86_64) Stream-Recorder/1.0",
-             "-F", "reqtype=fileupload",
-             "-F", f"fileToUpload=@{path}",
-             "https://catbox.moe/user/api.php"],
-            capture_output=True, text=True, timeout=150,
-        )
-        url = (out.stdout or "").strip()
-        if url.startswith("https://"):
-            return url
-        log(f"catbox returned: {url[:120]}")
-    except Exception as e:
-        log(f"catbox upload error: {e}")
-    return None
+def upload_archive(path: pathlib.Path, remote_name: str, content_type: str) -> Optional[str]:
+    """Upload a single file to the shared Archive.org storyboards item.
+    Returns the public download URL on success, None on failure.
 
-
-def upload_0x0(path: pathlib.Path) -> Optional[str]:
-    """Upload to 0x0.st as a fallback when Catbox rejects."""
-    try:
-        out = subprocess.run(
-            ["curl", "-sS", "--max-time", "120",
-             "-A", "Stream-Recorder/1.0 (storyboard generator)",
-             "-F", f"file=@{path}",
-             "-F", "expires=8760",   # 1 year retention (max for 0x0.st)
-             "https://0x0.st"],
-            capture_output=True, text=True, timeout=150,
-        )
-        url = (out.stdout or "").strip()
-        if url.startswith("https://0x0.st/"):
-            return url
-        log(f"0x0.st returned: {url[:120]}")
-    except Exception as e:
-        log(f"0x0.st upload error: {e}")
-    return None
-
-
-def upload_anywhere(path: pathlib.Path) -> Optional[str]:
-    """Try every supported anonymous file host until one accepts the upload.
-    Catbox is preferred (truly permanent, well-known); 0x0.st is the
-    fallback (also permanent for 1y, more lenient on user-agents and IPs).
+    Uses the same S3-compatible endpoint + LOW auth pattern that the rest
+    of the pipeline already uses for video uploads (see url-to-cloud.yml
+    line 231). Includes x-archive-auto-make-bucket so the item is created
+    on first upload — subsequent uploads just add new files to it.
     """
-    url = upload_catbox(path)
-    if url:
-        return url
-    log("  catbox rejected — trying 0x0.st fallback")
-    url = upload_0x0(path)
-    if url:
-        return url
+    if not ARCHIVE_ACCESS_KEY or not ARCHIVE_SECRET_KEY:
+        log("ARCHIVE_ACCESS_KEY / ARCHIVE_SECRET_KEY not set — cannot upload")
+        return None
+    url = f"https://s3.us.archive.org/{ARCHIVE_ITEM}/{remote_name}"
+    cmd = [
+        "curl", "-sS", "--max-time", "300",
+        "-o", "/dev/null", "-w", "%{http_code}",
+        "-H", f"authorization: LOW {ARCHIVE_ACCESS_KEY}:{ARCHIVE_SECRET_KEY}",
+        "-H", "x-archive-auto-make-bucket: 1",
+        "-H", "x-archive-meta-title: Muslim Lantern Storyboards",
+        "-H", "x-archive-meta-creator: Stream Recorder Bot",
+        "-H", "x-archive-meta-description: Hover-preview sprite sheets and WebVTT cues for the dashboard player.",
+        "-H", "x-archive-meta-mediatype: image",
+        "-H", "x-archive-meta-collection: opensource_media",
+        "-H", f"Content-Type: {content_type}",
+        "--upload-file", str(path),
+        url,
+    ]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        http = (out.stdout or "").strip()
+        if http.startswith("2"):
+            # Public download URL (CDN-fronted, edge-cached worldwide)
+            return f"https://archive.org/download/{ARCHIVE_ITEM}/{remote_name}"
+        log(f"archive.org returned HTTP {http} for {remote_name}: {(out.stderr or '')[:120]}")
+    except Exception as e:
+        log(f"archive.org upload error for {remote_name}: {e}")
     return None
 
 
@@ -280,21 +278,27 @@ def main() -> int:
             duration = int(rec.get("duration_sec", 0) or 0)
             log(f"── {vid} — {rec.get('title','')[:60]} ({duration//60} min)")
 
-            # Generate sprite directly into the public storyboards dir.
-            STORYBOARDS_DIR.mkdir(parents=True, exist_ok=True)
-            sprite_path = STORYBOARDS_DIR / f"{vid}.jpg"
+            # Generate sprite into a tmp file (Archive.org-hosted, NOT git-hosted).
+            sprite_path = tmp / f"{vid}.jpg"
             meta = build_sprite(src, duration, sprite_path)
             if not meta:
                 log("  ✗ sprite generation failed — skipping")
                 continue
-            sprite_url = f"{JSDELIVR_BASE}/{vid}.jpg"
-            log(f"  ✓ sprite saved:    {sprite_path.relative_to(ROOT)}")
 
-            vtt_path = STORYBOARDS_DIR / f"{vid}.vtt"
+            sprite_url = upload_archive(sprite_path, f"{vid}.jpg", "image/jpeg")
+            if not sprite_url:
+                log("  ✗ sprite upload to Archive.org failed — skipping")
+                continue
+            log(f"  ✓ sprite uploaded: {sprite_url}")
+
+            vtt_path = tmp / f"{vid}.vtt"
             vtt_text = build_vtt(meta, sprite_url, duration)
             vtt_path.write_text(vtt_text)
-            vtt_url = f"{JSDELIVR_BASE}/{vid}.vtt"
-            log(f"  ✓ vtt saved:       {vtt_path.relative_to(ROOT)}")
+            vtt_url = upload_archive(vtt_path, f"{vid}.vtt", "text/vtt")
+            if not vtt_url:
+                log("  ✗ vtt upload to Archive.org failed — skipping")
+                continue
+            log(f"  ✓ vtt uploaded:    {vtt_url}")
 
             rec["storyboard"] = {
                 "url": sprite_url,

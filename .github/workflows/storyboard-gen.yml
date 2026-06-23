@@ -53,13 +53,20 @@ jobs:
         env:
           STORYBOARD_MAX_ITEMS: ${{ github.event.inputs.max_items || '3' }}
           STORYBOARD_FORCE:     ${{ github.event.inputs.force || 'false' }}
+          # Auth for Archive.org S3-compatible API — sprites + VTTs live in
+          # a shared Archive.org item (not git) so the repo stays under the
+          # 1 GB soft limit even as the back-catalogue grows.
+          ARCHIVE_ACCESS_KEY:   ${{ secrets.ARCHIVE_ACCESS_KEY }}
+          ARCHIVE_SECRET_KEY:   ${{ secrets.ARCHIVE_SECRET_KEY }}
         run: python3 scripts/storyboard/generate_storyboard.py
 
-      - name: 📤 Commit storyboard URLs
+      - name: 📤 Commit storyboard URLs to recordings.json
         run: |
           git config user.name  "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
-          git add data/recordings.json dashboard/public/storyboards/
+          # Only commit recordings.json. Storyboard assets themselves live
+          # on Archive.org now (NOT in git), so we never grow the repo size.
+          git add data/recordings.json
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
