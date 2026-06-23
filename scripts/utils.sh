@@ -577,21 +577,75 @@ get_file_size() {
     stat -c %s "$file" 2>/dev/null || echo "0"
 }
 
-# Check if a file is a valid video (has video stream)
+# Check if a file is a valid video (has video stream AND a readable duration).
+# A file that yt-dlp got SIGTERM'd mid-fragment often has a video codec stream
+# but no/zero duration — those crash the player and confuse the splitter.
 is_valid_video() {
     local file="$1"
     local min_size="${2:-102400}"  # 100 KB default minimum
-    
+
     # Check file exists
     [[ ! -f "$file" ]] && return 1
-    
+
     # Check minimum size
     local size
     size=$(get_file_size "$file")
     (( size < min_size )) && return 1
-    
+
     # Check for video stream
-    ffprobe -v quiet -show_streams "$file" 2>/dev/null | grep -q "codec_type=video"
+    ffprobe -v quiet -show_streams "$file" 2>/dev/null | grep -q "codec_type=video" || return 1
+
+    # FIX #13 — must also have a readable, non-zero duration. If it doesn't,
+    # the file is structurally damaged (missing moov atom is the usual cause
+    # when timeout SIGTERM'd yt-dlp mid-fragment with --no-part). The caller
+    # should then try a recovery remux.
+    local dur
+    dur=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$file" 2>/dev/null | head -1)
+    dur="${dur%.*}"
+    [[ -z "$dur" ]] && return 1
+    [[ ! "$dur" =~ ^[0-9]+$ ]] && return 1
+    (( dur < 5 )) && return 1
+
+    return 0
+}
+
+# Attempt to recover a structurally damaged video file (missing/broken moov
+# atom from a killed recorder). Runs in-place: writes to <file>.recovered.mp4
+# and swaps if successful. Returns 0 on success, 1 if unrecoverable.
+recover_broken_video() {
+    local file="$1"
+    [[ ! -f "$file" ]] && return 1
+
+    local recovered="${file%.mp4}.recovered.mp4"
+    log_warn "  recover_broken_video: attempting moov-atom recovery on $(basename "$file")"
+
+    # ffmpeg with -err_detect ignore_err + -fflags +genpts can often rebuild
+    # a seekable container from a truncated stream. We also force re-mux
+    # (-c copy) so we don't pay re-encode cost.
+    if ffmpeg -y -err_detect ignore_err -fflags +genpts -i "$file" \
+        -c copy -movflags +faststart -avoid_negative_ts make_zero \
+        "$recovered" 2>/dev/null && is_valid_video "$recovered"; then
+        mv -f "$recovered" "$file"
+        log_ok "  recover_broken_video: ✓ recovered"
+        return 0
+    fi
+    rm -f "$recovered"
+
+    # Last resort: force re-encode (slow, but rebuilds container from scratch)
+    log_warn "  recover_broken_video: copy-remux failed, trying full re-encode"
+    if ffmpeg -y -err_detect ignore_err -fflags +genpts -i "$file" \
+        -c:v libx264 -preset veryfast -crf 23 \
+        -c:a aac -b:a 160k \
+        -movflags +faststart \
+        "$recovered" 2>/dev/null && is_valid_video "$recovered"; then
+        mv -f "$recovered" "$file"
+        log_ok "  recover_broken_video: ✓ recovered via re-encode"
+        return 0
+    fi
+    rm -f "$recovered"
+
+    log_error "  recover_broken_video: ✗ unrecoverable"
+    return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
