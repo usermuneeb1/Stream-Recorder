@@ -9,7 +9,6 @@ import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
 import { NotFoundPage } from './components/NotFoundPage';
 import { Footer } from './components/Footer';
-import { BottomStats } from './components/BottomStats';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 
@@ -253,8 +252,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {!loading && recs.length > 0 && <BottomStats recs={recs} />}
 
       <Footer />
 

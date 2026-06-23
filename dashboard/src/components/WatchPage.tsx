@@ -7,6 +7,7 @@ import type { Recording } from '../utils/dataFetcher';
 import { fmtTime, fmtRelative, copyText, shareLinks } from '../utils/format';
 import { savePosition, loadPosition, pushHistory } from '../utils/history';
 import { Comments } from './Comments';
+import { BottomStats } from './BottomStats';
 
 interface P {
   rec: Recording;
@@ -533,6 +534,9 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
 
           {/* ── Comments (on the left column, below the player) ── */}
           <Comments videoId={rec.videoId} onToast={onToast} />
+
+          {/* ── Archive-overview stats (bottom of the video page) ── */}
+          {all.length > 0 && <BottomStats recs={all} />}
         </div>
 
         {/* ── Right sidebar ── */}
