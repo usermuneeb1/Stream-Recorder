@@ -207,7 +207,25 @@ jobs:
 
       - name: Push
         run: |
-          git config user.name "Stream Recorder Bot"
+          git config user.name  "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
           git add data/recordings.json
-          git diff --cached --quiet || { git commit -m "👻 YouTube Ghost-Host: all recordings" && git push; }
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "👻 YouTube Ghost-Host: all recordings"
+          # Retry-with-rebase: long ghost-host runs (30–60 min for 3-hour
+          # videos) frequently race against sibling workflows / Dependabot
+          # commits. Without this loop, the new youtube_id values were lost
+          # and the workflow would re-upload the same video next time.
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then
+              echo "Pushed successfully on attempt $attempt"
+              exit 0
+            fi
+            echo "Push attempt $attempt failed; retrying after $((attempt * 10))s..."
+            sleep $((attempt * 10))
+          done
+          echo "::error::Push failed after 5 attempts — youtube_id values from this run are NOT persisted in recordings.json"
+          exit 1
