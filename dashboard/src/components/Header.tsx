@@ -61,7 +61,7 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount
             ref={inputRef}
             value={q}
             onChange={e => setQ(e.target.value)}
-            placeholder="Search recordings, guests, dates…"
+            placeholder="Search recordings…"
             className="w-full rounded-lg py-2 pl-9 pr-12 text-[13px] focus:outline-none ring-focus transition-all"
             style={{ background: 'var(--bg3)', border: '1px solid var(--bd2)', color: 'var(--tx)' }}
           />
