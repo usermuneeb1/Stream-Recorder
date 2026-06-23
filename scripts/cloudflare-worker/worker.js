@@ -130,14 +130,22 @@ export default {
   },
 };
 
+// FIX #19 — don't echo ALLOWED_ORIGINS[0] back when the request origin isn't
+// allowed; that header would be wrong AND the browser would reject the
+// request anyway. Just omit Allow-Origin entirely so the browser blocks
+// cleanly with the correct error message in the console.
 function corsHeaders(request) {
   const origin = request.headers.get('Origin') || '';
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allowed,
+  const headers = {
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
     'Access-Control-Allow-Headers': 'Range, Content-Type',
     'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, X-Cache',
     'Vary': 'Origin',
   };
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+  // Same-origin / no-CORS requests (no Origin header at all) still work fine
+  // — the browser doesn't need an Allow-Origin header for them.
+  return headers;
 }
