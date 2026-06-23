@@ -132,7 +132,7 @@ jobs:
 
       # ─── 1. CHECKOUT REPOSITORY ──────────────────────────────────────────
       - name: "📥 Checkout Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
       - name: "📦 Install Dependencies"
