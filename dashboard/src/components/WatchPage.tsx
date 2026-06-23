@@ -39,7 +39,11 @@ function getSources(r: Recording): Source[] {
   //     recording, so GHOST is reliably available on all videos.
   // The mp4 mirrors remain as fallbacks (manual selection or auto-failover).
   const gid = ghostId(r);
-  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}`, tone: 'red',     kind: 'youtube' });
+  // GHOST URL includes ?vq=hd1080 → tells YouTube to start at 1080p
+  // instead of YouTube's bandwidth-adaptive default (often 480p first).
+  // &rel=0 disables the related-videos overlay at the end of playback.
+  // &modestbranding=1 hides most YouTube branding from the player chrome.
+  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}&vq=hd1080&rel=0&modestbranding=1`, tone: 'red', kind: 'youtube' });
   if (r.archiveNode)                                        out.push({ label: 'R3AL',  url: r.archiveNode,                        tone: 'gold',    kind: 'mp4'    });
   if (r.githubDirect || r.githubRelease)                    out.push({ label: 'B3ING', url: (r.githubDirect || r.githubRelease), tone: 'sky',     kind: 'mp4'    });
   if (r.cfStream)                                           out.push({ label: 'STORM', url: r.cfStream,                           tone: 'violet',  kind: 'mp4'    });
@@ -259,7 +263,27 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
       try { localStorage.setItem('mla_pb_rate_v1', String(p.playbackRate || 1)); } catch { /* quota */ }
     };
     p.addEventListener('rate-change', onRate);
-    return () => { p.removeEventListener('rate-change', onRate); };
+
+    // Force highest available quality once Vidstack has enumerated them.
+    // The YouTube embed gets 1080p via the ?vq=hd1080 URL param, but mp4
+    // sources don't have quality variants. For HLS / DASH (rare) this picks
+    // the top rung. Falls back silently if .qualities is empty.
+    const onQualities = () => {
+      try {
+        const qs = (p as any).qualities?.toArray?.() || [];
+        if (qs.length > 0) {
+          // Pick highest height. Vidstack uses .selected = true on the chosen one.
+          qs.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+          if (qs[0] && !qs[0].selected) qs[0].selected = true;
+        }
+      } catch { /* noop */ }
+    };
+    p.addEventListener('qualities-change', onQualities);
+    onQualities(); // try once now in case qualities are already loaded
+    return () => {
+      p.removeEventListener('rate-change', onRate);
+      p.removeEventListener('qualities-change', onQualities);
+    };
   }, [ready, rec.videoId]);
 
   // ── Resume from URL ?t= or saved position ────────────────────────────────
@@ -416,12 +440,21 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 />
               </MediaPlayer>
             )}
-            {!ready && (
+            {/* Loading overlay logic:
+                  • For GHOST (YouTube): show until ghostReady (= iframe is
+                    actually playing video frames). YouTube's iframe is fully
+                    hidden underneath via .ghost-mask CSS, so we only ever
+                    see ONE loader — ours. No more double-spinner.
+                  • For mp4 sources: show until 'ready' (= loaded-metadata
+                    or loaded-data fired). Vidstack's native buffering
+                    spinner then takes over for any further mid-playback
+                    buffering. */}
+            {((activeSrc?.kind === 'youtube' && !ghostReady) || (activeSrc?.kind !== 'youtube' && !ready)) && (
               <div className="absolute inset-0 xl:top-4 xl:left-4 xl:right-4 xl:rounded-xl z-20 flex items-center justify-center" style={{ background: '#000' }}>
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 mb-3 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: 'var(--red)' }} />
-                  <p className="text-white/60 text-[13px] font-medium tracking-wide">Preparing stream</p>
-                  <p className="text-white/30 text-[11px] mt-1">{activeSrc?.label || 'Auto'} source</p>
+                  <p className="text-white/60 text-[13px] font-medium tracking-wide">Loading</p>
+                  <p className="text-white/30 text-[11px] mt-1">{activeSrc?.label || 'Auto'} · 1080p</p>
                 </div>
               </div>
             )}
