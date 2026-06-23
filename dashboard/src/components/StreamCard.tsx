@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Recording } from '../utils/dataFetcher';
 import { fmtDate, fmtRelative, copyText } from '../utils/format';
+import { loadPosition } from '../utils/history';
 
 // FEATURE: Netflix-style hover preview. When the user hovers a card that has
 // a storyboard, animate through 6 evenly-spaced sprite tiles to give a
@@ -60,6 +61,15 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
   const isHD = /1080|1440|2160|4k/i.test(rec.resolution);
   const spriteStyle = useSpritePreview(rec, hover);
 
+  // FEATURE: watched-progress overlay (YouTube-style). Reads the user's saved
+  // playback position from localStorage. If they got past 95%, mark as fully
+  // watched (with a checkmark badge); else show a red progress bar.
+  const saved = loadPosition(rec.videoId);
+  const progressPct = saved && saved.d > 0
+    ? Math.min(100, Math.max(0, (saved.t / saved.d) * 100))
+    : 0;
+  const fullyWatched = progressPct >= 95;
+
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}`;
@@ -95,6 +105,18 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
           )}
           {isHD && (
             <span className="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--red)', color: '#fff' }}>HD</span>
+          )}
+          {/* FEATURE: watched-progress bar (YouTube-style) */}
+          {progressPct > 0 && !fullyWatched && (
+            <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: 'rgba(255,255,255,.18)' }}>
+              <div className="h-full" style={{ width: `${progressPct}%`, background: 'var(--red)' }} />
+            </div>
+          )}
+          {fullyWatched && (
+            <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/80 text-white">
+              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              Watched
+            </span>
           )}
         </div>
         <div className="flex-1 min-w-0 flex flex-col py-1">
@@ -176,6 +198,19 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
         {rec.durationFmt && (
           <span className="absolute bottom-2 right-2 bg-black/85 text-white text-[10px] font-bold px-1.5 py-0.5 rounded tabular-nums">
             {rec.durationFmt}
+          </span>
+        )}
+
+        {/* FEATURE: watched-progress bar (YouTube-style) — grid card */}
+        {progressPct > 0 && !fullyWatched && (
+          <div className="absolute bottom-0 left-0 right-0 h-[3px] z-10" style={{ background: 'rgba(255,255,255,.18)' }}>
+            <div className="h-full" style={{ width: `${progressPct}%`, background: 'var(--red)' }} />
+          </div>
+        )}
+        {fullyWatched && (
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/80 text-white z-10">
+            <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            Watched
           </span>
         )}
 

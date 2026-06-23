@@ -215,6 +215,26 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     if (p) { p.currentTime = s; p.play().catch(() => {}); }
   }, []);
 
+  // FEATURE: persist playback speed across videos (Netflix/YouTube-style).
+  // Read from localStorage once the player is ready; write back whenever
+  // the user changes it via Vidstack's settings menu.
+  useEffect(() => {
+    if (!ready) return;
+    const p = playerRef.current;
+    if (!p) return;
+    try {
+      const saved = parseFloat(localStorage.getItem('mla_pb_rate_v1') || '1');
+      if (saved && saved >= 0.25 && saved <= 4 && Math.abs((p.playbackRate || 1) - saved) > 0.01) {
+        p.playbackRate = saved;
+      }
+    } catch { /* ignore */ }
+    const onRate = () => {
+      try { localStorage.setItem('mla_pb_rate_v1', String(p.playbackRate || 1)); } catch { /* quota */ }
+    };
+    p.addEventListener('rate-change', onRate);
+    return () => { p.removeEventListener('rate-change', onRate); };
+  }, [ready, rec.videoId]);
+
   // ── Resume from URL ?t= or saved position ────────────────────────────────
   const [resumeShown, setResumeShown] = useState(false);
   const [resumeAt, setResumeAt] = useState<number | null>(null);
@@ -264,6 +284,22 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   const activeSrc = sources[activeIdx];
   const sl = shareLinks(`${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}`, rec.title);
 
+  // FEATURE: Theatre mode (premium). Hides the sidebar so the player gets
+  // the full width — for users who want a more cinematic experience.
+  // Toggled with 'T' key or the button in the top-right of the player.
+  // Persists across navigation in localStorage.
+  const [theatre, setTheatre] = useState(() => localStorage.getItem('mla_theatre_v1') === '1');
+  useEffect(() => { localStorage.setItem('mla_theatre_v1', theatre ? '1' : '0'); }, [theatre]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (e.key === 't' || e.key === 'T') { setTheatre(v => !v); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)', color: 'var(--tx)' }}>
       {/* ───── Top bar ───── */}
@@ -282,6 +318,23 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 <path strokeLinecap="round" d="M9.5 9a2.5 2.5 0 015 0c0 1.5-1.5 2-2.5 3v1" />
                 <circle cx="12" cy="17" r=".7" fill="currentColor" />
               </svg>
+            </button>
+            {/* FEATURE: Theatre-mode toggle. Premium cinematic view. */}
+            <button
+              onClick={() => setTheatre(v => !v)}
+              className="btn-ghost btn !p-2 hidden xl:inline-flex"
+              title={theatre ? 'Exit theatre mode (T)' : 'Theatre mode (T)'}
+              aria-pressed={theatre}
+            >
+              {theatre ? (
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4M9 9H4m11 0V4m0 5h5M9 15v5m0-5H4m11 0v5m0-5h5" />
+                </svg>
+              ) : (
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M16 4h4v4M4 16v4h4M16 20h4v-4" />
+                </svg>
+              )}
             </button>
             <button onClick={onTheme} className="btn-ghost btn !p-2" title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
               {theme === 'dark' ? (
@@ -414,7 +467,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
         </div>
 
         {/* ── Right sidebar ── */}
-        <aside className="xl:w-[400px] shrink-0 px-4 sm:px-6 xl:px-4 pb-6 pt-2 xl:pt-4 border-l-0 xl:border-l space-y-3" style={{ borderColor: 'var(--bd)' }}>
+        <aside className={`${theatre ? 'xl:hidden' : 'xl:w-[400px]'} shrink-0 px-4 sm:px-6 xl:px-4 pb-6 pt-2 xl:pt-4 border-l-0 xl:border-l space-y-3`} style={{ borderColor: 'var(--bd)' }}>
 
           {/* Sources */}
           {sources.length > 0 && (
@@ -520,6 +573,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 ['Fullscreen',         'F'],
                 ['Picture-in-Picture', 'I'],
                 ['Switch source',      '0–5'],
+                ['Theatre mode',       'T'],
                 ['Close player',       'Esc'],
                 ['Show this help',     '?'],
               ].map(([l, k]) => (
