@@ -397,7 +397,8 @@ github_api_write() {
     local message="${3:-📡 Auto-update: $filepath [$(now_pkt)]}"
     local repo="${GITHUB_REPOSITORY:-}"
     local token="${GH_PAT:-}"
-    
+    local max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}"
+
     if [[ -z "$repo" ]]; then
         log_error "GITHUB_REPOSITORY not set"
         return 1
@@ -406,112 +407,99 @@ github_api_write() {
         log_error "GH_PAT not set"
         return 1
     fi
-    
-    # Get current file SHA (required for updates)
-    local sha=""
-    local existing
-    existing=$(curl -s \
-        -H "Authorization: token $token" \
-        -H "Accept: application/vnd.github.v3+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
-    sha=$(echo "$existing" | jq -r '.sha // empty' 2>/dev/null)
-    
-    # ── Step 1: Write raw content to a temp file ──
-    # Using a temp file avoids shell variable corruption, pipe issues, and
-    # CRLF injection that caused the persistent "Problems parsing JSON" error.
-    local tmp_content tmp_b64 tmp_payload
+
+    # ── Encode content once, outside the retry loop ──
+    local tmp_content tmp_b64
     tmp_content=$(mktemp /tmp/gh_content_XXXX)
     tmp_b64=$(mktemp /tmp/gh_b64_XXXX)
-    tmp_payload=$(mktemp /tmp/gh_payload_XXXX)
-    
-    # Write content — use printf to avoid echo adding newlines
     printf '%s' "$content" > "$tmp_content"
-    
-    # ── Step 2: Base64 encode — strip ALL whitespace from output ──
     base64 -w 0 < "$tmp_content" | tr -d '\r\n\t ' > "$tmp_b64"
     rm -f "$tmp_content"
-    
-    # Check base64 file is not empty
+
     if [[ ! -s "$tmp_b64" ]]; then
         log_error "Base64 encoding produced empty output for $filepath"
-        rm -f "$tmp_b64" "$tmp_payload"
+        rm -f "$tmp_b64"
         return 1
     fi
-    
-    # ── Step 3: Build JSON payload with jq → write directly to file ──
-    # Use --rawfile to read base64 from file directly, avoiding shell variable corruption
-    if [[ -n "$sha" ]]; then
-        jq -n --compact-output \
-            --arg msg     "$message" \
-            --rawfile b64 "$tmp_b64" \
-            --arg sha     "$sha" \
-            '{message: $msg, content: ($b64 | gsub("\\s"; "")), sha: $sha}' > "$tmp_payload" 2>/dev/null
-    else
-        jq -n --compact-output \
-            --arg msg     "$message" \
-            --rawfile b64 "$tmp_b64" \
-            '{message: $msg, content: ($b64 | gsub("\\s"; ""))}' > "$tmp_payload" 2>/dev/null
-    fi
-    rm -f "$tmp_b64"
 
-    # Validate JSON was produced
-    if [[ ! -s "$tmp_payload" ]]; then
-        log_error "jq failed to build payload for $filepath"
-        rm -f "$tmp_payload"
-        return 1
-    fi
-    
-    if ! jq -e . "$tmp_payload" >/dev/null 2>&1; then
-        log_error "Payload is invalid JSON for $filepath"
-        rm -f "$tmp_payload"
-        return 1
-    fi
-    
-    local payload_size
-    payload_size=$(wc -c < "$tmp_payload" | tr -d ' ')
-    log_debug "  Payload size: ${payload_size} bytes for $filepath"
-    
-    # ── Step 4: Send to GitHub API ──
-    # Use -d @file (NOT --data-binary) to let curl handle the file reading
-    local response http_code
-    local tmp_response
-    tmp_response=$(mktemp /tmp/gh_resp_XXXX)
-    
-    http_code=$(curl -s -o "$tmp_response" -w '%{http_code}' \
-        -X PUT \
-        -H "Authorization: token $token" \
-        -H "Accept: application/vnd.github.v3+json" \
-        -H "Content-Type: application/json; charset=utf-8" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/${repo}/contents/${filepath}" \
-        -d "@${tmp_payload}" 2>/dev/null)
-    
-    response=$(cat "$tmp_response" 2>/dev/null)
-    rm -f "$tmp_payload" "$tmp_response"
-    
-    local commit_sha
-    commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)
-    
-    if [[ -n "$commit_sha" ]]; then
-        log_ok "File written to GitHub: $filepath (commit: ${commit_sha:0:7})"
-        return 0
-    else
-        local err_msg
-        err_msg=$(echo "$response" | jq -r '.message // empty' 2>/dev/null)
-        log_error "Failed to write file to GitHub: $filepath"
-        log_error "  HTTP status: $http_code"
-        if [[ -n "$err_msg" ]]; then
-            log_error "  GitHub API error: $err_msg"
-            if [[ "$err_msg" == *"not accessible"* ]] || [[ "$err_msg" == *"Resource not accessible"* ]]; then
-                log_error "  FIX: Your GH_PAT needs 'Contents: Read and write' permission"
-            fi
+    # ── Retry loop: fetch SHA → PUT → on 409 (conflict), sleep + retry ──
+    local attempt=1
+    while (( attempt <= max_attempts )); do
+        local sha="" existing tmp_payload tmp_response
+        existing=$(curl -s \
+            -H "Authorization: token $token" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
+        sha=$(echo "$existing" | jq -r '.sha // empty' 2>/dev/null)
+
+        tmp_payload=$(mktemp /tmp/gh_payload_XXXX)
+        if [[ -n "$sha" ]]; then
+            jq -n --compact-output \
+                --arg msg     "$message" \
+                --rawfile b64 "$tmp_b64" \
+                --arg sha     "$sha" \
+                '{message: $msg, content: ($b64 | gsub("\\s"; "")), sha: $sha}' \
+                > "$tmp_payload" 2>/dev/null
+        else
+            jq -n --compact-output \
+                --arg msg     "$message" \
+                --rawfile b64 "$tmp_b64" \
+                '{message: $msg, content: ($b64 | gsub("\\s"; ""))}' \
+                > "$tmp_payload" 2>/dev/null
         fi
-        # Dump first 500 chars of response for debugging
-        log_debug "  Response (first 500 chars): ${response:0:500}"
+
+        if [[ ! -s "$tmp_payload" ]] || ! jq -e . "$tmp_payload" >/dev/null 2>&1; then
+            log_error "jq failed to build valid JSON for $filepath (attempt $attempt)"
+            rm -f "$tmp_payload"
+            sleep $(( attempt * 2 ))
+            (( attempt++ ))
+            continue
+        fi
+
+        tmp_response=$(mktemp /tmp/gh_resp_XXXX)
+        local http_code response
+        http_code=$(curl -s -o "$tmp_response" -w '%{http_code}' \
+            -X PUT \
+            -H "Authorization: token $token" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${repo}/contents/${filepath}" \
+            -d "@${tmp_payload}" 2>/dev/null)
+        response=$(cat "$tmp_response" 2>/dev/null)
+        rm -f "$tmp_payload" "$tmp_response"
+
+        if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]]; then
+            local commit_sha
+            commit_sha=$(echo "$response" | jq -r '.commit.sha // empty' 2>/dev/null)
+            log_ok "File written to GitHub: $filepath (commit: ${commit_sha:0:7}) [attempt $attempt]"
+            rm -f "$tmp_b64"
+            return 0
+        fi
+
+        # 409 Conflict (CAS), 422 (no-op or conflict), or 5xx → backoff + retry
+        if [[ "$http_code" == "409" ]] || [[ "$http_code" == "422" ]] || [[ "$http_code" =~ ^5 ]]; then
+            local backoff=$(( attempt * attempt ))   # 1, 4, 9, 16, 25 s
+            log_warn "GitHub returned ${http_code} for $filepath — retry $((attempt+1))/${max_attempts} in ${backoff}s"
+            sleep "$backoff"
+            (( attempt++ ))
+            continue
+        fi
+
+        # Anything else (400, 401, 403, 404) is fatal — don't retry
+        local err_msg
+        err_msg=$(echo "$response" | jq -r '.message // .error // "unknown"' 2>/dev/null)
+        log_error "GitHub write failed (${http_code}): ${err_msg}"
+        rm -f "$tmp_b64"
         return 1
-    fi
+    done
+
+    log_error "GitHub write exhausted ${max_attempts} retries for $filepath"
+    rm -f "$tmp_b64"
+    return 1
 }
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  NETWORK UTILITIES
