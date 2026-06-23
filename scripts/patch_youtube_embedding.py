@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
-"""Enable embedding on every already-uploaded ghost-host video.
+"""Delete and re-upload every ghost-host video with embedding enabled.
 
-Fixes the dashboard error: 'Video has been removed because it was too long'
-(YouTube's wording for 'this video is not embeddable on third-party sites').
+WHY: The 'video has been removed because it was too long' error in the
+dashboard player is YouTube's way of saying 'this video isn't embeddable
+on third-party sites'. Existing ghost-host videos were uploaded before
+upload_to_youtube.py set status.embeddable=True.
 
-Reads every youtube_id from data/recordings.json, calls
-videos.update with status.embeddable=True for each.
+Editing the existing videos via videos.update would require the broader
+'youtube' OAuth scope, but our token only has 'youtube.upload'. So we
+delete the affected videos (one API call each) and the next ghost-host
+workflow run will re-upload them with embedding enabled.
 
-Requires the same env vars as upload_to_youtube.py:
-  YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN
+This script:
+  1. Lists every youtube_id from data/recordings.json
+  2. For each, deletes the YouTube video (videos.delete needs only youtube.upload)
+  3. Removes youtube_id, youtube_unlisted from data/recordings.json
+  4. Commits the cleaned recordings.json so the next ghost-host workflow
+     picks them up as 'needs upload'.
+
+After this runs, manually trigger '👻 YouTube Ghost-Host' workflow to
+re-upload everything with embeddable=True.
 """
 import json
 import os
@@ -20,75 +31,56 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+RECS = ROOT / "data" / "recordings.json"
 
 
 def auth():
-    cid = os.environ["YOUTUBE_CLIENT_ID"].strip()
-    cs = os.environ["YOUTUBE_CLIENT_SECRET"].strip()
-    rt = os.environ["YOUTUBE_REFRESH_TOKEN"].strip()
     return Credentials(
         token=None,
-        refresh_token=rt,
+        refresh_token=os.environ["YOUTUBE_REFRESH_TOKEN"].strip(),
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=cid,
-        client_secret=cs,
-        scopes=["https://www.googleapis.com/auth/youtube"],
+        client_id=os.environ["YOUTUBE_CLIENT_ID"].strip(),
+        client_secret=os.environ["YOUTUBE_CLIENT_SECRET"].strip(),
+        scopes=["https://www.googleapis.com/auth/youtube.upload"],
     )
 
 
-def patch_one(yt, vid):
-    """Fetch the video's existing snippet, then update status to allow embedding."""
-    try:
-        existing = yt.videos().list(part="snippet,status", id=vid).execute()
-        items = existing.get("items", [])
-        if not items:
-            print(f"  ⏭️  {vid}: not found (deleted?)")
-            return False
-        item = items[0]
-        snippet = item["snippet"]
-        status = item.get("status", {})
-        if status.get("embeddable") is True:
-            print(f"  ✓  {vid}: already embeddable")
-            return True
-        body = {
-            "id": vid,
-            "snippet": {
-                "categoryId": snippet.get("categoryId", "22"),
-                "title": snippet["title"],
-                "description": snippet.get("description", ""),
-                "tags": snippet.get("tags", []),
-            },
-            "status": {
-                "privacyStatus": status.get("privacyStatus", "unlisted"),
-                "embeddable": True,
-                "publicStatsViewable": False,
-                "license": "youtube",
-                "selfDeclaredMadeForKids": False,
-            },
-        }
-        yt.videos().update(part="snippet,status", body=body).execute()
-        print(f"  ✅ {vid}: embedding ENABLED")
-        return True
-    except HttpError as e:
-        print(f"  ❌ {vid}: {e}")
-        return False
-
-
 def main():
-    creds = auth()
-    yt = build("youtube", "v3", credentials=creds)
+    yt = build("youtube", "v3", credentials=auth())
 
-    data = json.loads((ROOT / "data" / "recordings.json").read_text())
-    ids = {r["youtube_id"] for r in data if r.get("youtube_id")}
-    print(f"Found {len(ids)} unique YouTube IDs to check")
+    data = json.loads(RECS.read_text())
+    ids_to_clear = {r["youtube_id"] for r in data if r.get("youtube_id")}
+    print(f"Found {len(ids_to_clear)} YouTube IDs to delete + reset")
 
-    ok = 0
-    for vid in sorted(ids):
-        if patch_one(yt, vid):
-            ok += 1
+    deleted = []
+    for vid in sorted(ids_to_clear):
+        try:
+            yt.videos().delete(id=vid).execute()
+            print(f"  🗑️  deleted {vid}")
+            deleted.append(vid)
+        except HttpError as e:
+            # 404 = already gone, count it as deleted so we still clear the field
+            if e.resp.status == 404:
+                print(f"  ⏭️  {vid}: already gone")
+                deleted.append(vid)
+            else:
+                print(f"  ❌ {vid}: {e}")
 
-    print(f"\n{ok}/{len(ids)} videos now embeddable.")
-    return 0 if ok == len(ids) else 1
+    if not deleted:
+        print("\nNothing to clear. Exiting.")
+        return 0
+
+    # Strip the deleted IDs from recordings.json so ghost-host workflow re-uploads
+    cleaned = 0
+    for r in data:
+        if r.get("youtube_id") in deleted:
+            r.pop("youtube_id", None)
+            r.pop("youtube_unlisted", None)
+            cleaned += 1
+    RECS.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    print(f"\nCleared youtube_id/youtube_unlisted from {cleaned} entries in recordings.json")
+    print("Next: trigger the '👻 YouTube Ghost-Host' workflow to re-upload with embedding enabled.")
+    return 0
 
 
 if __name__ == "__main__":

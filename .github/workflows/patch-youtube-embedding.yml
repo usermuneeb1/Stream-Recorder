@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   patch:
@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Google API client
         run: pip3 install --quiet google-auth google-auth-oauthlib google-api-python-client
@@ -23,9 +25,32 @@ jobs:
           YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
         run: python3 scripts/youtube_extract_creds.py
 
-      - name: Enable embedding on every ghost-host video
+      - name: Delete non-embeddable videos + clear from recordings.json
         env:
           YOUTUBE_CLIENT_ID: ${{ steps.creds.outputs.client_id }}
           YOUTUBE_CLIENT_SECRET: ${{ steps.creds.outputs.client_secret }}
           YOUTUBE_REFRESH_TOKEN: ${{ steps.creds.outputs.refresh_token }}
         run: python3 scripts/patch_youtube_embedding.py
+
+      - name: Commit cleaned recordings.json
+        run: |
+          git config user.name  "Stream Recorder Bot"
+          git config user.email "stream-recorder-bot@users.noreply.github.com"
+          if ! git diff --quiet -- data/recordings.json; then
+            git add data/recordings.json
+            git commit -m "🔧 Reset youtube_id/youtube_unlisted for non-embeddable videos"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+
+      - name: Trigger ghost-host workflow to re-upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/youtube-ghost-host.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"skip_morph":"true"}}'
+          echo "ghost-host workflow triggered"
