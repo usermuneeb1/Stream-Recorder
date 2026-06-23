@@ -158,6 +158,12 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     const p = playerRef.current;
     if (!p) return;
     const onTime = () => setT(p.currentTime || 0);
+    // FIX (preparing-stream too slow): mark ready as SOON as the player has
+    // *any* signal that loading is making progress, not only when it can fully
+    // play. `loaded-metadata` fires within ~100-500ms (just headers + moov);
+    // `loaded-data` fires when the first frame is decoded. Either is enough
+    // to swap our black "Preparing stream" overlay for the real player UI,
+    // which itself shows Vidstack's native loading spinner (much nicer).
     const onGo = () => { if (!played.current) { played.current = true; setReady(true); } };
     const onErr = () => {
       // FIX #2 — previously read `errorFallbackIdx` from a stale closure
@@ -191,14 +197,25 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
       });
     };
     p.addEventListener('time-update', onTime);
-    p.addEventListener('playing', onGo);
-    p.addEventListener('can-play', onGo);
+    p.addEventListener('loaded-metadata', onGo);    // ~100-500ms after src set
+    p.addEventListener('loaded-data', onGo);        // first frame decoded
+    p.addEventListener('playing', onGo);            // actual playback started
+    p.addEventListener('can-play', onGo);           // fully buffered enough
     p.addEventListener('error', onErr);
+    // Hard timeout: if NOTHING fired in 4 seconds, drop the black overlay
+    // anyway. The player's own loading indicator will keep showing until the
+    // real video is ready, so the user always sees forward progress.
+    const forceShow = window.setTimeout(() => {
+      if (!played.current) { played.current = true; setReady(true); }
+    }, 4000);
     return () => {
       p.removeEventListener('time-update', onTime);
+      p.removeEventListener('loaded-metadata', onGo);
+      p.removeEventListener('loaded-data', onGo);
       p.removeEventListener('playing', onGo);
       p.removeEventListener('can-play', onGo);
       p.removeEventListener('error', onErr);
+      clearTimeout(forceShow);
     };
   }, [si, autoIdx, sources, errorFallbackIdx, onToast]);
 
@@ -349,7 +366,9 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
         {/* ── Left: player + meta + comments ── */}
         <div className="flex-1 min-w-0">
           <div className="xl:p-4 xl:pb-0 relative">
-            <style>{`media-player [data-media-buffering-indicator],media-player [part~="buffering-indicator"]{display:none!important}`}</style>
+            {/* (Vidstack's native buffering indicator is allowed to show now —
+                gives the user real-time feedback while the video buffers,
+                instead of a static "Preparing stream" overlay.) */}
             {activeSrc?.url && (
               <MediaPlayer
                 key={activeSrc.url}

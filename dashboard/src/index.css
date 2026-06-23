@@ -221,8 +221,9 @@ media-player {
   --media-brand: var(--red);
   --media-focus-ring-color: var(--red);
 }
-media-player [data-media-buffering-indicator],
-media-player [part~="buffering-indicator"] { display: none !important; }
+/* (Vidstack's native buffering indicator is intentionally allowed to show —
+   it gives the user real-time feedback while video data buffers, and looks
+   far more premium than a static "Preparing stream" overlay.) */
 
 /* Hide spinbox arrows on time-jump input */
 input[type=number]::-webkit-inner-spin-button,
