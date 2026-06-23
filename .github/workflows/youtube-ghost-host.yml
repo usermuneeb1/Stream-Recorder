@@ -107,20 +107,65 @@ jobs:
           print(f'Found {len(todo)} recordings to ghost-host')
           skip = os.environ.get('SKIP_MORPH', 'true') == 'true'
 
+          import urllib.request, urllib.error
+          def resolve_archive_mp4(rec):
+              # Prefer the direct mp4 URLs that update-links.sh writes.
+              for key in ('archive_node', 'archive_direct'):
+                  u = rec.get(key)
+                  if u and u.endswith('.mp4'):
+                      return u
+              # Fall back to the /details/<id> page → list files via the
+              # public metadata API → pick the biggest .mp4 (the original).
+              link = rec.get('archive_link', '')
+              m = link.rstrip('/').rsplit('/', 1)[-1] if '/details/' in link else None
+              if not m:
+                  return ''
+              try:
+                  with urllib.request.urlopen(f'https://archive.org/metadata/{m}', timeout=30) as r:
+                      meta = json.loads(r.read())
+              except Exception as e:
+                  print(f'   metadata API failed: {e}')
+                  return ''
+              files = meta.get('files', [])
+              mp4s = [f for f in files if f.get('name', '').lower().endswith('.mp4')]
+              if not mp4s:
+                  return ''
+              # The biggest mp4 is virtually always the original (not a
+              # derivative). 'size' is a string in the metadata API.
+              mp4s.sort(key=lambda f: int(f.get('size', 0) or 0), reverse=True)
+              return f\"https://archive.org/download/{m}/{mp4s[0]['name']}\"
+
           for i, rec in enumerate(todo):
               title = rec.get('title', 'Recording')
               vid = rec.get('video_id', '')
-              url = rec.get('archive_node') or rec.get('archive_direct') or ''
-              if not url and rec.get('archive_link'):
-                  url = rec['archive_link'].replace('/details/', '/download/') + '/'
+              url = resolve_archive_mp4(rec)
 
               print(f'\n{\"=\"*60}')
               print(f'[{i+1}/{len(todo)}] {title}')
+              if not url:
+                  print('   Could not resolve a direct mp4 URL — skipping'); continue
+              print(f'   URL: {url[:120]}')
               print(f'   Downloading...')
-              subprocess.run(['curl', '-L', '--retry', '3', '--max-time', '3600', '-o', '/tmp/input.mp4', url], capture_output=True)
+              dl = subprocess.run(
+                  ['curl', '-L', '--fail', '--retry', '3', '--retry-delay', '5',
+                   '--max-time', '3600', '-o', '/tmp/input.mp4', url],
+                  capture_output=True, text=True,
+              )
+              if dl.returncode != 0:
+                  print(f'   curl failed (exit {dl.returncode}): {(dl.stderr or \"\")[:200]}')
+                  continue
 
-              if not os.path.exists('/tmp/input.mp4') or os.path.getsize('/tmp/input.mp4') < 10000:
-                  print('   Download failed'); continue
+              # Require ≥10 MB and a real mp4 magic header — guards against
+              # accidentally downloading an HTML error page or directory
+              # listing that happens to be > 10 KB.
+              if not os.path.exists('/tmp/input.mp4') or os.path.getsize('/tmp/input.mp4') < 10_000_000:
+                  print(f'   Download too small ({os.path.getsize(\"/tmp/input.mp4\") if os.path.exists(\"/tmp/input.mp4\") else 0} bytes) — skipping'); continue
+              with open('/tmp/input.mp4', 'rb') as f:
+                  head = f.read(16)
+              # mp4/mov files have 'ftyp' at offset 4
+              if b'ftyp' not in head:
+                  print(f'   Not a valid mp4 (first bytes: {head[:16].hex()}) — skipping')
+                  continue
 
               print(f'   Downloaded: {os.path.getsize(\"/tmp/input.mp4\")/1024/1024:.0f} MB')
 
