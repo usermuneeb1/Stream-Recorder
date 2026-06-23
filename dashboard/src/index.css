@@ -349,23 +349,23 @@ media-player {
   --media-time-color: rgba(255, 255, 255, .85);
 }
 
-/* FIX (GHOST splash): hide YouTube's branded play-button overlay /
-   "Watch on YouTube" badge / channel art that the embedded iframe
-   shows before the first frame plays. The Vidstack poster covers the
-   video area; this rule keeps the iframe black underneath so YouTube's
-   logo never flashes through during the iframe's first paint. */
+/* FIX (GHOST splash): the YouTube embed shows its play-button logo +
+   "Watch on YouTube" badge for ~1-2s before our autoplay kicks in.
+   Aggressive masking: keep the iframe fully invisible until it's actually
+   playing video, then fade in fast. Combined with the <MediaPlayer poster>
+   image, the user only ever sees our own thumbnail → black → first frame. */
 media-player iframe[src*="youtube.com"],
 media-player iframe[src*="youtube-nocookie.com"] {
   background: #000;
 }
-/* When the player has not started yet, fade the iframe in slowly so any
-   branding flash during initialisation is masked by the poster image. */
 .ghost-mask iframe {
-  opacity: 0;
-  animation: ghost-fade-in 1.2s ease-in 0.6s forwards;
+  opacity: 0 !important;
+  pointer-events: none;
 }
-@keyframes ghost-fade-in {
-  to { opacity: 1; }
+.ghost-mask.ghost-ready iframe {
+  opacity: 1 !important;
+  pointer-events: auto;
+  transition: opacity 250ms ease-in;
 }
 
 /* Premium glass on dropdowns, palettes */

@@ -76,20 +76,26 @@ export function StatsBar({ recs }: { recs: Recording[] }) {
 
       <div className="flex flex-col gap-5 mb-7 relative">
         <div>
-          <div className="flex items-center gap-2 mb-3">
+          {/* Premium eyebrow: glass pill + animated live dot + lantern icon */}
+          <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full border" style={{ borderColor: 'var(--bd2)', background: 'rgba(239,68,68,.06)' }}>
             <span className="relative inline-block w-2 h-2">
               <span className="absolute inset-0 rounded-full" style={{ background: 'var(--red)' }} />
               <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'var(--red)', opacity: 0.6 }} />
             </span>
-            <p className="text-[11px] font-bold uppercase tracking-[.22em]" style={{ color: 'var(--red)' }}>
-              The Muslim Lantern · Stream Archive
+            <svg className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C9 2 8 4 8 6c0 1.5 1 2.5 1 4v1H7v2c0 4 1 8 5 8s5-4 5-8v-2h-2v-1c0-1.5 1-2.5 1-4 0-2-1-4-4-4z" opacity=".9"/>
+              <circle cx="12" cy="13" r="2" fill="#fff7d6"/>
+            </svg>
+            <p className="text-[10.5px] font-bold uppercase tracking-[.22em]" style={{ color: 'var(--red)' }}>
+              The Muslim Lantern Archive
             </p>
           </div>
-          <h1 className="font-display text-3xl sm:text-[44px] font-bold leading-[1.05]">
-            Preserving <span className="text-gradient-red">daʿwah</span>,<br />one stream at a time.
+          <h1 className="font-display text-[34px] sm:text-[56px] xl:text-[64px] font-extrabold leading-[1.02] tracking-[-0.025em]">
+            <span className="block">Preserving <span className="text-gradient-red">daʿwah</span>,</span>
+            <span className="block opacity-95" style={{ color: 'var(--tx)' }}>one stream at a time.</span>
           </h1>
-          <p className="text-sm sm:text-[15px] mt-3 max-w-xl leading-relaxed" style={{ color: 'var(--tx2)' }}>
-            Every live broadcast, kept forever — searchable, free to watch, always available.
+          <p className="text-[14px] sm:text-[16px] mt-4 max-w-xl leading-relaxed font-medium" style={{ color: 'var(--tx2)' }}>
+            Every live broadcast, kept forever — searchable, free to watch, always available across <span style={{ color: 'var(--tx)' }}>six redundant clouds</span>.
           </p>
         </div>
       </div>
