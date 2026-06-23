@@ -1,39 +1,44 @@
 /**
- * 🚀 Muslim Lantern Archive — Service Worker v4
+ * 🚀 Muslim Lantern Archive — Service Worker v6 (cache-purge edition)
  *
- * Strategy:
- *   1. Network-first for the HTML shell (so updates land instantly).
- *   2. Stale-while-revalidate for fonts and immutable build assets.
- *   3. Cache-first for the static logo / thumbnail images.
- *   4. NEVER intercept video (range requests + Cache API don't play well).
- *
- * Any failure falls straight through to the network — the page works the
- * same with or without this worker installed.
+ * KEY CHANGES from v5:
+ *   • Version bumped to mla-v6 — old caches from v4/v5 are wiped on activate
+ *   • The HTML shell is now network-only (no fallback to cached HTML), so
+ *     a user with a stale cached index.html can never get pinned to an old
+ *     deploy's asset hashes
+ *   • Self-uninstall on aggressive-purge mode: if window posts {clear:true},
+ *     wipe everything and unregister
  */
 
-// FIX #21 — version stamp includes a build timestamp so each new deploy
-// instantly invalidates the previous shell cache. Without this, a user on
-// the old SW could see an old index.html that references hashed asset
-// filenames no longer on the server → white screen.
-const BUILD_ID = '__BUILD_ID__'; // replaced at build time; falls back to literal in dev
-const VERSION = `mla-v5-${BUILD_ID === '__BUILD_ID__' ? Date.now() : BUILD_ID}`;
+const BUILD_ID = '__BUILD_ID__'; // replaced at build time
+const VERSION = `mla-v6-${BUILD_ID === '__BUILD_ID__' ? Date.now() : BUILD_ID}`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 
-const SHELL_URLS = ['/', '/index.html', '/logo.png', '/logo-vertical.pn.jpg', '/site.webmanifest'];
-
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(SHELL_CACHE).then(c => c.addAll(SHELL_URLS)).catch(() => {}));
+  // No pre-cache of shell. Always go network-first below.
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => !k.startsWith(VERSION)).map(k => caches.delete(k))
-    )),
-  );
-  self.clients.claim();
+  e.waitUntil((async () => {
+    // Delete EVERY old cache (not just non-matching this version). Belt-and-
+    // braces: clears the v4/v5 caches that pinned users to old asset hashes.
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => !k.startsWith(VERSION)).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('message', (e) => {
+  // Window can post { clear: true } to nuke all caches and unregister.
+  if (e.data && e.data.clear) {
+    e.waitUntil((async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+      await self.registration.unregister();
+    })());
+  }
 });
 
 function isVideo(req) {
@@ -58,19 +63,17 @@ self.addEventListener('fetch', (e) => {
   // 1. NEVER intercept video bytes
   if (isVideo(req)) return;
 
-  // 2. HTML shell — network-first, fall back to cache
+  // 2. HTML — NETWORK-ONLY (don't fall back to cached HTML; we'd rather show
+  //    a network-error than serve a stale shell pointing at deleted asset
+  //    hashes). The browser's own cache + Vercel's no-cache headers handle
+  //    offline gracefully.
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
-    e.respondWith(
-      fetch(req).then(r => {
-        const copy = r.clone();
-        caches.open(SHELL_CACHE).then(c => c.put('/', copy)).catch(() => {});
-        return r;
-      }).catch(() => caches.match('/') || caches.match(req)),
-    );
+    e.respondWith(fetch(req));
     return;
   }
 
-  // 3. Immutable build assets — stale-while-revalidate
+  // 3. Immutable build assets — stale-while-revalidate. These are content-
+  //    hashed so any new asset = new filename = no collision.
   if (isImmutableAsset(url) || isFont(url)) {
     e.respondWith(
       caches.open(ASSET_CACHE).then(async cache => {
