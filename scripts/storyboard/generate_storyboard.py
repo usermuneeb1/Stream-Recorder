@@ -43,6 +43,13 @@ from typing import Optional
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 RECS = ROOT / "data" / "recordings.json"
+# Sprites + VTTs live in the dashboard's public folder so Vercel serves
+# them statically from its edge CDN. No third-party host needed — Catbox
+# and 0x0.st both stopped accepting uploads from GitHub Actions IPs.
+STORYBOARDS_DIR = ROOT / "dashboard" / "public" / "storyboards"
+# jsDelivr serves any file in the repo for free with global CDN caching.
+# Use this as the public URL so dev environments work without Vercel too.
+JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main/dashboard/public/storyboards"
 
 MAX_ITEMS      = int(os.environ.get("STORYBOARD_MAX_ITEMS", "3"))
 # 30s interval (was 10s) — 3× fewer frames means 3× faster ffmpeg pass.
@@ -273,26 +280,21 @@ def main() -> int:
             duration = int(rec.get("duration_sec", 0) or 0)
             log(f"── {vid} — {rec.get('title','')[:60]} ({duration//60} min)")
 
-            sprite_path = tmp / f"{vid}.jpg"
+            # Generate sprite directly into the public storyboards dir.
+            STORYBOARDS_DIR.mkdir(parents=True, exist_ok=True)
+            sprite_path = STORYBOARDS_DIR / f"{vid}.jpg"
             meta = build_sprite(src, duration, sprite_path)
             if not meta:
                 log("  ✗ sprite generation failed — skipping")
                 continue
+            sprite_url = f"{JSDELIVR_BASE}/{vid}.jpg"
+            log(f"  ✓ sprite saved:    {sprite_path.relative_to(ROOT)}")
 
-            sprite_url = upload_anywhere(sprite_path)
-            if not sprite_url:
-                log("  ✗ sprite upload failed on every host — skipping")
-                continue
-            log(f"  ✓ sprite uploaded: {sprite_url}")
-
+            vtt_path = STORYBOARDS_DIR / f"{vid}.vtt"
             vtt_text = build_vtt(meta, sprite_url, duration)
-            vtt_path = tmp / f"{vid}.vtt"
             vtt_path.write_text(vtt_text)
-            vtt_url = upload_anywhere(vtt_path)
-            if not vtt_url:
-                log("  ✗ vtt upload failed on every host — skipping")
-                continue
-            log(f"  ✓ vtt uploaded:    {vtt_url}")
+            vtt_url = f"{JSDELIVR_BASE}/{vid}.vtt"
+            log(f"  ✓ vtt saved:       {vtt_path.relative_to(ROOT)}")
 
             rec["storyboard"] = {
                 "url": sprite_url,
