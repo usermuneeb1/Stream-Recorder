@@ -21,11 +21,22 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
     copyText(url).then(ok => onToast?.(ok ? 'Link copied!' : 'Copy failed'));
   };
 
+  // FIX #24 — outer was <button>, but it contains another <button> (copy
+  // link) → invalid HTML. Replaced with a div+role=button so the inner
+  // copy button remains a real interactive element with its own a11y
+  // tree. Keyboard activation (Enter/Space) is preserved manually.
+  const cardKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+  };
+
   if (view === 'list') {
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onClick}
-        className="w-full flex items-stretch gap-4 sm:gap-5 p-3 rounded-xl border text-left fade-up group transition-all hover:border-[var(--bd3)] hover:bg-[var(--bg2)] ring-focus"
+        onKeyDown={cardKeyDown}
+        className="w-full flex items-stretch gap-4 sm:gap-5 p-3 rounded-xl border text-left fade-up group transition-all hover:border-[var(--bd3)] hover:bg-[var(--bg2)] ring-focus cursor-pointer"
         style={{ animationDelay: `${delay}ms`, borderColor: 'var(--bd)' }}
       >
         <div className="relative w-48 sm:w-56 shrink-0 aspect-video rounded-lg overflow-hidden" style={{ background: 'var(--bg3)' }}>
@@ -61,17 +72,20 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
             </svg>
           </button>
         </div>
-      </button>
+      </div>
     );
   }
 
-  // ── Grid card ─────────────────────────────────────────────────────────
+  // ── Grid card ───────────────────────────────────────────────────────── (FIX #24)
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={cardKeyDown}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="text-left w-full group focus:outline-none fade-up ring-focus rounded-xl"
+      className="text-left w-full group focus:outline-none fade-up ring-focus rounded-xl cursor-pointer"
       style={{ animationDelay: `${delay}ms` }}
     >
       <div
@@ -143,6 +157,6 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
           <span>{rec.sizeHuman}</span>
         </p>
       </div>
-    </button>
+    </div>
   );
 }
