@@ -30,27 +30,26 @@ function useCounter(target: number, dur = 1200): number {
 function StatCard({ label, value, icon, sub }: { label: string; value: string; icon: React.ReactNode; sub?: string }) {
   return (
     <div
-      className="relative rounded-xl border px-4 sm:px-5 py-4 sm:py-5 overflow-hidden group transition-all hover:border-[var(--bd3)]"
+      className="relative rounded-xl border px-3.5 sm:px-4 py-3 sm:py-3.5 overflow-hidden group transition-all hover:border-[var(--bd3)]"
       style={{ borderColor: 'var(--bd)', background: 'var(--bg2)' }}
     >
-      {/* Soft red glow on hover (premium) */}
       <div
-        className="absolute -top-12 -right-12 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity blur-2xl pointer-events-none"
+        className="absolute -top-10 -right-10 w-20 h-20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity blur-2xl pointer-events-none"
         style={{ background: 'var(--red-soft)' }}
       />
-      <div className="flex items-center justify-between mb-2 relative">
-        <div className="text-[10px] sm:text-[11px] uppercase tracking-[.18em] font-semibold" style={{ color: 'var(--tx3)' }}>
+      <div className="flex items-center justify-between mb-1.5 relative">
+        <div className="text-[9.5px] sm:text-[10px] uppercase tracking-[.18em] font-semibold" style={{ color: 'var(--tx3)' }}>
           {label}
         </div>
         <div className="opacity-30 group-hover:opacity-60 transition-opacity" style={{ color: 'var(--red)' }}>
           {icon}
         </div>
       </div>
-      <div className="font-display text-2xl sm:text-[34px] font-bold tabular-nums leading-none relative" style={{ color: 'var(--tx)' }}>
+      <div className="font-display text-[20px] sm:text-[24px] font-bold tabular-nums leading-none relative" style={{ color: 'var(--tx)' }}>
         {value}
       </div>
       {sub && (
-        <div className="text-[10.5px] mt-1.5 font-medium" style={{ color: 'var(--tx3)' }}>{sub}</div>
+        <div className="text-[10px] mt-1 font-medium hidden sm:block" style={{ color: 'var(--tx3)' }}>{sub}</div>
       )}
     </div>
   );
@@ -69,12 +68,12 @@ export function StatsBar({ recs }: { recs: Recording[] }) {
   const g = useCounter(stats.gb);
 
   return (
-    <section className="mesh rounded-2xl border px-5 sm:px-8 py-7 sm:py-10 mb-8 relative overflow-hidden" style={{ borderColor: 'var(--bd)' }}>
+    <section className="mesh rounded-2xl border px-5 sm:px-7 py-6 sm:py-7 mb-6 relative overflow-hidden" style={{ borderColor: 'var(--bd)' }}>
       {/* Subtle ambient gradient orbs */}
       <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full opacity-30 blur-3xl pointer-events-none" style={{ background: 'radial-gradient(circle, var(--red) 0%, transparent 70%)' }} />
       <div className="absolute -bottom-32 -left-20 w-72 h-72 rounded-full opacity-20 blur-3xl pointer-events-none" style={{ background: 'radial-gradient(circle, var(--gold) 0%, transparent 70%)' }} />
 
-      <div className="flex flex-col gap-5 mb-7 relative">
+      <div className="flex flex-col gap-4 mb-5 relative">
         <div>
           {/* Premium eyebrow: glass pill + animated live dot + lantern icon */}
           <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full border" style={{ borderColor: 'var(--bd2)', background: 'rgba(239,68,68,.06)' }}>
@@ -90,12 +89,12 @@ export function StatsBar({ recs }: { recs: Recording[] }) {
               The Muslim Lantern Archive
             </p>
           </div>
-          <h1 className="font-display text-[34px] sm:text-[56px] xl:text-[64px] font-extrabold leading-[1.02] tracking-[-0.025em]">
+          <h1 className="font-display text-[26px] sm:text-[36px] xl:text-[44px] font-extrabold leading-[1.04] tracking-[-0.02em]">
             <span className="block">Preserving <span className="text-gradient-red">daʿwah</span>,</span>
             <span className="block opacity-95" style={{ color: 'var(--tx)' }}>one stream at a time.</span>
           </h1>
-          <p className="text-[14px] sm:text-[16px] mt-4 max-w-xl leading-relaxed font-medium" style={{ color: 'var(--tx2)' }}>
-            Every live broadcast, kept forever — searchable, free to watch, always available across <span style={{ color: 'var(--tx)' }}>six redundant clouds</span>.
+          <p className="text-[13px] sm:text-[14px] mt-3 max-w-xl leading-relaxed" style={{ color: 'var(--tx2)' }}>
+            Every live broadcast, kept forever — searchable, free to watch, mirrored across <span style={{ color: 'var(--tx)' }}>six redundant clouds</span>.
           </p>
         </div>
       </div>
