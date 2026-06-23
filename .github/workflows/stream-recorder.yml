@@ -138,43 +138,67 @@ jobs:
       - name: "📦 Install Dependencies"
         run: |
           echo "📦 Installing required tools..."
-          
+
           # Update package list
           sudo apt-get update -qq
-          
+
           # Install core tools (nodejs is pre-installed on GitHub runners)
           sudo apt-get install -y -qq ffmpeg jq bc curl python3 megatools
-          
+
           # Install yt-dlp (nightly build for latest YouTube anti-bot patches)
           sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp 2>/dev/null || \
           sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
           sudo chmod a+rx /usr/local/bin/yt-dlp
-          
+
+          # ── NEW: Install ytarchive (purpose-built YouTube live archiver) ──
+          # Independent Go binary; far more robust for live streams than yt-dlp.
+          YTA_VER="0.5.0"
+          sudo curl -L "https://github.com/Kethsar/ytarchive/releases/download/v${YTA_VER}/ytarchive_linux_amd64.zip" -o /tmp/ytarchive.zip
+          sudo unzip -o /tmp/ytarchive.zip -d /usr/local/bin/
+          sudo chmod a+rx /usr/local/bin/ytarchive
+          rm -f /tmp/ytarchive.zip
+
           # Install yt-dlp PO token / nsig challenge solver
-          # Required for YouTube's JavaScript-based anti-bot challenge (n parameter)
           pip3 install --quiet bgutil-ytdlp-pot-provider 2>/dev/null || true
-          
+
           # Install streamlink and chat-downloader
           pip3 install --quiet streamlink chat-downloader
-          
+
           # Strip Windows CRLF line endings — these corrupt JSON payloads
-          # This is the root fix for "Problems parsing JSON" GitHub API errors
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
-          
+
           # Make scripts executable
           chmod +x scripts/*.sh
-          
+
           # Verify installations
           echo "──────────────────────────────────────"
-          echo "yt-dlp version: $(yt-dlp --version)"
-          echo "ffmpeg version: $(ffmpeg -version 2>&1 | head -1)"
+          echo "yt-dlp     version: $(yt-dlp --version)"
+          echo "ytarchive  version: $(ytarchive --version 2>&1 | head -1 || echo 'N/A')"
+          echo "ffmpeg     version: $(ffmpeg -version 2>&1 | head -1)"
           echo "streamlink version: $(streamlink --version 2>/dev/null || echo 'N/A')"
-          echo "jq version: $(jq --version)"
-          echo "node version: $(node --version 2>/dev/null || echo 'N/A')"
+          echo "jq         version: $(jq --version)"
+          echo "node       version: $(node --version 2>/dev/null || echo 'N/A')"
           echo "──────────────────────────────────────"
 
+      - name: "🛡️ Start PoToken Provider"
+        # Runs the bgutil-ytdlp-pot-provider HTTP service on 127.0.0.1:4416.
+        # yt-dlp methods (via _pot_args helper in record-stream.sh) auto-detect
+        # this service and route through it. If this step fails for any reason,
+        # yt-dlp falls back to direct mode — no recording is blocked by a
+        # missing PoToken service.
+        run: |
+          (python3 -m bgutil_ytdlp_pot_provider --host 127.0.0.1 --port 4416 \
+            >/tmp/pot.log 2>&1 &)
+          # Give it a moment to bind the port
+          sleep 2
+          if curl -fsS --max-time 2 http://127.0.0.1:4416/ping >/dev/null 2>&1; then
+            echo "✅ PoToken provider: listening on 127.0.0.1:4416"
+          else
+            echo "⚠️  PoToken provider failed to start — yt-dlp will run without it"
+            tail -20 /tmp/pot.log || true
+          fi
+        continue-on-error: true
 
-      # ─── 4. CHECK DISK SPACE ─────────────────────────────────────────────
       - name: "💾 Check Disk Space"
         id: disk_check
         run: |

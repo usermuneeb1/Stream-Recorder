@@ -389,6 +389,138 @@ validate_recorded_file() {
 #  RECORDING ATTEMPT — Tries all 7 methods in sequence
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# APPEND-ONLY snippet — paste at the END of scripts/record-stream.sh, BEFORE
+# the `attempt_recording()` function definition (around line 392). Nothing
+# above this line gets touched.
+#
+# Adds two new recording methods:
+#   H: ytarchive  — purpose-built YouTube live stream archiver, separate codebase
+#   I: streamlink (hardened) — independent of yt-dlp, with PoToken-aware retries
+#
+# Also defines _pot_args() — a helper that returns yt-dlp PoToken provider args
+# if the local PoToken provider is running, or empty array otherwise.
+# Existing methods can opt-in by adding "${pot_args[@]}" to their yt-dlp call.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ── PoToken provider helper ─────────────────────────────────────────────────
+# Returns extractor-args that route yt-dlp through the local bgutil PoToken
+# HTTP service if it is reachable. Safe to call when the service isn't running
+# — it returns an empty array and yt-dlp behaves exactly as before.
+_pot_args() {
+    local -n _out=$1
+    _out=()
+    if curl -fsS --max-time 1 "http://127.0.0.1:4416/ping" >/dev/null 2>&1; then
+        _out=(--extractor-args "youtube:pot_provider=http://127.0.0.1:4416")
+    fi
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RECORDING METHOD H: ytarchive (PURPOSE-BUILT FOR YOUTUBE LIVE)
+#  Independent Go binary, not yt-dlp. Holds the live connection through ad
+#  rolls, handles fragment re-fetch, and uses its own client signature.
+#  Most reliable single tool for live streams as of 2026.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+record_method_h() {
+    local video_url="$1"
+    local output_file="$2"
+
+    log_info "  Method H: ytarchive (cookieless, purpose-built for live)"
+
+    if ! command -v ytarchive &>/dev/null; then
+        log_warn "  Method H: ytarchive not installed — skipping"
+        return 1
+    fi
+
+    # ytarchive writes to <output>.<ext>, so strip the .mp4 we were given
+    local base="${output_file%.mp4}"
+
+    # Optional cookies — only if verified valid (matches method D's logic)
+    local -a cookies_args=()
+    if [[ "${COOKIE_STATUS:-}" == "valid" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
+        && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        cookies_args=(-c "${COOKIES_FILE:-cookies.txt}")
+    fi
+
+    timeout "${MAX_RECORD_DURATION:-18000}" ytarchive \
+        "${cookies_args[@]}" \
+        --threads 4 \
+        --merge \
+        --no-frag-files \
+        --retry-stream 30 \
+        --output "$base" \
+        "$video_url" best 2>&1 | tail -10
+
+    local status=${PIPESTATUS[0]}
+    [[ "$status" == "124" ]] && return 0
+
+    # ytarchive sometimes writes to <base>.mp4 directly, sometimes to
+    # <base>.f<itag>.mp4 — try to find what it actually produced.
+    if [[ ! -f "$output_file" ]]; then
+        local produced
+        produced=$(ls -1t "${base}"*.mp4 2>/dev/null | head -1 || true)
+        [[ -n "$produced" && -f "$produced" ]] && mv "$produced" "$output_file"
+    fi
+
+    return "$status"
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RECORDING METHOD I: streamlink (HARDENED — DIFFERENT FROM EXISTING METHOD F)
+#  Independent of yt-dlp. Hardened retry flags to survive longer outages, and
+#  uses ffmpeg for the final mux so we get a clean MP4 with faststart.
+#  Method F already uses streamlink but with default flags — this is the
+#  "give it everything" variant for when F's defaults aren't enough.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+record_method_i() {
+    local video_url="$1"
+    local output_file="$2"
+
+    log_info "  Method I: streamlink (hardened retry, independent codebase)"
+
+    if ! command -v streamlink &>/dev/null; then
+        log_warn "  Method I: streamlink not installed — skipping"
+        return 1
+    fi
+
+    local -a cookies_args=()
+    if [[ "${COOKIE_STATUS:-}" == "valid" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
+        && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        # streamlink takes cookies via --http-cookie KEY=VALUE pairs.
+        # Simpler: tell it to load a Netscape cookies.txt via the http session.
+        cookies_args=(--http-header "Cookie=$(awk 'NF==7 {printf "%s=%s; ", $6, $7}' "${COOKIES_FILE}")")
+    fi
+
+    timeout "${MAX_RECORD_DURATION:-18000}" streamlink \
+        "${cookies_args[@]}" \
+        --hls-live-restart \
+        --hls-segment-threads 4 \
+        --hls-playlist-reload-attempts 10 \
+        --hls-playlist-reload-time 2 \
+        --hls-segment-attempts 10 \
+        --hls-segment-timeout 30 \
+        --retry-streams 5 \
+        --retry-max 10 \
+        --retry-open 3 \
+        --stream-timeout 60 \
+        --ffmpeg-fout mp4 \
+        --ffmpeg-copyts \
+        -o "$output_file" \
+        --force \
+        "$video_url" best 2>&1 | tail -10
+
+    local status=${PIPESTATUS[0]}
+    [[ "$status" == "124" ]] && return 0
+    return "$status"
+}
+
 attempt_recording() {
     local video_url="$1"
     local attempt_num="$2"
@@ -404,7 +536,10 @@ attempt_recording() {
     # stale/expired YouTube cookies can NEVER block a public-stream recording.
     # The cookie-based methods (A/B) run only AFTER, as a bonus for the rare
     # members-only / age-restricted stream where cookies are actually required.
+
     local methods=(
+        "record_method_h"
+        "record_method_i"
         "record_method_d"
         "record_method_c"
         "record_method_a"
@@ -414,15 +549,16 @@ attempt_recording() {
         "record_method_f"
     )
     local method_names=(
-        "D: Android VR (cookieless 1080p — primary)"
+        "H: ytarchive (cookieless, purpose-built for live — PRIMARY)"
+        "I: streamlink hardened (cookieless, independent codebase)"
+        "D: Android VR (cookieless 1080p)"
         "C: mediaconnect (cookieless 1080p)"
         "A: Cookies+web_creator (bonus)"
         "B: Cookies+tv_embedded (bonus)"
         "G: Plain yt-dlp (default)"
         "E: Mobile Web"
-        "F: Streamlink (HLS)"
+        "F: Streamlink (HLS, default flags)"
     )
-    
     for i in "${!methods[@]}"; do
         log_separator
         log_info "  Trying method ${method_names[$i]}..."
