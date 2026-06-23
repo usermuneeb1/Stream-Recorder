@@ -20,19 +20,22 @@ interface P {
 
 interface Source { label: string; url: string; tone: string }
 
-// GHOST is our YouTube unlisted re-upload played through the Vercel
-// resolver (302 → direct .mp4) so it works in our native player
-// without an iframe. We hard-code the Vercel host so the dashboard
-// still works when served from GitHub Pages or jsDelivr.
-const GHOST_HOST = 'https://muslim-lantern-archive.vercel.app';
-function ghostUrl(r: Recording): string {
-  const id = r.youtubeId || (r.youtubeUnlisted.match(/(?:youtu\.be\/|v=)([\w-]{11})/) || [])[1];
-  return id ? `${GHOST_HOST}/api/yt/${id}` : '';
+// GHOST is our YouTube unlisted re-upload played inside Vidstack's
+// custom-UI player. The src "youtube/<id>" tells Vidstack to render
+// through YouTube's official embed under the hood, but ALL the controls,
+// keyboard shortcuts, chapters and theming are still our own — the
+// player chrome you see is Vidstack's, not YouTube's.
+function ghostId(r: Recording): string {
+  return r.youtubeId || (r.youtubeUnlisted.match(/(?:youtu\.be\/|v=)([\w-]{11})/) || [])[1] || '';
+}
+function ghostSrc(r: Recording): string {
+  const id = ghostId(r);
+  return id ? `youtube/${id}` : '';
 }
 
 function getSources(r: Recording): Source[] {
   const out: Source[] = [];
-  const ghost = ghostUrl(r);
+  const ghost = ghostSrc(r);
   if (ghost)                                              out.push({ label: 'GHOST',  url: ghost,            tone: 'red'    });
   if (r.archiveNode)                                      out.push({ label: 'R3AL',   url: r.archiveNode,    tone: 'gold'   });
   if (r.githubDirect || r.githubRelease)                  out.push({ label: 'B3ING',  url: (r.githubDirect || r.githubRelease), tone: 'sky' });
@@ -92,11 +95,15 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
       }).catch(() => {});
   }, [rec.videoId, rec.chatUrl]);
 
-  // ── Auto source: race HEAD requests, pick fastest ────────────────────────
+  // ── Auto source: pick GHOST if available (always reachable, no rate limits);
+  //    otherwise race HEAD requests across the .mp4 mirrors and pick the fastest.
   useEffect(() => {
-    if (si !== 0 || sources.length < 2) {
-      // No race needed
-      setAutoUrl(sources[0]?.url || '');
+    if (si !== 0 || sources.length === 0) return;
+    // If GHOST is the first source, just use it — it's always reachable through
+    // YouTube and doesn't suffer from CDN node failures.
+    if (sources[0].url.startsWith('youtube/')) {
+      setAutoUrl(sources[0].url);
+      setSourceHealth({ 0: 0 }); // mark GHOST as instant
       return;
     }
     const ctrl = new AbortController();
@@ -104,6 +111,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     let winner = '';
     let bestTime = Infinity;
     Promise.allSettled(sources.map(async (s, idx) => {
+      if (s.url.startsWith('youtube/')) return; // skip GHOST in HEAD race
       const start = performance.now();
       try {
         await fetch(s.url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
