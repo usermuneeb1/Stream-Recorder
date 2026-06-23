@@ -15,13 +15,31 @@ import { CommandPalette } from './components/CommandPalette';
 type Route =
   | { kind: 'home' }
   | { kind: 'watch'; rec: Recording }
+  | { kind: 'watch-pending'; id: string }   // FIX #27 — waiting for data to resolve a deep link
   | { kind: 'notfound' };
+
+// FIX #27 — derive the initial route from the URL synchronously so a hard-refresh
+// on /#/watch/<id> doesn't render the home page for ~500ms while data loads.
+function initialRoute(): Route {
+  if (typeof window === 'undefined') return { kind: 'home' };
+  const m = (window.location.hash || '').match(/^#\/watch\/([^?]+)/);
+  if (m) return { kind: 'watch-pending', id: decodeURIComponent(m[1]) };
+  return { kind: 'home' };
+}
 
 export default function App() {
   const [recs, setRecs] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  const [route, setRoute] = useState<Route>({ kind: 'home' });
+  // FIX #25 — debounced copy of `q` used by the heavy filter+sort useMemo.
+  // The input UI updates instantly (controlled by `q`); the expensive
+  // recomputation runs ~150ms after the user stops typing.
+  const [qDebounced, setQDebounced] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setQDebounced(q), 150);
+    return () => clearTimeout(id);
+  }, [q]);
+  const [route, setRoute] = useState<Route>(initialRoute);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     typeof window !== 'undefined' ? ((localStorage.getItem('t') as 'dark' | 'light') || 'dark') : 'dark',
   );
@@ -61,8 +79,12 @@ export default function App() {
       const h = window.location.hash || '';
       const m = h.match(/^#\/watch\/([^?]+)/);
       if (m) {
-        if (!recs.length) return; // wait for data
         const id = decodeURIComponent(m[1]);
+        if (!recs.length) {
+          // FIX #27 — show pending screen instead of flashing home while we wait
+          setRoute({ kind: 'watch-pending', id });
+          return;
+        }
         const r = recs.find(x => x.videoId === id);
         setRoute(r ? { kind: 'watch', rec: r } : { kind: 'notfound' });
         return;
@@ -95,11 +117,11 @@ export default function App() {
   const goHome = useCallback(() => { window.location.hash = ''; }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
 
-  // Apply search + filter + sort
+  // Apply search + filter + sort (debounced query — see FIX #25)
   const filtered = useMemo(() => {
     let xs = recs;
-    if (q.trim()) {
-      const s = q.toLowerCase();
+    if (qDebounced.trim()) {
+      const s = qDebounced.toLowerCase();
       xs = xs.filter(r =>
         r.title.toLowerCase().includes(s)
         || r.date.includes(s)
@@ -117,11 +139,23 @@ export default function App() {
       default:         xs.sort((a, b) => b.date.localeCompare(a.date)); break;
     }
     return xs;
-  }, [recs, q, filter, sort]);
+  }, [recs, qDebounced, filter, sort]);
 
   // ── Render by route ─────────────────────────────────────────────────────
   if (route.kind === 'notfound') {
     return <NotFoundPage onHome={goHome} />;
+  }
+  if (route.kind === 'watch-pending') {
+    // FIX #27 — black holding screen so deep-link refresh doesn't flash home.
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#000' }}>
+        <div className="flex flex-col items-center">
+          <div className="w-10 h-10 mb-3 rounded-full border-2 border-transparent animate-spin"
+               style={{ borderTopColor: 'var(--red)' }} />
+          <p className="text-white/60 text-[13px] font-medium tracking-wide">Loading recording</p>
+        </div>
+      </div>
+    );
   }
   if (route.kind === 'watch') {
     return (
