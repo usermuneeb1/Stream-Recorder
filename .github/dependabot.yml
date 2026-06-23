@@ -1,4 +1,10 @@
 # Dependabot — automatic dependency update PRs (supply-chain safety).
+#
+# IMPORTANT: major-version updates are IGNORED here because Tailwind v3→v4
+# (and similar) require manual migration steps that Dependabot can't perform.
+# When auto-merged, they break the build. Patch + minor bumps are still
+# automatic and safe; majors are listed as "ignored" so you can review the
+# changelog and migrate deliberately if/when you want.
 version: 2
 updates:
   # Dashboard npm dependencies
@@ -8,6 +14,23 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["dependencies"]
+    # Block major bumps for packages with breaking-change migrations.
+    # If/when you want to upgrade, do it manually with the migration guide.
+    ignore:
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vidstack/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions versions
   - package-ecosystem: "github-actions"
