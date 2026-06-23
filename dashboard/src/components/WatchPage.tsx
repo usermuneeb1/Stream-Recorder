@@ -7,7 +7,6 @@ import type { Recording } from '../utils/dataFetcher';
 import { fmtTime, fmtRelative, copyText, shareLinks } from '../utils/format';
 import { savePosition, loadPosition, pushHistory } from '../utils/history';
 import { Comments } from './Comments';
-import { BottomStats } from './BottomStats';
 
 interface P {
   rec: Recording;
@@ -22,10 +21,13 @@ interface P {
 interface Source { label: string; url: string; tone: string; kind: 'youtube' | 'mp4' }
 
 // GHOST is our YouTube unlisted re-upload played in our own Vidstack player.
+// Defensive: handles records where youtubeUnlisted is undefined / null (some
+// older entries lack the field entirely; safe-default everything).
 function ghostId(r: Recording): string {
-  return r.youtubeId
-    || (r.youtubeUnlisted.match(/(?:youtu\.be\/|v=)([\w-]{11})/) || [])[1]
-    || '';
+  if (r.youtubeId) return r.youtubeId;
+  const u = r.youtubeUnlisted || '';
+  const m = u.match(/(?:youtu\.be\/|v=)([\w-]{11})/);
+  return (m && m[1]) || '';
 }
 
 function getSources(r: Recording): Source[] {
@@ -534,9 +536,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
 
           {/* ── Comments (on the left column, below the player) ── */}
           <Comments videoId={rec.videoId} onToast={onToast} />
-
-          {/* ── Archive-overview stats (bottom of the video page) ── */}
-          {all.length > 0 && <BottomStats recs={all} />}
         </div>
 
         {/* ── Right sidebar ── */}

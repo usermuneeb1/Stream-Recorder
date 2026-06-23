@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchRecordings, type Recording } from './utils/dataFetcher';
 import { initAnalytics, track } from './utils/analytics';
 import { Header } from './components/Header';
-import { StatsBar } from './components/StatsBar';
+import { SlimHero } from './components/SlimHero';
 import { ContinueWatching } from './components/ContinueWatching';
 import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
 import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
 import { NotFoundPage } from './components/NotFoundPage';
 import { Footer } from './components/Footer';
+import { BottomStats } from './components/BottomStats';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 
@@ -202,7 +203,7 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12">
-        <StatsBar recs={recs} />
+        <SlimHero recs={recs} />
         {!q.trim() && filter === 'all' && <ContinueWatching recs={recs} onOpen={open} />}
         <FilterBar
           sort={sort}
@@ -250,6 +251,12 @@ export default function App() {
               <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 40} view="grid" onToast={setToast} featured={i === 0 && sort === 'newest' && !qDebounced.trim() && filter === 'all'} />
             ))}
           </div>
+        )}
+
+        {/* Bottom-of-home archive stats (sits inside <main> so it follows
+            the same max-width / padding as the recordings grid) */}
+        {!loading && recs.length > 0 && (
+          <BottomStats recs={recs} />
         )}
       </main>
 
