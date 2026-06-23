@@ -10,18 +10,9 @@ interface P {
   onToast?: (m: string) => void;
 }
 
-function guestsFromChapters(rec: Recording): string[] {
-  return (rec.aiChapters || [])
-    .filter(c => c.label?.toLowerCase().includes('joins'))
-    .map(c => c.label.replace(/\s*joins.*/i, '').trim())
-    .filter(Boolean);
-}
-
 export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
   const [err, setErr] = useState(false);
   const [hover, setHover] = useState(false);
-  const guests = guestsFromChapters(rec);
-  const chapters = rec.aiChapters?.length || 0;
   const isHD = /1080|1440|2160|4k/i.test(rec.resolution);
 
   const copy = (e: React.MouseEvent) => {
@@ -37,10 +28,7 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
         className="w-full flex items-stretch gap-4 sm:gap-5 p-3 rounded-xl border text-left fade-up group transition-all hover:border-[var(--bd3)] hover:bg-[var(--bg2)] ring-focus"
         style={{ animationDelay: `${delay}ms`, borderColor: 'var(--bd)' }}
       >
-        <div
-          className="relative w-48 sm:w-56 shrink-0 aspect-video rounded-lg overflow-hidden"
-          style={{ background: 'var(--bg3)' }}
-        >
+        <div className="relative w-48 sm:w-56 shrink-0 aspect-video rounded-lg overflow-hidden" style={{ background: 'var(--bg3)' }}>
           {!err
             ? <img src={rec.thumbnail} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
             : <div className="w-full h-full flex items-center justify-center opacity-30">📺</div>}
@@ -63,17 +51,7 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
             <span className="tabular-nums">{rec.sizeHuman}</span>
             <span style={{ color: 'var(--tx4)' }}>·</span>
             <span>{rec.resolution || '—'}</span>
-            {chapters > 0 && (<><span style={{ color: 'var(--tx4)' }}>·</span><span>{chapters} chapters</span></>)}
           </div>
-          {guests.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {guests.slice(0, 4).map((g, i) => (
-                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
-                  style={{ background: 'var(--red-soft)', color: 'var(--red)' }}>{g}</span>
-              ))}
-              {guests.length > 4 && <span className="text-[10px]" style={{ color: 'var(--tx3)' }}>+{guests.length - 4}</span>}
-            </div>
-          )}
         </div>
         <div className="flex items-center pr-2">
           <button onClick={copy} className="btn-ghost btn !p-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Copy link">
@@ -114,17 +92,12 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
               </svg>
             </div>}
 
-        {/* Top badges */}
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-          {isHD && (
+        {/* HD badge */}
+        {isHD && (
+          <div className="absolute top-2.5 left-2.5">
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--red)', color: '#fff' }}>HD</span>
-          )}
-          {chapters > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded glass" style={{ color: 'var(--tx)' }}>
-              {chapters} chapters
-            </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Duration badge */}
         {rec.durationFmt && (
@@ -169,21 +142,6 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast }: P) {
           <span className="mx-1.5" style={{ color: 'var(--tx4)' }}>·</span>
           <span>{rec.sizeHuman}</span>
         </p>
-        {guests.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {guests.slice(0, 3).map((g, i) => (
-              <span key={i} className="text-[9.5px] px-1.5 py-0.5 rounded-full font-bold"
-                style={{ background: 'var(--red-soft)', color: 'var(--red)' }}>
-                👤 {g}
-              </span>
-            ))}
-            {guests.length > 3 && (
-              <span className="text-[9.5px] px-1 py-0.5" style={{ color: 'var(--tx3)' }}>
-                +{guests.length - 3}
-              </span>
-            )}
-          </div>
-        )}
       </div>
     </button>
   );

@@ -1,0 +1,31 @@
+name: "🔧 Patch YouTube Embedding"
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Google API client
+        run: pip3 install --quiet google-auth google-auth-oauthlib google-api-python-client
+
+      - name: Extract YouTube credentials
+        id: creds
+        env:
+          YT_CLIENT_SECRETS: ${{ secrets.YOUTUBE_CLIENT_SECRETS }}
+          YT_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
+        run: python3 scripts/youtube_extract_creds.py
+
+      - name: Enable embedding on every ghost-host video
+        env:
+          YOUTUBE_CLIENT_ID: ${{ steps.creds.outputs.client_id }}
+          YOUTUBE_CLIENT_SECRET: ${{ steps.creds.outputs.client_secret }}
+          YOUTUBE_REFRESH_TOKEN: ${{ steps.creds.outputs.refresh_token }}
+        run: python3 scripts/patch_youtube_embedding.py

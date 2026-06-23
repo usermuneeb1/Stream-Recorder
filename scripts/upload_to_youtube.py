@@ -101,6 +101,9 @@ def upload_video(file_path: str) -> str:
         "status": {
             "privacyStatus": "unlisted",
             "selfDeclaredMadeForKids": False,
+            "embeddable": True,
+            "publicStatsViewable": False,
+            "license": "youtube",
         },
     }
 

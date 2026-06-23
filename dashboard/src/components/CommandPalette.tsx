@@ -27,10 +27,9 @@ export function CommandPalette({ open, onClose, recs, onOpenRec, toggleTheme }: 
   }).slice(0, 8);
 
   const actions = [
-    { id: 'theme', label: 'Toggle theme', icon: '◐', run: () => { toggleTheme(); onClose(); } },
-    { id: 'home',  label: 'Go home',      icon: '⌂', run: () => { window.location.hash = ''; onClose(); } },
-    { id: 'yt',    label: 'Open YouTube channel', icon: '▶', run: () => { window.open('https://youtube.com/@TheMuslimLantern', '_blank'); onClose(); } },
-    { id: 'gh',    label: 'Open source on GitHub', icon: '⌘', run: () => { window.open('https://github.com/usermuneeb1/Stream-Recorder', '_blank'); onClose(); } },
+    { id: 'theme',  label: 'Toggle theme',         icon: '◐', run: () => { toggleTheme(); onClose(); } },
+    { id: 'home',   label: 'Go home',              icon: '⌂', run: () => { window.location.hash = ''; onClose(); } },
+    { id: 'yt',     label: 'Open YouTube channel', icon: '▶', run: () => { window.open('https://youtube.com/@TheMuslimLantern', '_blank'); onClose(); } },
   ].filter(a => !q.trim() || a.label.toLowerCase().includes(q.toLowerCase()));
 
   const items = [

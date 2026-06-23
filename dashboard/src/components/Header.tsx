@@ -30,7 +30,7 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount
       className="sticky top-0 z-50 glass border-b no-select"
       style={{ borderColor: 'var(--bd)' }}
     >
-      <div className="max-w-[1400px] mx-auto flex items-center gap-3 sm:gap-5 px-4 sm:px-6 lg:px-10 h-16 sm:h-[72px]">
+      <div className="max-w-[1400px] mx-auto flex items-center gap-3 sm:gap-5 px-4 sm:px-6 lg:px-10 h-[88px] sm:h-[104px]">
         {/* Logo */}
         <a
           href="#"
@@ -38,7 +38,7 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount
           className="shrink-0 flex items-center gap-2.5 -ml-1"
           aria-label="Home"
         >
-          <img src="/logo.png" alt="" className="h-10 sm:h-12 object-contain" />
+          <img src="/logo.png" alt="" className="h-[68px] sm:h-[84px] object-contain" />
         </a>
 
         {/* Spacer / count */}
