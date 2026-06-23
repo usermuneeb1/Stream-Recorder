@@ -29,13 +29,17 @@ function ghostId(r: Recording): string {
 
 function getSources(r: Recording): Source[] {
   const out: Source[] = [];
+  // ORDER MATTERS — the first eligible source is Auto's instant default.
+  // R3AL (Archive.org node) is fast, CORS-friendly, and supports byte-range
+  // seeking out of the box → best primary. GHOST goes LAST because it depends
+  // on the YouTube ghost-host upload existing (which requires phone-verified
+  // YouTube + only works for videos ≤ 15 min for unverified accounts).
+  if (r.archiveNode)                                        out.push({ label: 'R3AL',  url: r.archiveNode,                        tone: 'gold',    kind: 'mp4'    });
+  if (r.githubDirect || r.githubRelease)                    out.push({ label: 'B3ING', url: (r.githubDirect || r.githubRelease), tone: 'sky',     kind: 'mp4'    });
+  if (r.cfStream)                                           out.push({ label: 'STORM', url: r.cfStream,                           tone: 'violet',  kind: 'mp4'    });
+  if (r.archiveDirect && r.archiveDirect !== r.archiveNode) out.push({ label: 'BUNNY', url: r.archiveDirect,                      tone: 'emerald', kind: 'mp4'    });
   const gid = ghostId(r);
-  // FIX #1 — Vidstack's YouTubeProvider needs a real URL, not a `youtube/<id>` path.
-  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}`, tone: 'red',     kind: 'youtube' });
-  if (r.archiveNode)                                        out.push({ label: 'R3AL',  url: r.archiveNode,         tone: 'gold',    kind: 'mp4'    });
-  if (r.githubDirect || r.githubRelease)                    out.push({ label: 'B3ING', url: (r.githubDirect || r.githubRelease), tone: 'sky', kind: 'mp4' });
-  if (r.cfStream)                                           out.push({ label: 'STORM', url: r.cfStream,            tone: 'violet',  kind: 'mp4'    });
-  if (r.archiveDirect && r.archiveDirect !== r.archiveNode) out.push({ label: 'BUNNY', url: r.archiveDirect,       tone: 'emerald', kind: 'mp4'    });
+  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}`, tone: 'red', kind: 'youtube' });
   return out;
 }
 
@@ -74,27 +78,28 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     played.current = false;
   }, [rec.videoId]);
 
-  // ── Auto picker: races ALL sources including GHOST ───────────────────────
-  // For .mp4 mirrors: race HEAD requests, lowest ms wins.
-  // For GHOST: probe img.ytimg.com/<id> as a proxy for "YouTube is reachable
-  //   AND the video exists". Counts the same as a server race.
+  // ── Auto picker: INSTANT default + background health probes ──────────────
+  // Strategy:
+  //   1. Pick the first non-failed source IMMEDIATELY (zero delay). This is
+  //      the order from getSources() — R3AL > B3ING > STORM > BUNNY > GHOST,
+  //      which puts the most reliable mirror first.
+  //   2. Run cheap probes in the background JUST for the latency badges in
+  //      the sidebar (informational). Do NOT re-pick based on probe times —
+  //      they're unreliable (CORS, edge caches, geo-routing), and switching
+  //      mid-load creates a worse experience than just sticking with R3AL.
+  //   3. If Vidstack actually raises an error event, errorFallbackIdx is
+  //      updated and the player switches to the next available source. That
+  //      is the only signal we trust for "this source is really broken".
   useEffect(() => {
     if (si !== 0 || sources.length === 0) return;
+
+    // Instant pick: first non-failed source. No 3-second wait, no flicker.
+    const firstGood = sources.findIndex((_, idx) => !errorFallbackIdx.has(idx));
+    setAutoIdx(firstGood >= 0 ? firstGood : 0);
+
+    // Background probes for the latency badges in the sidebar (advisory only).
     const ctrl = new AbortController();
     const health: Record<number, number> = {};
-    let winner = -1;
-    let bestTime = Infinity;
-
-    // Reachability probes are advisory only — they inform the Auto picker's
-    // ranking, but never block the user from manually selecting a source.
-    // Real failures come from Vidstack's `error` event (errorFallbackIdx).
-    //
-    // We use `mode: 'no-cors'` for mp4s because cross-origin Range GETs to
-    // archive.org / pixeldrain / etc are blocked by CORS even though the
-    // video plays fine via <video src=...> (browsers exempt media tags).
-    // no-cors gives an opaque response — we treat 'no exception' as "the
-    // host is up" and time-rank by latency. For GHOST we still hit our own
-    // /api/yt (same-origin) since it gives a real status code.
     Promise.allSettled(sources.map(async (s, idx) => {
       if (errorFallbackIdx.has(idx)) { health[idx] = -1; return; }
       const start = performance.now();
@@ -107,28 +112,15 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
             ok = r.status === 302 || r.status === 200;
           }
         } else {
-          // no-cors: lies about content, but accurate enough to detect "host
-          // is reachable AND responding within budget". DNS-failed / dead
-          // hosts throw, which we catch as ok=false.
           await fetch(s.url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
           ok = true;
         }
       } catch { ok = false; }
       const dt = ok ? (performance.now() - start) : -1;
       health[idx] = dt;
-      if (dt > 0 && dt < bestTime) { bestTime = dt; winner = idx; }
-      setSourceHealth({ ...health });
+      setSourceHealth(prev => ({ ...prev, [idx]: dt }));
     }));
-
-    const timer = setTimeout(() => {
-      ctrl.abort();
-      // Pick winner, or first available non-errored source
-      let pick = winner;
-      if (pick < 0) pick = sources.findIndex((_, idx) => !errorFallbackIdx.has(idx));
-      if (pick < 0) pick = 0;
-      setAutoIdx(pick);
-    }, 3000);
-    return () => { ctrl.abort(); clearTimeout(timer); };
+    return () => { ctrl.abort(); };
   }, [rec.videoId, sources, si, errorFallbackIdx]);
 
   // ── Esc closes / shortcuts ───────────────────────────────────────────────
