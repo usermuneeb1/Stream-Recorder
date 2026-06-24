@@ -536,6 +536,22 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
 
           {/* ── Comments (on the left column, below the player) ── */}
           <Comments videoId={rec.videoId} onToast={onToast} />
+
+          {/* Per-page credit line (mirrors the global footer credit so the
+              user sees attribution even on long watch pages where the
+              footer is far below the fold) */}
+          <div className="mt-10 mb-2 px-4 sm:px-6 pt-5 pb-1 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11.5px]" style={{ borderTop: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+            <p className="tabular-nums">
+              © {new Date().getFullYear()} <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Muneeb Ahmad</span> · All rights reserved.
+            </p>
+            <p className="flex items-center gap-1.5">
+              Made with
+              <svg className="w-3.5 h-3.5 inline animate-pulse" style={{ color: 'var(--accent-glow)', filter: 'drop-shadow(0 0 4px rgba(255, 61, 61, 0.5))' }} viewBox="0 0 24 24" fill="currentColor" aria-label="love">
+                <path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z" />
+              </svg>
+              by <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Muneeb Ahmad</span>
+            </p>
+          </div>
         </div>
 
         {/* ── Right sidebar ── */}
@@ -548,7 +564,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 active={si === 0}
                 onClick={() => setSi(0)}
                 label="Auto"
-                sublabel="Smart pick"
                 ms={si === 0 ? sourceHealth[autoIdx] : undefined}
                 primary
               />
@@ -565,7 +580,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                     });
                   }}
                   label={s.label}
-                  sublabel={SUBLABELS[s.label] || ''}
                   ms={sourceHealth[i]}
                   failed={errorFallbackIdx.has(i)}
                 />
@@ -679,21 +693,14 @@ function Panel({ title, hint, right, children }: { title: string; hint?: string;
   );
 }
 
-// Friendly sublabels for each playback source name (instead of raw tone colors)
-const SUBLABELS: Record<string, string> = {
-  GHOST: 'YouTube · 1080p',
-  R3AL:  'Archive.org',
-  B3ING: 'GitHub Direct',
-  STORM: 'Cloudflare',
-  BUNNY: 'Archive Mirror',
-};
-
-// Premium source row — unified design, only colored DOT indicates health
-function SourceRow({ active, onClick, label, sublabel, ms, primary, failed }: {
+// Premium source row — unified design, only colored DOT indicates health.
+// We deliberately DO NOT expose the underlying host name (Archive.org / YouTube /
+// GitHub / etc) — the user only sees the brand label (R3AL, GHOST, etc) so the
+// archive's hosting infrastructure is not advertised in the UI.
+function SourceRow({ active, onClick, label, ms, primary, failed }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  sublabel?: string;
   ms?: number;
   primary?: boolean;
   failed?: boolean;
@@ -729,14 +736,9 @@ function SourceRow({ active, onClick, label, sublabel, ms, primary, failed }: {
     >
       <div className="flex items-center gap-2.5 min-w-0">
         <span className="relative w-2 h-2 rounded-full shrink-0" style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
-        <div className="text-left min-w-0">
-          <div className="text-[12.5px] font-bold flex items-center gap-1.5" style={{ color: active ? '#fff' : 'var(--text-primary)' }}>
-            {label}
-            {primary && <span className="text-[9px] opacity-70 font-mono">⚡</span>}
-          </div>
-          {sublabel && (
-            <div className="text-[10px] mt-0.5 opacity-70 truncate" style={{ color: active ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)' }}>{sublabel}</div>
-          )}
+        <div className="text-[13px] font-bold flex items-center gap-1.5" style={{ color: active ? '#fff' : 'var(--text-primary)' }}>
+          {label}
+          {primary && <span className="text-[9px] opacity-70 font-mono">⚡</span>}
         </div>
       </div>
       {ms !== undefined && ms > 0 && (
