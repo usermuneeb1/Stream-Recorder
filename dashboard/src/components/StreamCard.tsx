@@ -66,8 +66,8 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }:
         role="button" tabIndex={0}
         onClick={onClick} onKeyDown={onKey}
         onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-        className="card-surface w-full flex items-stretch gap-4 sm:gap-5 p-3 fade-up group cursor-pointer ring-focus"
-        style={{ animationDelay: `${delay}ms` }}
+        className="card-surface reveal-on-scroll w-full flex items-stretch gap-4 sm:gap-5 p-3 group cursor-pointer ring-focus"
+        data-stagger={(delay / 60) % 7}
       >
         <div className="relative w-48 sm:w-60 shrink-0 aspect-video rounded-[10px] overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
           {!err
@@ -113,8 +113,8 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }:
       role="button" tabIndex={0}
       onClick={onClick} onKeyDown={onKey}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      className="card-surface group fade-up cursor-pointer ring-focus overflow-hidden"
-      style={{ animationDelay: `${delay}ms` }}
+      className="card-surface reveal-on-scroll group cursor-pointer ring-focus overflow-hidden"
+      data-stagger={(delay / 60) % 7}
     >
       <div className="relative aspect-video overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
         {!err
@@ -173,30 +173,24 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }:
   );
 }
 
-function Badges({ featured, isHD, duration, hasGhost }: { featured?: boolean; isHD: boolean; duration?: string; hasGhost?: boolean }) {
+function Badges({ featured, isHD, duration }: { featured?: boolean; isHD: boolean; duration?: string; hasGhost?: boolean }) {
+  // Max 2 badges total — top-left ONE status (NEWEST > HD, mutually exclusive)
+  // + bottom-right duration. Per round-2 spec to reduce visual chaos.
+  // Hosting-mirror indicator removed entirely.
   return (
     <>
-      {/* Top-left stack */}
-      <div className="absolute top-2.5 left-2.5 flex gap-1.5 z-10">
-        {featured && (
+      <div className="absolute top-2.5 left-2.5 z-10">
+        {featured ? (
           <span className="frost-badge !text-[9.5px] inline-flex items-center gap-1" style={{ background: 'rgba(255, 107, 53, 0.92)', color: '#fff', borderColor: 'rgba(255, 200, 150, 0.30)' }}>
             <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6L12 2z" /></svg>
             NEWEST
           </span>
-        )}
-        {isHD && <span className="frost-badge !text-[9.5px]" style={{ background: 'rgba(0, 0, 0, 0.78)', color: '#fff' }}>HD</span>}
+        ) : isHD ? (
+          <span className="frost-badge !text-[9.5px]" style={{ background: 'rgba(0, 0, 0, 0.78)', color: '#fff' }}>HD</span>
+        ) : null}
       </div>
-      {/* Top-right: ghost mirror indicator */}
-      {hasGhost && (
-        <div className="absolute top-2.5 right-12 z-10" title="YouTube ghost-host available">
-          <span className="frost-badge !text-[9.5px] inline-flex items-center gap-1" style={{ background: 'rgba(212, 168, 83, 0.20)', borderColor: 'rgba(212, 168, 83, 0.35)', color: 'var(--accent-gold)' }}>
-            ★ HD MIRROR
-          </span>
-        </div>
-      )}
-      {/* Bottom-right duration */}
       {duration && (
-        <span className="frost-badge absolute bottom-2.5 right-2.5 tabular-nums z-10" style={{ background: 'rgba(10, 10, 15, 0.85)' }}>
+        <span className="frost-badge absolute bottom-2.5 right-2.5 tabular-nums z-10 !font-mono" style={{ background: 'rgba(10, 10, 15, 0.85)' }}>
           {duration}
         </span>
       )}

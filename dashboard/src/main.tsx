@@ -9,6 +9,33 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 );
 
+// SCROLL-REVEAL — any element with .reveal-on-scroll fades+slides into place
+// when it enters the viewport. Single observer for the whole document, runs
+// continuously so React-rendered cards added later are also caught.
+if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
+  const obs = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('is-visible');
+        obs.unobserve(e.target);
+      }
+    }
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+  // Re-scan periodically (cheap — just querySelector) so newly mounted
+  // cards from React get observed too without each component having to wire
+  // up its own observer.
+  const scan = () => {
+    document.querySelectorAll<HTMLElement>('.reveal-on-scroll:not(.is-visible):not([data-observed])').forEach(el => {
+      el.dataset.observed = '1';
+      obs.observe(el);
+    });
+  };
+  // Initial after first paint, then every 800ms (lightweight DOM walk).
+  requestAnimationFrame(scan);
+  setInterval(scan, 800);
+}
+
 // Service-worker management.
 // Production only — in dev, vite serves modules and SW gets in the way.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
