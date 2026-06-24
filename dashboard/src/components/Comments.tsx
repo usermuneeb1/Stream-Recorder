@@ -191,8 +191,16 @@ export function Comments({ videoId, onToast }: P) {
           ))}
         </div>
       ) : roots.length === 0 ? (
-        <div className="text-center py-10 opacity-50">
-          <p className="text-[13px]" style={{ color: 'var(--tx3) ' }}>No comments yet. Be the first.</p>
+        <div className="text-center py-12 flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+            <svg className="w-6 h-6" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-[14px] font-semibold" style={{ color: 'var(--text-secondary)' }}>No comments yet</p>
+            <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>Be the first to share your thoughts.</p>
+          </div>
         </div>
       ) : (
         <ul className="space-y-5">
