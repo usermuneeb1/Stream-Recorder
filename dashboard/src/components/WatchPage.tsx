@@ -541,90 +541,89 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
         {/* ── Right sidebar ── */}
         <aside className={`${theatre ? 'xl:hidden' : 'xl:w-[400px]'} shrink-0 px-4 sm:px-6 xl:px-4 pb-6 pt-2 xl:pt-4 border-l-0 xl:border-l space-y-3`} style={{ borderColor: 'var(--bd)' }}>
 
-          {/* Sources */}
+          {/* Premium PLAYBACK sources — unified list, health dots */}
           {sources.length > 0 && (
             <Panel title="Playback" hint={`${sources.length} servers`}>
-              <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                <SourceBtn
-                  active={si === 0}
-                  onClick={() => setSi(0)}
-                  label="Auto"
-                  tone="emerald"
-                  ms={si === 0 ? sourceHealth[autoIdx] : undefined}
-                  best
+              <SourceRow
+                active={si === 0}
+                onClick={() => setSi(0)}
+                label="Auto"
+                sublabel="Smart pick"
+                ms={si === 0 ? sourceHealth[autoIdx] : undefined}
+                primary
+              />
+              {sources.map((s, i) => (
+                <SourceRow
+                  key={i}
+                  active={si === i + 1}
+                  onClick={() => {
+                    setSi(i + 1);
+                    played.current = false; setReady(false); setGhostReady(false);
+                    setErrorFallbackIdx(prev => {
+                      if (!prev.has(i)) return prev;
+                      const next = new Set(prev); next.delete(i); return next;
+                    });
+                  }}
+                  label={s.label}
+                  sublabel={SUBLABELS[s.label] || ''}
+                  ms={sourceHealth[i]}
+                  failed={errorFallbackIdx.has(i)}
                 />
-                {sources.map((s, i) => (
-                  <SourceBtn
-                    key={i}
-                    active={si === i + 1}
-                    // ALWAYS clickable. Reset ready/played so the player
-                    // re-mounts even if user clicks the already-failed source
-                    // (treat as a manual retry).
-                    onClick={() => {
-                      setSi(i + 1);
-                      played.current = false;
-                      setReady(false);
-                      // If user is trying a previously-failed source, give it
-                      // another chance by removing it from the fail-set.
-                      setErrorFallbackIdx(prev => {
-                        if (!prev.has(i)) return prev;
-                        const next = new Set(prev); next.delete(i); return next;
-                      });
-                    }}
-                    label={s.label}
-                    tone={s.tone}
-                    ms={sourceHealth[i]}
-                    failed={errorFallbackIdx.has(i)}
-                  />
-                ))}
-              </div>
+              ))}
             </Panel>
           )}
 
-          {/* Downloads */}
+          {/* Premium DOWNLOADS — unified list, accent only as indicator */}
           {downloads.length > 0 && (
             <Panel title="Downloads" hint={`${downloads.length} mirrors`}>
-              <div className="grid grid-cols-2 gap-1.5">
-                {downloads.map((d, i) => (
-                  <a
-                    key={i}
-                    href={d.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[11.5px] font-bold text-white transition-all hover:brightness-110 active:scale-95"
-                    style={{ background: d.bg }}
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    {d.label}
-                  </a>
-                ))}
-              </div>
+              {downloads.map((d, i) => (
+                <a
+                  key={i}
+                  href={d.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] transition-all hover:translate-y-[-1px] ring-focus"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-accent)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(0,0,0,0.25)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
+                >
+                  <span className="w-1 h-6 rounded-full" style={{ background: d.bg }} />
+                  <svg className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="flex-1 text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{d.label}</span>
+                  <span className="text-[10.5px] font-mono opacity-70" style={{ color: 'var(--text-muted)' }}>↓</span>
+                </a>
+              ))}
             </Panel>
           )}
 
-          {/* Up Next */}
+          {/* Premium UP NEXT — wider thumbs, cleaner type */}
           {others.length > 0 && (
             <Panel title="Up next" hint={`${others.length}`}>
-              <div className="space-y-1.5">
-                {others.map(o => (
-                  <button
-                    key={o.videoId}
-                    onClick={() => { onNav(o); window.scrollTo(0, 0); }}
-                    className="flex gap-2.5 w-full text-left rounded-md p-1.5 -mx-1.5 transition-colors hover:bg-[var(--bg3)] group ring-focus"
-                  >
-                    <div className="w-28 shrink-0 aspect-video rounded-md overflow-hidden" style={{ background: 'var(--bg3)' }}>
-                      <img src={o.thumbnail} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        onError={(e: any) => { e.target.src = '/thumbnail.jpg'; }} />
-                    </div>
-                    <div className="min-w-0 pt-0.5">
-                      <p className="text-[11.5px] font-semibold line-clamp-2 leading-snug" style={{ color: 'var(--tx)' }}>{o.title}</p>
-                      <p className="text-[10px] mt-1" style={{ color: 'var(--tx3)' }}>{o.date} · {o.durationFmt}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {others.map(o => (
+                <button
+                  key={o.videoId}
+                  onClick={() => { onNav(o); window.scrollTo(0, 0); }}
+                  className="flex gap-3 w-full text-left rounded-[12px] p-2 transition-all hover:bg-[var(--bg-elevated)] group ring-focus"
+                  style={{ marginBottom: '4px' }}
+                >
+                  <div className="w-[120px] shrink-0 aspect-video rounded-[8px] overflow-hidden relative" style={{ background: 'var(--bg-elevated)' }}>
+                    <img src={o.thumbnail} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                      onError={(e: any) => { e.target.src = '/thumbnail.jpg'; }} />
+                    {o.durationFmt && (
+                      <span className="absolute bottom-1 right-1 frost-badge !text-[9px] !px-1.5 !py-0.5 tabular-nums">{o.durationFmt}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 pt-0.5 flex-1">
+                    <p className="text-[12.5px] font-semibold line-clamp-2 leading-snug" style={{ color: 'var(--text-primary)' }}>{o.title}</p>
+                    <p className="text-[10.5px] mt-1" style={{ color: 'var(--text-muted)' }}>{o.date}</p>
+                  </div>
+                </button>
+              ))}
             </Panel>
           )}
         </aside>
@@ -663,72 +662,85 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   );
 }
 
-// ── Reusable sidebar panel ────────────────────────────────────────────────
+// Premium sidebar panel — refined heading + soft surface
 function Panel({ title, hint, right, children }: { title: string; hint?: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border p-3" style={{ borderColor: 'var(--bd)', background: 'var(--bg2)' }}>
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-baseline gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-[.2em]" style={{ color: 'var(--tx3)' }}>{title}</p>
-          {hint && <span className="text-[10px] font-mono" style={{ color: 'var(--tx4)' }}>{hint}</span>}
+    <div className="rounded-[14px] border p-3.5" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}>
+      <div className="flex items-center justify-between mb-3 px-0.5">
+        <div className="flex items-center gap-2">
+          <span className="w-1 h-3 rounded-full" style={{ background: 'var(--accent-primary)' }} />
+          <p className="text-[10.5px] font-bold uppercase tracking-[.2em]" style={{ color: 'var(--text-secondary)' }}>{title}</p>
+          {hint && <span className="text-[10px] font-mono opacity-60" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
         </div>
         {right}
       </div>
-      {children}
+      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }
 
-const toneMap: Record<string, string> = {
-  emerald: 'var(--emerald)',
-  red:     'var(--red)',
-  gold:    'var(--gold)',
-  sky:     'var(--sky)',
-  violet:  'var(--violet)',
+// Friendly sublabels for each playback source name (instead of raw tone colors)
+const SUBLABELS: Record<string, string> = {
+  GHOST: 'YouTube · 1080p',
+  R3AL:  'Archive.org',
+  B3ING: 'GitHub Direct',
+  STORM: 'Cloudflare',
+  BUNNY: 'Archive Mirror',
 };
 
-function SourceBtn({ active, onClick, label, tone, ms, best, failed }: {
-  active: boolean; onClick: () => void; label: string; tone: string;
-  ms?: number; best?: boolean;
-  // `failed` = Vidstack actually raised an error event on this source.
-  // ONLY this should disable the button — probe failures are advisory.
+// Premium source row — unified design, only colored DOT indicates health
+function SourceRow({ active, onClick, label, sublabel, ms, primary, failed }: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  sublabel?: string;
+  ms?: number;
+  primary?: boolean;
   failed?: boolean;
 }) {
-  const color = toneMap[tone] || 'var(--tx2)';
   const probeFailed = ms === -1;
   const status =
     failed ? 'fail'
     : ms === undefined ? 'idle'
-    : probeFailed ? 'slow'   // probe failed ≠ source is dead; show as "slow/unknown" not red
+    : probeFailed ? 'slow'
     : ms < 300 ? 'fast'
     : ms < 1200 ? 'ok'
     : 'slow';
   const dotColor =
-    status === 'fail' ? 'var(--red)'
-    : status === 'fast' ? 'var(--emerald)'
-    : status === 'ok' ? 'var(--gold)'
-    : status === 'slow' ? 'var(--tx3)'
-    : 'var(--tx4)';
+    status === 'fail' ? 'var(--accent-glow)'
+    : status === 'fast' ? '#10b981'
+    : status === 'ok'   ? 'var(--accent-gold)'
+    : status === 'slow' ? 'var(--text-muted)'
+    : 'var(--text-muted)';
   return (
     <button
       onClick={onClick}
-      title={failed ? 'This source failed during playback — click anyway to retry' : undefined}
-      className="inline-flex items-center justify-between px-2.5 py-2 rounded-md text-[11.5px] font-bold transition-all ring-focus cursor-pointer"
+      title={failed ? 'This source failed during playback — click to retry' : undefined}
+      className="w-full flex items-center justify-between px-3 py-2.5 rounded-[10px] transition-all ring-focus cursor-pointer hover:translate-y-[-1px]"
       style={{
-        background: active ? color : 'var(--bg3)',
-        color: active ? '#fff' : 'var(--tx)',
-        border: '1px solid', borderColor: active ? color : 'var(--bd2)',
-        opacity: failed ? .55 : 1,
+        background: active ? 'rgba(198, 40, 40, 0.12)' : 'var(--bg-elevated)',
+        border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+        opacity: failed ? .60 : 1,
         textDecoration: failed ? 'line-through' : 'none',
+        boxShadow: active ? '0 4px 14px -4px rgba(198, 40, 40, 0.35)' : 'none',
       }}
+      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-accent)'; }}
+      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}
     >
-      <span className="flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? '#fff' : dotColor }} />
-        {label}
-        {best && <span className="text-[8.5px] opacity-70 font-mono">⚡</span>}
-      </span>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="relative w-2 h-2 rounded-full shrink-0" style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
+        <div className="text-left min-w-0">
+          <div className="text-[12.5px] font-bold flex items-center gap-1.5" style={{ color: active ? '#fff' : 'var(--text-primary)' }}>
+            {label}
+            {primary && <span className="text-[9px] opacity-70 font-mono">⚡</span>}
+          </div>
+          {sublabel && (
+            <div className="text-[10px] mt-0.5 opacity-70 truncate" style={{ color: active ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)' }}>{sublabel}</div>
+          )}
+        </div>
+      </div>
       {ms !== undefined && ms > 0 && (
-        <span className="text-[9px] font-mono opacity-60 tabular-nums">{Math.round(ms)}ms</span>
+        <span className="text-[10px] font-mono opacity-65 tabular-nums shrink-0" style={{ color: active ? '#fff' : 'var(--text-muted)' }}>{Math.round(ms)}ms</span>
       )}
     </button>
   );
