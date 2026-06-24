@@ -483,17 +483,15 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
           <div className="px-4 sm:px-6 pt-6 pb-3">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <h1 className="font-display text-xl sm:text-2xl font-bold leading-tight" style={{ color: 'var(--tx)' }}>
+                <h1 className="font-display text-[22px] sm:text-[26px] font-bold leading-tight tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>
                   {rec.title}
                 </h1>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] mt-2.5" style={{ color: 'var(--tx3)' }}>
-                  <span title={rec.recordedAt}>{fmtRelative(rec.recordedAt || rec.date)}</span>
-                  <span style={{ color: 'var(--tx4)' }}>·</span>
-                  <span className="tabular-nums">{rec.durationFmt}</span>
-                  <span style={{ color: 'var(--tx4)' }}>·</span>
-                  <span>{rec.resolution || '—'}</span>
-                  <span style={{ color: 'var(--tx4)' }}>·</span>
-                  <span className="tabular-nums">{rec.sizeHuman}</span>
+                {/* Meta as premium pills (frosted background, subtle border) */}
+                <div className="flex flex-wrap items-center gap-2 mt-3.5">
+                  <span className="pill" title={rec.recordedAt}>{fmtRelative(rec.recordedAt || rec.date)}</span>
+                  <span className="pill tabular-nums font-mono">{rec.durationFmt}</span>
+                  <span className="pill">{rec.resolution || '—'}</span>
+                  <span className="pill tabular-nums font-mono">{rec.sizeHuman}</span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
