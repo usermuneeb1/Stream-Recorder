@@ -401,6 +401,17 @@ media-player iframe[src*="youtube-nocookie.com"] {
   opacity: 0 !important;
   pointer-events: none;
 }
+
+/* Sprite-preview overlay (StreamCard hover) — render the scaled-up sprite
+   sheet with the browser's HIGH-QUALITY image scaling (smoother than the
+   default 'auto' which often falls back to nearest-neighbour for big
+   upscales). Combined with the bigger 240×135 source tiles, this gives
+   sharp hover frames instead of the blurry tiled look. */
+.sprite-preview {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  image-rendering: smooth;
+}
 .ghost-mask.ghost-ready iframe {
   opacity: 1 !important;
   pointer-events: auto;

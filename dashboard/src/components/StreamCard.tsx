@@ -93,7 +93,7 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }:
             ? <img src={rec.thumbnail} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
             : <FallbackArt />}
           {sprite && (
-            <div className="absolute inset-0 transition-opacity duration-300 pointer-events-none" style={{ ...sprite, backgroundRepeat: 'no-repeat', opacity: hover ? 1 : 0 }} aria-hidden="true" />
+            <div className="absolute inset-0 transition-opacity duration-300 pointer-events-none sprite-preview" style={{ ...sprite, backgroundRepeat: 'no-repeat', opacity: hover ? 1 : 0 }} aria-hidden="true" />
           )}
           <Badges featured={featured} isHD={isHD} duration={rec.durationFmt} hasGhost={hasGhost} />
           {pct > 0 && !watched && <ProgressBar pct={pct} />}
@@ -140,7 +140,7 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }:
           ? <img src={rec.thumbnail} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
           : <FallbackArt />}
         {sprite && (
-          <div className="absolute inset-0 transition-opacity duration-300 pointer-events-none" style={{ ...sprite, backgroundRepeat: 'no-repeat', opacity: hover ? 1 : 0 }} aria-hidden="true" />
+          <div className="absolute inset-0 transition-opacity duration-300 pointer-events-none sprite-preview" style={{ ...sprite, backgroundRepeat: 'no-repeat', opacity: hover ? 1 : 0 }} aria-hidden="true" />
         )}
         {/* Vignette on hover for premium feel */}
         <div className="absolute inset-0 transition-opacity duration-400 pointer-events-none" style={{ background: 'var(--gradient-card-hover)', opacity: hover ? 1 : 0 }} />
