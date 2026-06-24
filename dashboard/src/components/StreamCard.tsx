@@ -3,35 +3,34 @@ import type { Recording } from '../utils/dataFetcher';
 import { fmtDate, fmtRelative, copyText } from '../utils/format';
 import { loadPosition } from '../utils/history';
 
-// FEATURE: Netflix-style hover preview. When the user hovers a card that has
-// a storyboard, animate through 6 evenly-spaced sprite tiles to give a
-// rich preview of the recording's content (instead of a static thumbnail).
+interface P {
+  rec: Recording;
+  onClick: () => void;
+  delay?: number;
+  view: 'grid' | 'list';
+  onToast?: (m: string) => void;
+  featured?: boolean;
+}
+
+// Netflix-style sprite preview on hover
 function useSpritePreview(rec: Recording, hover: boolean) {
   const sb = rec.storyboard;
   const [tile, setTile] = useState(0);
-  const interval = useRef<number | null>(null);
+  const id = useRef<number | null>(null);
   const PREVIEW_TILES = 6;
-
   useEffect(() => {
     if (!sb || !hover) {
-      if (interval.current) { clearInterval(interval.current); interval.current = null; }
-      setTile(0);
-      return;
+      if (id.current) { clearInterval(id.current); id.current = null; }
+      setTile(0); return;
     }
     setTile(0);
-    interval.current = window.setInterval(() => {
-      setTile(t => (t + 1) % PREVIEW_TILES);
-    }, 700);
-    return () => {
-      if (interval.current) { clearInterval(interval.current); interval.current = null; }
-    };
+    id.current = window.setInterval(() => setTile(t => (t + 1) % PREVIEW_TILES), 700);
+    return () => { if (id.current) { clearInterval(id.current); id.current = null; } };
   }, [hover, sb]);
-
   if (!sb) return null;
-  // Pick PREVIEW_TILES tiles evenly spaced from across the whole sheet.
   const total = sb.n_frames || (sb.cols! * sb.rows!);
-  const stepFrac = total / PREVIEW_TILES;
-  const idx = Math.min(total - 1, Math.floor(tile * stepFrac));
+  const step = total / PREVIEW_TILES;
+  const idx = Math.min(total - 1, Math.floor(tile * step));
   const cols = sb.cols || 5;
   const col = idx % cols;
   const row = Math.floor(idx / cols);
@@ -41,229 +40,203 @@ function useSpritePreview(rec: Recording, hover: boolean) {
     backgroundImage: `url(${sb.url})`,
     backgroundPosition: `-${col * w}px -${row * h}px`,
     backgroundSize: `${cols * w}px auto`,
-    width: '100%',
-    height: '100%',
-    imageRendering: 'auto' as const,
   };
-}
-
-interface P {
-  rec: Recording;
-  onClick: () => void;
-  delay?: number;
-  view: 'grid' | 'list';
-  onToast?: (m: string) => void;
-  // Newest recording — gets a subtle premium gold ring animation
-  featured?: boolean;
 }
 
 export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }: P) {
   const [err, setErr] = useState(false);
   const [hover, setHover] = useState(false);
   const isHD = /1080|1440|2160|4k/i.test(rec.resolution);
-  const spriteStyle = useSpritePreview(rec, hover);
-
-  // FEATURE: watched-progress overlay (YouTube-style). Reads the user's saved
-  // playback position from localStorage. If they got past 95%, mark as fully
-  // watched (with a checkmark badge); else show a red progress bar.
+  const sprite = useSpritePreview(rec, hover);
   const saved = loadPosition(rec.videoId);
-  const progressPct = saved && saved.d > 0
-    ? Math.min(100, Math.max(0, (saved.t / saved.d) * 100))
-    : 0;
-  const fullyWatched = progressPct >= 95;
+  const pct = saved && saved.d > 0 ? Math.min(100, Math.max(0, (saved.t / saved.d) * 100)) : 0;
+  const watched = pct >= 95;
+  const hasGhost = !!rec.youtubeId;
 
-  const copy = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const copy = (e: React.MouseEvent | React.PointerEvent) => {
+    e.stopPropagation(); e.preventDefault();
     const url = `${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}`;
     copyText(url).then(ok => onToast?.(ok ? 'Link copied!' : 'Copy failed'));
   };
-
-  // FIX #24 — outer was <button>, but it contains another <button> (copy
-  // link) → invalid HTML. Replaced with a div+role=button so the inner
-  // copy button remains a real interactive element with its own a11y
-  // tree. Keyboard activation (Enter/Space) is preserved manually.
-  const cardKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
-  };
+  const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } };
 
   if (view === 'list') {
     return (
       <div
-        role="button"
-        tabIndex={0}
-        onClick={onClick}
-        onKeyDown={cardKeyDown}
-        className="w-full flex items-stretch gap-4 sm:gap-5 p-3 rounded-xl border text-left fade-up group transition-all hover:border-[var(--bd3)] hover:bg-[var(--bg2)] ring-focus cursor-pointer"
-        style={{ animationDelay: `${delay}ms`, borderColor: 'var(--bd)' }}
+        role="button" tabIndex={0}
+        onClick={onClick} onKeyDown={onKey}
+        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        className="card-surface w-full flex items-stretch gap-4 sm:gap-5 p-3 fade-up group cursor-pointer ring-focus"
+        style={{ animationDelay: `${delay}ms` }}
       >
-        <div className="relative w-48 sm:w-56 shrink-0 aspect-video rounded-lg overflow-hidden" style={{ background: 'var(--bg3)' }}>
+        <div className="relative w-48 sm:w-60 shrink-0 aspect-video rounded-[10px] overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
           {!err
-            ? <img src={rec.thumbnail} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center opacity-30">📺</div>}
-          {rec.durationFmt && (
-            <span className="absolute bottom-1.5 right-1.5 bg-black/85 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-              {rec.durationFmt}
-            </span>
+            ? <img src={rec.thumbnail} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
+            : <FallbackArt />}
+          {sprite && (
+            <div className="absolute inset-0 transition-opacity duration-300 pointer-events-none" style={{ ...sprite, backgroundRepeat: 'no-repeat', opacity: hover ? 1 : 0 }} aria-hidden="true" />
           )}
-          {isHD && (
-            <span className="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--red)', color: '#fff' }}>HD</span>
-          )}
-          {/* FEATURE: watched-progress bar (YouTube-style) */}
-          {progressPct > 0 && !fullyWatched && (
-            <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: 'rgba(255,255,255,.18)' }}>
-              <div className="h-full" style={{ width: `${progressPct}%`, background: 'var(--red)' }} />
-            </div>
-          )}
-          {fullyWatched && (
-            <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/80 text-white">
-              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              Watched
-            </span>
-          )}
+          <Badges featured={featured} isHD={isHD} duration={rec.durationFmt} hasGhost={hasGhost} />
+          {pct > 0 && !watched && <ProgressBar pct={pct} />}
+          {watched && <WatchedBadge />}
         </div>
-        <div className="flex-1 min-w-0 flex flex-col py-1">
-          <h3 className="font-display text-[15px] sm:text-base font-semibold leading-tight line-clamp-2 mb-1.5" style={{ color: 'var(--tx)' }}>
+        <div className="flex-1 min-w-0 flex flex-col py-1.5">
+          <h3 className="font-display text-[15px] sm:text-[16px] font-semibold leading-tight line-clamp-2 mb-2" style={{ color: 'var(--text-primary)' }}>
             {rec.title}
           </h3>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]" style={{ color: 'var(--tx3)' }}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
             <span>{fmtDate(rec.date)}</span>
-            <span style={{ color: 'var(--tx4)' }}>·</span>
+            <Dot />
             <span className="tabular-nums">{rec.sizeHuman}</span>
-            <span style={{ color: 'var(--tx4)' }}>·</span>
+            <Dot />
             <span>{rec.resolution || '—'}</span>
           </div>
         </div>
         <div className="flex items-center pr-2">
-          <button onClick={copy} className="btn-ghost btn !p-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Copy link">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-            </svg>
+          <button
+            type="button"
+            onClick={copy}
+            onPointerDown={e => e.stopPropagation()}
+            className="btn-ghost btn !p-2 opacity-0 group-hover:opacity-100 transition-opacity ring-focus"
+            title="Copy share link" aria-label="Copy link"
+          >
+            <CopyIcon />
           </button>
         </div>
       </div>
     );
   }
 
-  // ── Grid card ───────────────────────────────────────────────────────── (FIX #24)
+  // ─── GRID CARD ───────────────────────────────────────────────────────
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={cardKeyDown}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className="text-left w-full group focus:outline-none fade-up ring-focus rounded-xl cursor-pointer"
+      role="button" tabIndex={0}
+      onClick={onClick} onKeyDown={onKey}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      className="card-surface group fade-up cursor-pointer ring-focus overflow-hidden"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div
-        className={`relative aspect-video rounded-xl overflow-hidden ring-1 transition-all duration-300 group-hover:ring-[var(--red)]/50 ${featured ? 'featured-ring' : ''}`}
-        style={{ background: 'var(--bg2)', boxShadow: hover ? 'var(--shadow-lg)' : 'none', '--tw-ring-color': 'var(--bd2)' } as any}
-      >
+      <div className="relative aspect-video overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
         {!err
-          ? <img
-              src={rec.thumbnail}
-              alt=""
-              loading="lazy"
-              onError={() => setErr(true)}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-            />
-          : <div className="w-full h-full flex items-center justify-center opacity-25" style={{ color: 'var(--tx3)' }}>
-              <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </div>}
-
-        {/* FEATURE: Storyboard preview — fades over the static thumbnail
-            while hovering, cycles through 6 frames from across the video. */}
-        {spriteStyle && (
-          <div
-            className="absolute inset-0 transition-opacity duration-300 pointer-events-none"
-            style={{
-              ...spriteStyle,
-              backgroundRepeat: 'no-repeat',
-              opacity: hover ? 1 : 0,
-            }}
-            aria-hidden="true"
-          />
+          ? <img src={rec.thumbnail} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" />
+          : <FallbackArt />}
+        {sprite && (
+          <div className="absolute inset-0 transition-opacity duration-300 pointer-events-none" style={{ ...sprite, backgroundRepeat: 'no-repeat', opacity: hover ? 1 : 0 }} aria-hidden="true" />
         )}
+        {/* Vignette on hover for premium feel */}
+        <div className="absolute inset-0 transition-opacity duration-400 pointer-events-none" style={{ background: 'var(--gradient-card-hover)', opacity: hover ? 1 : 0 }} />
 
-        {/* HD + NEWEST badges (premium polish) */}
-        <div className="absolute top-2.5 left-2.5 flex gap-1.5">
-          {featured && (
-            <span
-              className="text-[9px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-              style={{ background: 'linear-gradient(135deg, var(--gold), #f59e0b)', color: '#1a1300' }}
-            >
-              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6L12 2z" />
-              </svg>
-              NEWEST
-            </span>
-          )}
-          {isHD && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--red)', color: '#fff' }}>HD</span>
-          )}
-        </div>
+        <Badges featured={featured} isHD={isHD} duration={rec.durationFmt} hasGhost={hasGhost} />
+        {pct > 0 && !watched && <ProgressBar pct={pct} />}
+        {watched && <WatchedBadge />}
 
-        {/* Duration badge */}
-        {rec.durationFmt && (
-          <span className="absolute bottom-2 right-2 bg-black/85 text-white text-[10px] font-bold px-1.5 py-0.5 rounded tabular-nums">
-            {rec.durationFmt}
-          </span>
-        )}
-
-        {/* FEATURE: watched-progress bar (YouTube-style) — grid card */}
-        {progressPct > 0 && !fullyWatched && (
-          <div className="absolute bottom-0 left-0 right-0 h-[3px] z-10" style={{ background: 'rgba(255,255,255,.18)' }}>
-            <div className="h-full" style={{ width: `${progressPct}%`, background: 'var(--red)' }} />
-          </div>
-        )}
-        {fullyWatched && (
-          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/80 text-white z-10">
-            <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            Watched
-          </span>
-        )}
-
-        {/* Copy-link quick action */}
+        {/* Copy link quick action */}
         <button
+          type="button"
           onClick={copy}
-          className="absolute top-2.5 right-2.5 p-1.5 rounded-md glass opacity-0 group-hover:opacity-100 transition-opacity hover:!bg-[var(--red)] hover:!text-white"
-          style={{ color: 'var(--tx)' }}
-          title="Copy share link"
-          aria-label="Copy link"
+          onPointerDown={e => e.stopPropagation()}
+          className="absolute top-2.5 right-2.5 p-1.5 rounded-md glass opacity-0 group-hover:opacity-100 transition-all hover:!bg-[var(--accent-primary)] hover:!text-white z-10"
+          style={{ color: 'var(--text-primary)' }}
+          title="Copy share link" aria-label="Copy link"
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-          </svg>
+          <CopyIcon w="3.5" />
         </button>
 
-        {/* Play overlay */}
-        <div className="absolute inset-0 flex items-center justify-center transition-all bg-black/0 group-hover:bg-black/40">
+        {/* Center play overlay (premium circle + glow) */}
+        <div className="absolute inset-0 flex items-center justify-center transition-all duration-400 pointer-events-none" style={{ background: hover ? 'rgba(0, 0, 0, 0.30)' : 'transparent' }}>
           <div
-            className="w-14 h-14 rounded-full flex items-center justify-center scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-100 transition-all duration-300 glow-red"
-            style={{ background: 'var(--red)' }}
+            className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-400"
+            style={{
+              background: 'rgba(198, 40, 40, 0.95)',
+              opacity: hover ? 1 : 0,
+              transform: hover ? 'scale(1)' : 'scale(0.85)',
+              boxShadow: '0 8px 32px rgba(198, 40, 40, 0.6)',
+            }}
           >
-            <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
+            <svg className="w-6 h-6 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
           </div>
         </div>
       </div>
 
-      <div className="mt-3">
-        <h3 className="font-display text-[14px] font-semibold leading-snug line-clamp-2 group-hover:text-[var(--red)] transition-colors" style={{ color: 'var(--tx)' }}>
+      {/* Card body */}
+      <div className="px-3.5 sm:px-4 pt-3 pb-3.5">
+        <h3 className="font-display text-[14.5px] sm:text-[15px] font-semibold leading-snug line-clamp-2 mb-2" style={{ color: 'var(--text-primary)' }}>
           {rec.title}
         </h3>
-        <p className="text-[11px] mt-1.5 tabular-nums" style={{ color: 'var(--tx3)' }}>
-          <span title={rec.recordedAt}>{fmtRelative(rec.recordedAt || rec.date)}</span>
-          <span className="mx-1.5" style={{ color: 'var(--tx4)' }}>·</span>
-          <span>{rec.sizeHuman}</span>
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
+          <span>{fmtRelative(rec.recordedAt || rec.date)}</span>
+          <Dot />
+          <span className="tabular-nums">{rec.sizeHuman}</span>
+        </div>
       </div>
     </div>
+  );
+}
+
+function Badges({ featured, isHD, duration, hasGhost }: { featured?: boolean; isHD: boolean; duration?: string; hasGhost?: boolean }) {
+  return (
+    <>
+      {/* Top-left stack */}
+      <div className="absolute top-2.5 left-2.5 flex gap-1.5 z-10">
+        {featured && (
+          <span className="frost-badge !text-[9.5px] inline-flex items-center gap-1" style={{ background: 'rgba(255, 107, 53, 0.92)', color: '#fff', borderColor: 'rgba(255, 200, 150, 0.30)' }}>
+            <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6L12 2z" /></svg>
+            NEWEST
+          </span>
+        )}
+        {isHD && <span className="frost-badge !text-[9.5px]" style={{ background: 'rgba(0, 0, 0, 0.78)', color: '#fff' }}>HD</span>}
+      </div>
+      {/* Top-right: ghost mirror indicator */}
+      {hasGhost && (
+        <div className="absolute top-2.5 right-12 z-10" title="YouTube ghost-host available">
+          <span className="frost-badge !text-[9.5px] inline-flex items-center gap-1" style={{ background: 'rgba(212, 168, 83, 0.20)', borderColor: 'rgba(212, 168, 83, 0.35)', color: 'var(--accent-gold)' }}>
+            ★ HD MIRROR
+          </span>
+        </div>
+      )}
+      {/* Bottom-right duration */}
+      {duration && (
+        <span className="frost-badge absolute bottom-2.5 right-2.5 tabular-nums z-10" style={{ background: 'rgba(10, 10, 15, 0.85)' }}>
+          {duration}
+        </span>
+      )}
+    </>
+  );
+}
+
+function ProgressBar({ pct }: { pct: number }) {
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-[3px] z-20" style={{ background: 'rgba(255, 255, 255, 0.18)' }}>
+      <div className="h-full" style={{ width: `${pct}%`, background: 'var(--accent-glow)', boxShadow: '0 0 8px rgba(255, 61, 61, 0.6)' }} />
+    </div>
+  );
+}
+
+function WatchedBadge() {
+  return (
+    <span className="absolute bottom-2.5 left-2.5 frost-badge !text-[9px] inline-flex items-center gap-1 z-10" style={{ background: 'rgba(0, 0, 0, 0.85)' }}>
+      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      Watched
+    </span>
+  );
+}
+
+function FallbackArt() {
+  return (
+    <div className="w-full h-full flex items-center justify-center opacity-25" style={{ color: 'var(--text-muted)' }}>
+      <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+    </div>
+  );
+}
+
+function Dot() { return <span style={{ color: 'var(--text-muted)' }}>·</span>; }
+function CopyIcon({ w = '4' }: { w?: string }) {
+  return (
+    <svg className={`w-${w} h-${w}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+    </svg>
   );
 }
