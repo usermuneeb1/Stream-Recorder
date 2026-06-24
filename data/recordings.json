@@ -165,13 +165,17 @@
         "label": "Stream starts"
       },
       {
-        "time": 7590,
-        "label": "Odens joins"
+        "time": 2400,
+        "label": "Sam joins"
+      },
+      {
+        "time": 6125,
+        "label": "Guest joins"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-05-lQySsXx00Io-1778454605/transcript.json",
-    "ai_enriched_at": "2026-06-15T15:40:46Z",
-    "chapter_logic_version": 10,
+    "ai_enriched_at": "2026-06-24T12:05:24Z",
+    "chapter_logic_version": 12,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
     "telegram_link": "https://t.me/c/4304551882/13",
@@ -220,28 +224,24 @@
       },
       {
         "time": 3600,
-        "label": "Sister in chat joins"
+        "label": "Sister joins"
       },
       {
-        "time": 3840,
-        "label": "Lucid joins"
+        "time": 3720,
+        "label": "Zakat question"
       },
       {
-        "time": 4081,
-        "label": "Brother joins"
+        "time": 4200,
+        "label": "Wudu question"
       },
       {
-        "time": 4564,
-        "label": "Last caller joins"
-      },
-      {
-        "time": 4800,
-        "label": "Stream ends"
+        "time": 4441,
+        "label": "Christian caller"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-LT7jTHW_e8Y-1777157490/transcript.json",
-    "ai_enriched_at": "2026-06-14T11:52:32Z",
-    "chapter_logic_version": 9,
+    "ai_enriched_at": "2026-06-24T12:12:05Z",
+    "chapter_logic_version": 12,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
     "telegram_link": "https://t.me/c/4304551882/14",
