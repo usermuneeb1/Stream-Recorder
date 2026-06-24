@@ -72,8 +72,8 @@ INTERVAL_SEC   = int(os.environ.get("STORYBOARD_INTERVAL_SEC", "30"))
 COLS           = int(os.environ.get("STORYBOARD_COLS", "10"))
 # Smaller tiles (was 160×90 → 120×68) — half the pixels, much faster to
 # encode and a smaller final JPEG to upload to free hosts.
-THUMB_W        = int(os.environ.get("STORYBOARD_THUMB_W", "120"))
-THUMB_H        = int(os.environ.get("STORYBOARD_THUMB_H", "68"))
+THUMB_W        = int(os.environ.get("STORYBOARD_THUMB_W", "240"))
+THUMB_H        = int(os.environ.get("STORYBOARD_THUMB_H", "135"))
 MIN_DURATION   = int(os.environ.get("STORYBOARD_MIN_DURATION_SEC", "600"))
 FORCE          = os.environ.get("STORYBOARD_FORCE", "false").lower() in ("1", "true", "yes")
 # 8-minute ceiling (was 4) — long streams need more time to download frames
@@ -132,7 +132,7 @@ def build_sprite(source_url: str, duration: int, out_path: pathlib.Path) -> Opti
         "-i", source_url,
         "-vf", vf,
         "-frames:v", "1",
-        "-q:v", "5",   # JPEG quality (1=best,31=worst); 5 is small + sharp enough
+        "-q:v", "3",   # JPEG quality (1=best,31=worst); 3 is sharper for 240×135
         str(out_path),
     ]
     log(f"running ffmpeg ({n_frames} tiles, {COLS}×{rows}, ~{THUMB_W*COLS}×{THUMB_H*rows}px)")

@@ -74,14 +74,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   const downloads = useMemo(() => getDownloads(rec), [rec]);
 
   const [si, setSi] = useState(0);            // 0 = Auto, 1..N = sources[i-1]
-  // Quality preference, persisted across recordings so a 1080p user stays
-  // at 1080p on every new video they open.
-  type QPref = 'auto' | 'hd1080' | 'hd720' | 'large' | 'medium' | 'small';
-  const Q_LABELS: Record<QPref, string> = {
-    auto: 'Auto', hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p',
-  };
-  const [quality, setQualityState] = useState<QPref>(() => (localStorage.getItem('mla_quality_v1') as QPref) || 'hd1080');
-  useEffect(() => { try { localStorage.setItem('mla_quality_v1', quality); } catch { /* quota */ } }, [quality]);
   const [autoIdx, setAutoIdx] = useState(0);  // resolved index when in Auto
   const [t, setT] = useState(0);
   const [ready, setReady] = useState(false);
@@ -321,19 +313,15 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     p.addEventListener('qualities-change', onQualities);
     onQualities();
 
-    // For YouTube (GHOST): postMessage to the iframe to set the user's
-    // preferred quality. Tries the user's choice first, then degrades to
-    // smaller sizes. YouTube silently ignores any quality it can't deliver.
+    // For YouTube (GHOST): force HD via postMessage to the iframe.
+    // Tries hd1080 → hd720 → large; YouTube silently ignores any rung
+    // it can't deliver, so this always lands on the best available.
     const forceYTQuality = () => {
       const iframe = (p as any).provider?.iframe as HTMLIFrameElement | undefined
         || document.querySelector('media-player iframe[src*="youtube"]') as HTMLIFrameElement | null;
       if (!iframe?.contentWindow) return;
       const target = iframe.contentWindow;
-      // Build try-order: user's preference first, then degrade.
-      const order: QPref[] = quality === 'auto'
-        ? ['hd1080', 'hd720', 'large']
-        : ([quality, 'hd720', 'large', 'medium', 'small'] as QPref[]).filter((v, i, a) => a.indexOf(v) === i);
-      for (const q of order) {
+      for (const q of ['hd1080', 'hd720', 'large']) {
         try {
           target.postMessage(JSON.stringify({
             event: 'command', func: 'setPlaybackQuality', args: [q],
@@ -341,14 +329,11 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
         } catch { /* noop */ }
       }
     };
-    // Try every second for 10s after the player starts (YouTube's API
-    // becomes available a couple seconds after iframe first paints).
     let attempts = 0;
     const ytQualityInterval = window.setInterval(() => {
       if (attempts++ > 10) { clearInterval(ytQualityInterval); return; }
       forceYTQuality();
     }, 1000);
-    // Also fire immediately when the user changes quality preference.
     forceYTQuality();
 
     return () => {
@@ -356,7 +341,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
       p.removeEventListener('qualities-change', onQualities);
       clearInterval(ytQualityInterval);
     };
-  }, [ready, rec.videoId, quality]);
+  }, [ready, rec.videoId]);
 
   // ── Resume from URL ?t= or saved position ────────────────────────────────
   const [resumeShown, setResumeShown] = useState(false);
@@ -656,37 +641,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
               ))}
             </Panel>
           )}
-
-          {/* QUALITY — works on every source. For GHOST we postMessage the
-              YouTube iframe; for HLS/DASH (rare) we set Vidstack's selected
-              quality. mp4 sources don't have variants, so the chosen quality
-              is just the user's "preference for next time GHOST is active". */}
-          <Panel title="Quality" hint={Q_LABELS[quality]}>
-            {(['auto', 'hd1080', 'hd720', 'large', 'medium'] as QPref[]).map(q => (
-              <button
-                key={q}
-                onClick={() => setQualityState(q)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-[10px] transition-all ring-focus cursor-pointer hover:translate-y-[-1px]"
-                style={{
-                  background: quality === q ? 'rgba(198, 40, 40, 0.12)' : 'var(--bg-elevated)',
-                  border: `1px solid ${quality === q ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                  boxShadow: quality === q ? '0 4px 14px -4px rgba(198, 40, 40, 0.35)' : 'none',
-                }}
-                onMouseEnter={e => { if (quality !== q) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-accent)'; }}
-                onMouseLeave={e => { if (quality !== q) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: quality === q ? 'var(--accent-glow)' : 'var(--text-muted)', boxShadow: quality === q ? '0 0 6px var(--accent-glow)' : 'none' }} />
-                  <div className="text-[13px] font-bold" style={{ color: quality === q ? '#fff' : 'var(--text-primary)' }}>
-                    {Q_LABELS[q]}
-                  </div>
-                </div>
-                {q === 'hd1080' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-[.1em]" style={{ background: quality === q ? 'rgba(0,0,0,.25)' : 'var(--bg-deep)', color: quality === q ? '#fff' : 'var(--accent-gold)' }}>HD</span>
-                )}
-              </button>
-            ))}
-          </Panel>
 
           {/* Premium DOWNLOADS — unified list, accent only as indicator */}
           {downloads.length > 0 && (
