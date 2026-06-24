@@ -41,25 +41,25 @@ export function SlimHero({ recs }: { recs: Recording[] }) {
 
   return (
     <section className="mesh-hero noise-overlay rounded-[20px] border px-5 sm:px-9 py-7 sm:py-9 mb-8 relative fade-up" style={{ borderColor: 'var(--border-subtle)' }}>
-      {/* Decorative gold lines flanking the eyebrow label */}
-      <div className="flex items-center gap-3 mb-4 relative">
-        <div className="hidden sm:block h-px w-8" style={{ background: 'linear-gradient(to right, transparent, var(--accent-gold))' }} />
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'var(--gold-soft)', border: '1px solid rgba(212, 168, 83, 0.20)' }}>
-          <svg className="w-3.5 h-3.5" style={{ color: 'var(--accent-gold)', filter: 'drop-shadow(0 0 6px rgba(212, 168, 83, 0.45))' }} viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C9 2 8 4 8 6c0 1.5 1 2.5 1 4v1H7v2c0 4 1 8 5 8s5-4 5-8v-2h-2v-1c0-1.5 1-2.5 1-4 0-2-1-4-4-4z" opacity=".95"/>
-            <circle cx="12" cy="13" r="2" fill="#fff7d6"/>
-          </svg>
-          <p className="text-[10.5px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--accent-gold)' }}>
-            The Muslim Lantern Archive
-          </p>
-        </div>
-        <div className="hidden sm:block flex-1 h-px" style={{ background: 'linear-gradient(to right, var(--accent-gold), transparent)' }} />
+      {/* Elegant gold overline — decorative dashes flanking the brand text,
+          no badge background. Per round-2 spec: this should NOT look like a
+          system label. */}
+      <div className="flex items-center gap-3 mb-5 relative">
+        <span className="hidden sm:block h-px w-7" style={{ background: 'linear-gradient(to right, transparent, var(--accent-gold))' }} />
+        <svg className="w-3.5 h-3.5" style={{ color: 'var(--accent-gold)', filter: 'drop-shadow(0 0 6px rgba(212, 168, 83, 0.50))' }} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C9 2 8 4 8 6c0 1.5 1 2.5 1 4v1H7v2c0 4 1 8 5 8s5-4 5-8v-2h-2v-1c0-1.5 1-2.5 1-4 0-2-1-4-4-4z" opacity=".95"/>
+          <circle cx="12" cy="13" r="2" fill="#fff7d6"/>
+        </svg>
+        <p className="text-[10.5px] font-semibold uppercase tracking-[.18em]" style={{ color: 'var(--accent-gold)' }}>
+          The Muslim Lantern Archive
+        </p>
+        <span className="flex-1 h-px max-w-[180px] sm:max-w-none" style={{ background: 'linear-gradient(to right, var(--accent-gold), transparent)' }} />
       </div>
 
       <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6 relative">
         {/* Left — tagline */}
         <div className="max-w-2xl">
-          <p className="text-[11.5px] font-semibold uppercase tracking-[.18em] mb-2" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[13.5px] font-medium mb-2" style={{ color: 'var(--text-secondary)', letterSpacing: '0.02em' }}>
             {greeting()}
           </p>
           <h1 className="font-display text-[28px] sm:text-[38px] xl:text-[44px] font-extrabold leading-[1.04] tracking-[-0.02em]" style={{ color: 'var(--text-primary)' }}>

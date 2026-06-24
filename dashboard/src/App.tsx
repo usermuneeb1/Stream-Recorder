@@ -9,7 +9,6 @@ import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
 import { NotFoundPage } from './components/NotFoundPage';
 import { Footer } from './components/Footer';
-import { BottomStats } from './components/BottomStats';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 
@@ -251,12 +250,6 @@ export default function App() {
               <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 40} view="grid" onToast={setToast} featured={i === 0 && sort === 'newest' && !qDebounced.trim() && filter === 'all'} />
             ))}
           </div>
-        )}
-
-        {/* Bottom-of-home archive stats (sits inside <main> so it follows
-            the same max-width / padding as the recordings grid) */}
-        {!loading && recs.length > 0 && (
-          <BottomStats recs={recs} />
         )}
       </main>
 
