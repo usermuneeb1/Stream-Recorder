@@ -12,7 +12,19 @@ interface P {
   featured?: boolean;
 }
 
-// Netflix-style sprite preview on hover
+// Netflix-style sprite-preview hook.
+//
+// FIXED LAYOUT BUG: the sprite sheet was being rendered at native pixel size
+// (120×68 tiles in a 1200-wide sheet), which is much smaller than the card
+// area (~300px wide). The unscaled sheet got TILED across the card, showing
+// many tiles at once like a wallpaper. The fix uses percentage-based
+// background-size so a single tile fills the entire card area exactly.
+//
+// Math: background-size = (cols * 100%) horizontally and (rows * 100%)
+// vertically. background-position is then a percentage too — to show the
+// tile at column C of N: position-x = C / (N - 1) * 100%. (Not C/N — the
+// extra -1 is a CSS background-position quirk: it represents how far to
+// slide the larger image LEFT so the target tile aligns with the card.)
 function useSpritePreview(rec: Recording, hover: boolean) {
   const sb = rec.storyboard;
   const [tile, setTile] = useState(0);
@@ -24,22 +36,29 @@ function useSpritePreview(rec: Recording, hover: boolean) {
       setTile(0); return;
     }
     setTile(0);
-    id.current = window.setInterval(() => setTile(t => (t + 1) % PREVIEW_TILES), 700);
+    id.current = window.setInterval(() => setTile(t => (t + 1) % PREVIEW_TILES), 900);
     return () => { if (id.current) { clearInterval(id.current); id.current = null; } };
   }, [hover, sb]);
   if (!sb) return null;
-  const total = sb.n_frames || (sb.cols! * sb.rows!);
-  const step = total / PREVIEW_TILES;
-  const idx = Math.min(total - 1, Math.floor(tile * step));
-  const cols = sb.cols || 5;
+  const total = Math.max(1, sb.n_frames || ((sb.cols || 1) * (sb.rows || 1)));
+  // For short videos with fewer than PREVIEW_TILES total frames, just cycle
+  // through what we have instead of computing duplicates.
+  const previewCount = Math.min(PREVIEW_TILES, total);
+  const step = total / previewCount;
+  const idx = Math.min(total - 1, Math.floor(tile % previewCount * step));
+  const cols = Math.max(1, sb.cols || 1);
+  const rows = Math.max(1, sb.rows || Math.ceil(total / cols));
   const col = idx % cols;
   const row = Math.floor(idx / cols);
-  const w = sb.w || 160;
-  const h = sb.h || 90;
   return {
     backgroundImage: `url(${sb.url})`,
-    backgroundPosition: `-${col * w}px -${row * h}px`,
-    backgroundSize: `${cols * w}px auto`,
+    // Position uses the standard CSS percentage formula. If only 1 col or
+    // row, division-by-zero → use 0 to avoid NaN.
+    backgroundPositionX: cols > 1 ? `${(col / (cols - 1)) * 100}%` : '0%',
+    backgroundPositionY: rows > 1 ? `${(row / (rows - 1)) * 100}%` : '0%',
+    // Scale the sheet so ONE tile fills the entire container (the card).
+    backgroundSize: `${cols * 100}% ${rows * 100}%`,
+    backgroundRepeat: 'no-repeat',
   };
 }
 

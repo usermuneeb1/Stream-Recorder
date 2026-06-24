@@ -42,11 +42,14 @@ function getSources(r: Recording): Source[] {
   //     recording, so GHOST is reliably available on all videos.
   // The mp4 mirrors remain as fallbacks (manual selection or auto-failover).
   const gid = ghostId(r);
-  // GHOST URL includes ?vq=hd1080 → tells YouTube to start at 1080p
-  // instead of YouTube's bandwidth-adaptive default (often 480p first).
-  // &rel=0 disables the related-videos overlay at the end of playback.
-  // &modestbranding=1 hides most YouTube branding from the player chrome.
-  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}&vq=hd1080&rel=0&modestbranding=1`, tone: 'red', kind: 'youtube' });
+  // GHOST URL — YouTube IFrame embed parameters:
+  //   • vq=hd1080         — initial-quality hint (best-effort, ignored if BW too low)
+  //   • rel=0             — no 'related videos' overlay at end of playback
+  //   • modestbranding=1  — hide most YouTube branding from player chrome
+  //   • enablejsapi=1     — CRITICAL: allows postMessage commands so our
+  //                         setPlaybackQuality('hd1080') retry loop works
+  //   • playsinline=1     — iOS Safari doesn't go fullscreen on play
+  if (gid)                                                  out.push({ label: 'GHOST', url: `https://www.youtube.com/watch?v=${gid}&vq=hd1080&rel=0&modestbranding=1&enablejsapi=1&playsinline=1`, tone: 'red', kind: 'youtube' });
   if (r.archiveNode)                                        out.push({ label: 'R3AL',  url: r.archiveNode,                        tone: 'gold',    kind: 'mp4'    });
   if (r.githubDirect || r.githubRelease)                    out.push({ label: 'B3ING', url: (r.githubDirect || r.githubRelease), tone: 'sky',     kind: 'mp4'    });
   if (r.cfStream)                                           out.push({ label: 'STORM', url: r.cfStream,                           tone: 'violet',  kind: 'mp4'    });
@@ -267,25 +270,48 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     };
     p.addEventListener('rate-change', onRate);
 
-    // Force highest available quality once Vidstack has enumerated them.
-    // The YouTube embed gets 1080p via the ?vq=hd1080 URL param, but mp4
-    // sources don't have quality variants. For HLS / DASH (rare) this picks
-    // the top rung. Falls back silently if .qualities is empty.
+    // For HLS / DASH (rare): pick the highest rung via Vidstack's qualities API.
     const onQualities = () => {
       try {
         const qs = (p as any).qualities?.toArray?.() || [];
         if (qs.length > 0) {
-          // Pick highest height. Vidstack uses .selected = true on the chosen one.
           qs.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
           if (qs[0] && !qs[0].selected) qs[0].selected = true;
         }
       } catch { /* noop */ }
     };
     p.addEventListener('qualities-change', onQualities);
-    onQualities(); // try once now in case qualities are already loaded
+    onQualities();
+
+    // For YouTube (GHOST): postMessage directly to the iframe to force HD.
+    // Vidstack does not expose YouTube quality control, so we use YouTube's
+    // own IFrame Player API command channel. Try hd1080 → hd720 → large
+    // in order; YouTube silently ignores any quality it cant deliver.
+    const forceYTQuality = () => {
+      const iframe = (p as any).provider?.iframe as HTMLIFrameElement | undefined
+        || document.querySelector('media-player iframe[src*="youtube"]') as HTMLIFrameElement | null;
+      if (!iframe?.contentWindow) return;
+      const target = iframe.contentWindow;
+      for (const q of ['hd1080', 'hd720', 'large']) {
+        try {
+          target.postMessage(JSON.stringify({
+            event: 'command', func: 'setPlaybackQuality', args: [q],
+          }), '*');
+        } catch { /* noop */ }
+      }
+    };
+    // Try every second for 10s after the player starts — YouTube's quality
+    // picker becomes available a couple seconds after the iframe first plays.
+    let attempts = 0;
+    const ytQualityInterval = window.setInterval(() => {
+      if (attempts++ > 10) { clearInterval(ytQualityInterval); return; }
+      forceYTQuality();
+    }, 1000);
+
     return () => {
       p.removeEventListener('rate-change', onRate);
       p.removeEventListener('qualities-change', onQualities);
+      clearInterval(ytQualityInterval);
     };
   }, [ready, rec.videoId]);
 
@@ -562,7 +588,8 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 active={si === 0}
                 onClick={() => setSi(0)}
                 label="Auto"
-                ms={si === 0 ? sourceHealth[autoIdx] : undefined}
+                // Same as above — don't show ms when auto resolved to GHOST.
+                ms={si === 0 && sources[autoIdx]?.kind !== 'youtube' ? sourceHealth[autoIdx] : undefined}
                 primary
               />
               {sources.map((s, i) => (
@@ -578,7 +605,9 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                     });
                   }}
                   label={s.label}
-                  ms={sourceHealth[i]}
+                  // GHOST is YouTube via our own /api/yt proxy — the latency
+                  // here measures OUR server, not YouTube's CDN. Hide it.
+                  ms={s.kind === 'youtube' ? undefined : sourceHealth[i]}
                   failed={errorFallbackIdx.has(i)}
                 />
               ))}

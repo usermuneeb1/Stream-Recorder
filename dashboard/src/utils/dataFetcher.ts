@@ -100,8 +100,14 @@ function fmtDuration(f: string): string {
 }
 
 function thumb(id: string, t?: string): string {
+  // ALWAYS prefer YouTube CDN when we have a valid 11-char video id. ytimg
+  // is faster than Archive.org by a wide margin, and every recording always
+  // has a YouTube counterpart since we record from YT live streams. Only
+  // fall back to a custom http thumbnail if we somehow don't have a YT id.
+  if (id && /^[\w-]{11}$/.test(id)) {
+    return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+  }
   if (t && t.startsWith('http')) return t;
-  if (id && /^[\w-]{11}$/.test(id)) return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
   return '/thumbnail.jpg';
 }
 
@@ -145,7 +151,14 @@ function dedupAndMerge(records: Recording[]): Recording[] {
     for (const f of fields) if (!merged[f] && (r as any)[f]) merged[f] = (r as any)[f];
     if (!merged.aiChapters?.length && r.aiChapters?.length) merged.aiChapters = r.aiChapters;
     if (!merged.storyboard && r.storyboard) merged.storyboard = r.storyboard;
-    if (!merged.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) merged.thumbnail = r.thumbnail;
+    // Thumbnail preference: ytimg.com > anything else > /local fallback.
+    // We always have a ytimg URL when we have a video_id, so this typically
+    // keeps the fast CDN thumbnail and never silently upgrades to a slow
+    // archive.org one.
+    const mIsYt = (merged.thumbnail || '').includes('ytimg.com');
+    const rIsYt = (r.thumbnail || '').includes('ytimg.com');
+    if (!mIsYt && rIsYt) merged.thumbnail = r.thumbnail;
+    else if (!merged.thumbnail?.startsWith('http') && r.thumbnail?.startsWith('http')) merged.thumbnail = r.thumbnail;
     // #5 — always upgrade to the highest resolution available
     if (resHeight(r.resolution) > resHeight(merged.resolution)) merged.resolution = r.resolution;
     // Same for duration — keep the longest (most-complete) recording
@@ -178,7 +191,12 @@ export async function fetchRecordings(): Promise<Recording[]> {
       sizeHuman:      r.size_human || '',
       sizeGb:         r.size_gb || 0,
       resolution:     r.resolution || '',
-      thumbnail:      thumb(r.video_id, r.thumbnail),
+      // Extract YT id from video_url so cards w/ tml-prefixed video_ids
+      // also resolve to the fast ytimg CDN (not a slow archive.org URL).
+      thumbnail:      thumb(
+        (/^[\w-]{11}$/.test(r.video_id || '') ? r.video_id : (r.video_url || '').match(/(?:v=|\/)([\w-]{11})/)?.[1]) || r.video_id,
+        r.thumbnail,
+      ),
       archiveLink:    r.archive_link || '',
       archiveDirect:  r.archive_direct || '',
       archiveNode:    r.archive_node || '',
