@@ -6,9 +6,7 @@ interface P { recs: Recording[]; onOpen: (r: Recording) => void }
 
 export function ContinueWatching({ recs, onOpen }: P) {
   const [tick, setTick] = useState(0);
-  // refresh when component re-mounts (e.g. user returns from a watch page)
   useEffect(() => { setTick(t => t + 1); }, []);
-
   const ids = getHistory();
   const items = ids
     .map(id => {
@@ -17,76 +15,75 @@ export function ContinueWatching({ recs, onOpen }: P) {
       return rec && pos ? { rec, pos } : null;
     })
     .filter((x): x is { rec: Recording; pos: { t: number; d: number } } => !!x)
-    .slice(0, 6);
-
+    .slice(0, 8);
   if (!items.length) return null;
 
   return (
-    <section className="mb-10" key={tick}>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-display text-[17px] font-bold flex items-center gap-2">
-          <svg className="w-4 h-4" style={{ color: 'var(--red)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-            <circle cx="12" cy="12" r="9" />
-            <path strokeLinecap="round" d="M12 7v5l3 2" />
-          </svg>
+    <section className="mb-10 fade-up" key={tick}>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="relative inline-block w-2 h-2 pulse-ring rounded-full" style={{ background: 'var(--accent-glow)' }} />
+        <h2 className="font-display text-[19px] font-bold" style={{ color: 'var(--text-primary)' }}>
           Continue watching
         </h2>
+        <span className="text-[11px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          {items.length}
+        </span>
       </div>
-      <div className="flex gap-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 snap-x">
+      <div className="flex gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-3 snap-x" style={{ scrollbarWidth: 'none' }}>
         {items.map(({ rec, pos }) => {
           const pct = Math.min(100, Math.max(0, (pos.t / pos.d) * 100));
-          const openIt = () => { (window as any).__mlaContinueResume = rec.videoId; onOpen(rec); };
-          const removeIt = (e: React.SyntheticEvent) => {
-            e.stopPropagation();
-            e.preventDefault();
-            clearPosition(rec.videoId);
-            removeFromHistory(rec.videoId);
-            setTick(t => t + 1);
+          const open = () => { (window as any).__mlaContinueResume = rec.videoId; onOpen(rec); };
+          const remove = (e: React.SyntheticEvent) => {
+            e.stopPropagation(); e.preventDefault();
+            clearPosition(rec.videoId); removeFromHistory(rec.videoId); setTick(t => t + 1);
           };
           return (
-            // FIX — outer was <button>, inner × was <button>. Nested
-            // interactive elements: clicking × on mobile (especially iOS Safari)
-            // sometimes bubbles to the outer button and opens the video instead
-            // of removing the tile. Now outer is a div with role=button (still
-            // keyboard-accessible) and × is a real <button> with proper
-            // event isolation — guaranteed to never trigger the open handler.
             <div
               key={rec.videoId}
-              role="button"
-              tabIndex={0}
-              onClick={openIt}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openIt(); } }}
-              className="group shrink-0 w-[230px] sm:w-[260px] text-left snap-start ring-focus rounded-lg cursor-pointer"
+              role="button" tabIndex={0}
+              onClick={open}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+              className="group shrink-0 w-[260px] sm:w-[300px] text-left snap-start ring-focus card-surface cursor-pointer"
             >
-              <div className="relative aspect-video rounded-lg overflow-hidden" style={{ background: 'var(--bg3)' }}>
-                <img src={rec.thumbnail} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e: any) => { e.target.src = '/thumbnail.jpg'; }} />
-                {/* Resume bar */}
-                <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: 'rgba(255,255,255,.18)' }}>
-                  <div className="h-full" style={{ width: `${pct}%`, background: 'var(--red)' }} />
+              <div className="relative aspect-video overflow-hidden rounded-t-[16px]" style={{ background: 'var(--bg-elevated)' }}>
+                <img
+                  src={rec.thumbnail} alt="" loading="lazy"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]"
+                  onError={(e: any) => { e.target.src = '/thumbnail.jpg'; }}
+                />
+                {/* Progress bar with glow */}
+                <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: 'rgba(255, 255, 255, 0.18)' }}>
+                  <div className="h-full" style={{ width: `${pct}%`, background: 'var(--accent-glow)', boxShadow: '0 0 8px rgba(255, 61, 61, 0.65)' }} />
                 </div>
+                {/* X button (always visible on mobile) */}
                 <button
                   type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  onClick={removeIt}
-                  className="absolute top-1.5 right-1.5 z-20 w-7 h-7 flex items-center justify-center rounded-md bg-black/70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:!bg-[var(--red)]"
+                  onPointerDown={e => e.stopPropagation()}
+                  onMouseDown={e => e.stopPropagation()}
+                  onTouchStart={e => e.stopPropagation()}
+                  onClick={remove}
+                  className="absolute top-2 right-2 z-20 w-7 h-7 flex items-center justify-center rounded-md bg-black/75 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:!bg-[var(--accent-primary)]"
                   style={{ color: '#fff' }}
-                  title="Remove from list"
-                  aria-label="Remove from continue-watching"
+                  title="Remove from list" aria-label="Remove from continue-watching"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" d="M6 6l12 12M6 18L18 6" />
                   </svg>
                 </button>
-                <div className="absolute inset-0 flex items-center justify-center transition-all bg-black/0 group-hover:bg-black/30 pointer-events-none">
-                  <div className="w-10 h-10 rounded-full opacity-0 group-hover:opacity-100 transition-all" style={{ background: 'var(--red)' }}>
-                    <svg className="w-full h-full p-2.5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                {/* Centered play overlay */}
+                <div className="absolute inset-0 flex items-center justify-center transition-all bg-black/0 group-hover:bg-black/35 pointer-events-none">
+                  <div className="w-12 h-12 rounded-full opacity-0 group-hover:opacity-100 transition-all" style={{ background: 'var(--accent-primary)', boxShadow: '0 8px 28px rgba(198, 40, 40, 0.55)' }}>
+                    <svg className="w-full h-full p-3 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                   </div>
                 </div>
               </div>
-              <p className="text-[12.5px] font-semibold mt-2 line-clamp-2 leading-snug" style={{ color: 'var(--tx)' }}>{rec.title}</p>
-              <p className="text-[10.5px] mt-1" style={{ color: 'var(--tx3)' }}>{Math.round(pct)}% watched</p>
+              <div className="px-3.5 py-3">
+                <p className="text-[13px] font-semibold line-clamp-2 leading-snug mb-1.5" style={{ color: 'var(--text-primary)' }}>{rec.title}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10.5px] font-medium" style={{ color: 'var(--text-muted)' }}>{Math.round(pct)}% watched</p>
+                  <p className="text-[10.5px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>{rec.durationFmt}</p>
+                </div>
+              </div>
             </div>
           );
         })}
