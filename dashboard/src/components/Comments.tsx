@@ -126,48 +126,60 @@ export function Comments({ videoId, onToast }: P) {
         </button>
       </div>
 
-      {/* ── Compose box ────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border p-4 mb-6" style={{ borderColor: 'var(--bd)', background: 'var(--bg2)' }}>
+      {/* Premium compose box — focus-within: red border, focused input
+          uses bottom-border-only style for a clean look */}
+      <div
+        className="rounded-[16px] p-5 mb-6 transition-colors duration-300"
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-subtle)',
+        }}
+        onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(198, 40, 40, 0.25)'; }}
+        onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}
+      >
         {replyTo && (
-          <div className="flex items-center justify-between mb-3 pb-3 border-b text-[12px]" style={{ borderColor: 'var(--bd)', color: 'var(--tx3)' }}>
-            <span>Replying to <strong style={{ color: 'var(--red)' }}>{replyTo.author}</strong></span>
-            <button onClick={() => setReplyTo(null)} className="btn-ghost btn !p-1" aria-label="Cancel reply">
+          <div className="flex items-center justify-between mb-4 pb-3 text-[12px]" style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+            <span>Replying to <strong style={{ color: 'var(--accent-glow)' }}>{replyTo.author}</strong></span>
+            <button onClick={() => setReplyTo(null)} className="btn-ghost btn !p-1.5" aria-label="Cancel reply">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" d="M6 6l12 12M6 18L18 6" />
               </svg>
             </button>
           </div>
         )}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            value={author}
-            onChange={e => setAuthor(e.target.value.slice(0, 40))}
-            placeholder="Your name"
-            className="w-full sm:w-44 rounded-md px-3 py-2 text-[13px] focus:outline-none ring-focus"
-            style={{ background: 'var(--bg3)', border: '1px solid var(--bd2)', color: 'var(--tx)' }}
-            maxLength={40}
-          />
-          <textarea
-            ref={taRef}
-            value={body}
-            onChange={e => setBody(e.target.value.slice(0, 2000))}
-            placeholder="Share your thoughts on this video…"
-            rows={3}
-            className="flex-1 rounded-md px-3 py-2 text-[13.5px] leading-relaxed focus:outline-none ring-focus resize-y min-h-[68px]"
-            style={{ background: 'var(--bg3)', border: '1px solid var(--bd2)', color: 'var(--tx)' }}
-            maxLength={2000}
-            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit(); }}
-          />
-        </div>
-        <div className="flex items-center justify-between mt-3">
-          <span className="text-[10.5px] font-mono tabular-nums" style={{ color: 'var(--tx3)' }}>
+        <input
+          value={author}
+          onChange={e => setAuthor(e.target.value.slice(0, 40))}
+          placeholder="Your name"
+          className="w-full bg-transparent text-[13.5px] focus:outline-none transition-all py-2 mb-2"
+          style={{
+            color: 'var(--text-primary)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+          onFocus={e => { (e.target as HTMLElement).style.borderBottomColor = 'rgba(198, 40, 40, 0.4)'; }}
+          onBlur={e => { (e.target as HTMLElement).style.borderBottomColor = 'var(--border-subtle)'; }}
+          maxLength={40}
+        />
+        <textarea
+          ref={taRef}
+          value={body}
+          onChange={e => setBody(e.target.value.slice(0, 2000))}
+          placeholder="Share your thoughts on this video…"
+          rows={3}
+          className="w-full bg-transparent text-[14px] leading-relaxed focus:outline-none resize-y min-h-[76px] py-3"
+          style={{ color: 'var(--text-primary)' }}
+          maxLength={2000}
+          onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit(); }}
+        />
+        <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <span className="text-[10.5px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
             {body.length}/2000 · ⌘+↵ to post
           </span>
           <button
             onClick={submit}
             disabled={submitting || body.trim().length < 2}
-            className="btn btn-primary !py-1.5"
-            style={{ opacity: submitting || body.trim().length < 2 ? .5 : 1 }}
+            className="btn btn-primary !py-2 !px-5"
+            style={{ opacity: submitting || body.trim().length < 2 ? .45 : 1 }}
           >
             {submitting
               ? <><div className="w-3 h-3 rounded-full border-2 border-transparent border-t-white animate-spin"/> Posting…</>
