@@ -289,41 +289,13 @@
         "label": "Stream starts"
       },
       {
-        "time": 1200,
-        "label": "Caller joins"
-      },
-      {
-        "time": 1446,
-        "label": "Caller leaves"
-      },
-      {
-        "time": 1562,
-        "label": "Caller joins"
-      },
-      {
-        "time": 1920,
-        "label": "Caller leaves"
-      },
-      {
-        "time": 2042,
-        "label": "Caller joins"
-      },
-      {
-        "time": 2282,
-        "label": "Caller leaves"
-      },
-      {
         "time": 2400,
-        "label": "New caller joins"
-      },
-      {
-        "time": 2524,
-        "label": "Caller leaves"
+        "label": "Guest joins"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776546681/transcript.json",
-    "ai_enriched_at": "2026-06-14T12:08:14Z",
-    "chapter_logic_version": 9,
+    "ai_enriched_at": "2026-06-25T11:50:06Z",
+    "chapter_logic_version": 12,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "telegram_link": "https://t.me/c/4304551882/15",
@@ -383,17 +355,13 @@
         "label": "Kainat joins"
       },
       {
-        "time": 4330,
-        "label": "Kris joins"
-      },
-      {
         "time": 8070,
         "label": "Ron Brailey joins"
       }
     ],
     "transcript_url": "https://archive.org/download/tml-2026-04-1-Rb7AkebH4-1776554397/transcript.json",
-    "ai_enriched_at": "2026-06-14T12:04:54Z",
-    "chapter_logic_version": 9,
+    "ai_enriched_at": "2026-06-25T12:02:31Z",
+    "chapter_logic_version": 12,
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
     "telegram_link": "https://t.me/c/4304551882/16",
