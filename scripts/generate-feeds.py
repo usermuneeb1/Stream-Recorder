@@ -169,7 +169,6 @@ def make_json_feed(items: list[dict]) -> str:
                 "summary": r.get("title", ""),
                 "image": thumb_url(r),
                 "date_published": iso(r),
-                "tags": [c["label"] for c in r.get("ai_chapters", []) if "joins" in c.get("label", "").lower()][:5],
                 "attachments": [
                     {
                         "url": best_audio_or_video_url(r),

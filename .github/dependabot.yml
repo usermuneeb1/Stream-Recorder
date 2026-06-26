@@ -39,10 +39,3 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["dependencies", "ci"]
-
-  # Python deps for the account managers + AI scripts
-  - package-ecosystem: "pip"
-    directory: "/scripts/ai"
-    schedule:
-      interval: "monthly"
-    labels: ["dependencies"]

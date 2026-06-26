@@ -40,14 +40,12 @@ def main():
     yt = load(os.path.join(DATA, "youtube-stats.json"), {})
 
     total = len(recordings)
-    enriched = sum(1 for r in recordings if r.get("ai_summary"))
     total_gb = round(sum((r.get("size_bytes", 0) or 0) for r in recordings) / 1073741824, 2)
     latest = recordings[0] if recordings else {}
 
     status = {
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "recordings_total": total,
-        "recordings_ai_enriched": enriched,
         "total_size_gb": total_gb,
         "total_hours": stats.get("total_hours"),
         "latest_recording": {
@@ -62,14 +60,13 @@ def main():
     }
     write(os.path.join(DATA, "system-status.json"), status)
 
-    # README badges
+    # README badges (no AI badge anymore — feature removed)
     write(os.path.join(BADGES, "recordings.json"), badge("recordings", total, "red"))
     write(os.path.join(BADGES, "storage.json"), badge("archived", f"{total_gb} GB", "orange"))
-    write(os.path.join(BADGES, "ai.json"), badge("AI enriched", f"{enriched}/{total}", "blueviolet"))
     write(os.path.join(BADGES, "subscribers.json"),
           badge("subscribers", status["youtube"]["subscribers"], "informational"))
 
-    print(f"✅ status: {total} recordings, {total_gb} GB, {enriched} AI-enriched")
+    print(f"✅ status: {total} recordings, {total_gb} GB")
     return 0
 
 
