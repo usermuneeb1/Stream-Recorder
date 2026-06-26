@@ -73,6 +73,17 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   const sources = useMemo(() => getSources(rec), [rec]);
   const downloads = useMemo(() => getDownloads(rec), [rec]);
 
+  // Trickplay scrub-preview VTT URL, routed through our /api/vtt proxy so
+  // CORS + content-type are correct (Archive.org doesn't serve text/vtt).
+  // Returns undefined when there's no storyboard yet — Vidstack hides the
+  // hover preview entirely in that case (no broken UI).
+  const trickplayVtt = useMemo(() => {
+    const raw = rec.storyboard?.vtt;
+    if (!raw) return undefined;
+    const m = raw.match(/\/([^/]+)\.vtt(?:\?|$)/);
+    return m ? `/api/vtt/${m[1]}` : undefined;
+  }, [rec.storyboard]);
+
   const [si, setSi] = useState(0);            // 0 = Auto, 1..N = sources[i-1]
   const [autoIdx, setAutoIdx] = useState(0);  // resolved index when in Auto
   const [t, setT] = useState(0);
@@ -489,11 +500,20 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 className={`w-full aspect-video xl:rounded-xl overflow-hidden bg-black shadow-2xl ${activeSrc.kind === 'youtube' ? 'ghost-mask' : ''} ${ghostReady ? 'ghost-ready' : ''}`}
               >
                 <MediaProvider />
-                {/* Hover-preview thumbnails on the seek bar — only shown when
-                    a storyboard has been generated for this recording. */}
+                {/* TRICKPLAY SCRUB PREVIEWS — Vidstack reads the WebVTT
+                    cues file (which contains 1 cue every 30s pointing at
+                    coordinates in the sprite-sheet image) and renders the
+                    exact frame the user is hovering on the seek bar.
+
+                    We route through /api/vtt/<id> instead of using the raw
+                    Archive.org URL because Archive.org serves the .vtt with
+                    content-type: text/plain AND no CORS headers, which
+                    blocks Vidstack's cross-origin fetch. The Vercel Edge
+                    proxy rewrites the content-type to text/vtt, adds CORS,
+                    and caches the response for a week at the edge. */}
                 <DefaultVideoLayout
                   icons={defaultLayoutIcons}
-                  thumbnails={rec.storyboard?.vtt || undefined}
+                  thumbnails={trickplayVtt}
                 />
               </MediaPlayer>
             )}
