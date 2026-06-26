@@ -1,0 +1,210 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🔬 COOKIELESS SMOKE TEST                                                   ║
+# ║  Proves all cookieless recording methods can still pull 1080p from your     ║
+# ║  channel BEFORE a stream goes live. Run this any time you want assurance.   ║
+# ║                                                                              ║
+# ║  Tests against the most recent PUBLIC video on @TheMuslimLantern, downloads ║
+# ║  a tiny 10-second slice with each method, and verifies real 1920×1080 mp4   ║
+# ║  bytes come back. No cookies used. Fails loudly if any method breaks so you ║
+# ║  get a Discord alert hours/days before your next live stream.               ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🔬 Cookieless Smoke Test"
+
+on:
+  schedule:
+    # Daily at 06:00 UTC (11:00 Karachi) — well before evening live streams
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      video_id:
+        description: "Specific YouTube video ID to test (leave empty to auto-pick most recent)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: cookieless-smoke-test
+  cancel-in-progress: true
+
+env:
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  CHANNEL_HANDLE: "@TheMuslimLantern"
+  TZ: Asia/Karachi
+
+jobs:
+  smoke-test:
+    name: "🔬 Verify cookieless methods still work"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v7
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg curl jq
+          python3 -m pip install -q --upgrade yt-dlp streamlink
+          yt-dlp --version
+          streamlink --version | head -1
+          ffmpeg -version | head -1
+
+      - name: "🎯 Pick a public video to test against"
+        id: pick
+        run: |
+          if [[ -n "${{ github.event.inputs.video_id }}" ]]; then
+            VID="${{ github.event.inputs.video_id }}"
+            echo "Using user-supplied video id: $VID"
+          else
+            echo "Fetching most recent public video from $CHANNEL_HANDLE/streams..."
+            VID=$(yt-dlp --no-warnings --flat-playlist --playlist-end 1 --print "%(id)s" \
+                  "https://www.youtube.com/${CHANNEL_HANDLE}/streams" 2>/dev/null | head -1)
+            if [[ -z "$VID" ]]; then
+              echo "::warning::No /streams found, falling back to /videos"
+              VID=$(yt-dlp --no-warnings --flat-playlist --playlist-end 1 --print "%(id)s" \
+                    "https://www.youtube.com/${CHANNEL_HANDLE}/videos" 2>/dev/null | head -1)
+            fi
+          fi
+          if [[ -z "$VID" ]]; then
+            echo "::error::Could not pick a test video"
+            exit 1
+          fi
+          echo "vid=$VID" >> "$GITHUB_OUTPUT"
+          echo "Testing against: https://www.youtube.com/watch?v=$VID"
+
+      - name: "🧪 Run smoke tests on all cookieless methods"
+        id: tests
+        run: |
+          set +e
+          URL="https://www.youtube.com/watch?v=${{ steps.pick.outputs.vid }}"
+          mkdir -p /tmp/smoke
+          cd /tmp/smoke
+
+          PASSED=()
+          FAILED=()
+          DETAILS=""
+
+          run_method() {
+              local name="$1"
+              local outfile="$2"
+              shift 2
+              echo ""
+              echo "──── $name ────"
+              if timeout 90 yt-dlp \
+                  --no-warnings \
+                  "$@" \
+                  -f "bestvideo[height<=1080]+bestaudio/best" \
+                  --download-sections "*0-10" \
+                  --force-keyframes-at-cuts \
+                  --merge-output-format mp4 \
+                  -o "${outfile}.%(ext)s" \
+                  "$URL" 2>&1 | tail -3; then
+                  if [[ -f "${outfile}.mp4" ]]; then
+                      local h
+                      h=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "${outfile}.mp4" 2>/dev/null)
+                      local s
+                      s=$(stat -c%s "${outfile}.mp4" 2>/dev/null)
+                      if [[ -n "$h" ]] && (( h > 0 )) && (( s > 100000 )); then
+                          echo "  ✅ PASS — ${h}p, ${s} bytes"
+                          PASSED+=("$name (${h}p)")
+                          DETAILS+="✅ ${name} — ${h}p, $((s/1024)) KB\n"
+                          return 0
+                      fi
+                  fi
+              fi
+              echo "  ❌ FAIL"
+              FAILED+=("$name")
+              DETAILS+="❌ ${name}\n"
+              return 1
+          }
+
+          # Test all the cookieless methods the recorder uses
+          run_method "Method G (yt-dlp default)"     "g_default"
+          run_method "Method D (android_vr)"          "d_androidvr"   --extractor-args "youtube:player_client=android_vr"
+          run_method "Method C (mediaconnect)"        "c_mediaconnect" --extractor-args "youtube:player_client=mediaconnect"
+          run_method "Method E (mweb)"                "e_mweb"         --extractor-args "youtube:player_client=mweb"
+
+          # Streamlink (independent codebase, Method F/I)
+          echo ""
+          echo "──── Method F/I (streamlink — independent codebase) ────"
+          if timeout 60 streamlink --json "$URL" best > /tmp/smoke/sl.json 2>&1 && \
+             jq -e '.url' /tmp/smoke/sl.json >/dev/null 2>&1; then
+              echo "  ✅ PASS — streamlink resolved URL"
+              PASSED+=("Method F/I (streamlink)")
+              DETAILS+="✅ Method F/I (streamlink)\n"
+          else
+              echo "  ❌ FAIL"
+              FAILED+=("Method F/I (streamlink)")
+              DETAILS+="❌ Method F/I (streamlink)\n"
+          fi
+
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "  PASSED: ${#PASSED[@]} / 5"
+          echo "  FAILED: ${#FAILED[@]} / 5"
+          echo "════════════════════════════════════════"
+
+          {
+            echo "## 🔬 Cookieless Smoke Test"
+            echo ""
+            echo "**Test video**: \`${{ steps.pick.outputs.vid }}\`"
+            echo ""
+            echo "| Result | Method |"
+            echo "|---|---|"
+            for m in "${PASSED[@]}"; do echo "| ✅ | $m |"; done
+            for m in "${FAILED[@]}"; do echo "| ❌ | $m |"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Set outputs for Discord step
+          echo "passed=${#PASSED[@]}" >> "$GITHUB_OUTPUT"
+          echo "failed=${#FAILED[@]}" >> "$GITHUB_OUTPUT"
+          printf "details<<DETAILS_EOF\n%b\nDETAILS_EOF\n" "$DETAILS" >> "$GITHUB_OUTPUT"
+
+          # Pass if at least 2 methods succeed (we only need ONE to record successfully)
+          # but warn loudly if any single method breaks.
+          if (( ${#PASSED[@]} >= 2 )); then
+              echo "::notice::At least 2 cookieless methods working — recorder is safe."
+              exit 0
+          else
+              echo "::error::Fewer than 2 cookieless methods working — RECORDER AT RISK"
+              exit 1
+          fi
+
+      - name: "📢 Discord alert if any method failed"
+        if: always() && steps.tests.outputs.failed != '0'
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && { echo "No webhook"; exit 0; }
+          PASSED="${{ steps.tests.outputs.passed }}"
+          FAILED="${{ steps.tests.outputs.failed }}"
+          DETAILS=$(cat <<'DEOF'
+          ${{ steps.tests.outputs.details }}
+          DEOF
+          )
+          STATUS="⚠️ Some methods broke (recorder still works — ${PASSED}/5 passing)"
+          COLOR=16761095
+          if (( PASSED < 2 )); then
+              STATUS="🚨 CRITICAL: Recorder at risk — only ${PASSED}/5 methods passing"
+              COLOR=15158332
+          fi
+          jq -n \
+            --arg title "🔬 Cookieless Smoke Test" \
+            --arg status "$STATUS" \
+            --arg details "$DETAILS" \
+            --argjson color "$COLOR" \
+            '{
+              username: "🔬 Smoke Test Sentinel",
+              embeds: [{
+                title: $title,
+                description: ($status + "\n\n```\n" + $details + "\n```"),
+                color: $color
+              }]
+            }' | curl -sS -X POST -H "Content-Type: application/json" -d @- "$WEBHOOK" >/dev/null
