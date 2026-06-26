@@ -302,10 +302,8 @@ notify_recording_complete() {
     [[ "$upload_count" != "$upload_total" ]]          && color=16761095   # amber — partial
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
-    # HD links (first entry or "HD" tagged)
+    # HD links only (compressed/480p variant removed from pipeline)
     local gofile_url="" pixeldrain_url="" archive_url="" archive_id="" mega_url=""
-    # Compressed links
-    local gofile_comp="" pixeldrain_comp="" archive_comp="" mega_comp=""
     
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
@@ -313,9 +311,8 @@ notify_recording_complete() {
             local _part _link
             _part=$(echo "$entry" | cut -d'|' -f1)
             _link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ "$_part" == "Compressed" ]]; then
-                gofile_comp="$_link"
-            elif [[ -z "$gofile_url" ]]; then
+            [[ "$_part" == "Compressed" ]] && continue
+            if [[ -z "$gofile_url" ]]; then
                 gofile_url="$_link"
             fi
         done
@@ -326,9 +323,8 @@ notify_recording_complete() {
             local _part _link
             _part=$(echo "$entry" | cut -d'|' -f1)
             _link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ "$_part" == "Compressed" ]]; then
-                pixeldrain_comp="$_link"
-            elif [[ -z "$pixeldrain_url" ]]; then
+            [[ "$_part" == "Compressed" ]] && continue
+            if [[ -z "$pixeldrain_url" ]]; then
                 pixeldrain_url="$_link"
             fi
         done
@@ -340,9 +336,8 @@ notify_recording_complete() {
             _part=$(echo "$entry" | cut -d'|' -f1)
             _link=$(echo "$entry" | cut -d'|' -f2)
             _id=$(echo "$entry" | cut -d'|' -f3)
-            if [[ "$_part" == "Compressed" ]]; then
-                archive_comp="$_link"
-            elif [[ -z "$archive_url" ]]; then
+            [[ "$_part" == "Compressed" ]] && continue
+            if [[ -z "$archive_url" ]]; then
                 archive_url="$_link"
                 archive_id="$_id"
             fi
@@ -354,9 +349,8 @@ notify_recording_complete() {
             local _part _link
             _part=$(echo "$entry" | cut -d'|' -f1)
             _link=$(echo "$entry" | cut -d'|' -f2)
-            if [[ "$_part" == "Compressed" ]]; then
-                mega_comp="$_link"
-            elif [[ -z "$mega_url" ]]; then
+            [[ "$_part" == "Compressed" ]] && continue
+            if [[ -z "$mega_url" ]]; then
                 mega_url="$_link"
             fi
         done
@@ -377,9 +371,7 @@ notify_recording_complete() {
     upstatus+=" · "
     upstatus+=$(if [[ -n "$mega_url" ]]; then echo "🔴 MEGA ✅"; else echo "🔴 MEGA ❌"; fi)
     
-    # Compressed info
-    local comp_info="${COMPRESSED_SIZE_HUMAN:-}"
-    local comp_reduction="${COMPRESSED_REDUCTION:-}"
+    # Compressed/480p variant removed from pipeline — HD-only
 
     local payload
     payload=$(jq -n \
@@ -401,12 +393,7 @@ notify_recording_complete() {
         --arg archive_url      "$archive_url" \
         --arg archive_id       "$archive_id" \
         --arg mega_url         "$mega_url" \
-        --arg gofile_comp      "$gofile_comp" \
-        --arg pixeldrain_comp  "$pixeldrain_comp" \
-        --arg archive_comp     "$archive_comp" \
-        --arg mega_comp        "$mega_comp" \
-        --arg comp_info      "$comp_info" \
-        --arg comp_reduction "$comp_reduction" \
+
         --arg chat_status    "$chat_status" \
         --arg dash_url       "$dashboard_url" \
         --arg timestamp      "$timestamp" \
@@ -455,13 +442,6 @@ notify_recording_complete() {
                         (if $archive_url     != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         (if $mega_url        != "" then { name: "🔴  MEGA.nz",      value: ("[⬇️ Download (Permanent)](" + $mega_url + ")"),               inline: true } else empty end),
                         
-                        (if ($gofile_comp != "" or $pixeldrain_comp != "" or $archive_comp != "" or $mega_comp != "") then
-                            { name: ("╔══  📱 Compressed (" + $comp_info + " • " + $comp_reduction + " smaller)  ══╗"), value: "**480p** • Tiny file size • For storage", inline: false }
-                        else empty end),
-                        (if $gofile_comp      != "" then { name: "🟠  Gofile",      value: ("[⬇️ Quick Download](" + $gofile_comp + ")"),     inline: true } else empty end),
-                        (if $pixeldrain_comp  != "" then { name: "🟣  Pixeldrain",  value: ("[⬇️ Quick Download](" + $pixeldrain_comp + ")"), inline: true } else empty end),
-                        (if $archive_comp     != "" then { name: "🏛️  Archive.org", value: ("[🔗 Permanent](" + $archive_comp + ")"),          inline: false } else empty end),
-                        (if $mega_comp        != "" then { name: "🔴  MEGA.nz",     value: ("[⬇️ Download](" + $mega_comp + ")"),               inline: true } else empty end),
                         
                         (if ($gofile_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "") then
                             { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }

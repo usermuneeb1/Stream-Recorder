@@ -660,10 +660,8 @@ upload_to_clouds() {
         local basename_f
         basename_f=$(basename "$f")
         
-        # Detect compressed version
-        if [[ "$basename_f" == *"_compressed"* ]]; then
-            part_name="Compressed"
-        elif (( total_files <= 2 )); then
+        # HD-only pipeline (compressed/480p variant removed)
+        if (( total_files <= 2 )); then
             part_name="HD"
         else
             part_name="Part${file_num}"
@@ -673,10 +671,8 @@ upload_to_clouds() {
         log_separator
 
         local svc_success=0
-        local is_compressed=false
-        [[ "$part_name" == "Compressed" ]] && is_compressed=true
 
-        # ── 1. Gofile (uploads ALL files — HD + compressed) ──
+        # ── 1. Gofile (HD only) ──
         if [[ "${GOFILE_SKIP:-false}" != "true" ]]; then
             (( expected_total_uploads++ ))
             if upload_to_gofile "$f" "$part_name"; then
@@ -692,7 +688,7 @@ upload_to_clouds() {
             log_info "  Gofile: Skipped (GOFILE_SKIP=true)"
         fi
 
-        # ── 2. Pixeldrain (uploads ALL files — HD + compressed) ──
+        # ── 2. Pixeldrain (HD only) ──
         if [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]]; then
             (( expected_total_uploads++ ))
             if upload_to_pixeldrain "$f" "$part_name"; then
@@ -708,10 +704,8 @@ upload_to_clouds() {
             log_info "  Pixeldrain: Skipped (PIXELDRAIN_SKIP=true)"
         fi
 
-        # ── 3. Archive.org (HD only — skip compressed) ──
-        if [[ "$is_compressed" == "true" ]]; then
-            log_info "  Archive.org: Skipped (compressed — HD only)"
-        elif [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
+        # ── 3. Archive.org (HD) ──
+        if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
             (( expected_total_uploads++ ))
             if upload_to_archive "$f" "$part_name"; then
                 (( svc_success++ ))
@@ -726,10 +720,8 @@ upload_to_clouds() {
             log_info "  Archive.org: Skipped (ARCHIVE_SKIP=true)"
         fi
 
-        # ── 4. MEGA.nz (HD only — skip compressed) ──
-        if [[ "$is_compressed" == "true" ]]; then
-            log_info "  MEGA.nz: Skipped (compressed — HD only)"
-        elif [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]]; then
+        # ── 4. MEGA.nz (HD) ──
+        if [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]]; then
             (( expected_total_uploads++ ))
             if upload_to_mega "$f" "$part_name"; then
                 (( svc_success++ ))
