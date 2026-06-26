@@ -25,6 +25,23 @@ RECORDING_SUCCESS=false
 # so the timeout produces a file of approximately the requested length.
 CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PUBLIC_STREAM_ONLY (default: true)
+#   The Muslim Lantern channel only broadcasts PUBLIC live streams. Public
+#   streams require ZERO YouTube authentication — cookies bring no benefit and
+#   only ever cause problems (stale/rotated cookies can get the IP throttled).
+#
+#   When this flag is true (the default and the permanent recommended setting):
+#     • Cookie-based methods (A web_creator, B tv_embedded) are SKIPPED entirely
+#     • VOD-rescue cookie fallback is also disabled
+#     • COOKIES_FILE is never read
+#     • The recorder runs in a 100% cookieless configuration forever
+#
+#   Set PUBLIC_STREAM_ONLY=false (repo variable) ONLY if you ever start
+#   recording members-only / age-restricted / private streams.
+# ─────────────────────────────────────────────────────────────────────────────
+PUBLIC_STREAM_ONLY="${PUBLIC_STREAM_ONLY:-true}"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD A: Cookies + web_creator Player
@@ -38,7 +55,13 @@ record_method_a() {
     user_agent=$(rotate_user_agent)
     
     log_info "  Method A: Cookies + web_creator player"
-    
+
+    # Permanent cookieless mode for public streams
+    if [[ "${PUBLIC_STREAM_ONLY:-true}" == "true" ]]; then
+        log_info "  Method A: Skipped (PUBLIC_STREAM_ONLY=true — cookieless permanent mode)"
+        return 1
+    fi
+
     # Skip if cookies are expired or missing
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
         log_warn "  Method A: Cookies expired — skipping"
@@ -85,7 +108,13 @@ record_method_b() {
     user_agent=$(rotate_user_agent)
     
     log_info "  Method B: Cookies + tv_embedded player"
-    
+
+    # Permanent cookieless mode for public streams
+    if [[ "${PUBLIC_STREAM_ONLY:-true}" == "true" ]]; then
+        log_info "  Method B: Skipped (PUBLIC_STREAM_ONLY=true — cookieless permanent mode)"
+        return 1
+    fi
+
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
         log_warn "  Method B: Cookies expired — skipping"
         return 1
@@ -858,7 +887,8 @@ record_stream() {
             fi
             
             # Also try with cookies if available (they might still work for VOD even if live failed)
-            if [[ "$vod_rescued" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
+            # Skipped entirely under PUBLIC_STREAM_ONLY=true (permanent cookieless mode)
+            if [[ "$vod_rescued" != "true" ]] && [[ "${PUBLIC_STREAM_ONLY:-true}" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
                 log_info "  🆘 VOD Rescue retry with cookies: ${mname}..."
                 if timeout 1800 yt-dlp \
                     --cookies "$COOKIES_FILE" \

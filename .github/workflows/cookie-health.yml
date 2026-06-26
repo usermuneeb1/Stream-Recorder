@@ -5,10 +5,19 @@
 
 name: "🍪 Cookie Health Sentinel"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DISABLED: The recorder runs in permanent cookieless mode (PUBLIC_STREAM_ONLY=true)
+# because The Muslim Lantern only broadcasts public streams which never need
+# YouTube authentication. Cookie health is irrelevant.
+#
+# To re-enable (only if you ever start recording members-only / age-restricted
+# streams), uncomment the `schedule:` block below and set repo variable
+# PUBLIC_STREAM_ONLY=false.
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
-  schedule:
-    # Every 6 hours
-    - cron: "0 */6 * * *"
+  # schedule:
+  #   - cron: "0 */6 * * *"   # ← disabled; re-enable if you ever need cookies again
   workflow_dispatch:
 
 permissions:
