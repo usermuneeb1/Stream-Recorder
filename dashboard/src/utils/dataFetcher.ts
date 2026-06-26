@@ -9,8 +9,6 @@
 // Drop-in replacement for dashboard/src/utils/dataFetcher.ts.
 // ───────────────────────────────────────────────────────────────────────────
 
-export interface Chapter { time: number; label: string }
-
 export interface Storyboard {
   url: string;       // sprite-sheet JPEG (Catbox)
   vtt: string;       // WebVTT cues pointing into the sprite
@@ -47,10 +45,6 @@ export interface Recording {
   cfStream: string;
   youtubeUnlisted: string;
   youtubeId: string;
-  aiChapters: Chapter[];
-  aiEnrichedAt: string;
-  transcriptUrl: string;
-  chatUrl: string;
   storyboard?: Storyboard;
 }
 
@@ -142,11 +136,10 @@ function dedupAndMerge(records: Recording[]): Recording[] {
     const merged: any = { ...ex };
     const fields: (keyof Recording)[] = [
       'archiveDirect','archiveNode','archiveLink','megaLink','pixeldrainLink',
-      'gofileLink','githubRelease','githubDirect','transcriptUrl','chatUrl',
-      'telegramLink','cfStream','youtubeUnlisted','youtubeId','aiEnrichedAt',
+      'gofileLink','githubRelease','githubDirect',
+      'telegramLink','cfStream','youtubeUnlisted','youtubeId',
     ];
     for (const f of fields) if (!merged[f] && (r as any)[f]) merged[f] = (r as any)[f];
-    if (!merged.aiChapters?.length && r.aiChapters?.length) merged.aiChapters = r.aiChapters;
     if (!merged.storyboard && r.storyboard) merged.storyboard = r.storyboard;
     // Thumbnails are all /thumbnail.jpg now (set by thumb() above) so no
     // merge preference needed — they're identical strings. Skip the
@@ -196,10 +189,6 @@ export async function fetchRecordings(): Promise<Recording[]> {
       cfStream:       sanitizeCfStream(r.cf_stream || ''),
       youtubeUnlisted:r.youtube_unlisted || '',
       youtubeId:      r.youtube_id || '',
-      aiChapters:     Array.isArray(r.ai_chapters) ? r.ai_chapters : [],
-      aiEnrichedAt:   r.ai_enriched_at || '',
-      transcriptUrl:  r.transcript_url || '',
-      chatUrl:        r.chat_url || '',
       storyboard:     r.storyboard && r.storyboard.url && r.storyboard.vtt
         ? {
             url: r.storyboard.url,
