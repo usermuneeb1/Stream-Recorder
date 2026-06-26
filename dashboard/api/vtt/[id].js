@@ -1,54 +1,40 @@
 /**
- * 🎞️ Storyboard VTT proxy (Vercel Edge)
+ * 🎞️ Storyboard VTT proxy (Vercel Node Serverless)
  *
  * Archive.org serves our storyboard .vtt files with:
  *   • content-type: text/plain          → Vidstack expects text/vtt
- *   • NO Access-Control-Allow-Origin    → browser blocks cross-origin fetch()
+ *   • NO Access-Control-Allow-Origin    → browser blocks cross-origin fetch
  *
- * Without this proxy the seek-bar trickplay previews silently fail —
- * the storyboard URL is set on the player but the VTT load throws CORS
- * in DevTools and no thumbnail ever appears.
- *
- * This proxy fetches the VTT from Archive.org server-side, returns it with
- * the correct content-type + permissive CORS + long edge cache. Each VTT
- * is ~2 KB and rarely changes, so caching for a week is safe.
+ * AND archive.org rejects requests from Cloudflare worker IPs with HTTP 400.
+ * Vercel Edge runs on Cloudflare, so we MUST use the Node serverless runtime
+ * (runs on AWS, archive.org accepts those IPs).
  *
  * Route:  /api/vtt/<video_id>   →  Archive.org VTT for that video
- *
- * The video_id is the same filename used by generate_storyboard.py:
- *   PYkqrEBc_zY                        → muslim-lantern-storyboards-v1/PYkqrEBc_zY.vtt
- *   tml-2026-06-PYkqrEBc_zY-178...     → muslim-lantern-storyboards-v1/tml-2026-06-PYkqrEBc_zY-178....vtt
  */
 
-export const config = { runtime: 'edge' };
+export const config = {
+  runtime: 'nodejs',
+};
 
 const ARCHIVE_ITEM = 'muslim-lantern-storyboards-v1';
 
-function cors() {
-  return {
-    'Access-Control-Allow-Origin':  '*',
-    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': 'Range, Content-Type',
-  };
-}
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
 
-export default async function handler(request) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors() });
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
   }
 
-  const url = new URL(request.url);
-  // Sanitise the id — must match the patterns used by generate_storyboard.py.
-  // Allow [A-Za-z0-9_-] and limit length.
-  const id = (url.pathname.split('/').filter(Boolean).pop() || '')
-    .replace(/[^A-Za-z0-9_-]/g, '')
-    .slice(0, 80);
-
+  // Path looks like /api/vtt/<id>  — the id is in req.query.id thanks to
+  // the [id].js dynamic-route filename.
+  const id = String(req.query.id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
   if (!id || id.length < 8) {
-    return new Response(JSON.stringify({ error: 'Invalid storyboard id' }), {
-      status: 400,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
-    });
+    res.status(400).json({ error: 'Invalid storyboard id' });
+    return;
   }
 
   const upstreamUrl = `https://archive.org/download/${ARCHIVE_ITEM}/${id}.vtt`;
@@ -56,48 +42,34 @@ export default async function handler(request) {
   let upstream;
   try {
     upstream = await fetch(upstreamUrl, {
-      signal: AbortSignal.timeout(8000),
-      // Archive.org rejects bare cross-region datacenter requests with HTTP 400
-      // unless a real User-Agent and matching Referer are present. Mimic a
-      // normal browser request from our own origin.
       headers: {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 Stream-Recorder/1.0',
         'Referer': 'https://muslim-lantern-archive.vercel.app/',
         'Accept': 'text/vtt, text/plain, */*',
       },
+      // Node 18+ fetch supports AbortSignal.timeout
+      signal: AbortSignal.timeout(10000),
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'Upstream fetch failed', detail: String(e) }), {
-      status: 502,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
-    });
+    res.status(502).json({ error: 'Upstream fetch failed', detail: String(e?.message || e) });
+    return;
   }
 
   if (!upstream.ok) {
-    return new Response(JSON.stringify({ error: `Upstream ${upstream.status}`, url: upstreamUrl }), {
-      status: upstream.status === 404 ? 404 : 502,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
+    res.status(upstream.status === 404 ? 404 : 502).json({
+      error: `Upstream ${upstream.status}`,
+      url: upstreamUrl,
     });
+    return;
   }
 
   const body = await upstream.text();
-
-  // Quick sanity — VTT files always start with "WEBVTT".
   if (!body.startsWith('WEBVTT')) {
-    return new Response(JSON.stringify({ error: 'Not a valid VTT file' }), {
-      status: 502,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
-    });
+    res.status(502).json({ error: 'Not a valid VTT file', firstChars: body.slice(0, 40) });
+    return;
   }
 
-  return new Response(body, {
-    status: 200,
-    headers: {
-      ...cors(),
-      'Content-Type': 'text/vtt; charset=utf-8',
-      // 1-week edge cache + 1-day stale-while-revalidate. VTTs change only
-      // when storyboards are regenerated (rare).
-      'Cache-Control': 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400',
-    },
-  });
+  res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400');
+  res.status(200).send(body);
 }
