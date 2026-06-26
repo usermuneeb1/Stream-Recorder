@@ -57,7 +57,14 @@ export default async function handler(request) {
   try {
     upstream = await fetch(upstreamUrl, {
       signal: AbortSignal.timeout(8000),
-      // No special headers — Archive.org accepts plain GETs.
+      // Archive.org rejects bare cross-region datacenter requests with HTTP 400
+      // unless a real User-Agent and matching Referer are present. Mimic a
+      // normal browser request from our own origin.
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 Stream-Recorder/1.0',
+        'Referer': 'https://muslim-lantern-archive.vercel.app/',
+        'Accept': 'text/vtt, text/plain, */*',
+      },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: 'Upstream fetch failed', detail: String(e) }), {
