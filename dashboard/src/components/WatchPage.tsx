@@ -3,7 +3,6 @@ import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/
 import {
   defaultLayoutIcons,
   DefaultVideoLayout,
-  DefaultMenuButton,
   DefaultMenuRadioGroup,
   DefaultMenuSection,
 } from '@vidstack/react/player/layouts/default';
@@ -577,18 +576,30 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                   // For GHOST we postMessage setPlaybackQuality() to the iframe
                   // (handled by the effect that watches selectedQuality).
                   slots={{
+                    // INJECT QUALITY RADIO GROUP INTO VIDSTACK'S SETTINGS MENU
+                    // (the gear icon). Vidstack's built-in DefaultQualityMenu
+                    // submenu stays hidden for our sources because:
+                    //   • YouTube embeds: Vidstack can't see YT's internal
+                    //     `qualities` API (it lives inside the iframe).
+                    //   • mp4 mirrors: single-rung files have no rungs to pick.
+                    // So we add our own flat radio group at the END of the
+                    // settings menu, labelled "Quality". Selecting a rung
+                    // either postMessages YouTube (GHOST) or snaps Vidstack
+                    // .qualities to that height (mp4 HLS/DASH if any).
+                    //
+                    // IMPORTANT: We use DefaultMenuSection + DefaultMenuRadioGroup
+                    // only — NOT DefaultMenuButton. DefaultMenuButton is meant
+                    // to be a submenu *trigger* and rendering it standalone
+                    // inside settingsMenuItemsEnd crashes the menu render so
+                    // the whole settings popup appears blank (this was the bug).
                     settingsMenuItemsEnd: (
-                      <DefaultMenuSection>
-                        <DefaultMenuButton
-                          label="Quality"
-                          hint={(() => {
-                            const labels: Record<string, string> = {
-                              hd1080: '1080p', hd720: '720p', large: '480p',
-                              medium: '360p', small: '240p', auto: 'Auto',
-                            };
-                            return labels[selectedQuality] || '1080p';
-                          })()}
-                        />
+                      <DefaultMenuSection label="Quality" value={(() => {
+                        const labels: Record<string, string> = {
+                          hd1080: '1080p', hd720: '720p', large: '480p',
+                          medium: '360p', small: '240p', auto: 'Auto',
+                        };
+                        return labels[selectedQuality] || '1080p';
+                      })()}>
                         <DefaultMenuRadioGroup
                           value={selectedQuality}
                           options={[
