@@ -3,8 +3,6 @@ import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/
 import {
   defaultLayoutIcons,
   DefaultVideoLayout,
-  DefaultMenuRadioGroup,
-  DefaultMenuSection,
 } from '@vidstack/react/player/layouts/default';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
@@ -103,12 +101,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   const [errorFallbackIdx, setErrorFallbackIdx] = useState<Set<number>>(new Set());
   const played = useRef(false);
 
-  // ── Quality state ─────────────────────────────────────────────────────────
-  // For YouTube/GHOST: posts setPlaybackQuality(<rung>) to the iframe. Lives
-  // in the Vidstack settings menu (gear icon) via the slots API below.
-  // For mp4: Vidstack reads HLS/DASH rungs natively, no state needed here.
-  const [selectedQuality, setSelectedQuality] = useState<string>('hd1080');
-
   // ── Loading progress hints — drives the "please wait" message ────────────
   // We surface honest, age-aware copy so the user isn't staring at a static
   // "Loading" forever wondering if the page broke.
@@ -124,7 +116,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   useEffect(() => {
     setSi(0); setAutoIdx(0); setT(0); setReady(false); setGhostReady(false);
     setSourceHealth({}); setErrorFallbackIdx(new Set());
-    setSelectedQuality('hd1080');
     setLoadingElapsed(0);
     played.current = false;
   }, [rec.videoId]);
@@ -366,39 +357,19 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     p.addEventListener('qualities-change', onQualities);
     onQualities();
 
-    // For YouTube (GHOST): apply the selected quality via postMessage.
-    // YouTube silently ignores any rung it can't deliver — that's fine.
-    const forceYTQuality = () => {
-      const iframe = (p as any).provider?.iframe as HTMLIFrameElement | undefined
-        || document.querySelector('media-player iframe[src*="youtube"]') as HTMLIFrameElement | null;
-      if (!iframe?.contentWindow) return;
-      const target = iframe.contentWindow;
-      // Try the explicitly-selected rung first, then sensible fallbacks so
-      // first-load still lands on the best available.
-      const rungs = selectedQuality === 'auto'
-        ? ['hd1080', 'hd720', 'large']
-        : [selectedQuality, 'hd1080', 'hd720', 'large'];
-      for (const q of rungs) {
-        try {
-          target.postMessage(JSON.stringify({
-            event: 'command', func: 'setPlaybackQuality', args: [q],
-          }), '*');
-        } catch { /* noop */ }
-      }
-    };
-    let attempts = 0;
-    const ytQualityInterval = window.setInterval(() => {
-      if (attempts++ > 10) { clearInterval(ytQualityInterval); return; }
-      forceYTQuality();
-    }, 1000);
-    forceYTQuality();
+    // NOTE: We previously tried postMessage setPlaybackQuality('hd1080') here
+    // to force YouTube into HD on the GHOST iframe. YouTube DEPRECATED that
+    // API around 2018 — the call returns silently and changes nothing. The
+    // ?vq=hd1080 URL hint we already pass on iframe creation is the only
+    // remaining (best-effort) lever, and YouTube's own adaptive bitrate logic
+    // negotiates the actual resolution based on bandwidth. No quality picker
+    // exposed in the settings menu — it would be cosmetic only.
 
     return () => {
       p.removeEventListener('rate-change', onRate);
       p.removeEventListener('qualities-change', onQualities);
-      clearInterval(ytQualityInterval);
     };
-  }, [ready, rec.videoId, selectedQuality]);
+  }, [ready, rec.videoId]);
 
   // ── Resume from URL ?t= or saved position ────────────────────────────────
   const [resumeShown, setResumeShown] = useState(false);
@@ -563,65 +534,22 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 <DefaultVideoLayout
                   icons={defaultLayoutIcons}
                   thumbnails={trickplayVtt}
-                  // ── INJECT QUALITY MENU INTO VIDSTACK'S SETTINGS (GEAR ICON) ──
-                  // Vidstack's DefaultVideoLayout exposes a built-in gear-icon
-                  // settings menu. By default, the Quality submenu only shows
-                  // when the player has an HLS/DASH source with multiple rungs
-                  // (mp4 single-rung mirrors → hidden; YouTube embed → hidden
-                  // because Vidstack can't see YT's internal qualities API).
-                  //
-                  // We inject our own Quality submenu via the `slots` prop so
-                  // the user ALWAYS has 1080p/720p/480p/360p/Auto control
-                  // inside the standard gear menu — same place YouTube puts it.
-                  // For GHOST we postMessage setPlaybackQuality() to the iframe
-                  // (handled by the effect that watches selectedQuality).
-                  slots={{
-                    // INJECT QUALITY RADIO GROUP INTO VIDSTACK'S SETTINGS MENU
-                    // (the gear icon). Vidstack's built-in DefaultQualityMenu
-                    // submenu stays hidden for our sources because:
-                    //   • YouTube embeds: Vidstack can't see YT's internal
-                    //     `qualities` API (it lives inside the iframe).
-                    //   • mp4 mirrors: single-rung files have no rungs to pick.
-                    // So we add our own flat radio group at the END of the
-                    // settings menu, labelled "Quality". Selecting a rung
-                    // either postMessages YouTube (GHOST) or snaps Vidstack
-                    // .qualities to that height (mp4 HLS/DASH if any).
-                    //
-                    // IMPORTANT: We use DefaultMenuSection + DefaultMenuRadioGroup
-                    // only — NOT DefaultMenuButton. DefaultMenuButton is meant
-                    // to be a submenu *trigger* and rendering it standalone
-                    // inside settingsMenuItemsEnd crashes the menu render so
-                    // the whole settings popup appears blank (this was the bug).
-                    settingsMenuItemsEnd: (
-                      <DefaultMenuSection label="Quality" value={(() => {
-                        const labels: Record<string, string> = {
-                          hd1080: '1080p', hd720: '720p', large: '480p',
-                          medium: '360p', small: '240p', auto: 'Auto',
-                        };
-                        return labels[selectedQuality] || '1080p';
-                      })()}>
-                        <DefaultMenuRadioGroup
-                          value={selectedQuality}
-                          options={[
-                            { label: '1080p HD', value: 'hd1080' },
-                            { label: '720p HD',  value: 'hd720'  },
-                            { label: '480p',     value: 'large'  },
-                            { label: '360p',     value: 'medium' },
-                            { label: 'Auto',     value: 'auto'   },
-                          ]}
-                          onChange={(v) => {
-                            setSelectedQuality(v);
-                            const labels: Record<string, string> = {
-                              hd1080: '1080p', hd720: '720p', large: '480p',
-                              medium: '360p', small: '240p', auto: 'Auto',
-                            };
-                            onToast(`Quality: ${labels[v] || v}`);
-                          }}
-                        />
-                      </DefaultMenuSection>
-                    ),
-                  }}
                 />
+                {/* NOTE: NO custom quality picker injected here.
+                    Honest reason: programmatic quality control simply isn't
+                    possible for our sources.
+                      • GHOST (YouTube embed): YouTube deprecated the
+                        setPlaybackQuality() postMessage API in 2018. The call
+                        is silently ignored. Adaptive bitrate negotiates the
+                        actual rung based on bandwidth — the user can override
+                        only via YouTube's own controls inside the iframe.
+                      • mp4 mirrors (R3AL/B3ING/STORM/BUNNY): these are
+                        single-rung mp4 files, not HLS/DASH adaptive bitrate.
+                        There are no alternate rungs to switch between.
+                    So Vidstack's default settings menu now just shows Speed
+                    (and Captions if any) — the real controls that actually
+                    do something. To pick a different SERVER (which DOES work),
+                    users use the Playback panel in the right sidebar. */}
               </MediaPlayer>
             )}
             {/* Loading overlay logic:
@@ -649,10 +577,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                   <p className="text-white/35 text-[11px] mt-3 font-mono tabular-nums">
                     <span className="text-white/55">{activeSrc?.label || 'Auto'}</span>
                     {' · '}
-                    <span>{(() => {
-                      const labels: Record<string, string> = { hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', auto: 'Auto' };
-                      return labels[selectedQuality] || '1080p';
-                    })()}</span>
+                    <span>1080p</span>
                     {loadingElapsed >= 3 && <> · <span>{loadingElapsed}s</span></>}
                   </p>
                   {loadingElapsed >= 25 && sources.length > 1 && (
