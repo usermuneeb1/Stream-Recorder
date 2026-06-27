@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MediaPlayer, MediaProvider, type MediaPlayerInstance } from '@vidstack/react';
-import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
+import {
+  defaultLayoutIcons,
+  DefaultVideoLayout,
+  DefaultMenuButton,
+  DefaultMenuRadioGroup,
+  DefaultMenuSection,
+} from '@vidstack/react/player/layouts/default';
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
 import type { Recording } from '../utils/dataFetcher';
@@ -98,17 +104,11 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   const [errorFallbackIdx, setErrorFallbackIdx] = useState<Set<number>>(new Set());
   const played = useRef(false);
 
-  // ── Quality picker state ─────────────────────────────────────────────────
-  // YouTube-style quality selector. Two paths:
-  //   • mp4 sources → reads Vidstack's `qualities` API (works if the source
-  //     is HLS/DASH with multiple rungs). Most of our mp4 mirrors are single-
-  //     rung so we surface "Source (1080p)" as a single option.
-  //   • youtube/GHOST → tells the YouTube iframe to setPlaybackQuality(...)
-  //     via postMessage. YouTube ignores any rung it can't deliver, so we
-  //     report the *requested* rung in the UI for clarity.
-  const [qualities, setQualities] = useState<Array<{ id: string; label: string; height: number }>>([]);
-  const [selectedQuality, setSelectedQuality] = useState<string>('hd1080');  // default 1080p
-  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
+  // ── Quality state ─────────────────────────────────────────────────────────
+  // For YouTube/GHOST: posts setPlaybackQuality(<rung>) to the iframe. Lives
+  // in the Vidstack settings menu (gear icon) via the slots API below.
+  // For mp4: Vidstack reads HLS/DASH rungs natively, no state needed here.
+  const [selectedQuality, setSelectedQuality] = useState<string>('hd1080');
 
   // ── Loading progress hints — drives the "please wait" message ────────────
   // We surface honest, age-aware copy so the user isn't staring at a static
@@ -125,7 +125,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
   useEffect(() => {
     setSi(0); setAutoIdx(0); setT(0); setReady(false); setGhostReady(false);
     setSourceHealth({}); setErrorFallbackIdx(new Set());
-    setQualities([]); setSelectedQuality('hd1080'); setQualityMenuOpen(false);
+    setSelectedQuality('hd1080');
     setLoadingElapsed(0);
     played.current = false;
   }, [rec.videoId]);
@@ -143,18 +143,7 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     return () => clearInterval(tick);
   }, [ready, ghostReady, autoIdx, si]);
 
-  // ── Close quality menu on outside click / Esc ────────────────────────────
-  useEffect(() => {
-    if (!qualityMenuOpen) return;
-    const onDocClick = () => setQualityMenuOpen(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setQualityMenuOpen(false); };
-    document.addEventListener('click', onDocClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('click', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [qualityMenuOpen]);
+
 
   // ── Auto picker: INSTANT default + background health probes ──────────────
   // Strategy:
@@ -360,44 +349,19 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
     };
     p.addEventListener('rate-change', onRate);
 
-    // ── Quality picker population ────────────────────────────────────────
-    // For mp4 sources with HLS/DASH rungs, populate from Vidstack.qualities.
-    // For YouTube (GHOST) we hardcode YouTube's rung set so the picker still
-    // shows familiar 1080p / 720p / 480p / 360p / Auto choices.
+    // ── mp4 quality auto-select ──────────────────────────────────────────
+    // For mp4 sources with HLS/DASH rungs, snap to 1080p (or highest) on
+    // first load. Vidstack's built-in settings menu already exposes the
+    // picker, no custom UI needed here.
     const onQualities = () => {
       try {
-        const kind = activeSrcKindRef.current;
-        if (kind === 'youtube') {
-          setQualities([
-            { id: 'hd1080', label: '1080p', height: 1080 },
-            { id: 'hd720',  label: '720p',  height: 720  },
-            { id: 'large',  label: '480p',  height: 480  },
-            { id: 'medium', label: '360p',  height: 360  },
-            { id: 'auto',   label: 'Auto',  height: 0    },
-          ]);
-          return;
-        }
+        if (activeSrcKindRef.current === 'youtube') return;
         const qs = (p as any).qualities?.toArray?.() || [];
-        if (qs.length > 0) {
-          qs.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
-          setQualities(qs.map((q: any) => ({
-            id: String(q.height || q.id || 'auto'),
-            label: q.height ? `${q.height}p` : 'Auto',
-            height: q.height || 0,
-          })));
-          // Honour the user's selected rung, else default to highest (1080p).
-          const desiredH = selectedQuality === 'hd1080' ? 1080
-                         : selectedQuality === 'hd720'  ? 720
-                         : selectedQuality === 'large'  ? 480
-                         : selectedQuality === 'medium' ? 360
-                         : 0;
-          const match = qs.find((q: any) => q.height === desiredH) || qs[0];
-          if (match && !match.selected) match.selected = true;
-        } else {
-          // Single-rung mp4 (most of our mirrors). Surface a non-interactive
-          // "1080p" label so the user sees the quality even with no picker.
-          setQualities([{ id: 'hd1080', label: '1080p', height: 1080 }]);
-        }
+        if (qs.length === 0) return;
+        qs.sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+        // Prefer 1080p if present, otherwise the highest rung available.
+        const target = qs.find((q: any) => q.height === 1080) || qs[0];
+        if (target && !target.selected) target.selected = true;
       } catch { /* noop */ }
     };
     p.addEventListener('qualities-change', onQualities);
@@ -600,6 +564,52 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                 <DefaultVideoLayout
                   icons={defaultLayoutIcons}
                   thumbnails={trickplayVtt}
+                  // ── INJECT QUALITY MENU INTO VIDSTACK'S SETTINGS (GEAR ICON) ──
+                  // Vidstack's DefaultVideoLayout exposes a built-in gear-icon
+                  // settings menu. By default, the Quality submenu only shows
+                  // when the player has an HLS/DASH source with multiple rungs
+                  // (mp4 single-rung mirrors → hidden; YouTube embed → hidden
+                  // because Vidstack can't see YT's internal qualities API).
+                  //
+                  // We inject our own Quality submenu via the `slots` prop so
+                  // the user ALWAYS has 1080p/720p/480p/360p/Auto control
+                  // inside the standard gear menu — same place YouTube puts it.
+                  // For GHOST we postMessage setPlaybackQuality() to the iframe
+                  // (handled by the effect that watches selectedQuality).
+                  slots={{
+                    settingsMenuItemsEnd: (
+                      <DefaultMenuSection>
+                        <DefaultMenuButton
+                          label="Quality"
+                          hint={(() => {
+                            const labels: Record<string, string> = {
+                              hd1080: '1080p', hd720: '720p', large: '480p',
+                              medium: '360p', small: '240p', auto: 'Auto',
+                            };
+                            return labels[selectedQuality] || '1080p';
+                          })()}
+                        />
+                        <DefaultMenuRadioGroup
+                          value={selectedQuality}
+                          options={[
+                            { label: '1080p HD', value: 'hd1080' },
+                            { label: '720p HD',  value: 'hd720'  },
+                            { label: '480p',     value: 'large'  },
+                            { label: '360p',     value: 'medium' },
+                            { label: 'Auto',     value: 'auto'   },
+                          ]}
+                          onChange={(v) => {
+                            setSelectedQuality(v);
+                            const labels: Record<string, string> = {
+                              hd1080: '1080p', hd720: '720p', large: '480p',
+                              medium: '360p', small: '240p', auto: 'Auto',
+                            };
+                            onToast(`Quality: ${labels[v] || v}`);
+                          }}
+                        />
+                      </DefaultMenuSection>
+                    ),
+                  }}
                 />
               </MediaPlayer>
             )}
@@ -628,7 +638,10 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                   <p className="text-white/35 text-[11px] mt-3 font-mono tabular-nums">
                     <span className="text-white/55">{activeSrc?.label || 'Auto'}</span>
                     {' · '}
-                    <span>{selectedQuality === 'auto' ? 'Auto' : (qualities.find(q => q.id === selectedQuality)?.label || '1080p')}</span>
+                    <span>{(() => {
+                      const labels: Record<string, string> = { hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', auto: 'Auto' };
+                      return labels[selectedQuality] || '1080p';
+                    })()}</span>
                     {loadingElapsed >= 3 && <> · <span>{loadingElapsed}s</span></>}
                   </p>
                   {loadingElapsed >= 25 && sources.length > 1 && (
@@ -654,68 +667,6 @@ export function WatchPage({ rec, onClose, all, onNav, theme, onTheme, onToast }:
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* ── YouTube-style quality picker (gear icon, top-right) ──────
-                Visible only AFTER the video is ready, so it doesn't compete
-                with the loading overlay. Sits above Vidstack's own controls
-                via z-30; closing it is one click anywhere outside. */}
-            {((activeSrc?.kind === 'youtube' && ghostReady) || (activeSrc?.kind !== 'youtube' && ready)) && qualities.length > 0 && (
-              <div className="absolute top-3 right-3 xl:top-7 xl:right-7 z-30">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setQualityMenuOpen(o => !o); }}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-black/60 hover:bg-black/80 backdrop-blur-sm text-white/85 hover:text-white text-[11px] font-semibold tracking-wide transition border border-white/10"
-                  aria-label="Quality"
-                  title="Change video quality"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                  <span>{qualities.find(q => q.id === selectedQuality)?.label || '1080p'}</span>
-                  {selectedQuality === 'hd1080' && (
-                    <span className="px-1 py-px rounded text-[8.5px] font-bold bg-white/15 text-white/95">HD</span>
-                  )}
-                </button>
-                {qualityMenuOpen && (
-                  <div
-                    className="absolute right-0 mt-1.5 min-w-[140px] py-1 rounded-md bg-black/85 backdrop-blur-md border border-white/10 shadow-2xl"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <p className="px-3 pt-1.5 pb-1 text-[9.5px] font-bold uppercase tracking-wider text-white/40">Quality</p>
-                    {qualities.map(q => (
-                      <button
-                        key={q.id}
-                        onClick={() => {
-                          setSelectedQuality(q.id);
-                          setQualityMenuOpen(false);
-                          // For mp4: apply directly via Vidstack qualities API.
-                          if (activeSrc?.kind !== 'youtube') {
-                            try {
-                              const p = playerRef.current as any;
-                              const qs = p?.qualities?.toArray?.() || [];
-                              const match = qs.find((x: any) => x.height === q.height);
-                              if (match && !match.selected) match.selected = true;
-                            } catch { /* noop */ }
-                          }
-                          onToast(`Quality: ${q.label}`);
-                        }}
-                        className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center justify-between gap-3 hover:bg-white/10 transition ${selectedQuality === q.id ? 'text-white font-semibold' : 'text-white/75'}`}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {q.label}
-                          {q.height >= 720 && <span className="px-1 py-px rounded text-[8.5px] font-bold bg-white/15 text-white/95">HD</span>}
-                        </span>
-                        {selectedQuality === q.id && (
-                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 
