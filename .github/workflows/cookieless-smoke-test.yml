@@ -81,14 +81,36 @@ jobs:
             VID="${{ github.event.inputs.video_id }}"
             echo "Using user-supplied video id: $VID"
           else
-            echo "Fetching most recent public video from $CHANNEL_HANDLE/streams..."
-            VID=$(yt-dlp --no-warnings --flat-playlist --playlist-end 1 --print "%(id)s" \
-                  "https://www.youtube.com/${CHANNEL_HANDLE}/streams" 2>/dev/null | head -1)
-            if [[ -z "$VID" ]]; then
-              echo "::warning::No /streams found, falling back to /videos"
-              VID=$(yt-dlp --no-warnings --flat-playlist --playlist-end 1 --print "%(id)s" \
-                    "https://www.youtube.com/${CHANNEL_HANDLE}/videos" 2>/dev/null | head -1)
+            echo "Fetching candidates from $CHANNEL_HANDLE…"
+            # Pull last 8 entries from /streams (and fall back to /videos) and
+            # walk them until we find ONE that is a fully-downloadable VOD:
+            #   • live_status='was_live'  → past live, has bytes  ✅
+            #   • live_status='not_live'  → regular VOD, has bytes ✅
+            # We SKIP anything that's currently live or scheduled:
+            #   • live_status='is_upcoming' → scheduled premiere, no bytes yet ❌
+            #   • live_status='is_live'    → broadcasting right now, won't have a
+            #                                stable VOD until it ends ❌
+            # Without this guard the smoke test false-alarms whenever the
+            # channel has a scheduled stream on the home tab (caught a real
+            # 'This live event will begin in 70 minutes' false-positive on
+            # 2026-06-27 — recording was actually fine, smoke test misread).
+            CANDIDATES=$(yt-dlp --no-warnings --flat-playlist --playlist-end 8 --print "%(id)s" \
+                         "https://www.youtube.com/${CHANNEL_HANDLE}/streams" 2>/dev/null)
+            if [[ -z "$CANDIDATES" ]]; then
+              CANDIDATES=$(yt-dlp --no-warnings --flat-playlist --playlist-end 8 --print "%(id)s" \
+                           "https://www.youtube.com/${CHANNEL_HANDLE}/videos" 2>/dev/null)
             fi
+
+            VID=""
+            for cand in $CANDIDATES; do
+              status=$(yt-dlp --no-warnings --skip-download --print "%(live_status)s" \
+                       "https://www.youtube.com/watch?v=$cand" 2>/dev/null | head -1)
+              echo "  candidate $cand → live_status=$status"
+              if [[ "$status" == "was_live" || "$status" == "not_live" || "$status" == "None" ]]; then
+                VID="$cand"
+                break
+              fi
+            done
           fi
           if [[ -z "$VID" ]]; then
             echo "::error::Could not pick a test video"
