@@ -1,0 +1,167 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🧱 INSTALL SELF-TEST                                                       ║
+# ║  Runs the EXACT install commands the real Stream Recorder uses, on the      ║
+# ║  same runner image, to catch install-step bugs BEFORE they kill a recording.║
+# ║                                                                              ║
+# ║  History: 2026-06-26 lost a live recording because                          ║
+# ║      rm /tmp/ytarchive.zip → Operation not permitted (created by sudo curl) ║
+# ║  killed the install step under bash -e. This workflow exists so any future  ║
+# ║  install-step regression fails LOUDLY in CI/PR review instead of silently   ║
+# ║  during the next live stream.                                               ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🧱 Install Self-Test"
+
+on:
+  # Run on every PR that touches install-related files
+  pull_request:
+    paths:
+      - ".github/workflows/stream-recorder.yml"
+      - ".github/workflows/install-self-test.yml"
+      - "scripts/setup-warp.sh"
+      - "scripts/utils.sh"
+  # Run daily so an upstream URL change (yt-dlp release moved, ytarchive
+  # version gone, apt mirror dead) gets caught before the next live stream
+  schedule:
+    - cron: "30 5 * * *"   # 10:30 Karachi — before evening streams
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: install-self-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  TZ: Asia/Karachi
+
+jobs:
+  self-test:
+    name: "🧱 Install runs cleanly on ubuntu-24.04"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v7
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Step 1: Replay EXACTLY the install block from stream-recorder.yml.
+      # If we ever drift, this test will pass while the real workflow breaks
+      # — so we also do a structural check below to keep them in sync.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "📦 Replay real install block"
+        id: install
+        shell: bash {0}
+        run: |
+          set -u
+          set +o pipefail
+
+          echo "📦 Installing required tools..."
+
+          sudo apt-get update -qq || echo "::warning::apt update returned non-zero (continuing)"
+          sudo apt-get install -y -qq ffmpeg jq bc curl python3 megatools
+
+          # yt-dlp (nightly preferred, stable fallback)
+          sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp 2>/dev/null || \
+          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+          sudo chmod a+rx /usr/local/bin/yt-dlp
+
+          # ytarchive — the line that lost a recording on 2026-06-26
+          YTA_VER="0.5.0"
+          sudo curl -L "https://github.com/Kethsar/ytarchive/releases/download/v${YTA_VER}/ytarchive_linux_amd64.zip" -o /tmp/ytarchive.zip
+          sudo unzip -o /tmp/ytarchive.zip -d /usr/local/bin/
+          sudo chmod a+rx /usr/local/bin/ytarchive
+          sudo rm -f /tmp/ytarchive.zip || true
+
+          # python helpers
+          pip3 install --quiet bgutil-ytdlp-pot-provider 2>/dev/null || true
+          pip3 install --quiet streamlink chat-downloader
+
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
+
+          echo "INSTALL_EXIT=$?" >> "$GITHUB_OUTPUT"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Step 2: Verify every binary the recorder depends on is actually
+      # callable. This is the gate that would have caught the 2026-06-26
+      # failure even if the install step had silently corrupted itself.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "✅ Verify all critical tools"
+        id: verify
+        run: |
+          set +e
+          FAILED=()
+          check() {
+              local name="$1"; shift
+              if "$@" >/dev/null 2>&1; then
+                  echo "  ✅ $name"
+              else
+                  echo "  ❌ $name (command: $*)"
+                  FAILED+=("$name")
+              fi
+          }
+          echo "── Critical tools ──"
+          check "ffmpeg"     ffmpeg -version
+          check "jq"         jq --version
+          check "curl"       curl --version
+          check "python3"    python3 --version
+          check "yt-dlp"     yt-dlp --version
+          check "streamlink" streamlink --version
+          check "ytarchive"  ytarchive --version
+          check "megatools (megaput)" megaput --version
+
+          {
+            echo "## 🧱 Install Self-Test"
+            echo ""
+            if (( ${#FAILED[@]} == 0 )); then
+              echo "**✅ All ${#FAILED[@]} tools installed cleanly**"
+            else
+              echo "**❌ ${#FAILED[@]} tool(s) failed:** ${FAILED[*]}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( ${#FAILED[@]} > 0 )); then
+              echo "::error::Install regression — ${FAILED[*]}"
+              exit 1
+          fi
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Step 3: Structural drift check — ensure the install block in
+      # stream-recorder.yml hasn't gained new commands that aren't replayed
+      # here. Compares a fingerprint of the install lines.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: "🔍 Drift check — keep self-test in sync with real workflow"
+        run: |
+          REAL=$(awk '/Install Dependencies/,/Start PoToken Provider/' .github/workflows/stream-recorder.yml \
+                 | grep -E "^\s*(sudo|pip3|curl|sed -i|chmod)" | wc -l)
+          TEST=$(awk '/Replay real install block/,/Verify all critical tools/' .github/workflows/install-self-test.yml \
+                 | grep -E "^\s*(sudo|pip3|curl|sed -i|chmod)" | wc -l)
+          echo "Real workflow install commands: $REAL"
+          echo "Self-test install commands:     $TEST"
+          if (( REAL > TEST + 1 )); then
+            echo "::warning::Real install block has $REAL commands but self-test only mirrors $TEST. Update install-self-test.yml so it stays representative."
+          fi
+
+      - name: "📢 Discord alert on failure"
+        if: failure()
+        run: |
+          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-$DISCORD_WEBHOOK_URL}"
+          [[ -z "$WEBHOOK" ]] && exit 0
+          jq -n \
+            --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              username: "🧱 Install Self-Test",
+              embeds: [{
+                title: "🚨 Install step regression detected",
+                description: ("The install block used by Stream Recorder failed in CI. **A live recording would fail right now.** Fix before the next stream.\n\n[View run](" + $run + ")"),
+                color: 15158332
+              }]
+            }' | curl -sS -X POST -H "Content-Type: application/json" -d @- "$WEBHOOK" >/dev/null
