@@ -11,6 +11,15 @@ source "$SCRIPT_DIR/utils.sh"
 _cookie_alert() {
     local status="$1"
     local detail="$2"
+
+    # Suppressed under PUBLIC_STREAM_ONLY mode — the recorder runs cookieless
+    # so a stale/missing cookie is irrelevant to recording success. Posting
+    # 'cookie warning' Discord alerts in this mode just confuses the user.
+    if [[ "${PUBLIC_STREAM_ONLY:-true}" == "true" ]]; then
+        log_info "Cookie alert suppressed (PUBLIC_STREAM_ONLY=true — cookies not used)"
+        return 0
+    fi
+
     local throttle_file="cookie_${status}_warning_sent.txt"
     local throttle_seconds="${COOKIE_WARNING_THROTTLE_SECONDS:-43200}" # 12 hours
     local now_ts last_sent
