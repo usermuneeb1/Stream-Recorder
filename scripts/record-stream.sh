@@ -26,21 +26,25 @@ RECORDING_SUCCESS=false
 CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC_STREAM_ONLY (default: true)
-#   The Muslim Lantern channel only broadcasts PUBLIC live streams. Public
-#   streams require ZERO YouTube authentication — cookies bring no benefit and
-#   only ever cause problems (stale/rotated cookies can get the IP throttled).
+# PUBLIC_STREAM_ONLY (default: false — HYBRID mode)
+#   Set to "true" only if you NEVER want cookie-based methods to run.
 #
-#   When this flag is true (the default and the permanent recommended setting):
-#     • Cookie-based methods (A web_creator, B tv_embedded) are SKIPPED entirely
-#     • VOD-rescue cookie fallback is also disabled
-#     • COOKIES_FILE is never read
-#     • The recorder runs in a 100% cookieless configuration forever
+#   HYBRID MODE (the default):
+#     • Cookieless methods (H ytarchive, I streamlink, D androidvr, C
+#       mediaconnect, G/E/F) run FIRST — fastest path, no cookie risk.
+#     • Cookie-based methods (A web_creator, B tv_embedded) run as a
+#       fallback if the cookieless methods all bail. This is what catches
+#       sign-in-required / age-restricted / membership streams.
+#     • Stale cookies can't break a public-stream recording (cookieless
+#       runs first), but valid cookies rescue a LOGIN_REQUIRED stream
+#       that would otherwise be missed (real failure on 2026-06-27 with
+#       stream WOqZf9Myz_c).
 #
-#   Set PUBLIC_STREAM_ONLY=false (repo variable) ONLY if you ever start
-#   recording members-only / age-restricted / private streams.
+#   PURE COOKIELESS (PUBLIC_STREAM_ONLY=true):
+#     • Methods A/B + VOD-rescue cookie fallback all skipped
+#     • Recommended only if you're certain ALL streams will be fully public
 # ─────────────────────────────────────────────────────────────────────────────
-PUBLIC_STREAM_ONLY="${PUBLIC_STREAM_ONLY:-true}"
+PUBLIC_STREAM_ONLY="${PUBLIC_STREAM_ONLY:-false}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ═══════════════════════════════════════════════════════════════════════════════
