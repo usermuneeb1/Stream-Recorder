@@ -15,10 +15,20 @@ name: "☪️ The Muslim Lantern — Stream Recorder"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 on:
-  # Scheduled: Every 5 minutes, every day.
-  # The channel can go live unexpectedly, so daily monitoring prevents misses.
+  # Scheduled: Every 5 minutes. GitHub silently throttles this on inactive
+  # repos — see https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#schedule
+  # We supplement with repository_dispatch from an external 5-min pinger
+  # (see PINGER.md) which is NOT throttled, giving real 5-min coverage.
   schedule:
     - cron: "*/5 * * * *"
+
+  # External pinger trigger — call this via:
+  #   POST /repos/usermuneeb1/Stream-Recorder/dispatches
+  #   { "event_type": "ping-recorder" }
+  # The pinger fires every 5 min from cron-job.org (or any external scheduler)
+  # which bypasses GitHub's silent cron throttling entirely.
+  repository_dispatch:
+    types: [ping-recorder]
 
   # Manual trigger — run manually, optionally waiting for the stream to go live
   workflow_dispatch:
@@ -334,6 +344,21 @@ jobs:
           # Clamp between 1 and 5
           [[ "$MAX_H" -lt 1 ]] 2>/dev/null && MAX_H=1
           [[ "$MAX_H" -gt 5 ]] 2>/dev/null && MAX_H=5
+
+          # ── AUTO WAIT-FOR-LIVE on scheduled / repository_dispatch triggers ──
+          # GitHub Actions silently throttles cron schedules on inactive repos:
+          # our `*/5 * * * *` cron actually fired only 2 times in 24h on
+          # 2026-06-27 (instead of ~288). That's why a live stream was missed.
+          # Mitigation: when the workflow IS triggered (by ANY non-manual
+          # event), it polls for the stream for up to 1 hour before exiting.
+          # Combined with an external 5-min pinger hitting
+          # repository_dispatch, this gives near-continuous coverage even
+          # when GitHub silently skips cron ticks.
+          if [[ "$WAIT_MODE" != "true" ]] && [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            echo "🕐 Auto wait-for-live (scheduled trigger) — polling for 1h"
+            WAIT_MODE="true"
+            MAX_H=1
+          fi
 
           if [[ "$WAIT_MODE" == "true" ]]; then
             echo "🕐 Wait-for-live mode: polling every 60s for up to ${MAX_H}h…"
