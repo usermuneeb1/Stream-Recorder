@@ -96,8 +96,13 @@ env:
   RECORD_DIR: /tmp/stream-recorder
   COOKIES_FILE: cookies.txt
   # Permanent cookieless mode — the channel only streams public broadcasts.
-  # Repo variable PUBLIC_STREAM_ONLY (default true) wins over this if set.
-  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'true' }}
+  # HYBRID mode (default 'false'): cookieless methods try first, cookie
+  # methods (A/B) catch sign-in-required streams as fallback. Real failure on
+  # 2026-06-27 stream WOqZf9Myz_c returned LOGIN_REQUIRED — pure cookieless
+  # mode could never have recorded it. Set repo variable
+  # PUBLIC_STREAM_ONLY=true ONLY if you're certain all streams are fully
+  # public AND never restricted.
+  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'false' }}
   TZ: Asia/Karachi
 
 # ═══════════════════════════════════════════════════════════════════════════════
