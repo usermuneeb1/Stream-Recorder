@@ -481,6 +481,7 @@ record_method_h() {
         --merge \
         --no-frag-files \
         --retry-stream 30 \
+        --wait \
         --output "$base" \
         "$video_url" best 2>&1 | tail -10
 

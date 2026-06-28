@@ -244,14 +244,27 @@ detect_method_2_ytdlp() {
         return 1
     fi
     
-    # Check if stream is live
+    # Check if stream is live (or about to go live as a scheduled premiere)
     local is_live live_status
     is_live=$(echo "$json_output" | jq -r '.is_live // false' 2>/dev/null)
     live_status=$(echo "$json_output" | jq -r '.live_status // "not_live"' 2>/dev/null)
     
-    if [[ "$is_live" != "true" ]] && [[ "$live_status" != "is_live" ]]; then
+    # PREMIERE-AWARE MODE
+    # When live_status='is_upcoming', the channel has a SCHEDULED PREMIERE that
+    # hasn't started yet. We treat it as "live" so the record step kicks in —
+    # ytarchive --wait will then sit on the URL and grab the very first frame
+    # the moment the countdown ends. Without this we'd bail and the streamer
+    # would private the VOD before the next poll cycle picks it up.
+    # (This was the failure mode on 2026-06-27: SBOyQenrRoM was a premiere,
+    # recorder bailed every cycle, streamer privated within seconds of end.)
+    if [[ "$is_live" != "true" ]] \
+       && [[ "$live_status" != "is_live" ]] \
+       && [[ "$live_status" != "is_upcoming" ]]; then
         log_info "Method 2: Stream is not live (is_live=${is_live}, live_status=${live_status})"
         return 1
+    fi
+    if [[ "$live_status" == "is_upcoming" ]]; then
+        log_ok "Method 2: Scheduled PREMIERE detected — will wait for go-live with ytarchive --wait"
     fi
     
     # Extract metadata
@@ -633,16 +646,25 @@ is_stream_still_live() {
     if grep -qE '"isLiveNow"\s*:\s*true' <<< "$video_page"; then
         return 0
     fi
+
+    # PREMIERE-AWARE: a scheduled premiere shows isUpcoming=true in the
+    # embedded ytInitialPlayerResponse. We treat that as 'go-record-now'
+    # because ytarchive --wait will sit on the URL until premiere starts.
+    if grep -qE '"isUpcoming"\s*:\s*true' <<< "$video_page"; then
+        log_info "Scheduled premiere detected on $video_id — entering wait mode"
+        return 0
+    fi
     
     # Method B: yt-dlp json check (Definitive but slower — only if Method A inconclusive)
-    local is_live
-    is_live=$(timeout 20 yt-dlp --dump-json --no-download \
+    local json_blob is_live live_status
+    json_blob=$(timeout 20 yt-dlp --dump-json --no-download \
         --extractor-args "youtube:player_client=mweb" \
         --no-check-formats --ignore-no-formats-error \
         --socket-timeout 5 \
-        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null \
-        | jq -r '.is_live // false' 2>/dev/null)
-    if [[ "$is_live" == "true" ]]; then
+        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null)
+    is_live=$(echo "$json_blob" | jq -r '.is_live // false' 2>/dev/null)
+    live_status=$(echo "$json_blob" | jq -r '.live_status // "not_live"' 2>/dev/null)
+    if [[ "$is_live" == "true" ]] || [[ "$live_status" == "is_live" ]] || [[ "$live_status" == "is_upcoming" ]]; then
         return 0
     fi
     
