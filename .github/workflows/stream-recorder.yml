@@ -150,7 +150,7 @@ jobs:
 
       # ─── 1. CHECKOUT REPOSITORY ──────────────────────────────────────────
       - name: "📥 Checkout Repository"
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
       - name: "📦 Install Dependencies"
@@ -398,6 +398,7 @@ jobs:
         id: record
         if: steps.detect.outputs.is_live == 'true'
         timeout-minutes: 300  # 5 hours max for recording
+        continue-on-error: true
         run: |
           CUSTOM_DUR="${{ github.event.inputs.custom_duration_minutes }}"
           if [[ -n "$CUSTOM_DUR" && "$CUSTOM_DUR" != "0" ]]; then
