@@ -61,7 +61,7 @@ record_method_a() {
     log_info "  Method A: Cookies + web_creator player"
 
     # Permanent cookieless mode for public streams
-    if [[ "${PUBLIC_STREAM_ONLY:-true}" == "true" ]]; then
+    if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]]; then
         log_info "  Method A: Skipped (PUBLIC_STREAM_ONLY=true — cookieless permanent mode)"
         return 1
     fi
@@ -114,7 +114,7 @@ record_method_b() {
     log_info "  Method B: Cookies + tv_embedded player"
 
     # Permanent cookieless mode for public streams
-    if [[ "${PUBLIC_STREAM_ONLY:-true}" == "true" ]]; then
+    if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]]; then
         log_info "  Method B: Skipped (PUBLIC_STREAM_ONLY=true — cookieless permanent mode)"
         return 1
     fi
@@ -204,7 +204,7 @@ record_method_d() {
     # cookies if they are verified-valid; otherwise run clean cookieless so a bad
     # cookie file can never block a public-stream recording.
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -473,11 +473,14 @@ record_method_h() {
 
     # Optional cookies — only if verified valid (matches method D's logic)
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" ]] \
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
         && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
         && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(-c "${COOKIES_FILE:-cookies.txt}")
     fi
+
+    local wait_flag="--wait"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && wait_flag=""
 
     timeout "${MAX_RECORD_DURATION:-18000}" ytarchive \
         "${cookies_args[@]}" \
@@ -485,7 +488,7 @@ record_method_h() {
         --merge \
         --no-frag-files \
         --retry-stream 30 \
-        --wait \
+        $wait_flag \
         --output "$base" \
         "$video_url" best 2>&1 | tail -10
 
@@ -496,7 +499,7 @@ record_method_h() {
     # <base>.f<itag>.mp4 — try to find what it actually produced.
     if [[ ! -f "$output_file" ]]; then
         local produced
-        produced=$(ls -1t "${base}"*.mp4 2>/dev/null | head -1 || true)
+        produced=$(ls -1t "${base}".* 2>/dev/null | grep -E '\.(mp4|mkv|ts|webm)$' | head -1 || true)
         [[ -n "$produced" && -f "$produced" ]] && mv "$produced" "$output_file"
     fi
 
@@ -524,17 +527,18 @@ record_method_i() {
     fi
 
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" ]] \
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
         && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
         && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
-        # streamlink takes cookies via --http-cookie KEY=VALUE pairs.
-        # Simpler: tell it to load a Netscape cookies.txt via the http session.
-        cookies_args=(--http-header "Cookie=$(awk 'NF==7 {printf "%s=%s; ", $6, $7}' "${COOKIES_FILE}")")
+        cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
+
+    local restart_flag="--hls-live-restart"
+    [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
 
     timeout "${MAX_RECORD_DURATION:-18000}" streamlink \
         "${cookies_args[@]}" \
-        --hls-live-restart \
+        $restart_flag \
         --hls-segment-threads 4 \
         --hls-playlist-reload-attempts 10 \
         --hls-playlist-reload-time 2 \
@@ -615,7 +619,7 @@ attempt_recording() {
         sleep "${METHOD_RETRY_DELAY:-5}"
     done
     
-    log_error "  All 7 methods failed for attempt ${attempt_num}"
+    log_error "  All ${#methods[@]} methods failed for attempt ${attempt_num}"
     return 1
 }
 
@@ -758,6 +762,7 @@ record_stream() {
     local max_attempts="${MAX_RECORD_ATTEMPTS:-3}"
     local attempt=1
     local consecutive_failures=0
+    local ever_succeeded=false
     
     while (( attempt <= max_attempts )); do
         log_separator
@@ -765,13 +770,14 @@ record_stream() {
         # Try to record
         if attempt_recording "$video_url" "$attempt"; then
             RECORDING_SUCCESS=true
+            ever_succeeded=true
             consecutive_failures=0
             log_ok "Attempt ${attempt} produced a valid recording"
         else
             (( consecutive_failures++ ))
             log_warn "Attempt ${attempt} failed to produce a recording (${consecutive_failures} consecutive failure(s))"
             # If we've had 2+ consecutive failures on non-first attempt, stream is likely over
-            if (( attempt > 1 && consecutive_failures >= 2 )); then
+            if (( attempt > 1 && consecutive_failures >= 2 )) && [[ "$ever_succeeded" == "true" ]]; then
                 log_info "Multiple consecutive failures after a successful segment — stream has ended"
                 break
             fi
@@ -893,7 +899,7 @@ record_stream() {
             
             # Also try with cookies if available (they might still work for VOD even if live failed)
             # Skipped entirely under PUBLIC_STREAM_ONLY=true (permanent cookieless mode)
-            if [[ "$vod_rescued" != "true" ]] && [[ "${PUBLIC_STREAM_ONLY:-true}" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
+            if [[ "$vod_rescued" != "true" ]] && [[ "${PUBLIC_STREAM_ONLY:-false}" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
                 log_info "  🆘 VOD Rescue retry with cookies: ${mname}..."
                 if timeout 1800 yt-dlp \
                     --cookies "$COOKIES_FILE" \
