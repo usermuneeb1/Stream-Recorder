@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: "📥 Checkout Repository"
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: "🔴 MEGA.nz — Keep Alive"
         id: mega
