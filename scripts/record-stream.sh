@@ -21,6 +21,28 @@ COOKIES_FILE="${COOKIES_FILE:-cookies.txt}"
 RECORDED_FILES=()
 RECORDING_SUCCESS=false
 
+# v4: per-method failure log so Discord notification can tell us WHY each method failed
+mkdir -p "${RECORD_DIR}/method_logs"
+METHOD_FAILURE_LOG="${RECORD_DIR}/method_logs/failures.log"
+: > "$METHOD_FAILURE_LOG"
+_log_method_failure() {
+  local method_name="$1"
+  local status="$2"
+  local video_url="$3"
+  local output_file="$4"
+  local last_err="${5:-}"
+  {
+    echo "==== ${method_name} FAILED at $(now_pkt) ===="
+    echo "Status: ${status}"
+    echo "URL: ${video_url}"
+    echo "Output: ${output_file}"
+    echo "--- last stderr ---"
+    echo "${last_err}"
+    echo ""
+  } >> "$METHOD_FAILURE_LOG" 2>/dev/null || true
+}
+export -f _log_method_failure
+
 # Custom duration mode: when set, we record from "now" (no --live-from-start)
 # so the timeout produces a file of approximately the requested length.
 CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
@@ -559,6 +581,61 @@ record_method_i() {
     return "$status"
 }
 
+# v4: RECORDING METHOD J — ffmpeg HLS direct (independent path)
+# Resolves the HLS manifest URL via yt-dlp --get-url, then hands it to ffmpeg.
+# Catches cases where yt-dlp internal downloader hits n-challenge but ffmpeg
+# can still read the manifest.
+record_method_j() {
+  local video_url="$1"
+  local output_file="$2"
+
+  log_info " Method J: ffmpeg HLS direct (independent path)"
+
+  if ! command -v ffmpeg &>/dev/null; then
+    log_warn " Method J: ffmpeg not installed — skipping"
+    return 1
+  fi
+
+  local err_log="${RECORD_DIR}/method_logs/last_err.log"
+  local manifest_url
+  manifest_url=$(timeout 60 yt-dlp \
+    --no-download \
+    --no-playlist \
+    --no-warnings \
+    --quiet \
+    -f "best" \
+    -g \
+    "${video_url}" 2>"${err_log}" | head -1) || {
+    local err
+    err=$(tail -3 "${err_log}" 2>/dev/null)
+    _log_method_failure "Method J" "$?" "$video_url" "$output_file" "${err}"
+    log_warn " Method J: could not resolve manifest URL"
+    return 1
+  }
+
+  if [[ -z "$manifest_url" ]]; then
+    _log_method_failure "Method J" "empty-manifest" "$video_url" "$output_file" "yt-dlp -g returned empty"
+    log_warn " Method J: empty manifest URL"
+    return 1
+  fi
+
+  log_info " Method J: manifest = ${manifest_url:0:80}..."
+
+  timeout "${MAX_RECORD_DURATION:-18000}" ffmpeg -y \
+    -i "$manifest_url" \
+    -c copy \
+    -f mp4 \
+    -movflags +faststart \
+    "$output_file" 2>&1 | tail -5
+
+  local status=${PIPESTATUS[0]}
+  if [[ "$status" != "0" && "$status" != "124" ]]; then
+    _log_method_failure "Method J" "$status" "$video_url" "$output_file" "ffmpeg returned non-zero"
+  fi
+  [[ "$status" == "124" ]] && return 0
+  return "$status"
+}
+
 attempt_recording() {
     local video_url="$1"
     local attempt_num="$2"
@@ -581,6 +658,7 @@ attempt_recording() {
         "record_method_i"
         "record_method_d"
         "record_method_c"
+        "record_method_j"
         "record_method_a"
         "record_method_b"
         "record_method_g"
@@ -592,6 +670,7 @@ attempt_recording() {
         "I: streamlink hardened (cookieless, independent codebase)"
         "D: Android VR (cookieless 1080p)"
         "C: mediaconnect (cookieless 1080p)"
+        "J: ffmpeg HLS direct (NEW v4, independent path)"
         "A: Cookies+web_creator (bonus)"
         "B: Cookies+tv_embedded (bonus)"
         "G: Plain yt-dlp (default)"
@@ -730,8 +809,17 @@ record_stream() {
     log_info "Stream    : ${stream_title}"
     log_info "Video ID  : ${video_id}"
     log_info "URL       : ${video_url}"
-    log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-3} attempts × 7 methods = $((${MAX_RECORD_ATTEMPTS:-3} * 7)) chances"
+    log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-3} attempts × 10 methods = $((${MAX_RECORD_ATTEMPTS:-3} * 10)) chances"
     log_info "Started   : $(now_pkt)"
+
+    # v4: pre-flight liveness check — race-condition guard for streams that
+    # end between detection and recording (this lost HbS5TF1atFU).
+    log_step "Pre-flight: verifying stream is still live..."
+    if is_stream_still_live "$video_id"; then
+        log_ok "Pre-flight: stream is LIVE — proceeding"
+    else
+        log_warn "Pre-flight: stream is NOT live anymore — falling through to VOD rescue"
+    fi
     
     # ── Prepare directories ──────────────────────────────────────────────────
     mkdir -p "$RECORD_DIR" "$SEGMENTS_DIR"
@@ -851,17 +939,49 @@ record_stream() {
         
         local vod_rescued=false
         local vod_output="${RECORD_DIR}/vod_rescue.mp4"
+
+        # v4: VOD rescue now waits up to 30 min for the VOD to appear AND
+        # tries 6 methods instead of 3. Some streamers private the VOD within
+        # seconds of ending; we poll every 60s for up to 30 min, then try
+        # each method.
+        log_info "Waiting up to 30 min for VOD to become available..."
+        local vod_wait_iters=0
+        local max_vod_wait=30  # 30 iterations × 60s = 30 min
+        local vod_url="https://www.youtube.com/watch?v=${video_id}"
+        while (( vod_wait_iters < max_vod_wait )); do
+            if is_stream_still_live "$video_id"; then
+                log_warn "VOD wait: stream is STILL live — unexpected, breaking"
+                break
+            fi
+            local http_code
+            http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+                --max-time 15 -L "$vod_url" 2>/dev/null || echo "000")
+            if [[ "$http_code" == "200" ]]; then
+                log_ok "VOD is now accessible (after $((vod_wait_iters * 60))s)"
+                break
+            fi
+            log_info "VOD not yet available (HTTP $http_code) — waiting 60s more... [$((vod_wait_iters + 1))/${max_vod_wait}]"
+            sleep 60
+            (( vod_wait_iters++ ))
+        done
+
         local vod_methods=(
             "android_vr"
             "ios"
             "mweb"
+            "web"
+            "tv_embedded"
+            "web_creator"
         )
         local vod_method_names=(
             "Android VR (anonymous)"
             "iOS (anonymous)"
             "Mobile Web (anonymous)"
+            "Web (default client)"
+            "TV Embedded (cookie-friendly)"
+            "Web Creator (alt client)"
         )
-        
+
         for i in "${!vod_methods[@]}"; do
             local client="${vod_methods[$i]}"
             local mname="${vod_method_names[$i]}"
@@ -935,9 +1055,26 @@ record_stream() {
         if [[ "$vod_rescued" != "true" ]]; then
             log_error "═══ RECORDING FAILED ═══"
             log_error "All live methods AND VOD rescue failed"
-            log_error "The stream may have been made private before we could grab it"
+
+            # v4: dump a diagnostic summary so the Discord alert has real data
+            log_separator
+            log_error "DIAGNOSTIC SUMMARY"
+            log_info "  Stream URL : ${video_url}"
+            log_info "  Video ID : ${video_id}"
+            log_info "  WARP : ${WARP_CONNECTED:-unknown} (IP: ${WARP_IP:-${ORIGINAL_IP:-unknown}})"
+            log_info "  PoToken : $(curl -fsS --max-time 1 http://127.0.0.1:4416/ping >/dev/null 2>&1 && echo running || echo NOT_RUNNING)"
+            log_info "  Cookies : ${COOKIE_STATUS:-unknown} ($(if [[ -f cookies.txt ]]; then wc -l < cookies.txt; else echo 0; fi) lines)"
+            log_info "  Method failures captured : $(wc -l < "$METHOD_FAILURE_LOG" 2>/dev/null || echo 0) lines"
+            log_separator
+            log_info "Last 20 lines of failure log:"
+            tail -20 "$METHOD_FAILURE_LOG" 2>/dev/null || echo "  (no failure log captured)"
+            log_separator
+
             set_env "RECORDING_SUCCESS" "false"
+            set_env "METHOD_FAILURE_LOG" "$METHOD_FAILURE_LOG"
             set_output "recording_success" "false"
+            log_error "The stream may have been made private before we could grab it"
+            log_error "Check the Discord notification for the diagnostic dump above."
             return 1
         fi
     fi
