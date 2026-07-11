@@ -466,9 +466,14 @@ validate_recorded_file() {
 _pot_args() {
     local -n _out=$1
     _out=()
-    if curl -fsS --max-time 1 "http://127.0.0.1:4416/ping" >/dev/null 2>&1; then
-        _out=(--extractor-args "youtube:pot_provider=http://127.0.0.1:4416")
-    fi
+    # Check multiple times with longer timeout
+    for _ in 1 2; do
+        if curl -fsS --max-time 3 "http://127.0.0.1:4416/ping" >/dev/null 2>&1; then
+            _out=(--extractor-args "youtube:pot_provider=http://127.0.0.1:4416")
+            return
+        fi
+        sleep 1
+    done
 }
 
 

@@ -229,28 +229,37 @@ jobs:
 
       - name: "🛡️ Start PoToken Provider"
         id: pot
-        # v4: 3-attempt restart loop + install guard. If still failing, set POT_PROVIDER_READY=false
-        # so the diagnostic dump catches it.
+        # v5: Dedicated hardened PoToken step
         run: |
-          # Ensure package is installed (idempotent, survives runner image changes)
-          pip3 install --quiet bgutil-ytdlp-pot-provider 2>/dev/null || true
+          echo "Installing/upgrading bgutil-ytdlp-pot-provider..."
+          pip3 install --upgrade --quiet bgutil-ytdlp-pot-provider || true
 
           for i in 1 2 3; do
             pkill -f bgutil_ytdlp_pot_provider 2>/dev/null || true
             (python3 -m bgutil_ytdlp_pot_provider --host 127.0.0.1 --port 4416 \
               >/tmp/pot.log 2>&1 &)
-            sleep 3
-            if curl -fsS --max-time 2 http://127.0.0.1:4416/ping >/dev/null 2>&1; then
+            sleep 4
+            if curl -fsS --max-time 3 http://127.0.0.1:4416/ping >/dev/null 2>&1; then
               echo "✅ PoToken provider: listening on 127.0.0.1:4416 (attempt $i)"
               echo "POT_PROVIDER_READY=true" >> "$GITHUB_ENV"
+              echo "pot_ready=true" >> $GITHUB_OUTPUT
               exit 0
             fi
             echo "⚠️  PoToken attempt $i failed, retrying..."
-            sleep 2
+            sleep 3
           done
-          echo "::error::PoToken provider failed after 3 attempts — yt-dlp may return LOGIN_REQUIRED"
+          echo "::error::PoToken provider failed after 3 attempts"
           echo "POT_PROVIDER_READY=false" >> "$GITHUB_ENV"
-          echo "Continuing anyway — ytarchive + streamlink don't need PoToken"
+          echo "pot_ready=false" >> $GITHUB_OUTPUT
+          echo "Continuing anyway — ytarchive + streamlink do not need PoToken"
+
+      - name: "⛔ Abort — PoToken Provider Failed"
+        if: steps.pot.outputs.pot_ready != 'true'
+        run: |
+          echo "::error::PoToken provider is not running — all yt-dlp methods will fail"
+          echo "::error::This is the root cause of the last two failures"
+          exit 1
+
 
       - name: "💾 Check Disk Space"
         id: disk_check
