@@ -395,28 +395,39 @@ jobs:
         timeout-minutes: 5
         run: |
           source scripts/utils.sh
-          log_header "🔁 LIVE RECHECK (MAX AGGRESSIVE)"
-          sleep 1
-          if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
-            log_ok "Check 1 passed"
-            sleep 1
+          log_header "🔁 LIVE RECHECK (any-pass)"
+          # Race-condition guard: confirm the stream is still live before recording.
+          #
+          # We run up to 3 checks but PROCEED as soon as ANY one confirms live.
+          # Why any-pass (not all-must-pass): a single transient false-negative
+          # must NOT abort a genuinely-live recording. Over WARP IPv6, YouTube
+          # frequently serves a consent/sign-in page that omits isLiveNow even
+          # for a stream that is actively live — so is_stream_still_live can
+          # return false on a live stream. The previous "all 3 must pass"
+          # logic turned one such hiccup into an abort.
+          #
+          # Cost asymmetry justifies the tolerance:
+          #   • false-negative (abort a live stream) → recording LOST, and the
+          #     VOD often goes private within minutes → UNRECOVERABLE.
+          #     (Incident 2026-07-12 lsgplOHzdJQ: aborted 4s after detect →
+          #     VOD privated → lost forever.)
+          #   • false-positive (record a just-ended stream) → produces a
+          #     short/empty file that is_valid_video() rejects → self-correcting.
+          # If the stream truly ended, all 3 checks fail and we still abort.
+          still_live=false
+          for i in 1 2 3; do
             if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
-              log_ok "Check 2 passed"
-              sleep 1
-              if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
-                log_ok "Check 3 passed — proceeding to record"
-                echo "still_live=true" >> "$GITHUB_OUTPUT"
-              else
-                log_warn "Died on check 3 — skipping"
-                echo "still_live=false" >> "$GITHUB_OUTPUT"
-              fi
+              log_ok "Check $i confirmed live — proceeding to record"
+              still_live=true
+              break
             else
-              log_warn "Died on check 2 — skipping"
-              echo "still_live=false" >> "$GITHUB_OUTPUT"
+              log_warn "Check $i did not confirm live"
+              [[ $i -lt 3 ]] && sleep 2
             fi
-          else
-            log_warn "Died on check 1 — skipping"
-            echo "still_live=false" >> "$GITHUB_OUTPUT"
+          done
+          echo "still_live=$still_live" >> "$GITHUB_OUTPUT"
+          if [[ "$still_live" == "false" ]]; then
+            log_warn "All 3 checks failed to confirm live — skipping (stream likely ended)"
           fi
 
       - name: "⏭️  Skip Recording — Stream Ended Mid-Race"
@@ -489,7 +500,11 @@ jobs:
       # (useless — no info about WHY). Now: includes WARP, PoToken, cookie,
       # IP state, plus last 50 lines of per-method failure log.
       - name: "❌ Notify — Recording Failed"
-        if: steps.detect.outputs.is_live == 'true' && steps.record.outputs.recording_success != 'true'
+        # Only fire when recording was actually ATTEMPTED and failed. When the
+        # recheck aborts (still_live=false), the dedicated "Stream Ended
+        # Mid-Race" step already notifies — firing a second "Recording failed"
+        # here would double-notify and mislabel a skip as a recording failure.
+        if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false' && steps.record.outputs.recording_success != 'true'
         run: |
           source scripts/utils.sh
           source scripts/discord-notify.sh
@@ -505,10 +520,12 @@ jobs:
           ip_state="${WARP_IP:-${ORIGINAL_IP:-unknown}}"
           cookie_state="${COOKIE_STATUS:-unknown}"
 
-          # Build diagnostic using printf so we avoid colons in YAML literal block.
-          detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP\\: %s\\nIP\\: %s\\nCookies\\: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." \
-            "$warp_state" "$ip_state" "$pot_state" "$cookie_state" "${failures:-no log captured}")
-
+          # Diagnostic: single-line printf, 5 specifiers = 5 args (aligned).
+          # Fixes: (1) prior 4-spec/5-arg mismatch made printf re-use the format,
+          # duplicating the dump; (2) pot_state was under "Cookies" and cookie_state
+          # under "Last method failures"; (3) \\:\\n escapes rendered as literal
+          # \: and \n text — now bare colons + single-backslash \n.
+          detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP: %s\nIP: %s\nCookies: %s\nPoToken: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." "$warp_state" "$ip_state" "$cookie_state" "$pot_state" "${failures:-no log captured}")
           notify_recording_failed "Recording failed" "$detail"
 
       # ─── 15. AUTO-RETRY ON FAILURE ────────────────────────────────────────
