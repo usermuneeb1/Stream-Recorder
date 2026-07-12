@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Recording } from '../utils/dataFetcher';
 import { fmtDate, fmtRelative, copyText } from '../utils/format';
 import { loadPosition } from '../utils/history';
+import { useTilt } from '../hooks/useTilt';
 
 interface P {
   rec: Recording;
@@ -127,13 +128,17 @@ export function StreamCard({ rec, onClick, delay = 0, view, onToast, featured }:
   }
 
   // ─── GRID CARD ───────────────────────────────────────────────────────
+  const tilt = useTilt(4);
   return (
     <div
+      ref={tilt.ref}
       role="button" tabIndex={0}
       onClick={onClick} onKeyDown={onKey}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      className="card-surface reveal-on-scroll group cursor-pointer ring-focus overflow-hidden"
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); tilt.onMouseLeave(); }}
+      onMouseMove={tilt.onMouseMove}
+      className="card-surface card-tilt reveal-on-scroll group cursor-pointer ring-focus overflow-hidden"
       data-stagger={(delay / 60) % 7}
+      style={{ transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s, box-shadow 0.35s, background 0.35s' }}
     >
       <div className="relative aspect-video overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
         {!err

@@ -51,10 +51,11 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount
 
   return (
     <header
-      className="sticky top-0 z-50 glass no-select transition-transform duration-300"
+      className="sticky top-0 z-50 glass-premium no-select transition-transform duration-300"
       style={{
         borderBottom: '1px solid var(--border-subtle)',
         transform: hidden ? 'translateY(-100%)' : 'translateY(0)',
+        boxShadow: '0 4px 30px rgba(0, 0, 0, 0.15)',
       }}
     >
       <div className="max-w-[1400px] mx-auto flex items-center gap-3 sm:gap-5 px-4 sm:px-6 lg:px-10 h-[72px] sm:h-[80px]">
@@ -65,11 +66,11 @@ export function Header({ q, setQ, theme, toggleTheme, onOpenCmd, recordingsCount
           className="shrink-0 flex items-center gap-2.5 -ml-1 group"
           aria-label="Muslim Lantern Archive home"
         >
-          <img src="/logo.png" alt="" className="h-10 sm:h-12 object-contain logo-glow" />
+          <img src="/logo.png" alt="" className="h-10 sm:h-12 object-contain logo-glow transition-transform duration-300 group-hover:scale-105" />
         </a>
 
-        {/* Recordings pill (dot + count) */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+        {/* Recordings pill (dot + count) — premium glass */}
+        <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-full transition-all duration-300 hover:scale-[1.02]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-subtle)', backdropFilter: 'blur(8px)' }}>
           <span className="relative inline-block w-1.5 h-1.5">
             <span className="absolute inset-0 rounded-full" style={{ background: 'var(--accent-glow)' }} />
             <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'var(--accent-glow)', opacity: 0.55 }} />

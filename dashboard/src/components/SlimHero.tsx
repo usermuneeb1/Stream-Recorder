@@ -4,6 +4,7 @@ import type { Recording } from '../utils/dataFetcher';
 function pretty(n: number, decimals = 0): string {
   return n.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
 }
+
 function useCounter(target: number, dur = 1100): number {
   const [v, setV] = useState(0);
   useEffect(() => {
@@ -11,7 +12,7 @@ function useCounter(target: number, dur = 1100): number {
     const start = performance.now();
     const tick = (t: number) => {
       const p = Math.min(1, (t - start) / dur);
-      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      const eased = 1 - Math.pow(1 - p, 3);
       setV(target * eased);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
@@ -29,6 +30,49 @@ function greeting(): string {
   return 'Good evening';
 }
 
+/**
+ * MiniSparkline — Premium inline activity chart showing recording frequency.
+ */
+function MiniSparkline({ recs }: { recs: Recording[] }) {
+  const bars = useMemo(() => {
+    // Group recordings by month for the last 6 months
+    const now = new Date();
+    const months: { label: string; count: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString('default', { month: 'short' });
+      const count = recs.filter(r => (r.recordedAt || r.date || '').startsWith(key)).length;
+      months.push({ label, count });
+    }
+    return months;
+  }, [recs]);
+
+  const max = Math.max(1, ...bars.map(b => b.count));
+
+  return (
+    <div className="flex items-end gap-1.5 h-10">
+      {bars.map((bar, i) => (
+        <div key={i} className="flex flex-col items-center gap-1">
+          <div
+            className="w-3 sm:w-4 rounded-t-sm transition-all duration-500"
+            style={{
+              height: `${Math.max(2, (bar.count / max) * 32)}px`,
+              background: bar.count > 0
+                ? 'linear-gradient(180deg, var(--accent-glow) 0%, var(--accent-primary) 100%)'
+                : 'var(--bg-elevated)',
+              opacity: bar.count > 0 ? 0.8 : 0.3,
+              boxShadow: bar.count > 0 ? '0 0 8px rgba(255, 61, 61, 0.3)' : 'none',
+            }}
+            title={`${bar.label}: ${bar.count} recordings`}
+          />
+          <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>{bar.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SlimHero({ recs }: { recs: Recording[] }) {
   const stats = useMemo(() => {
     const totalSec = recs.reduce((a, r) => a + (r.durationSec || 0), 0);
@@ -40,10 +84,8 @@ export function SlimHero({ recs }: { recs: Recording[] }) {
   const g = useCounter(stats.gb);
 
   return (
-    <section className="mesh-hero noise-overlay rounded-[20px] border px-5 sm:px-9 py-7 sm:py-9 mb-8 relative fade-up" style={{ borderColor: 'var(--border-subtle)' }}>
-      {/* Elegant gold overline — decorative dashes flanking the brand text,
-          no badge background. Per round-2 spec: this should NOT look like a
-          system label. */}
+    <section className="mesh-hero noise-overlay rounded-[20px] border px-5 sm:px-9 py-7 sm:py-9 mb-8 fade-up relative" style={{ borderColor: 'var(--border-subtle)' }}>
+      {/* Elegant gold overline */}
       <div className="flex items-center gap-3 mb-5 relative">
         <span className="hidden sm:block h-px w-7" style={{ background: 'linear-gradient(to right, transparent, var(--accent-gold))' }} />
         <svg className="w-3.5 h-3.5" style={{ color: 'var(--accent-gold)', filter: 'drop-shadow(0 0 6px rgba(212, 168, 83, 0.50))' }} viewBox="0 0 24 24" fill="currentColor">
@@ -71,11 +113,22 @@ export function SlimHero({ recs }: { recs: Recording[] }) {
           </p>
         </div>
 
-        {/* Right — glass stat tiles with animated counters */}
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-3 shrink-0">
-          <HeroStat value={pretty(c)} label="streams" />
-          <HeroStat value={pretty(h, h >= 100 ? 0 : 1)} label="hours" />
-          <HeroStat value={g >= 100 ? `${(g / 1024).toFixed(1)} TB` : `${g.toFixed(1)} GB`} label="library" small />
+        {/* Right — glass stat tiles + sparkline */}
+        <div className="flex flex-col gap-3 shrink-0">
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            <HeroStat value={pretty(c)} label="streams" />
+            <HeroStat value={pretty(h, h >= 100 ? 0 : 1)} label="hours" />
+            <HeroStat value={g >= 100 ? `${(g / 1024).toFixed(1)} TB` : `${g.toFixed(1)} GB`} label="library" small />
+          </div>
+          {/* Activity sparkline */}
+          <div className="glass rounded-[14px] px-4 py-3 flex items-center gap-3" style={{ border: '1px solid var(--border-subtle)' }}>
+            <div className="flex-1">
+              <p className="text-[9.5px] uppercase tracking-[.15em] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                Activity (6mo)
+              </p>
+              <MiniSparkline recs={recs} />
+            </div>
+          </div>
         </div>
       </div>
     </section>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchRecordings, type Recording } from './utils/dataFetcher';
 import { initAnalytics, track } from './utils/analytics';
 import { Header } from './components/Header';
+import { FeaturedStream } from './components/FeaturedStream';
 import { SlimHero } from './components/SlimHero';
 import { ContinueWatching } from './components/ContinueWatching';
 import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
@@ -190,7 +191,14 @@ export default function App() {
 
   // ── Home ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: 'var(--bg)' }} className="min-h-screen flex flex-col">
+    <div style={{ background: 'var(--bg)' }} className="min-h-screen flex flex-col relative">
+      {/* Ambient background orbs — premium floating gradients */}
+      <div className="ambient-orbs" aria-hidden="true">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+      </div>
+
       {loading && <div className="top-bar" />}
       <Header
         q={q}
@@ -201,7 +209,8 @@ export default function App() {
         recordingsCount={recs.length}
       />
 
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12 relative z-10">
+        <FeaturedStream recs={recs} onOpen={open} />
         <SlimHero recs={recs} />
         {!q.trim() && filter === 'all' && <ContinueWatching recs={recs} onOpen={open} />}
         <FilterBar
