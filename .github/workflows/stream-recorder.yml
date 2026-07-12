@@ -253,12 +253,13 @@ jobs:
           echo "pot_ready=false" >> $GITHUB_OUTPUT
           echo "Continuing anyway — ytarchive + streamlink do not need PoToken"
 
-      - name: "⛔ Abort — PoToken Provider Failed"
+      - name: "⚠️ PoToken Provider Warning (non-fatal)"
         if: steps.pot.outputs.pot_ready != 'true'
+        continue-on-error: true
         run: |
-          echo "::error::PoToken provider is not running — all yt-dlp methods will fail"
-          echo "::error::This is the root cause of the last two failures"
-          exit 1
+          echo "::warning::PoToken provider failed after 3 attempts — yt-dlp methods may hit LOGIN_REQUIRED"
+          echo "ytarchive (H) + streamlink (I) will still work without PoToken"
+          echo "Continuing with all 10 methods anyway"
 
 
       - name: "💾 Check Disk Space"
