@@ -5,8 +5,6 @@ import { Header } from './components/Header';
 import { FeaturedStream } from './components/FeaturedStream';
 import { SlimHero } from './components/SlimHero';
 import { ContinueWatching } from './components/ContinueWatching';
-import { LiveStatusBadge } from './components/LiveStatusBadge';
-import { MobileNav } from './components/MobileNav';
 import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
 import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
@@ -18,11 +16,9 @@ import { CommandPalette } from './components/CommandPalette';
 type Route =
   | { kind: 'home' }
   | { kind: 'watch'; rec: Recording }
-  | { kind: 'watch-pending'; id: string }   // FIX #27 — waiting for data to resolve a deep link
+  | { kind: 'watch-pending'; id: string }
   | { kind: 'notfound' };
 
-// FIX #27 — derive the initial route from the URL synchronously so a hard-refresh
-// on /#/watch/<id> doesn't render the home page for ~500ms while data loads.
 function initialRoute(): Route {
   if (typeof window === 'undefined') return { kind: 'home' };
   const m = (window.location.hash || '').match(/^#\/watch\/([^?]+)/);
@@ -34,66 +30,24 @@ export default function App() {
   const [recs, setRecs] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  // FIX #25 — debounced copy of `q` used by the heavy filter+sort useMemo.
-  // The input UI updates instantly (controlled by `q`); the expensive
-  // recomputation runs ~150ms after the user stops typing.
   const [qDebounced, setQDebounced] = useState('');
   useEffect(() => {
     const id = setTimeout(() => setQDebounced(q), 150);
     return () => clearTimeout(id);
   }, [q]);
   const [route, setRoute] = useState<Route>(initialRoute);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    typeof window !== 'undefined' ? ((localStorage.getItem('t') as 'dark' | 'light') || 'dark') : 'dark',
-  );
-  const [sort, setSort] = useState<SortKey>(() => (localStorage.getItem('sort') as SortKey) || 'newest');
-  const [filter, setFilter] = useState<FilterKey>(() => {
-    // Migration: chapters/guests filters were removed; reset to 'all' so
-    // users who had them selected don't end up seeing zero recordings.
-    const stored = localStorage.getItem('filter') as string | null;
-    return stored === 'all' || stored === 'hd' ? (stored as FilterKey) : 'all';
-  });
-  const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('view') as 'grid' | 'list') || 'grid');
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [sort, setSort] = useState<SortKey>('newest');
+  const [filter, setFilter] = useState<FilterKey>('all');
+  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [toast, setToast] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 600);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Theme persistence
-  useEffect(() => {
-    document.documentElement.className = theme === 'light' ? 'light' : '';
-    localStorage.setItem('t', theme);
-  }, [theme]);
-  useEffect(() => { localStorage.setItem('sort', sort); }, [sort]);
-  useEffect(() => { localStorage.setItem('filter', filter); }, [filter]);
-  useEffect(() => { localStorage.setItem('view', view); }, [view]);
-
-  // Analytics
-  useEffect(() => { initAnalytics(); }, []);
-
-  // FEATURE: First-visit hint nudges the user to the ⌘K command palette.
-  // Shown exactly once per browser (localStorage flag).
-  useEffect(() => {
-    const FLAG = 'mla_seen_cmdk_hint_v1';
-    if (localStorage.getItem(FLAG)) return;
-    const id = window.setTimeout(() => {
-      setToast('💡 Tip — press ⌘K (or Ctrl+K) for the command palette');
-      localStorage.setItem(FLAG, '1');
-    }, 4000);
-    return () => clearTimeout(id);
-  }, []);
-
-  // Load data
-  useEffect(() => {
+    initAnalytics();
     fetchRecordings().then(r => { setRecs(r); setLoading(false); });
   }, []);
 
-  // Route handling
   useEffect(() => {
     const sync = () => {
       const h = window.location.hash || '';
@@ -101,7 +55,6 @@ export default function App() {
       if (m) {
         const id = decodeURIComponent(m[1]);
         if (!recs.length) {
-          // FIX #27 — show pending screen instead of flashing home while we wait
           setRoute({ kind: 'watch-pending', id });
           return;
         }
@@ -116,18 +69,6 @@ export default function App() {
     return () => window.removeEventListener('hashchange', sync);
   }, [recs]);
 
-  // Global ⌘K / Ctrl+K
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setCmdOpen(o => !o);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   const open = useCallback((r: Recording) => {
     window.location.hash = `/watch/${encodeURIComponent(r.videoId)}`;
     window.scrollTo(0, 0);
@@ -137,14 +78,11 @@ export default function App() {
   const goHome = useCallback(() => { window.location.hash = ''; }, []);
   const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
 
-  // Apply search + filter + sort (debounced query — see FIX #25)
   const filtered = useMemo(() => {
     let xs = recs;
     if (qDebounced.trim()) {
       const s = qDebounced.toLowerCase();
-      xs = xs.filter(r =>
-        r.title.toLowerCase().includes(s)
-        || r.date.includes(s));
+      xs = xs.filter(r => r.title.toLowerCase().includes(s) || r.date.includes(s));
     }
     if (filter === 'hd') xs = xs.filter(r => /1080|1440|2160|4k/i.test(r.resolution));
     xs = [...xs];
@@ -158,18 +96,15 @@ export default function App() {
     return xs;
   }, [recs, qDebounced, filter, sort]);
 
-  // ── Render by route ─────────────────────────────────────────────────────
   if (route.kind === 'notfound') {
     return <NotFoundPage onHome={goHome} />;
   }
   if (route.kind === 'watch-pending') {
-    // FIX #27 — black holding screen so deep-link refresh doesn't flash home.
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#000' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="flex flex-col items-center">
-          <div className="w-10 h-10 mb-3 rounded-full border-2 border-transparent animate-spin"
-               style={{ borderTopColor: 'var(--red)' }} />
-          <p className="text-white/60 text-[13px] font-medium tracking-wide">Loading recording</p>
+          <img src="/logo-vertical.pn.jpg" alt="" className="w-16 h-16 rounded-xl mb-4 animate-pulse" />
+          <p className="font-display text-lg" style={{ color: 'var(--gold-primary)' }}>Loading Recording</p>
         </div>
       </div>
     );
@@ -191,17 +126,10 @@ export default function App() {
     );
   }
 
-  // ── Home ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: 'var(--bg)' }} className="min-h-screen flex flex-col relative">
-      {/* Ambient background orbs — premium floating gradients */}
-      <div className="ambient-orbs" aria-hidden="true">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-        <div className="orb orb-3" />
-      </div>
-
-      {loading && <div className="top-bar" />}
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      {loading && <div className="fixed top-0 left-0 right-0 h-1 z-50" style={{ background: 'var(--gradient-gold)', animation: 'shimmer 2s infinite' }} />}
+      
       <Header
         q={q}
         setQ={setQ}
@@ -211,15 +139,11 @@ export default function App() {
         recordingsCount={recs.length}
       />
 
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12 relative z-10 pb-20 md:pb-12">
-        {/* Live status indicator */}
-        <div className="mb-4 flex justify-center">
-          <LiveStatusBadge />
-        </div>
-
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-8 pb-12">
         <FeaturedStream recs={recs} onOpen={open} />
         <SlimHero recs={recs} />
         {!q.trim() && filter === 'all' && <ContinueWatching recs={recs} onOpen={open} />}
+        
         <FilterBar
           sort={sort}
           setSort={setSort}
@@ -232,51 +156,38 @@ export default function App() {
         />
 
         {loading ? (
-          <div className={view === 'list'
-              ? 'space-y-3'
-              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-8'}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
-              <div key={i}>
-                <div className="skel aspect-video w-full" />
-                <div className="skel h-4 w-3/4 mt-3" />
-                <div className="skel h-3 w-1/2 mt-2" />
+              <div key={i} className="card-premium">
+                <div className="aspect-video w-full" style={{ background: 'var(--bg-elevated)' }} />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 rounded" style={{ background: 'var(--bg-elevated)' }} />
+                  <div className="h-3 w-2/3 rounded" style={{ background: 'var(--bg-elevated)' }} />
+                </div>
               </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-24 opacity-60 text-center px-6">
-            <svg className="w-12 h-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <p className="font-display text-lg font-semibold mb-1">Nothing matches</p>
-            <p className="text-sm" style={{ color: 'var(--tx3)' }}>
-              {q ? `No recordings for "${q}"` : 'No recordings match this filter'}
-            </p>
-            <button onClick={() => { setQ(''); setFilter('all'); }} className="btn mt-4">Clear filters</button>
+          <div className="flex flex-col items-center py-24 text-center">
+            <p className="font-display text-xl mb-2" style={{ color: 'var(--text-secondary)' }}>No recordings found</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Try adjusting your search or filters</p>
           </div>
         ) : view === 'list' ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {filtered.map((r, i) => (
-              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 30} view="list" onToast={setToast} featured={i === 0 && sort === 'newest' && !qDebounced.trim() && filter === 'all'} />
+              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 50} view="list" onToast={setToast} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((r, i) => (
-              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 40} view="grid" onToast={setToast} featured={i === 0 && sort === 'newest' && !qDebounced.trim() && filter === 'all'} />
+              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 50} view="grid" onToast={setToast} featured={i === 0 && sort === 'newest'} />
             ))}
           </div>
         )}
       </main>
 
       <Footer />
-
-      <MobileNav
-        recordingsCount={recs.length}
-        onOpenCmd={() => setCmdOpen(true)}
-        theme={theme}
-        toggleTheme={toggleTheme}
-      />
 
       <CommandPalette
         open={cmdOpen}
@@ -286,18 +197,6 @@ export default function App() {
         toggleTheme={toggleTheme}
       />
       <Toast msg={toast} onDone={() => setToast('')} />
-      {scrolled && (
-        <button
-          className="fab pop-in"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          aria-label="Back to top"
-          title="Back to top"
-        >
-          <svg className="w-5 h-5 m-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }

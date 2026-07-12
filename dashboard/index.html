@@ -4,127 +4,53 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
-  <!-- Primary SEO Meta Tags -->
-  <meta name="description" content="The Muslim Lantern — Stream Archive. Every live broadcast preserved forever. Searchable, free to watch, mirrored across 6 cloud providers. Preserving daʿwah, one stream at a time." />
+  <!-- Primary Meta Tags -->
+  <meta name="description" content="The Muslim Lantern — Stream Archive. Every live broadcast preserved forever. Searchable, free to watch. Preserving daʿwah, one stream at a time." />
   <meta name="keywords" content="Muslim Lantern, Islamic lectures, daʿwah, stream archive, Islamic content, Muslim talks, Islamic live streams, Quran, Hadith, Islamic knowledge" />
   <meta name="author" content="Muneeb Ahmad" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://muslim-lantern-archive.vercel.app/" />
 
   <!-- Theme & Platform -->
-  <meta name="theme-color" content="#c62828" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0a0a0f" />
   <meta name="color-scheme" content="dark light" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Muslim Lantern" />
-  <meta name="application-name" content="Muslim Lantern Archive" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="msapplication-TileColor" content="#c62828" />
-  <meta name="msapplication-tap-highlight" content="no" />
 
-  <!-- Open Graph / Facebook -->
+  <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="The Muslim Lantern Archive" />
   <meta property="og:url" content="https://muslim-lantern-archive.vercel.app/" />
   <meta property="og:title" content="The Muslim Lantern — Stream Archive | Preserving Daʿwah Forever" />
-  <meta property="og:description" content="Every live broadcast from The Muslim Lantern, preserved forever. Searchable, free to watch, mirrored across 6 cloud providers. Watch Islamic lectures, talks, and Q&A sessions." />
+  <meta property="og:description" content="Every live broadcast from The Muslim Lantern, preserved forever. Searchable, free to watch." />
   <meta property="og:image" content="/thumbnail.jpg" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="The Muslim Lantern Archive" />
-  <meta property="og:locale" content="en_US" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:site" content="@TheMuslimLantern" />
-  <meta name="twitter:creator" content "@TheMuslimLantern" />
   <meta name="twitter:title" content="The Muslim Lantern — Stream Archive" />
-  <meta name="twitter:description" content="Every live broadcast from The Muslim Lantern, preserved forever. Searchable, free to watch, mirrored across 6 cloud providers." />
+  <meta name="twitter:description" content="Every live broadcast from The Muslim Lantern, preserved forever." />
   <meta name="twitter:image" content="/thumbnail.jpg" />
-  <meta name="twitter:image:alt" content="The Muslim Lantern Archive" />
-
-  <!-- Structured Data (JSON-LD) -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "The Muslim Lantern Archive",
-    "alternateName": "Muslim Lantern Stream Archive",
-    "url": "https://muslim-lantern-archive.vercel.app/",
-    "description": "Every live broadcast from The Muslim Lantern, preserved forever. Searchable, free to watch, mirrored across 6 cloud providers.",
-    "publisher": {
-      "@type": "Organization",
-      "name": "The Muslim Lantern",
-      "url": "https://youtube.com/@TheMuslimLantern",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://muslim-lantern-archive.vercel.app/logo.png"
-      }
-    },
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": {
-        "@type": "EntryPoint",
-        "urlTemplate": "https://muslim-lantern-archive.vercel.app/?q={search_term_string}"
-      },
-      "query-input": "required name=search_term_string"
-    }
-  }
-  </script>
-
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "VideoGallery",
-    "name": "The Muslim Lantern — Stream Archive",
-    "description": "Archive of live broadcasts from The Muslim Lantern YouTube channel. Islamic lectures, Q&A sessions, and daʿwah content preserved forever.",
-    "url": "https://muslim-lantern-archive.vercel.app/",
-    "genre": "Islamic Education",
-    "inLanguage": ["en", "ur", "ar"],
-    "provider": {
-      "@type": "Organization",
-      "name": "The Muslim Lantern",
-      "url": "https://youtube.com/@TheMuslimLantern"
-    }
-  }
-  </script>
 
   <title>The Muslim Lantern — Stream Archive | Preserving Daʿwah Forever</title>
 
-  <!-- Favicon & Icons -->
+  <!-- Favicon -->
   <link rel="icon" type="image/jpg" href="/logo-vertical.pn.jpg" />
   <link rel="apple-touch-icon" href="/logo-vertical.pn.jpg" />
   <link rel="manifest" href="/site.webmanifest" />
 
-  <!-- Preconnect to critical origins -->
-  <link rel="preconnect" href="https://i.ytimg.com" />
-  <link rel="preconnect" href="https://archive.org" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <link rel="preconnect" href="https://raw.githubusercontent.com" />
-  <link rel="dns-prefetch" href="https://pixeldrain.com" />
-  <link rel="dns-prefetch" href="https://gofile.io" />
-  <link rel="dns-prefetch" href="https://mega.nz" />
-
-  <!-- Premium fonts (Outfit for display, Inter for body, JetBrains Mono for numbers) -->
+  <!-- Premium fonts: Cinzel for display (FGO-style elegance), Inter for body, JetBrains Mono for numbers -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 
-  <!-- Inline critical paint styles so first render isn't a flash of unstyled content -->
+  <!-- Inline critical styles -->
   <style>
-    html, body { background: #0a0a0a; color: #f5f5f5; margin: 0; }
-    @media (prefers-color-scheme: light) { html, body { background: #fafafa; color: #111; } }
-    .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
-    .boot-logo { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; animation: logo-glow 2s ease-in-out infinite; }
-    .boot-text { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 0.05em; opacity: 0.6; }
-    @keyframes logo-glow { 0%, 100% { opacity: 0.4; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1); } }
-    .skeleton-shimmer {
-      background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-surface) 50%, var(--bg-elevated) 100%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s ease-in-out infinite;
-    }
-    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    html, body { background: #0a0a0f; color: #f5f5f7; margin: 0; }
+    .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+    .boot-logo { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; animation: logo-pulse 2s ease-in-out infinite; }
+    .boot-text { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 600; letter-spacing: 0.1em; color: #d4af37; opacity: 0.8; }
+    @keyframes logo-pulse { 0%, 100% { opacity: 0.6; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1); } }
   </style>
 </head>
 <body class="antialiased">

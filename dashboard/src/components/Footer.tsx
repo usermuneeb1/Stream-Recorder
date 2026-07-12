@@ -3,138 +3,99 @@ export function Footer() {
 
   return (
     <footer
-      className="no-select mt-20 noise-overlay relative"
+      className="mt-20 py-12"
       style={{
-        background: 'var(--bg-surface)',
         borderTop: '1px solid var(--border-subtle)',
+        background: 'var(--bg-secondary)',
       }}
     >
-      {/* Top decorative gradient line */}
-      <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(to right, transparent, var(--accent-primary) 30%, var(--accent-gold) 50%, var(--accent-primary) 70%, transparent)' }} />
-
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-12">
-        {/* Main footer content */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-          {/* Brand column */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3.5 mb-4">
-              <img src="/logo-vertical.pn.jpg" alt="" className="w-14 h-14 rounded-xl object-cover logo-glow" style={{ border: '1px solid var(--border-subtle)' }} />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+          {/* Brand */}
+          <div className="flex flex-col items-center md:items-start gap-3">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo-vertical.pn.jpg"
+                alt=""
+                className="w-12 h-12 rounded-lg object-cover"
+                style={{ border: '1px solid var(--border-gold)' }}
+              />
               <div>
-                <p className="font-display text-[18px] font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                  Muslim Lantern <span className="text-gradient-red">Archive</span>
+                <p className="font-display text-lg font-bold" style={{ color: 'var(--gold-primary)' }}>
+                  The Muslim Lantern
                 </p>
-                <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Preserving daʿwah, one stream at a time
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  Stream Archive
                 </p>
               </div>
             </div>
-            <p className="text-[13px] leading-relaxed max-w-md mb-5" style={{ color: 'var(--text-secondary)' }}>
-              Every live broadcast from The Muslim Lantern, archived forever. Searchable, free to watch, and mirrored across six redundant cloud providers for maximum durability.
+            <p className="text-sm text-center md:text-left" style={{ color: 'var(--text-secondary)' }}>
+              Preserving daʿwah, one stream at a time.
             </p>
-            <a
-              href="https://youtube.com/@TheMuslimLantern"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-youtube !py-2.5 !px-5 ring-focus btn-magnetic"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M23.5 6.2a3 3 0 00-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 00.5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 002.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 002.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z" />
-              </svg>
-              Visit YouTube Channel
-            </a>
           </div>
 
-          {/* Archive column */}
-          <div>
-            <h3 className="font-display text-[13px] font-bold uppercase tracking-[.15em] mb-4" style={{ color: 'var(--text-primary)' }}>
-              Archive
-            </h3>
-            <ul className="space-y-2.5">
-              {[
-                { label: 'All Recordings', href: '#' },
-                { label: 'HD Only', href: '#', onClick: () => localStorage.setItem('filter', 'hd') },
-                { label: 'Longest Streams', href: '#', onClick: () => localStorage.setItem('sort', 'longest') },
-                { label: 'Recently Added', href: '#', onClick: () => localStorage.setItem('sort', 'newest') },
-              ].map((item) => (
-                <li key={item.label}>
-                  <a
-                    href={item.href}
-                    onClick={(e) => {
-                      if (item.onClick) {
-                        e.preventDefault();
-                        item.onClick();
-                        window.location.hash = '';
-                        window.scrollTo(0, 0);
-                      }
-                    }}
-                    className="text-[13px] transition-colors hover:text-[var(--accent-glow)]"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {item.label}
+          {/* Links */}
+          <div className="flex gap-8">
+            <div>
+              <p className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+                Archive
+              </p>
+              <ul className="space-y-2">
+                <li>
+                  <a href="#" className="text-sm hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                    All Recordings
                   </a>
                 </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Features column */}
-          <div>
-            <h3 className="font-display text-[13px] font-bold uppercase tracking-[.15em] mb-4" style={{ color: 'var(--text-primary)' }}>
-              Features
-            </h3>
-            <ul className="space-y-2.5">
-              {[
-                'Command Palette (⌘K)',
-                'Keyboard Shortcuts',
-                'Continue Watching',
-                'Picture-in-Picture',
-                'Multi-Source Playback',
-                'Cloud Mirrors',
-              ].map((feature) => (
-                <li key={feature}>
-                  <span className="text-[13px] flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-                    <span className="w-1 h-1 rounded-full" style={{ background: 'var(--accent-gold)' }} />
-                    {feature}
-                  </span>
+                <li>
+                  <a href="#" className="text-sm hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                    HD Only
+                  </a>
                 </li>
-              ))}
-            </ul>
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+                Features
+              </p>
+              <ul className="space-y-2">
+                <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Search & Filter
+                </li>
+                <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Multi-Quality
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
 
-        {/* Cloud mirrors badge row */}
-        <div className="py-6 mb-6" style={{ borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <p className="text-[11px] font-semibold uppercase tracking-[.15em] text-center mb-4" style={{ color: 'var(--text-muted)' }}>
-            Mirrored Across 6 Clouds
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
-            {['Archive.org', 'MEGA', 'Pixeldrain', 'Gofile', 'GitHub', 'Cloudflare'].map((cloud) => (
-              <span
-                key={cloud}
-                className="text-[12px] font-semibold px-3 py-1.5 rounded-md transition-all hover:scale-105"
-                style={{
-                  background: 'var(--bg-elevated)',
-                  color: 'var(--text-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                {cloud}
-              </span>
-            ))}
-          </div>
+          {/* YouTube */}
+          <a
+            href="https://youtube.com/@TheMuslimLantern"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-premium"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.5 6.2a3 3 0 00-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 00.5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 002.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 002.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z" />
+            </svg>
+            Visit Channel
+          </a>
         </div>
 
         {/* Bottom bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-            © {year} <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Muneeb Ahmad</span> · All rights reserved.
+        <div
+          className="mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+          style={{ borderTop: '1px solid var(--border-subtle)' }}
+        >
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            © {year} Muneeb Ahmad. All rights reserved.
           </p>
-          <p className="text-[11.5px] flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
             Made with
-            <svg className="w-3.5 h-3.5 inline animate-pulse" style={{ color: 'var(--accent-glow)', filter: 'drop-shadow(0 0 4px rgba(255, 61, 61, 0.5))' }} viewBox="0 0 24 24" fill="currentColor" aria-label="love">
-              <path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z" />
+            <svg className="w-3 h-3" style={{ color: 'var(--accent-red)' }} viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
             </svg>
-            by <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Muneeb Ahmad</span>
+            for the Ummah
           </p>
         </div>
       </div>
