@@ -5,6 +5,8 @@ import { Header } from './components/Header';
 import { FeaturedStream } from './components/FeaturedStream';
 import { SlimHero } from './components/SlimHero';
 import { ContinueWatching } from './components/ContinueWatching';
+import { LiveStatusBadge } from './components/LiveStatusBadge';
+import { MobileNav } from './components/MobileNav';
 import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
 import { StreamCard } from './components/StreamCard';
 import { WatchPage } from './components/WatchPage';
@@ -209,7 +211,12 @@ export default function App() {
         recordingsCount={recs.length}
       />
 
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12 relative z-10">
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12 relative z-10 pb-20 md:pb-12">
+        {/* Live status indicator */}
+        <div className="mb-4 flex justify-center">
+          <LiveStatusBadge />
+        </div>
+
         <FeaturedStream recs={recs} onOpen={open} />
         <SlimHero recs={recs} />
         {!q.trim() && filter === 'all' && <ContinueWatching recs={recs} onOpen={open} />}
@@ -263,6 +270,13 @@ export default function App() {
       </main>
 
       <Footer />
+
+      <MobileNav
+        recordingsCount={recs.length}
+        onOpenCmd={() => setCmdOpen(true)}
+        theme={theme}
+        toggleTheme={toggleTheme}
+      />
 
       <CommandPalette
         open={cmdOpen}
