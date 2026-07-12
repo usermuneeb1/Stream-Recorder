@@ -395,11 +395,19 @@ jobs:
         timeout-minutes: 5
         run: |
           source scripts/utils.sh
-          log_header "🔁 LIVE RECHECK"
-          sleep 8
+          log_header "🔁 LIVE RECHECK (aggressive)"
+          sleep 3
           if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
-            log_ok "Stream is still live — proceeding to record"
-            echo "still_live=true" >> "$GITHUB_OUTPUT"
+            log_ok "Stream still live after first check"
+            # Second quick check
+            sleep 2
+            if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
+              log_ok "Stream confirmed live — proceeding to record"
+              echo "still_live=true" >> "$GITHUB_OUTPUT"
+            else
+              log_warn "Stream died on second check — skipping"
+              echo "still_live=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             log_warn "Stream ended between detection and recording — skipping"
             echo "still_live=false" >> "$GITHUB_OUTPUT"
