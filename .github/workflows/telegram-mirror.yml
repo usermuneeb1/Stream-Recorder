@@ -80,12 +80,18 @@ jobs:
                   ["python3", "scripts/telegram/upload_to_telegram.py", path, title],
                   env=env)
 
-              # Read output
+              # Read output — capture BOTH the t.me link AND the Telegram file_id.
+              # upload_to_telegram.py writes telegram_file_id= specifically so the
+              # Cloudflare Worker proxy can stream the file (see its "Save file_id
+              # for Cloudflare Worker proxy" comment).
               tg_link = ""
+              tg_file_id = ""
               try:
                   for line in open(env["GITHUB_OUTPUT"]):
                       if line.startswith("telegram_link="):
                           tg_link = line.strip().split("=", 1)[1]
+                      elif line.startswith("telegram_file_id="):
+                          tg_file_id = line.strip().split("=", 1)[1]
               except: pass
 
               if tg_link:
@@ -93,10 +99,17 @@ jobs:
                   for r in recs:
                       if r.get("video_id") == vid:
                           r["telegram_link"] = tg_link
-                          # Generate CF Worker URL from archive source (public, no auth)
-                          src = r.get("archive_node") or r.get("archive_direct") or ""
-                          if src:
-                              r["cf_stream"] = f"https://tg-stream.isthatdxture.workers.dev/?url={urllib.parse.quote(src, safe='')}"
+                          if tg_file_id:
+                              r["telegram_file_id"] = tg_file_id
+                          # CF Worker stream URL. The worker (worker.js) was hardened
+                          # to ONLY accept ?file_id= — ?url= and ?bot= were removed
+                          # (open-proxy / token-leak risk) and now return HTTP 400.
+                          # The dashboard's sanitizeCfStream() also strips ?url=/?bot=.
+                          # So the URL MUST be built from the Telegram file_id, NOT the
+                          # archive source. (Previously this used ?url=<src>, which
+                          # produced a dead STORM player source on every recording.)
+                          if tg_file_id:
+                              r["cf_stream"] = f"https://tg-stream.isthatdxture.workers.dev/?file_id={urllib.parse.quote(tg_file_id, safe='')}"
                           break
                   with open("data/recordings.json", "w") as f:
                       json.dump(recs, f, indent=2)
