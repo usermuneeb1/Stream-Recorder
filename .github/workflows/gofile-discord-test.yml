@@ -1,0 +1,153 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🧪 GOFILE + DISCORD TEST (real upload + real notification, nothing else)    ║
+# ║                                                                              ║
+# ║  Tests the upload→Discord tail of the pipeline on a REAL capture:            ║
+# ║   • captures a 15s slice of a PUBLIC video                                   ║
+# ║   • runs the REAL post-process.sh + upload-clouds.sh (GOFILE ONLY)           ║
+# ║   • fires the REAL notify_recording_complete (validates the null-payload fix)║
+# ║                                                                              ║
+# ║  HARD GUARDRAILS:                                                            ║
+# ║   • contents: read  → CANNOT commit to recordings.json (dashboard untouched) ║
+# ║   • ARCHIVE_SKIP/MEGA_SKIP/PIXELDRAIN_SKIP=true → Gofile only                ║
+# ║   • No YouTube upload, no Archive.org upload                                 ║
+# ║   • Title marked [PIPELINE TEST] so the Discord post isn't mistaken for real ║
+# ║   • Dispatch-only — never runs on schedule                                   ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🧪 Gofile + Discord Test"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read   # read-only — this workflow CANNOT modify your repo/dashboard
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: gofile-discord-test
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Karachi
+
+jobs:
+  test:
+    name: "🧪 record → gofile → discord"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v7
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq bc curl megatools
+          sed -i 's/\r$//' scripts/*.sh 2>/dev/null || true
+          chmod +x scripts/*.sh
+          python3 -m pip install -q --upgrade yt-dlp
+          yt-dlp --version
+          ffmpeg -version | head -1
+
+      - name: "🌐 Setup Cloudflare WARP"
+        continue-on-error: true
+        run: bash scripts/setup-warp.sh
+
+      - name: "🎯 Pick a public video"
+        id: pick
+        run: |
+          VID=""
+          echo "Auto-picking a recent public VOD from @TheMuslimLantern..."
+          while read -r candidate; do
+            [[ -z "$candidate" ]] && continue
+            av=$(yt-dlp --skip-download --no-warnings --print "%(availability)s" \
+              "https://www.youtube.com/watch?v=$candidate" 2>/dev/null || true)
+            echo "  $candidate → ${av:-unknown}"
+            if [[ "$av" == "public" ]]; then VID="$candidate"; break; fi
+          done < <(yt-dlp --flat-playlist --print "%(id)s" \
+            "https://www.youtube.com/@TheMuslimLantern/videos" 2>/dev/null | head -12)
+          [[ -z "$VID" ]] && VID="RATmDJ9Roh4"
+          echo "Using video: $VID"
+          echo "video_id=$VID" >> "$GITHUB_OUTPUT"
+
+      - name: "🎬 RECORD — Method D (android_vr), 15s slice"
+        run: |
+          mkdir -p /tmp/stream-recorder
+          cd /tmp/stream-recorder
+          VID="${{ steps.pick.outputs.video_id }}"
+          echo "Recording 15s slice with Method D (android_vr)..."
+          timeout 120 yt-dlp \
+              --extractor-args "youtube:player_client=android_vr" \
+              --no-part --no-continue --no-check-certificates \
+              --concurrent-fragments 4 --fixup never \
+              -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
+              --merge-output-format mp4 \
+              --download-sections "*0-15" --force-keyframes-at-cuts \
+              -o "test_raw.mp4" \
+              "https://www.youtube.com/watch?v=$VID" 2>&1 | tail -3
+          [[ -f test_raw.mp4 ]] || { echo "❌ no raw file"; exit 1; }
+          echo "✅ raw: $(stat -c%s test_raw.mp4) bytes"
+
+      - name: "⚙️ POST-PROCESS (real post-process.sh)"
+        run: |
+          export RECORD_DIR="/tmp/stream-recorder"
+          export RECORDING_RAW_FILE="/tmp/stream-recorder/test_raw.mp4"
+          export SAVE_THUMBNAIL=false   # no thumbnail → thumbnail cloud-upload auto-skips
+          cd "$GITHUB_WORKSPACE"
+          bash scripts/post-process.sh
+
+      - name: "☁️ UPLOAD — GOFILE ONLY (real upload-clouds.sh)"
+        run: |
+          export RECORD_DIR="/tmp/stream-recorder"
+          cd "$GITHUB_WORKSPACE"
+          # GUARDRAILS: Gofile only. Skip MEGA / Pixeldrain / Archive.org.
+          export GOFILE_SKIP=false
+          export MEGA_SKIP=true
+          export PIXELDRAIN_SKIP=true
+          export ARCHIVE_SKIP=true
+          bash scripts/upload-clouds.sh
+          echo "---"
+          echo "UPLOAD_SUCCESS_COUNT=${UPLOAD_SUCCESS_COUNT:-0}"
+          echo "UPLOAD_EXPECTED_COUNT=${UPLOAD_EXPECTED_COUNT:-0}"
+          echo "GOFILE_LINKS=${GOFILE_LINKS:-<empty>}"
+
+      - name: "📢 DISCORD — real notify_recording_complete (validates null-payload fix)"
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
+          AVATAR_URL: ${{ secrets.AVATAR_URL }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          # Set the inputs notify_recording_complete reads. Title is clearly a
+          # TEST so the Discord post is never mistaken for a real archive entry.
+          export STREAM_TITLE="🧪 [PIPELINE TEST] record → gofile → discord (15s slice) — NOT a real archive entry"
+          export STREAM_CHANNEL="The Muslim Lantern (test)"
+          export STREAM_URL="https://www.youtube.com/watch?v=${{ steps.pick.outputs.video_id }}"
+          export STREAM_VIDEO_ID="${{ steps.pick.outputs.video_id }}"
+          # RECORD_DURATION_FMT / RECORD_SIZE_HUMAN / RECORD_RESOLUTION / RECORD_PARTS
+          # are already in the env (set by post-process.sh via GITHUB_ENV).
+          # UPLOAD_SUCCESS_COUNT / UPLOAD_EXPECTED_COUNT / GOFILE_LINKS are already
+          # in the env (set by upload-clouds.sh). notify_recording_complete reads them.
+          echo "=== firing real notify_recording_complete ==="
+          notify_recording_complete && echo "✅ Discord notification sent (check recordings channel)" \
+            || { echo "❌ notify_recording_complete failed"; exit 1; }
+
+      - name: "🧹 Cleanup"
+        if: always()
+        run: |
+          rm -rf /tmp/stream-recorder
+          echo "✅ Test files removed. NOTHING was committed to recordings.json. Dashboard untouched."
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          echo "## 🧪 Gofile + Discord Test" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Real Gofile upload + real Discord notification on a 15s public-video slice." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Guardrails honored:** Gofile only · no Archive/YouTube/MEGA/Pixeldrain · read-only (no commit to recordings.json) · dashboard untouched." >> "$GITHUB_STEP_SUMMARY"
