@@ -670,17 +670,22 @@ attempt_recording() {
         "record_method_a"      # cookies web_creator
         "record_method_b"      # cookies tv_embedded
     )
+    # NOTE: this array MUST stay aligned 1:1 with `methods[]` above.
+    # (A previous version drifted out of order — 9/10 labels pointed at the
+    # wrong method, so failure logs + the Discord diagnostic dump reported
+    # the wrong tool. Reordering `methods[]` without updating this array
+    # was the root cause.)
     local method_names=(
-        "H: ytarchive (cookieless, purpose-built for live — PRIMARY)"
-        "I: streamlink hardened (cookieless, independent codebase)"
         "D: Android VR (cookieless 1080p)"
         "C: mediaconnect (cookieless 1080p)"
-        "J: ffmpeg HLS direct (NEW v4, independent path)"
-        "A: Cookies+web_creator (bonus)"
-        "B: Cookies+tv_embedded (bonus)"
         "G: Plain yt-dlp (default)"
         "E: Mobile Web"
+        "J: ffmpeg HLS direct (independent path)"
+        "H: ytarchive (cookieless, purpose-built for live)"
+        "I: streamlink hardened (cookieless, independent codebase)"
         "F: Streamlink (HLS, default flags)"
+        "A: Cookies+web_creator (bonus)"
+        "B: Cookies+tv_embedded (bonus)"
     )
     for i in "${!methods[@]}"; do
         log_separator

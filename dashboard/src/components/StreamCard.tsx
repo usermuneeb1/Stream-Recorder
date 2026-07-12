@@ -246,8 +246,14 @@ function FallbackArt() {
 
 function Dot() { return <span style={{ color: 'var(--text-muted)' }}>·</span>; }
 function CopyIcon({ w = '4' }: { w?: string }) {
+  // Use COMPLETE literal class strings — Tailwind's JIT scanner can't see
+  // classes assembled from variables (e.g. `w-${w}`), so a dynamic build
+  // would silently omit `w-3.5`/`h-3.5` from the CSS and the icon would
+  // render unsized. Selecting between full literals guarantees both are
+  // always generated.
+  const size = w === '3.5' ? 'w-3.5 h-3.5' : 'w-4 h-4';
   return (
-    <svg className={`w-${w} h-${w}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg className={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
       <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
     </svg>

@@ -393,7 +393,6 @@ notify_recording_complete() {
         --arg archive_url      "$archive_url" \
         --arg archive_id       "$archive_id" \
         --arg mega_url         "$mega_url" \
-
         --arg chat_status    "$chat_status" \
         --arg dash_url       "$dashboard_url" \
         --arg timestamp      "$timestamp" \
