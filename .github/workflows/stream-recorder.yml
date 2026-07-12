@@ -227,40 +227,6 @@ jobs:
           fi
           echo "✅ All critical tools present — recording can proceed"
 
-      - name: "🛡️ Start PoToken Provider"
-        id: pot
-        # v6: Best effort PoToken (many GitHub runners can't run it)
-        run: |
-          echo "Trying to start PoToken provider..."
-          pip3 install --upgrade bgutil-ytdlp-pot-provider 2>/dev/null || true
-
-          for i in 1 2 3; do
-            pkill -f bgutil_ytdlp_pot_provider 2>/dev/null || true
-            python3 -m bgutil_ytdlp_pot_provider --host 127.0.0.1 --port 4416 > /tmp/pot.log 2>&1 &
-            sleep 6
-            if curl -fsS --max-time 4 http://127.0.0.1:4416/ping >/dev/null 2>&1; then
-              echo "✅ PoToken provider running (attempt $i)"
-              echo "POT_PROVIDER_READY=true" >> "$GITHUB_ENV"
-              echo "pot_ready=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          done
-          echo "::warning::PoToken provider could not start (common on GitHub runners)"
-          echo "POT_PROVIDER_READY=false" >> "$GITHUB_ENV"
-          echo "pot_ready=false" >> $GITHUB_OUTPUT
-          echo "::error::PoToken provider failed after 3 attempts"
-          echo "POT_PROVIDER_READY=false" >> "$GITHUB_ENV"
-          echo "pot_ready=false" >> $GITHUB_OUTPUT
-          echo "Continuing anyway — ytarchive + streamlink do not need PoToken"
-
-      - name: "⚠️ PoToken Provider Warning (non-fatal)"
-        if: steps.pot.outputs.pot_ready != 'true'
-        continue-on-error: true
-        run: |
-          echo "::warning::PoToken provider failed after 3 attempts — yt-dlp methods may hit LOGIN_REQUIRED"
-          echo "ytarchive (H) + streamlink (I) will still work without PoToken"
-          echo "Continuing with all 10 methods anyway"
-
 
       - name: "💾 Check Disk Space"
         id: disk_check
@@ -526,7 +492,7 @@ jobs:
           cookie_state="${COOKIE_STATUS:-unknown}"
 
           # Build diagnostic using printf so we avoid colons in YAML literal block.
-          detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP\\: %s\\nIP\\: %s\\nPoToken\\: %s\\nCookies\\: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." \
+          detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP\\: %s\\nIP\\: %s\\nCookies\\: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." \
             "$warp_state" "$ip_state" "$pot_state" "$cookie_state" "${failures:-no log captured}")
 
           notify_recording_failed "Recording failed" "$detail"

@@ -455,7 +455,7 @@ validate_recorded_file() {
 #
 # Also defines _pot_args() — a helper that returns yt-dlp PoToken provider args
 # if the local PoToken provider is running, or empty array otherwise.
-# Existing methods can opt-in by adding "${pot_args[@]}" to their yt-dlp call.
+# Existing methods can opt-in by adding "" to their yt-dlp call.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
