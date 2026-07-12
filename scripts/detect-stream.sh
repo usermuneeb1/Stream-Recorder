@@ -634,12 +634,21 @@ is_stream_still_live() {
     local user_agent
     user_agent=$(rotate_user_agent)
     local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
+    # Use the real YouTube auth cookies when available — YouTube frequently
+    # omits isLiveNow (and serves a consent/sign-in page) to unauthenticated
+    # datacenter/WARP IPs even for genuinely-live streams. Detection already
+    # authenticated successfully with these cookies; reuse them here so the
+    # recheck doesn't false-negative on a live stream and abort the recording.
+    local -a curl_cookie_args=(-H "Cookie: ${bypass_cookie}")
+    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        curl_cookie_args=(-b "${COOKIES_FILE:-cookies.txt}")
+    fi
     
     # Method A: Direct video page check with bypass cookies (Fastest & most accurate)
     local video_page
     video_page=$(curl -s --max-time 10 \
         -H "User-Agent: ${user_agent}" \
-        -H "Cookie: ${bypass_cookie}" \
+        "${curl_cookie_args[@]}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || true
     
