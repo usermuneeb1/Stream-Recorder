@@ -50,13 +50,27 @@ jobs:
 
       - name: "⬆️ Commit"
         run: |
-          if [[ -n "$(git status -s data/system-status.json data/badges)" ]]; then
-            git config user.name "Stream Recorder Bot"
-            git config user.email "bot@stream-recorder.local"
-            git add data/system-status.json data/badges
-            git commit -m "📊 Update system status + badges"
-            git push
-            echo "✅ Status updated."
-          else
+          # RACE-SAFE commit+push. Previously this was a bare `git push`, which
+          # failed intermittently with "! [rejected] main -> main (fetch first)"
+          # whenever another workflow (recorder, dependabot, another status
+          # trigger) landed a commit on main between our checkout and our push
+          # (incident 2026-07-12 run 29176112058). Now: only commit if changed,
+          # then rebase onto freshest main and retry so the status lands.
+          if [[ -z "$(git status -s data/system-status.json data/badges)" ]]; then
             echo "No change."
+            exit 0
           fi
+          git config user.name "Stream Recorder Bot"
+          git config user.email "bot@stream-recorder.local"
+          git add data/system-status.json data/badges
+          git commit -m "📊 Update system status + badges"
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then
+              echo "✅ Status updated (attempt $attempt)."
+              exit 0
+            fi
+            echo "⚠️ push attempt $attempt failed (remote moved) — rebasing + retrying in ${attempt}s"
+            sleep "$attempt"
+          done
+          echo "❌ Could not push status after 5 attempts — will retry on next schedule."
+          exit 1
