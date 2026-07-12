@@ -9,11 +9,19 @@ name: "🔄 Cloud Link Refresh"
 
 on:
   schedule:
-    # Daily at 06:00 UTC (11:00 AM PKT) to keep temporary links warm.
-    - cron: "0 6 * * *"
+    # 🟠 Gofile expires after 10 days of inactivity → refresh ~every 5 days (5-day buffer).
+    - cron: "0 6 */5 * *"
+    # 🔵 Pixeldrain expires after 60 days of inactivity → refresh monthly (~30-day buffer).
+    # Pinned to the 2nd of the month so it never collides with a Gofile */5 day.
+    - cron: "0 6 2 * *"
   
   workflow_dispatch:
     inputs:
+      providers:
+        description: "Which providers to refresh: gofile | pixeldrain | both"
+        required: false
+        default: "both"
+        type: string
       dry_run:
         description: "Dry run (check only, no refresh)"
         required: false
@@ -56,6 +64,11 @@ jobs:
       - name: "🔄 Refresh Links"
         env:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          # Manual run → use the provider(s) the user picked.
+          # Scheduled run → pick by WHICH cron fired: the monthly cron = pixeldrain,
+          # any other (the */5 cron) = gofile. (github.event.schedule holds the cron
+          # string that triggered a scheduled run.)
+          REFRESH_PROVIDERS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.providers || (github.event.schedule == '0 6 2 * *' && 'pixeldrain' || 'gofile') }}
         run: bash scripts/refresh-links.sh
 
       - name: "📢 Send Discord Notification"
