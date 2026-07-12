@@ -229,25 +229,25 @@ jobs:
 
       - name: "🛡️ Start PoToken Provider"
         id: pot
-        # v5: Dedicated hardened PoToken step
+        # v6: Best effort PoToken (many GitHub runners can't run it)
         run: |
-          echo "Installing/upgrading bgutil-ytdlp-pot-provider..."
-          pip3 install --upgrade --quiet bgutil-ytdlp-pot-provider || true
+          echo "Trying to start PoToken provider..."
+          pip3 install --upgrade bgutil-ytdlp-pot-provider 2>/dev/null || true
 
           for i in 1 2 3; do
             pkill -f bgutil_ytdlp_pot_provider 2>/dev/null || true
-            (python3 -m bgutil_ytdlp_pot_provider --host 127.0.0.1 --port 4416 \
-              >/tmp/pot.log 2>&1 &)
-            sleep 4
-            if curl -fsS --max-time 3 http://127.0.0.1:4416/ping >/dev/null 2>&1; then
-              echo "✅ PoToken provider: listening on 127.0.0.1:4416 (attempt $i)"
+            python3 -m bgutil_ytdlp_pot_provider --host 127.0.0.1 --port 4416 > /tmp/pot.log 2>&1 &
+            sleep 6
+            if curl -fsS --max-time 4 http://127.0.0.1:4416/ping >/dev/null 2>&1; then
+              echo "✅ PoToken provider running (attempt $i)"
               echo "POT_PROVIDER_READY=true" >> "$GITHUB_ENV"
               echo "pot_ready=true" >> $GITHUB_OUTPUT
               exit 0
             fi
-            echo "⚠️  PoToken attempt $i failed, retrying..."
-            sleep 3
           done
+          echo "::warning::PoToken provider could not start (common on GitHub runners)"
+          echo "POT_PROVIDER_READY=false" >> "$GITHUB_ENV"
+          echo "pot_ready=false" >> $GITHUB_OUTPUT
           echo "::error::PoToken provider failed after 3 attempts"
           echo "POT_PROVIDER_READY=false" >> "$GITHUB_ENV"
           echo "pot_ready=false" >> $GITHUB_OUTPUT
@@ -430,7 +430,7 @@ jobs:
         run: |
           source scripts/utils.sh
           log_header "🔁 LIVE RECHECK"
-          sleep 15
+          sleep 8
           if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
             log_ok "Stream is still live — proceeding to record"
             echo "still_live=true" >> "$GITHUB_OUTPUT"

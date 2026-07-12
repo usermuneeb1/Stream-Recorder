@@ -661,6 +661,8 @@ attempt_recording() {
     local methods=(
         "record_method_h"
         "record_method_i"
+        "record_method_h"
+        "record_method_i"
         "record_method_d"
         "record_method_c"
         "record_method_j"
