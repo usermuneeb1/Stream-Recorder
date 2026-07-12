@@ -1,0 +1,145 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  🎬 RECORD → POST-PROCESS TEST (ephemeral, zero side-effects)                ║
+# ║                                                                              ║
+# ║  Tests the EXACT record→post-process chain a live stream hits, but:          ║
+# ║   • captures only a 15-second slice of a PUBLIC video (not a live stream)    ║
+# ║   • runs the REAL scripts/post-process.sh (unchanged)                        ║
+# ║   • writes ONLY to /tmp — no upload, no commit, no Discord, no dashboard     ║
+# ║                                                                              ║
+# ║  This is the one part of the pipeline that was never tested end-to-end.      ║
+# ║  Dispatch-only (no schedule) so it never runs unless you ask.                ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "🎬 Record→Post-Process Test"
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_id:
+        description: "Public YouTube video ID to test against (leave empty to auto-pick)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read   # read-only — this workflow CANNOT commit anything
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: record-postprocess-test
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Karachi
+
+jobs:
+  test:
+    name: "🎬 record→post-process on a real capture"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: "📥 Checkout"
+        uses: actions/checkout@v7
+
+      - name: "📦 Install tools"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq bc curl
+          sed -i 's/\r$//' scripts/*.sh 2>/dev/null || true
+          chmod +x scripts/*.sh
+          python3 -m pip install -q --upgrade yt-dlp
+          yt-dlp --version
+          ffmpeg -version | head -1
+
+      - name: "🌐 Setup Cloudflare WARP"
+        continue-on-error: true
+        run: bash scripts/setup-warp.sh
+
+      - name: "🎯 Pick a public video"
+        id: pick
+        run: |
+          VID="${{ github.event.inputs.video_id }}"
+          if [[ -z "$VID" ]]; then
+            # Auto-pick a recent public VOD from the channel
+            VID=$(yt-dlp --flat-playlist --print "%(id)s %(availability)s" \
+              "https://www.youtube.com/@TheMuslimLantern/videos" 2>/dev/null \
+              | awk '$2=="public"{print $1; exit}')
+          fi
+          echo "Using video: $VID"
+          echo "video_id=$VID" >> "$GITHUB_OUTPUT"
+          yt-dlp --skip-download --no-warnings --print "title=%(title)s | res=%(resolution)s | avail=%(availability)s" \
+            "https://www.youtube.com/watch?v=$VID" 2>&1 | head -3
+
+      - name: "🎬 RECORD — Method D (android_vr), 15s slice"
+        id: record
+        run: |
+          mkdir -p /tmp/stream-recorder
+          cd /tmp/stream-recorder
+          VID="${{ steps.pick.outputs.video_id }}"
+          echo "Recording 15s slice with Method D (android_vr) — same flags as record-stream.sh..."
+          if timeout 120 yt-dlp \
+              --extractor-args "youtube:player_client=android_vr" \
+              --no-part --no-continue --no-check-certificates \
+              --concurrent-fragments 4 \
+              --fixup never \
+              -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best" \
+              --merge-output-format mp4 \
+              --download-sections "*0-15" \
+              --force-keyframes-at-cuts \
+              -o "test_raw.mp4" \
+              "https://www.youtube.com/watch?v=$VID" 2>&1 | tail -5; then
+            if [[ -f test_raw.mp4 ]]; then
+              echo "raw_size=$(stat -c%s test_raw.mp4)" >> "$GITHUB_OUTPUT"
+              echo "✅ Raw capture: $(stat -c%s test_raw.mp4) bytes, $(ffprobe -v quiet -show_entries format=duration -of csv=p=0 test_raw.mp4)s"
+            else
+              echo "❌ yt-dlp succeeded but no file produced"
+              exit 1
+            fi
+          else
+            echo "❌ Method D capture failed"
+            exit 1
+          fi
+
+      - name: "⚙️ POST-PROCESS — run the REAL post-process.sh"
+        run: |
+          export RECORD_DIR="/tmp/stream-recorder"
+          export RECORDING_RAW_FILE="/tmp/stream-recorder/test_raw.mp4"
+          cd "$GITHUB_WORKSPACE"
+          bash scripts/post-process.sh
+
+      - name: "✅ Verify post-processed output"
+        run: |
+          OUT="/tmp/stream-recorder/test.mp4"
+          echo "=== output verification ==="
+          if [[ ! -f "$OUT" ]]; then echo "❌ output file missing"; exit 1; fi
+          # repo's own validity check
+          source scripts/utils.sh
+          if is_valid_video "$OUT"; then echo "✅ is_valid_video: PASSED"; else echo "❌ is_valid_video: FAILED"; exit 1; fi
+          # faststart (web-playable)
+          python3 -c "
+          d=open('$OUT','rb').read(200000)
+          m=d.find(b'moov'); n=d.find(b'mdat')
+          print(f'moov@{m} mdat@{n}')
+          print('✅ faststart OK (web-playable)' if 0<m<n else '❌ faststart MISSING')
+          assert 0<m<n
+          "
+          echo "size=$(stat -c%s $OUT) bytes"
+          echo "duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 $OUT)s"
+          echo "resolution=$(ffprobe -v quiet -select_streams v:0 -show_entries stream=width,height -of csv=p=0 $OUT)"
+          echo "codec=$(ffprobe -v quiet -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 $OUT)"
+
+      - name: "🧹 Cleanup (ephemeral — nothing persists)"
+        run: |
+          rm -rf /tmp/stream-recorder
+          echo "✅ Test files removed. No uploads, no commits, no dashboard changes."
+
+      - name: "📋 Summary"
+        if: always()
+        run: |
+          echo "## 🎬 Record→Post-Process Test" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Captured a 15s slice of a **public** video with Method D (android_vr), ran the real \`post-process.sh\` on it." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Zero side effects:** no upload, no commit, no Discord, no dashboard change. Files lived in \`/tmp\` only." >> "$GITHUB_STEP_SUMMARY"
