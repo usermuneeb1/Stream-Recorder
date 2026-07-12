@@ -330,31 +330,44 @@ refresh_links() {
     entry_count=$(echo "$entries_json" | jq 'length' 2>/dev/null || echo "0")
     log_info "Found ${entry_count} stream entries"
     
-    # ── Extract all URLs for flat checking ────────────────────────────────────
+    # ── Extract URLs from the PARSED entries (source = recordings.json) ───────
+    # FIX: the old code regex-matched "[gofile:...] url" lines against the raw
+    # file content. That pattern is the legacy links.txt format and does NOT
+    # exist in recordings.json (which stores "gofile_link": "https://..."), so
+    # it matched nothing → gofile_urls/pixeldrain_urls stayed empty → the refresh
+    # was a complete no-op and Discord reported 0 checked / 0 active / 0 expired.
+    # Fix: pull URLs straight from entries_json (already JSON-parsed above),
+    # split any pipe-joined values, drop empties, and dedup.
     local gofile_urls=() pixeldrain_urls=() archive_urls=()
-    
-    while IFS= read -r line; do
-        if [[ "$line" =~ \[gofile:[^\]]+\]\ *(https://gofile\.io/d/[^ ]+) ]]; then
-            gofile_urls+=("${BASH_REMATCH[1]}")
-        fi
-        if [[ "$line" =~ \[pixeldrain:[^\]]+\]\ *(https://pixeldrain\.com/u/[^ ]+) ]]; then
-            pixeldrain_urls+=("${BASH_REMATCH[1]}")
-        fi
-        if [[ "$line" =~ \[archive:[^\]]+\]\ *(https://archive\.org/details/[^ ]+) ]]; then
-            archive_urls+=("${BASH_REMATCH[1]}")
-        fi
-    done <<< "$links_content"
-    
+    readarray -t gofile_urls     < <(echo "$entries_json" | jq -r '[.[].gofile // ""     | split("|")[]] | map(select(length>0)) | unique | .[]')
+    readarray -t pixeldrain_urls < <(echo "$entries_json" | jq -r '[.[].pixeldrain // "" | split("|")[]] | map(select(length>0)) | unique | .[]')
+    readarray -t archive_urls    < <(echo "$entries_json" | jq -r '[.[].archive // ""    | split("|")[]] | map(select(length>0)) | unique | .[]')
+
     local total_gofile=${#gofile_urls[@]}
     local total_pixeldrain=${#pixeldrain_urls[@]}
     local total_archive=${#archive_urls[@]}
-    local total_links=$(( total_gofile + total_pixeldrain ))
+
+    # ── Provider filtering (independent Gofile/Pixeldrain cadences) ───────────
+    # REFRESH_PROVIDERS = "both" (default) | "gofile" | "pixeldrain" | comma-list.
+    # Lets the workflow refresh Gofile every 5 days and Pixeldrain every 30 days
+    # on separate schedules without duplicating the whole job.
+    local providers="${REFRESH_PROVIDERS:-both}"
+    local do_gofile=false do_pixeldrain=false
+    [[ "$providers" == "both" || "$providers" == *"gofile"* ]]     && do_gofile=true
+    [[ "$providers" == "both" || "$providers" == *"pixeldrain"* ]] && do_pixeldrain=true
+    log_info "Provider filter: '${providers}' → gofile=${do_gofile} pixeldrain=${do_pixeldrain}"
+
+    # Count only the providers we'll actually refresh so totals are honest.
+    local eff_gofile=0 eff_pixeldrain=0
+    [[ "$do_gofile" == true ]]     && eff_gofile=$total_gofile
+    [[ "$do_pixeldrain" == true ]] && eff_pixeldrain=$total_pixeldrain
+    local total_links=$(( eff_gofile + eff_pixeldrain ))
     
     log_info "Found links:"
-    log_info "  Gofile     : ${total_gofile}"
-    log_info "  Pixeldrain : ${total_pixeldrain}"
+    log_info "  Gofile     : ${total_gofile}${do_gofile:+ (refreshing)}${do_gofile:+}"
+    log_info "  Pixeldrain : ${total_pixeldrain}${do_pixeldrain:+ (refreshing)}${do_pixeldrain:+}"
     log_info "  Archive.org: ${total_archive} (permanent, no refresh needed)"
-    log_info "  Total to check: ${total_links}"
+    log_info "  Total to check this run: ${total_links}"
     log_separator
     
     # ── Track results ─────────────────────────────────────────────────────────
@@ -363,7 +376,7 @@ refresh_links() {
     local updated_links="$links_content"
     
     # ── Refresh Gofile links (1KB ping) ───────────────────────────────────────
-    if (( total_gofile > 0 )); then
+    if [[ "$do_gofile" == true ]] && (( total_gofile > 0 )); then
         log_step "Refreshing Gofile links (1KB ping)..."
         
         for url in "${gofile_urls[@]}"; do
@@ -398,7 +411,7 @@ refresh_links() {
     fi
     
     # ── Refresh Pixeldrain links (10% download) ───────────────────────────────
-    if (( total_pixeldrain > 0 )); then
+    if [[ "$do_pixeldrain" == true ]] && (( total_pixeldrain > 0 )); then
         log_step "Refreshing Pixeldrain links (10% download)..."
         
         for url in "${pixeldrain_urls[@]}"; do
