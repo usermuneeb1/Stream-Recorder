@@ -659,18 +659,16 @@ attempt_recording() {
     # members-only / age-restricted stream where cookies are actually required.
 
     local methods=(
-        "record_method_h"
-        "record_method_i"
-        "record_method_h"
-        "record_method_i"
-        "record_method_d"
-        "record_method_c"
-        "record_method_j"
-        "record_method_a"
-        "record_method_b"
-        "record_method_g"
-        "record_method_e"
-        "record_method_f"
+        "record_method_h"      # ytarchive — best for live
+        "record_method_i"      # streamlink hardened
+        "record_method_d"      # android_vr — NO PoToken needed (guide)
+        "record_method_c"      # mediaconnect
+        "record_method_j"      # ffmpeg HLS direct
+        "record_method_g"      # plain yt-dlp
+        "record_method_e"      # mweb
+        "record_method_f"      # streamlink default
+        "record_method_a"      # cookies web_creator
+        "record_method_b"      # cookies tv_embedded
     )
     local method_names=(
         "H: ytarchive (cookieless, purpose-built for live — PRIMARY)"
