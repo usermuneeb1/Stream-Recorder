@@ -62,10 +62,21 @@ jobs:
         run: |
           VID="${{ github.event.inputs.video_id }}"
           if [[ -z "$VID" ]]; then
-            # Auto-pick a recent public VOD from the channel
-            VID=$(yt-dlp --flat-playlist --print "%(id)s %(availability)s" \
-              "https://www.youtube.com/@TheMuslimLantern/videos" 2>/dev/null \
-              | awk '$2=="public"{print $1; exit}')
+            echo "Auto-picking a recent public VOD from @TheMuslimLantern..."
+            # Robust pick: grab first 12 entries, then probe each for public availability.
+            while read -r candidate; do
+              [[ -z "$candidate" ]] && continue
+              av=$(yt-dlp --skip-download --no-warnings --print "%(availability)s" \
+                "https://www.youtube.com/watch?v=$candidate" 2>/dev/null || true)
+              echo "  $candidate → ${av:-unknown}"
+              if [[ "$av" == "public" ]]; then VID="$candidate"; break; fi
+            done < <(yt-dlp --flat-playlist --print "%(id)s" \
+              "https://www.youtube.com/@TheMuslimLantern/videos" 2>/dev/null | head -12)
+          fi
+          # Known-good fallback (verified public 1080p) if auto-pick found nothing
+          if [[ -z "$VID" ]]; then
+            echo "Auto-pick found nothing — using known-good fallback."
+            VID="RATmDJ9Roh4"
           fi
           echo "Using video: $VID"
           echo "video_id=$VID" >> "$GITHUB_OUTPUT"
