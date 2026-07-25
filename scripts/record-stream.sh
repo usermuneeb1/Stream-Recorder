@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  📡 STREAM RECORDER — BULLETPROOF RECORDING ENGINE                          ║
-# ║  6-method, 3-attempt approach to guarantee successful recording.            ║
-# ║  Methods: web → tv → ios → android_vr → mweb → streamlink                ║
-# ║  Each attempt checks if stream is still live before retrying.              ║
+# ║  10-method (A–J), 3-attempt cascade to guarantee a recording.              ║
+# ║  Order: D android_vr → C mediaconnect → G plain yt-dlp → E mweb →         ║
+# ║  J ffmpeg HLS → H ytarchive → I/F streamlink → A/B cookies (fallback)     ║
+# ║  Each attempt checks if the stream is still live before retrying.          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -264,8 +265,11 @@ record_method_e() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # Only attach cookies when verified-valid (mirrors method D). Sending
+    # EXPIRED/STALE cookies can make YouTube reject the request.
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -308,9 +312,11 @@ record_method_f() {
     local restart_flag="--hls-live-restart"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
     
-    # Use cookies with streamlink if available
+    # Only attach cookies when verified-valid — expired/stale cookies can be
+    # rejected by YouTube and waste this method's attempt.
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -342,8 +348,11 @@ record_method_g() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # Only attach cookies when verified-valid — expired/stale cookies can be
+    # rejected by YouTube and waste this method's attempt.
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -373,62 +382,81 @@ validate_recorded_file() {
     local output_base="$1"
     local min_size="${MIN_FILE_SIZE_KB:-100}"
     local min_bytes=$(( min_size * 1024 ))
-    
+
+    # Decide whether a candidate file is an acceptable recording.
+    #   1. size gate (cheap) — reject obviously truncated files
+    #   2. structural gate (video stream + sane, >=5s duration) via is_valid_video
+    #      when ffprobe is available — catches SIGTERM/network-truncated files
+    #      that are >= min size but are NOT playable.
+    #   3. if structurally damaged but size-OK, try recover_broken_video() once.
+    # Falls back to size-only acceptance when ffprobe/ffmpeg are missing, so the
+    # recorder still works on minimal runners.
+    _accept_candidate() {
+        local f="$1"
+        local size
+        size=$(get_file_size "$f")
+        if (( size < min_bytes )); then
+            log_warn "  File too small ($(format_size "$size")): $f" >&2
+            rm -f "$f"
+            return 1
+        fi
+        if ! command -v ffprobe &>/dev/null; then
+            return 0   # no probing tooling — accept on size alone (legacy behavior)
+        fi
+        if is_valid_video "$f"; then
+            return 0
+        fi
+        # Size is OK but the file is structurally damaged (e.g. killed mid-fragment)
+        if command -v ffmpeg &>/dev/null && recover_broken_video "$f" && is_valid_video "$f"; then
+            log_ok "  Recovered a structurally-damaged file: $(basename "$f")" >&2
+            return 0
+        fi
+        log_warn "  File present but NOT a valid/playable recording ($(format_size "$size")): $f" >&2
+        rm -f "$f"
+        return 1
+    }
+
     # Search for any output file (yt-dlp may add extensions)
     local found_file=""
     local extensions=("mp4" "webm" "mkv" "ts" "m4a" "flv" "part")
-    
+
     # First check the exact file
     if [[ -f "$output_base" ]]; then
-        local size
-        size=$(get_file_size "$output_base")
-        if (( size >= min_bytes )); then
-            found_file="$output_base"
-        else
-            log_warn "  File too small ($(format_size "$size")): $output_base" >&2
-            rm -f "$output_base"
-        fi
+        _accept_candidate "$output_base" && found_file="$output_base"
     fi
-    
+
     # Check with various extensions
     if [[ -z "$found_file" ]]; then
         for ext in "${extensions[@]}"; do
             local check_file="${output_base%.mp4}.${ext}"
             [[ "$check_file" == "$output_base" ]] && continue
-            
+
             if [[ -f "$check_file" ]]; then
-                local size
-                size=$(get_file_size "$check_file")
-                if (( size >= min_bytes )); then
+                if _accept_candidate "$check_file"; then
                     found_file="$check_file"
                     break
-                else
-                    log_warn "  File too small ($(format_size "$size")): $check_file" >&2
-                    rm -f "$check_file"
                 fi
             fi
         done
     fi
-    
+
     # Also check for files in the same directory matching the pattern
     if [[ -z "$found_file" ]]; then
         local dir
         dir=$(dirname "$output_base")
         local base
         base=$(basename "$output_base" .mp4)
-        
+
         while IFS= read -r f; do
             if [[ -f "$f" ]]; then
-                local size
-                size=$(get_file_size "$f")
-                if (( size >= min_bytes )); then
+                if _accept_candidate "$f"; then
                     found_file="$f"
                     break
                 fi
             fi
         done < <(find "$dir" -maxdepth 1 -name "${base}*" -type f 2>/dev/null | sort -r)
     fi
-    
+
     if [[ -n "$found_file" ]]; then
         local final_size
         final_size=$(get_file_size "$found_file")
@@ -436,7 +464,7 @@ validate_recorded_file() {
         echo "$found_file"
         return 0
     fi
-    
+
     return 1
 }
 
@@ -451,30 +479,8 @@ validate_recorded_file() {
 #
 # Adds two new recording methods:
 #   H: ytarchive  — purpose-built YouTube live stream archiver, separate codebase
-#   I: streamlink (hardened) — independent of yt-dlp, with PoToken-aware retries
-#
-# Also defines _pot_args() — a helper that returns yt-dlp PoToken provider args
-# if the local PoToken provider is running, or empty array otherwise.
-# Existing methods can opt-in by adding "" to their yt-dlp call.
+#   I: streamlink (hardened) — independent of yt-dlp, with hardened retries
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-# ── PoToken provider helper ─────────────────────────────────────────────────
-# Returns extractor-args that route yt-dlp through the local bgutil PoToken
-# HTTP service if it is reachable. Safe to call when the service isn't running
-# — it returns an empty array and yt-dlp behaves exactly as before.
-_pot_args() {
-    local -n _out=$1
-    _out=()
-    # Check multiple times with longer timeout
-    for _ in 1 2; do
-        if curl -fsS --max-time 3 "http://127.0.0.1:4416/ping" >/dev/null 2>&1; then
-            _out=(--extractor-args "youtube:pot_provider=http://127.0.0.1:4416")
-            return
-        fi
-        sleep 1
-    done
-}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -594,15 +600,16 @@ record_method_j() {
   local video_url="$1"
   local output_file="$2"
 
-  log_info " Method J: ffmpeg HLS direct (independent path)"
+  log_info "  Method J: ffmpeg HLS direct (independent path)"
 
   if ! command -v ffmpeg &>/dev/null; then
-    log_warn " Method J: ffmpeg not installed — skipping"
+    log_warn "  Method J: ffmpeg not installed — skipping"
     return 1
   fi
 
   local err_log="${RECORD_DIR}/method_logs/last_err.log"
   local manifest_url
+  local ytexit=0
   manifest_url=$(timeout 60 yt-dlp \
     --no-download \
     --no-playlist \
@@ -610,27 +617,30 @@ record_method_j() {
     --quiet \
     -f "best" \
     -g \
-    "${video_url}" 2>"${err_log}" | head -1) || {
+    "${video_url}" 2>"${err_log}" | head -1) || ytexit=$?
+  if (( ytexit != 0 )); then
     local err
     err=$(tail -3 "${err_log}" 2>/dev/null)
-    _log_method_failure "Method J" "$?" "$video_url" "$output_file" "${err}"
-    log_warn " Method J: could not resolve manifest URL"
-    return 1
-  }
-
-  if [[ -z "$manifest_url" ]]; then
-    _log_method_failure "Method J" "empty-manifest" "$video_url" "$output_file" "yt-dlp -g returned empty"
-    log_warn " Method J: empty manifest URL"
+    _log_method_failure "Method J" "$ytexit" "$video_url" "$output_file" "${err}"
+    log_warn "  Method J: could not resolve manifest URL (exit ${ytexit})"
     return 1
   fi
 
-  log_info " Method J: manifest = ${manifest_url:0:80}..."
+  if [[ -z "$manifest_url" ]]; then
+    _log_method_failure "Method J" "empty-manifest" "$video_url" "$output_file" "yt-dlp -g returned empty"
+    log_warn "  Method J: empty manifest URL"
+    return 1
+  fi
 
+  log_info "  Method J: manifest = ${manifest_url:0:80}..."
+
+  # Live HLS sources are still-growing, so avoid +faststart (needs a completed,
+  # seekable container) and use fragmented MP4 so the output stays playable.
   timeout "${MAX_RECORD_DURATION:-18000}" ffmpeg -y \
     -i "$manifest_url" \
     -c copy \
     -f mp4 \
-    -movflags +faststart \
+    -movflags +frag_keyframe+empty_moov \
     "$output_file" 2>&1 | tail -5
 
   local status=${PIPESTATUS[0]}
@@ -1073,7 +1083,7 @@ record_stream() {
             log_info "  Video ID : ${video_id}"
             log_info "  WARP : ${WARP_CONNECTED:-unknown} (IP: ${WARP_IP:-${ORIGINAL_IP:-unknown}})"
             log_info "  PoToken : $(curl -fsS --max-time 1 http://127.0.0.1:4416/ping >/dev/null 2>&1 && echo running || echo NOT_RUNNING)"
-            log_info "  Cookies : ${COOKIE_STATUS:-unknown} ($(if [[ -f cookies.txt ]]; then wc -l < cookies.txt; else echo 0; fi) lines)"
+            log_info "  Cookies : ${COOKIE_STATUS:-unknown} ($(if [[ -f "${COOKIES_FILE:-cookies.txt}" ]]; then wc -l < "${COOKIES_FILE:-cookies.txt}"; else echo 0; fi) lines)"
             log_info "  Method failures captured : $(wc -l < "$METHOD_FAILURE_LOG" 2>/dev/null || echo 0) lines"
             log_separator
             log_info "Last 20 lines of failure log:"
