@@ -40,6 +40,23 @@ Pixeldrain / Archive.org, and the dashboard-data files (`stats.json`,
 `links.txt`, `data/recordings.json`) written via the (mocked) GitHub API. This is
 the same sequence `stream-recorder.yml` runs when `@TheMuslimLantern` goes live.
 
+## Run the upload-only test (gofile + pixeldrain, no archive, no dashboard)
+```bash
+bash scripts/_dryrun/upload-only-test.sh
+```
+Reproduces a user request: record a stream but for **testing only** — upload
+**only to Gofile + Pixeldrain**, **skip Archive.org** (`ARCHIVE_SKIP=true`),
+**skip MEGA** (`MEGA_SKIP=true`), and **do NOT write to the dashboard**
+(`update-stats.sh` / `update-links.sh` are intentionally not run). Proves the
+upload routing targets exactly the requested services and skips the rest.
+
+> NOTE: a *real* byte-upload to gofile.io / pixeldrain.com cannot run in this
+> audit sandbox (those hosts are network-blocked — only GitHub/pypi are
+> reachable). This test proves the **routing logic** with mocked upload
+> endpoints. On your GitHub runner, the identical `ARCHIVE_SKIP=true` +
+> `MEGA_SKIP=true` env (plus skipping the dashboard workflow steps) performs
+> the real upload to Gofile + Pixeldrain only.
+
 ## Run the failure path (every method fails)
 
 ```bash
