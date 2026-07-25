@@ -14,6 +14,7 @@ export GITHUB_OUTPUT="$TMP/out.txt"; : > "$GITHUB_OUTPUT"
 export GITHUB_ENV="$TMP/env.txt"; : > "$GITHUB_ENV"
 export GITHUB_STEP_SUMMARY="$TMP/summary.md"; : > "$GITHUB_STEP_SUMMARY"
 export GITHUB_REPOSITORY="usermuneeb1/Stream-Recorder"
+export GH_PAT="dummy"   # dry-run only — exercises the GitHub-API write paths via the mocked curl
 export GITHUB_RUN_ID="12345"; export GITHUB_SHA="abc123def456"; export GITHUB_ACTOR="ci-bot"
 export GITHUB_WORKSPACE="$REPO"; export RUNNER_TEMP="$TMP"; export GITHUB_SERVER_URL="https://github.com"
 
@@ -70,9 +71,18 @@ run_step() {
 overall=0
 run_step "check-cookies" "$REPO/scripts/check-cookies.sh" || overall=1
 run_step "detect-stream" "$REPO/scripts/detect-stream.sh" || overall=1
+
+echo ""
+echo "════════ STEP: notify-live-detected (Discord 🔴 LIVE alert) ════════"
+( cd "$REPO"; source scripts/utils.sh; source scripts/discord-notify.sh; notify_live_detected )
+ld_rc=$?
+if [[ $ld_rc -eq 0 ]]; then echo "✅ notify-live-detected -> exit 0"; else echo "❌ notify-live-detected -> exit $ld_rc"; overall=1; fi
+
 run_step "record-stream" "$REPO/scripts/record-stream.sh" || overall=1
 run_step "post-process"  "$REPO/scripts/post-process.sh"  || overall=1
 run_step "upload-clouds" "$REPO/scripts/upload-clouds.sh" || overall=1
+run_step "update-stats"  "$REPO/scripts/update-stats.sh"  || overall=1
+run_step "update-links"  "$REPO/scripts/update-links.sh"  || overall=1
 
 echo ""
 echo "════════ Discord notify (sourced function) ════════"

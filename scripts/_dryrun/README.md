@@ -23,16 +23,22 @@ _dryrun/
 └── failure-path.sh # FAILURE-PATH: every method fails → graceful degradation
 ```
 
-## Run the happy path (successful recording)
+## Run the happy path (successful recording — full "when live" chain)
 
 ```bash
 bash scripts/_dryrun/run.sh
 ```
 
-Exercises: `check-cookies → detect-stream → record-stream → post-process →
-upload-clouds`, then sources `discord-notify.sh` and calls
-`notify_recording_complete`. Expects **all steps exit 0**, `RECORDING_SUCCESS=true`,
-and upload links for Gofile / Pixeldrain / Archive.org.
+Exercises the **entire "streamer went live" pipeline** in order:
+`check-cookies → detect-stream → notify_live_detected (🔴 Discord LIVE alert) →
+record-stream → post-process → upload-clouds → update-stats (stats.json +
+data/recordings.json) → update-links (links.txt + data/recordings.json gallery)
+→ notify_recording_complete (✅ Discord alert with links)`.
+
+Expects **all steps exit 0**, `RECORDING_SUCCESS=true`, upload links for Gofile /
+Pixeldrain / Archive.org, and the dashboard-data files (`stats.json`,
+`links.txt`, `data/recordings.json`) written via the (mocked) GitHub API. This is
+the same sequence `stream-recorder.yml` runs when `@TheMuslimLantern` goes live.
 
 ## Run the failure path (every method fails)
 

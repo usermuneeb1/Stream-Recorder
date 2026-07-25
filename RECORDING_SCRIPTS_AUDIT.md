@@ -181,16 +181,21 @@ bash -n scripts/upload-clouds.sh      → OK
 bash -n scripts/discord-notify.sh     → OK
 ```
 
-### 2. Happy-path dry-run — full pipeline runs end-to-end, no crashes
-Harness: `scripts/_dryrun/run.sh` (mocked tools, simulated GitHub Actions env).
-Result: **all 5 pipeline steps + the Discord completion notification exited 0**.
+### 2. Happy-path dry-run — the FULL "when live" chain runs end-to-end, no crashes
+Harness: `scripts/_dryrun/run.sh` (mocked tools, simulated GitHub Actions env,
+dummy `GH_PAT` so the GitHub-API write paths are exercised). This mirrors exactly
+what `stream-recorder.yml` runs when `@TheMuslimLantern` goes live.
+Result: **every step exited 0**.
 ```
-check-cookies  -> exit 0
-detect-stream  -> exit 0
-record-stream  -> exit 0
-post-process   -> exit 0
-upload-clouds  -> exit 0
-discord-notify -> exit 0
+check-cookies        -> exit 0
+detect-stream        -> exit 0   (LIVE DETECTED)
+notify-live-detected -> exit 0   (🔴 Discord "LIVE" alert → HTTP 200)
+record-stream        -> exit 0
+post-process         -> exit 0
+upload-clouds        -> exit 0   (Gofile / Pixeldrain / Archive links)
+update-stats         -> exit 0   (stats.json + data/recordings.json written)
+update-links         -> exit 0   (links.txt + data/recordings.json gallery)
+discord-notify       -> exit 0   (✅ complete alert w/ links → HTTP 200)
 
 RECORDING_SUCCESS=true
 UPLOAD_SUCCESS_COUNT=3
@@ -200,8 +205,18 @@ ARCHIVE_LINKS=HD|https://archive.org/details/tml-2026-07-dQw4w9WgXcQ-...
 🎉 DRY-RUN RESULT: NO CRASHES (all steps exited 0)
 ```
 This proves the step-to-step hand-offs (env exports via `GITHUB_ENV`/`GITHUB_OUTPUT`,
-the `RECORDING_SUCCESS` flag, the processed-files list, and the upload-link
-format) are all consistent.
+the `RECORDING_SUCCESS` flag, the processed-files list, the upload-link format,
+and the dashboard-data writes) are all consistent — i.e. the **Discord alert →
+record → upload audio → links → dashboard data** flow the user asked about is
+wired correctly and does not crash.
+
+> **Dashboard data flow (how "upload to dashboard" works):** `update-stats.sh`
+> writes `stats.json` + `data/recordings.json`, and `update-links.sh` writes
+> `links.txt` + the `data/recordings.json` gallery — all via the GitHub API into
+> the repo. The deployed dashboard (`deploy-pages.yml`, triggered on `push` to
+> `main`) reads `data/recordings.json` **live** through its API/worker layer, so
+> new recordings appear on the dashboard automatically without a redeploy. (A
+> redeploy only happens when dashboard *code* changes.)
 
 ### 3. Failure-path dry-run — graceful degradation when recording fails
 Harness: `scripts/_dryrun/failure-path.sh` (recording tools mocked to fail).
