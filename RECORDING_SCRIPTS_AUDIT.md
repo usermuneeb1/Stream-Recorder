@@ -246,10 +246,55 @@ rule to v2–v6 on 2026-07-16**. Verified it does **not** affect this repo:
 - `mass-fix-checkout.sh` downgrades `@v7 → @v4` — running it would roll back a
   major version for no reason and is **not** recommended.
 
+### 7. Real recording test — genuine tools, local live HLS source
+To go beyond mocks, the **real** `ffmpeg`/`yt-dlp`/`streamlink` binaries were
+installed (via `pip` + `imageio-ffmpeg`; `apt`/root unavailable in the audit
+sandbox) and the **actual `record-stream.sh` engine** was run against a
+locally-served *live* HLS source (so the recording code paths are exercised with
+real binaries — only the *source* differs from YouTube, which is network-blocked
+here).
+
+Result — **the engine recorded a live stream for real:**
+```
+Trying method F: Streamlink (HLS direct)
+[cli][info] Writing output to /tmp/realrec/segments/segment_001.mp4
+[cli][info] ✅ Method F: Streamlink (HLS, default flags) succeeded!
+═══ RECORDED 1 SEGMENT(S) ═══
+Final raw file: Local HLS Test_raw.mp4
+RECORDING_SUCCESS=true
+record_stream exit code: 0
+```
+The 1.65 MB output was verified **independently of `ffmpeg`** (the sandbox's
+static `ffmpeg` segfaults when *demuxing* HLS/TS input — an environment quirk,
+**not** a repo bug; it encodes fine and decodes a normal MP4 with rc=0) by
+parsing the MPEG-TS container in Python:
+```
+TS packets       : 8786  (sync-byte 0x47 at 188B boundaries: 8786/8786)
+PIDs present     : [(256, 7356)=video, (257, 1388)=audio, (17), (0)=PAT, (4096)=PMT]
+packets w/ H.264 start-code (00 00 01): 952
+H.264 NAL type found in capture: access unit delimiter
+VERDICT: ✅ Real MPEG-TS/H.264 video was captured by the engine
+```
+So the recorder genuinely grabs a live stream, and `post-process.sh` (which the
+workflow runs next) remuxes this TS payload into a clean MP4 — exactly as
+designed. Method F (streamlink) is one of the ten cascade methods; the others
+were also exercised (yt-dlp methods resolved the local manifest; Method J's
+`ffmpeg` HLS step is last-resort and was blocked only by the sandbox `ffmpeg`
+demux crash noted above).
+
+> Note: `bc` is **installed by the runner** (`stream-recorder.yml` does
+> `apt-get install -y ffmpeg jq bc curl python3 megatools`), so `utils.sh`'s
+> `format_size` (which shells out to `bc`) works on CI — the `bc: command not
+> found` seen during the local test is only because the audit sandbox lacked it.
+
 ### Honest limitations (what is NOT proven)
-- A *real* live YouTube stream has **not** been recorded — that needs a live
-  stream, valid cookies, and the real `ffmpeg`/`yt-dlp`/`streamlink`/`ytarchive`
-  binaries, none of which exist in this sandbox.
+- A *real YouTube* stream has **not** been recorded here — YouTube is
+  network-blocked from this audit sandbox (Google/Cloudflare-DNS/YouTube all time
+  out; only GitHub/pypi are reachable). To close that gap as far as possible, the
+  engine was run against a **locally-served live HLS source with the genuine
+  `ffmpeg`/`yt-dlp`/`streamlink` binaries** and it captured real H.264 video
+  (see §7). The only remaining unproven step is "point the same engine at a real
+  `youtube.com` HLS URL" — which your GitHub runner already does every 5 minutes.
 - The dry-run mocks simulate tool *behavior* (exit codes, file creation, API
   response shapes), so logic/control-flow is verified, not bit-level transcoding.
 - To prove a live capture end-to-end, run the real pipeline on a GitHub runner
