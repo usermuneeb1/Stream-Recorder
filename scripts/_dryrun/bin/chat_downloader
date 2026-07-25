@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# chat_downloader mock: no-op.
+exit 0

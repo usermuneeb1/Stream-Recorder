@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Minimal bc substitute for dry-run (supports scale=N; <expr> and comparisons).
+python3 - <<'PY'
+import sys, re
+data = sys.stdin.read()
+m = re.search(r'scale\s*=\s*(\d+)\s*;(.*)', data, re.S)
+scale = 2
+expr = data
+if m:
+    scale = int(m.group(1)); expr = m.group(2)
+expr = expr.strip().rstrip(';').strip().replace('\n', ' ')
+if not expr or not re.fullmatch(r'[0-9eE.+\-*/()% ]+', expr):
+    print(0); sys.exit(0)
+try:
+    if re.search(r'[<>]=?|==|!=', expr):
+        print(1 if eval(expr, {"__builtins__": {}}, {}) else 0)
+    else:
+        val = eval(expr, {"__builtins__": {}}, {})
+        print(round(val, scale) if isinstance(val, float) else val)
+except Exception:
+    print(0)
+PY

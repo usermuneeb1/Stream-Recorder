@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# ffmpeg mock: create the output file (last non -i positional) so size/valid checks pass.
+out=""
+prev=""
+for a in "$@"; do
+  [[ "$prev" != "-i" ]] && out="$a"
+  prev="$a"
+done
+[[ "$out" == *"%"* ]] && exit 0           # segment pattern — don't create literal file
+case "$out" in
+  -*|"") ;;
+  *.mp4|*.mkv|*.ts|*.webm|*.m4a|*.flv)
+    head -c 20000000 /dev/zero > "$out" 2>/dev/null ;;
+esac
+exit 0

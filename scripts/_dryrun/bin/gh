@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# gh mock: avoid real network; return empty JSON.
+echo '{}'
+exit 0

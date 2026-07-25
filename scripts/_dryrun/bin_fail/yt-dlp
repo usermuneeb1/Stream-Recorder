@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Failing yt-dlp mock for the FAILURE-PATH dry run: exit non-zero and
+# create NO output file, so every recording method fails cleanly.
+exit 1

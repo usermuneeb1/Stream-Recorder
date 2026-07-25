@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# streamlink mock: create output via -o.
+out=""; i=0; args=("$@")
+while [[ $i -lt ${#args[@]} ]]; do
+  [[ "${args[$i]}" == "-o" ]] && out="${args[$((i+1))]}"
+  i=$((i+1))
+done
+[[ -n "$out" ]] && head -c 25000000 /dev/zero > "$out" 2>/dev/null
+exit 0

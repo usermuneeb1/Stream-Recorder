@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# curl mock for dry-run. Handles -o (body to file) and -w (HTTP code line),
+# and returns the success-shaped responses the pipeline's jq parsers expect.
+url=""; outfile=""; has_w=0; method="GET"; has_data=0; w_format=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) outfile="$2"; shift 2 ;;
+    -w) w_format="$2"; has_w=1; shift 2 ;;
+    -X) method="$2"; shift 2 ;;
+    -d|--data|--data-raw|--data-urlencode) has_data=1; shift 2 ;;
+    -H|-A|-b|-c|-e|-u|--max-time|-m|--connect-timeout|-F|-I) shift 2 ;;
+    -s|-S|-L|-f|-k|-g|-v|-#|-fsS|-sL|-fs|--location|--upload-file|--retry) shift ;;
+    -*) shift ;;
+    *) url="$1"; shift ;;
+  esac
+done
+
+body=""
+case "$url" in
+  *upload.gofile.io*)
+    body='{"status":"ok","data":{"downloadPage":"https://gofile.io/d/ABC123","code":"ABC123","fileId":"ABC123"}}' ;;
+  *api.gofile.io*)
+    body='{"status":"ok","data":{"children":{"x":{"link":"https://gofile.io/d/ABC123"}}}}' ;;
+  *pixeldrain.com*)
+    body='{"success":true,"id":"pd-abc123"}' ;;
+  *s3.us.archive.org*)
+    body='{}' ;;   # archive checks the HTTP code, not the body
+  *youtube.com/watch*|*youtu.be/*)
+    body='{"isLiveNow":true,"title":"Test Live Stream","ownerChannelName":"The Muslim Lantern","accountName":"The Muslim Lantern"}' ;;
+  *feeds/videos.xml*)
+    body='<feed><entry><yt:videoId>dQw4w9WgXcQ</yt:videoId><media:title>Test Live Stream</media:title><author><name>The Muslim Lantern</name></author></entry></feed>' ;;
+  *i.ytimg.com*|*yt3.ggpht.com*|*ytimg*)
+    if [[ -n "$outfile" && "$outfile" != "/dev/null" ]]; then head -c 15000 /dev/zero > "$outfile" 2>/dev/null; fi
+    echo "200"; exit 0 ;;
+  *ifconfig.me*|*ipify.org*|*icanhazip.com*) body="203.0.113.5" ;;
+  *api.github.com*)
+    if [[ "$method" != "GET" || "$has_data" -eq 1 ]]; then body='{"commit":{"sha":"deadbeefcafe"}}'; else body='{}'; fi ;;
+  *4416/ping*) body="pong" ;;
+  *) body="" ;;
+esac
+
+# Write body to -o file (if any), and emit the -w HTTP code in the exact
+# -w format the caller expects (so cut -d'|' / tail -1 / whole-stdout all work).
+if [[ -n "$outfile" && "$outfile" != "/dev/null" ]]; then
+  printf '%s' "$body" > "$outfile"
+fi
+if [[ $has_w -eq 1 ]]; then
+  code_line=$(echo "$w_format" | sed 's/%{http_code}/200/; s/%{exitcode}/0/; s/%{time_total}/0/')
+  if [[ -n "$outfile" ]]; then
+    echo "$code_line"      # body already written to file (or discarded if /dev/null)
+  else
+    printf '%s%s' "$body" "$code_line"   # no -o: body + code line (e.g. pixeldrain)
+  fi
+elif [[ -z "$outfile" || "$outfile" == "/dev/null" ]]; then
+  printf '%s' "$body"
+fi
+exit 0
