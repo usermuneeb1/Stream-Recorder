@@ -40,6 +40,7 @@ get_webhook_url() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 send_discord_webhook() {
+    _discord_rate_limit
     local payload="$1"
     local channel_type="${2:-default}"
     local wait_id_file="${3:-}"
@@ -59,8 +60,9 @@ send_discord_webhook() {
     payload_tmp=$(mktemp)
     out_tmp=$(mktemp)
     
-    # Ping @everyone only for live alerts and recording complete/failed
-    if [[ "$channel_type" == "alerts" || "$channel_type" == "recordings" ]]; then
+    # SECURITY: Ping @everyone ONLY for critical alerts (live detected, failures)
+    # Recordings-complete notifications are informative, not urgent - don't ping.
+    if [[ "$channel_type" == "alerts" ]]; then
         payload=$(echo "$payload" | jq '. + {content: "@everyone"}')
     fi
     
@@ -102,6 +104,21 @@ send_discord_webhook() {
     [[ -n "$err_body" ]] && log_debug "  Discord response: ${err_body:0:300}"
     rm -f "$out_tmp"
     return 1
+}
+
+# Rate-limit guard for Discord API (max 5 req/s per webhook)
+_discord_rate_limit() {
+    local throttle_file="/tmp/.discord_last_call"
+    local last_call=0
+    [[ -f "$throttle_file" ]] && last_call=$(cat "$throttle_file" 2>/dev/null || echo 0)
+    local now
+    now=$(date '+%s')
+    local elapsed=$(( now - last_call ))
+    if (( elapsed < 1 )); then
+        local sleep_time=$(( 1 - elapsed ))
+        sleep "$sleep_time"
+    fi
+    echo "$(date '+%s')" > "$throttle_file" 2>/dev/null || true
 }
 
 patch_discord_webhook() {

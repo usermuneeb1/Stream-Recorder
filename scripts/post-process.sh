@@ -53,11 +53,11 @@ repair_and_optimize() {
                 -show_entries stream=codec_name -of csv=p=0 \
                 "$output_file" 2>/dev/null)
 
-            if [[ "$vcodec" == "vp9" ]] || [[ "$vcodec" == "vp8" ]]; then
-                log_info "  ⚠️  VP9 codec detected — transcoding to H.264 for browser compatibility..."
+            if [[ "$vcodec" == "vp9" ]] || [[ "$vcodec" == "vp8" ]] || [[ "$vcodec" == "av1" ]]; then
+                log_info "  ⚠️  VP9/VP8/AV1 codec detected — transcoding to H.264 for browser compatibility..."
                 local h264_tmp="${output_file%.mp4}_h264tmp.mp4"
-                local encode_start
-                encode_start=$(now_epoch)
+                local encode_start_h264
+                encode_start_h264=$(now_epoch)
 
                 if ffmpeg -y -i "$output_file" \
                     -c:v libx264 -crf "${REENCODE_CRF:-20}" -preset "${REENCODE_PRESET:-fast}" \
@@ -66,7 +66,7 @@ repair_and_optimize() {
                     "$h264_tmp" 2>/dev/null && is_valid_video "$h264_tmp"; then
 
                     mv -f "$h264_tmp" "$output_file"
-                    local e2=$(( $(now_epoch) - encode_start ))
+                    local e2=$(( $(now_epoch) - encode_start_h264 ))
                     log_ok "  H.264 transcode complete in ${e2}s"
                     log_ok "  Output: $(basename "$output_file") ($(format_size "$(get_file_size "$output_file")"))"
                 else
