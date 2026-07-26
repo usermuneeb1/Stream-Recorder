@@ -30,7 +30,11 @@ _is_gofile_alive() {
     fi
     # Also check if the page is basically empty / error page
     local size=${#page}
-    (( size < 500 )) && return 1
+    # Check for known Gofile error indicators (more reliable than byte count)
+    if echo "$page" | grep -qiE "(page not found|file was deleted|removed|expired|404)"; then
+        return 1
+    fi
+    (( size < 300 )) && return 1
     return 0
 }
 

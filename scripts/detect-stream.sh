@@ -646,7 +646,7 @@ is_stream_still_live() {
     
     # Method A: Direct video page check with bypass cookies (Fastest & most accurate)
     local video_page
-    video_page=$(curl -s --max-time 10 \
+    video_page=$(curl -s --max-time 15 \
         -H "User-Agent: ${user_agent}" \
         "${curl_cookie_args[@]}" \
         -H "Accept-Language: en-US,en;q=0.9" \
@@ -664,12 +664,17 @@ is_stream_still_live() {
         return 0
     fi
     
-    # Method B: yt-dlp json check (Definitive but slower — only if Method A inconclusive)
+    # Method B: yt-dlp json check (with cookies for WARP IP authentication)
     local json_blob is_live live_status
-    json_blob=$(timeout 20 yt-dlp --dump-json --no-download \
+    local -a yt_cookies=()
+    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+        yt_cookies=(--cookies "${COOKIES_FILE:-cookies.txt}")
+    fi
+    json_blob=$(timeout 30 yt-dlp --dump-json --no-download \
+        "${yt_cookies[@]}" \
         --extractor-args "youtube:player_client=mweb" \
         --no-check-formats --ignore-no-formats-error \
-        --socket-timeout 5 \
+        --socket-timeout 15 \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null)
     is_live=$(echo "$json_blob" | jq -r '.is_live // false' 2>/dev/null)
     live_status=$(echo "$json_blob" | jq -r '.live_status // "not_live"' 2>/dev/null)

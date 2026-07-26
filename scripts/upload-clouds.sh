@@ -70,7 +70,7 @@ upload_to_gofile() {
         local upload_start upload_response
         upload_start=$(now_epoch)
 
-        log_debug "  Gofile attempt ${attempt}/${max_retries} → ${endpoint}"
+        log_debug "  Gofile attempt ${attempt}/${max_retries}"
 
         if [[ -n "$api_key" ]]; then
             upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
@@ -143,7 +143,7 @@ upload_to_pixeldrain() {
         local upload_start upload_response http_code json_body
         upload_start=$(now_epoch)
 
-        log_debug "  Pixeldrain attempt ${attempt}/${max_retries} (api_key=${api_key:+SET})"
+        log_debug "  Pixeldrain attempt ${attempt}/${max_retries} (authenticated: $([[ -n "$api_key" ]] && echo yes || echo no))"
 
         if [[ -n "$api_key" ]]; then
             # ── PUT method with API key ────────────────────────────────────────
@@ -253,7 +253,8 @@ upload_to_mega() {
     fi
 
     # Create config file for authentication
-    local mega_rc="/tmp/.megarc"
+    local mega_rc
+    mega_rc=$(mktemp /tmp/megarc_XXXX)
     cat > "$mega_rc" << EOF
 [Login]
 Username = ${mega_email}
@@ -510,7 +511,8 @@ upload_thumbnail_to_mega() {
     fi
 
     local video_id="${STREAM_VIDEO_ID:-unknown}"
-    local mega_rc="/tmp/.megarc_thumb"
+    local mega_rc
+    mega_rc=$(mktemp /tmp/megarc_thumb_XXXX)
     cat > "$mega_rc" << EOF
 [Login]
 Username = ${mega_email}

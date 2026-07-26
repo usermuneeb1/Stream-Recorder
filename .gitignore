@@ -45,8 +45,14 @@ cookie_keepalive.json
 lofi.html
 sava.html
 
-# MEGA temporary files (accounts.csv is intentionally tracked publicly)
 scripts/mega/signin_results.json
 scripts/mega/.last_account_index
 scripts/mega/accounts.old.csv
 .megarc
+
+# SECURITY: Cloud account CSVs (contain credentials — never commit)
+scripts/mega/accounts.csv
+scripts/pixeldrain/accounts.csv
+scripts/mega/signin_results.json
+scripts/mega/.last_account_index
+scripts/mega/accounts.old.csv
