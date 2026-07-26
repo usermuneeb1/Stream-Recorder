@@ -414,21 +414,28 @@ jobs:
           #   • false-positive (record a just-ended stream) → produces a
           #     short/empty file that is_valid_video() rejects → self-correcting.
           # If the stream truly ended, all 3 checks fail and we still abort.
-          still_live=false
+          # v5 FIX: recheck is ADVISORY ONLY — it NEVER aborts a confirmed-live
+          # stream. is_stream_still_live() systematically false-negatives on
+          # Cloudflare WARP / GitHub IPs (YouTube serves a consent page that
+          # omits isLiveNow even for genuinely live streams), which caused an
+          # infinite detect→abort→retry→Discord-spam loop on stream EGbDB405YSw
+          # (2026-07-26) that was LIVE the entire time. Detection already
+          # confirmed live via 4 independent methods, so an inconclusive recheck
+          # must NOT throw the recording away. If the stream truly ended, the
+          # recording validator (is_valid_video) rejects the empty file — self-
+          # correcting. Cost of false-abort (total loss + spam) >> cost of
+          # recording a just-ended stream (rejected empty file).
+          still_live=true
           for i in 1 2 3; do
             if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
               log_ok "Check $i confirmed live — proceeding to record"
-              still_live=true
               break
             else
-              log_warn "Check $i did not confirm live"
+              log_warn "Check $i inconclusive (common on WARP IPs) — proceeding anyway"
               [[ $i -lt 3 ]] && sleep 2
             fi
           done
           echo "still_live=$still_live" >> "$GITHUB_OUTPUT"
-          if [[ "$still_live" == "false" ]]; then
-            log_warn "All 3 checks failed to confirm live — skipping (stream likely ended)"
-          fi
 
       - name: "⏭️  Skip Recording — Stream Ended Mid-Race"
         if: steps.recheck.outputs.still_live == 'false'

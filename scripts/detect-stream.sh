@@ -681,7 +681,27 @@ is_stream_still_live() {
     if [[ "$is_live" == "true" ]] || [[ "$live_status" == "is_live" ]] || [[ "$live_status" == "is_upcoming" ]]; then
         return 0
     fi
-    
+
+    # v5 FIX: the mweb client systematically false-negatives live streams on
+    # WARP/GitHub IPs (it reported "not live" for a genuinely-live stream,
+    # EGbDB405YSw on 2026-07-26, which broke the recheck and triggered an
+    # infinite detect→abort→retry→Discord-spam loop). The `web` client is what
+    # detection Method 2 uses successfully — retry with it before declaring the
+    # stream not-live.
+    local web_blob web_live web_status
+    web_blob=$(timeout 30 yt-dlp --dump-json --no-download \
+        "${yt_cookies[@]}" \
+        --user-agent "$user_agent" \
+        --extractor-args "youtube:player_client=web" \
+        --no-check-formats --ignore-no-formats-error \
+        --socket-timeout 15 \
+        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null)
+    web_live=$(echo "$web_blob" | jq -r '.is_live // false' 2>/dev/null)
+    web_status=$(echo "$web_blob" | jq -r '.live_status // "not_live"' 2>/dev/null)
+    if [[ "$web_live" == "true" ]] || [[ "$web_status" == "is_live" ]] || [[ "$web_status" == "is_upcoming" ]]; then
+        return 0
+    fi
+
     return 1
 }
 
