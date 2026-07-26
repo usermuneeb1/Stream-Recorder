@@ -384,47 +384,61 @@ jobs:
           source scripts/discord-notify.sh
           notify_live_detected
 
-      # ─── 7b. SOFT RECHECK (early-warning only — NEVER blocks recording) ──────
-      # The recording engine (record_stream()) has its own pre-flight liveness
-      # check and VOD rescue. We do NOT block recording on a false-negative:
-      #   • YouTube on WARP IPs frequently omits isLiveNow even for live streams
-      #   • A false-negative aborts a live recording (LOST PERMANENTLY)
-      #   • A false-positive records a short file → is_valid_video() catches it
-      #
-      # CRITICAL: The previous hard gate (sleep 2 between 3 checks) was killing
-      # recordings within 5 seconds of detection. Fixed 2026-07-25.
-      - name: "🔁 Soft Recheck — Still Live? (info only — NEVER blocks)"
+      # ─── 7b. RECHECK LIVE (defense against race condition) ──────────────────
+      # v4: detection → recording has a 30-60s gap. If the stream ends in
+      # that gap, recording starts on a dead stream and burns 30+ min on a
+      # doomed run. Re-verify it is STILL live right before recording.
+      # (This race condition lost HbS5TF1atFU on 2026-07-04.)
+      - name: "🔁 Recheck — Still Live?"
         id: recheck
         if: steps.detect.outputs.is_live == 'true'
-        continue-on-error: true
-        timeout-minutes: 2
+        timeout-minutes: 5
         run: |
           source scripts/utils.sh
-          log_header "🔁 SOFT RECHECK (info only — NEVER blocks recording)"
+          log_header "🔁 LIVE RECHECK (any-pass)"
+          # Race-condition guard: confirm the stream is still live before recording.
+          #
+          # We run up to 3 checks but PROCEED as soon as ANY one confirms live.
+          # Why any-pass (not all-must-pass): a single transient false-negative
+          # must NOT abort a genuinely-live recording. Over WARP IPv6, YouTube
+          # frequently serves a consent/sign-in page that omits isLiveNow even
+          # for a stream that is actively live — so is_stream_still_live can
+          # return false on a live stream. The previous "all 3 must pass"
+          # logic turned one such hiccup into an abort.
+          #
+          # Cost asymmetry justifies the tolerance:
+          #   • false-negative (abort a live stream) → recording LOST, and the
+          #     VOD often goes private within minutes → UNRECOVERABLE.
+          #     (Incident 2026-07-12 lsgplOHzdJQ: aborted 4s after detect →
+          #     VOD privated → lost forever.)
+          #   • false-positive (record a just-ended stream) → produces a
+          #     short/empty file that is_valid_video() rejects → self-correcting.
+          # If the stream truly ended, all 3 checks fail and we still abort.
           still_live=false
           for i in 1 2 3; do
             if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
-              log_ok "Soft recheck $i confirmed live"
+              log_ok "Check $i confirmed live — proceeding to record"
               still_live=true
               break
             else
-              log_warn "Soft recheck $i did not confirm live (WARP/YouTube delay)"
-              [[ $i -lt 3 ]] && sleep 10
+              log_warn "Check $i did not confirm live"
+              [[ $i -lt 3 ]] && sleep 2
             fi
           done
           echo "still_live=$still_live" >> "$GITHUB_OUTPUT"
           if [[ "$still_live" == "false" ]]; then
-            log_warn "⚠️  Soft recheck failed — PROCEEDING TO RECORD ANYWAY"
-            log_warn "    record_stream() has its own pre-flight + VOD rescue."
-            # IMPORTANT: Set still_live=true so the workflow continues to record!
-            # The hard gate ("Skip Recording") has been REMOVED below.
-            echo "still_live=true" >> "$GITHUB_OUTPUT"
+            log_warn "All 3 checks failed to confirm live — skipping (stream likely ended)"
           fi
 
-      # NOTE: The "Skip Recording — Stream Ended Mid-Race" step has been REMOVED.
-      # The hard gate was killing genuine live streams within 5 seconds of detection
-      # because YouTube on WARP IPs returns stripped pages without isLiveNow.
-      # record_stream() handles end-of-stream detection + VOD rescue correctly.
+      - name: "⏭️  Skip Recording — Stream Ended Mid-Race"
+        if: steps.recheck.outputs.still_live == 'false'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_recording_failed \
+            "Stream ended during detection→recording race window" \
+            "Will retry on next 5-min ping. No manual action needed."
+
 
       # ─── 8. RECORD THE STREAM ────────────────────────────────────────────
       - name: "🎬 Record Stream"
