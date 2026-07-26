@@ -140,8 +140,8 @@ resolve_youtube_thumbnail() {
             content_length=$(curl -sI --max-time 5 -L "$url" 2>/dev/null | \
                 grep -i 'content-length' | tail -1 | tr -dc '0-9')
             
-            # Real thumbnails are > 5KB; the gray placeholder is ~1.2KB
-            if [[ -n "$content_length" ]] && (( content_length > 5000 )); then
+            # Real thumbnails are > 2KB; the gray placeholder is ~1.2KB
+            if [[ -n "$content_length" ]] && (( content_length > 2000 )); then
                 echo "$url"
                 return 0
             fi
@@ -240,8 +240,8 @@ format_hours_human() {
 # Sanitize a string for use as a filename
 sanitize_filename() {
     local name="$1"
-    # Remove filesystem-unsafe characters
-    name=$(echo "$name" | sed 's/[\/\\:*?"<>|#&%$!@^`~]//g')
+    # CRITICAL: strip all path separators to prevent path traversal
+    name=$(echo "$name" | sed 's@[\/:*?"<>|#&%$!@^`~\/]@@g; s@\.\.@@g; s@^\.@@g')
     # Replace common separators with hyphens
     name=$(echo "$name" | sed 's/[|]/ - /g')
     # Collapse multiple spaces/hyphens
@@ -656,10 +656,16 @@ recover_broken_video() {
 # Escape a string for JSON embedding
 json_escape() {
     local str="$1"
-    # Use python for reliable JSON string escaping
-    python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$str" 2>/dev/null | \
-        sed 's/^"//; s/"$//' || \
-        echo "$str" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\t/\\t/g; s/\r/\\r/g'
+    # Use python for reliable JSON string escaping (pure, avoids shell escaping bugs)
+    python3 -c "
+import json, sys
+try:
+    print(json.dumps(sys.argv[1])[1:-1])
+except Exception:
+    s = sys.argv[1]
+    # Fallback: keep only printable chars + basic whitespace
+    print(''.join(c for c in s if c.isprintable() or c in ' \\t\\n'))
+" "$str" 2>/dev/null || echo "$str"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -674,7 +680,7 @@ set_output() {
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
         echo "${name}=${value}" >> "$GITHUB_OUTPUT"
     fi
-    log_debug "Output: ${name}=${value}"
+    log_debug "Output: ${name}=<set>"
 }
 
 # Set a GitHub Actions environment variable
@@ -685,7 +691,8 @@ set_env() {
         echo "${name}=${value}" >> "$GITHUB_ENV"
     fi
     export "${name}=${value}"
-    log_debug "Env: ${name}=${value}"
+    # SECURITY: only log env var name, not the value (could contain secrets)
+    log_debug "Env: ${name}=<set>"
 }
 
 # Append to GitHub Actions step summary

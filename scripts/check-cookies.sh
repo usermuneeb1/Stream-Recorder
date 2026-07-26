@@ -15,8 +15,8 @@ _cookie_alert() {
     # Suppressed under PUBLIC_STREAM_ONLY mode — the recorder runs cookieless
     # so a stale/missing cookie is irrelevant to recording success. Posting
     # 'cookie warning' Discord alerts in this mode just confuses the user.
-    if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]]; then
-        log_info "Cookie alert suppressed (PUBLIC_STREAM_ONLY=true — cookies not used)"
+    if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]] || [[ "${FORCE_RECORD:-false}" == "true" ]]; then
+        log_info "Cookie alert suppressed (PUBLIC_STREAM_ONLY=${PUBLIC_STREAM_ONLY:-false}, FORCE_RECORD=${FORCE_RECORD:-false})"
         return 0
     fi
 
