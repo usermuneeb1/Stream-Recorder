@@ -24,6 +24,9 @@ concurrency:
   group: thumbnail-gen
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-24.04

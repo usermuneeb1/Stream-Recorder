@@ -6,6 +6,20 @@
 
 set -euo pipefail
 
+# ⚠️ GUARD (added 2026-07-26): actions/checkout@v7 IS valid (released 2026-06-17,
+# current Latest v7.0.1). Downgrading to v4 is unnecessary and was already
+# reverted in commit c0de20b. This script is preserved for history only.
+# Uncomment the next line only if GitHub ever removes the v7 tag.
+# FORCE=1
+if [[ "${FORCE:-0}" != "1" ]]; then
+  echo "⛔ mass-fix-checkout.sh is DISABLED."
+  echo "   actions/checkout@v7 is valid and is the current release (v7.0.1, 2026-07-20)."
+  echo "   Downgrading to v4 is NOT needed and would be a no-op fix."
+  echo "   To force a downgrade anyway: FORCE=1 bash $0"
+  exit 0
+fi
+
+
 REPO_ROOT="${1:-.}"
 WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
 

@@ -20,6 +20,9 @@ concurrency:
   group: catbox-mirror
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   mirror:
     runs-on: ubuntu-24.04

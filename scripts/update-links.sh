@@ -299,5 +299,8 @@ read_links() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     update_links
-    update_recordings_json
+    # NOTE: recordings.json is owned by update-stats.sh (canonical schema, keyed
+    # by video_id, matches the existing gallery). update-links.sh used to also
+    # write it with a CONFLICTING schema (keyed by archive identifier), which
+    # produced duplicate/overwritten gallery entries. That write was removed.
 fi
