@@ -574,6 +574,14 @@ jobs:
           log_info "Final disk space: $(get_disk_space_gb) GB free"
           log_ok "Cleanup complete"
 
+      - name: "🔓 Release recording lock"
+        if: always() && steps.lock.outputs.proceed == 'true'
+        continue-on-error: true
+        run: |
+          source scripts/utils.sh
+          source scripts/recording-lock.sh
+          lock_release "${{ steps.detect.outputs.video_id }}" || true
+
       # ─── 17. RUN SUMMARY ─────────────────────────────────────────────────
       - name: "📋 Run Summary"
         if: always()
