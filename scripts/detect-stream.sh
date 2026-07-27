@@ -257,10 +257,19 @@ detect_method_2_ytdlp() {
     # would private the VOD before the next poll cycle picks it up.
     # (This was the failure mode on 2026-06-27: SBOyQenrRoM was a premiere,
     # recorder bailed every cycle, streamer privated within seconds of end.)
-    if [[ "$is_live" != "true" ]] \
-       && [[ "$live_status" != "is_live" ]] \
-       && [[ "$live_status" != "is_upcoming" ]]; then
-        log_info "Method 2: Stream is not live (is_live=${is_live}, live_status=${live_status})"
+    # v5 FIX: do NOT treat is_upcoming as live. Treating a scheduled-but-not-
+    # started event as "live" made the recorder commit to recording it, so every
+    # method failed with "This live event will begin in N minutes" -> recording-
+    # failed -> auto-retry -> infinite loop (EGbDB405YSw, 2026-07-26, was never
+    # recorded). Now we ONLY record when the event is ACTUALLY live
+    # (is_live / live_status==is_live). The workflow auto-wait + 5-min pinger
+    # catch the real go-live within ~5 min, which is fine for a live broadcast.
+    if [[ "$is_live" != "true" ]] && [[ "$live_status" != "is_live" ]]; then
+        if [[ "$live_status" == "is_upcoming" ]]; then
+            log_info "Method 2: Event is UPCOMING (scheduled, not live yet) - not recording; workflow keeps polling until go-live"
+        else
+            log_info "Method 2: Stream is not live (is_live=${is_live}, live_status=${live_status})"
+        fi
         return 1
     fi
     if [[ "$live_status" == "is_upcoming" ]]; then
@@ -442,8 +451,12 @@ detect_method_4_rss() {
     watch=$(curl -s --max-time 20 -H "User-Agent: ${ua}" \
         -H "Cookie: CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI" \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || true
-    if ! echo "$watch" | grep -qE '"isLiveNow":true|"isLive":true|"liveBroadcastDetails":\{"isLiveNow":true'; then
-        log_info "Method 4: Newest RSS video (${video_id}) is not live"
+    # v5 FIX: require isLiveNow (the authoritative "broadcasting now" flag).
+    # The loose '"isLive":true' alternative false-positives on UPCOMING scheduled
+    # events (the player embed can show isLive:true while waiting), which made
+    # Method 4 trigger recording on a not-yet-live event.
+    if ! echo "$watch" | grep -qE '"isLiveNow":true|"liveBroadcastDetails":\{"isLiveNow":true'; then
+        log_info "Method 4: Newest RSS video (${video_id}) is not live now"
         return 1
     fi
 
