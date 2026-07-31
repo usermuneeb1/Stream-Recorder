@@ -123,14 +123,9 @@ jobs:
           source scripts/utils.sh
           log_info "Channel not live right now — sniper standing down (will retry on next ping)."
 
-      - name: "🔴 Notify — Go-Live!"
-        if: steps.detect.outputs.is_live == 'true'
-        run: |
-          source scripts/utils.sh
-          source scripts/discord-notify.sh
-          notify_live_detected || true
-
       # ─── 3. LOCK — defer if the main recorder is already capturing this ───
+      # The "🔴 LIVE" notification is sent ONLY by the path that wins the lock,
+      # so the recorder and sniper never double-notify Discord.
       - name: "🔒 Acquire recording lock"
         id: lock
         if: steps.detect.outputs.is_live == 'true'
@@ -142,8 +137,15 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
-            log_warn "Main recorder appears to be capturing this stream already — sniper deferring."
+            log_warn "Main recorder appears to be capturing this stream already — sniper deferring (no duplicate notification)."
           fi
+
+      - name: "🔴 Notify — Go-Live!"
+        if: steps.lock.outputs.proceed == 'true'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_live_detected || true
 
       # ─── 4. FULL INSTALL (only when we're actually going to record) ───────
       - name: "📦 Full Install (ffmpeg, ytarchive, streamlink, megatools)"

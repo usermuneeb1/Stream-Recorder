@@ -376,14 +376,6 @@ jobs:
             bash scripts/detect-stream.sh
           fi
 
-      # ─── 7. SEND LIVE DETECTED NOTIFICATION ──────────────────────────────
-      - name: "🔴 Notify — Live Detected"
-        if: steps.detect.outputs.is_live == 'true'
-        run: |
-          source scripts/utils.sh
-          source scripts/discord-notify.sh
-          notify_live_detected
-
       # ─── 7b. RECHECK LIVE (defense against race condition) ──────────────────
       # v4: detection → recording has a 30-60s gap. If the stream ends in
       # that gap, recording starts on a dead stream and burns 30+ min on a
@@ -447,10 +439,36 @@ jobs:
             "Will retry on next 5-min ping. No manual action needed."
 
 
+      # ─── 7c. RECORDING LOCK + LIVE NOTIFICATION (coordinate with Sniper) ─
+      # The lock prevents both the recorder AND the sniper from capturing the
+      # same stream. The "🔴 LIVE" notification is sent ONLY by the path that
+      # wins the lock — no more duplicate Discord messages.
+      # Fail-safe: any lock error → proceed=true (always prefer to record).
+      - name: "🔒 Acquire recording lock"
+        id: lock
+        if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false'
+        continue-on-error: true
+        run: |
+          source scripts/utils.sh
+          source scripts/recording-lock.sh
+          if lock_acquire "${{ steps.detect.outputs.video_id }}" "recorder"; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            log_warn "Go-Live Sniper is already capturing this stream — main recorder deferring (no duplicate notification)."
+          fi
+
+      - name: "🔴 Notify — Live Detected"
+        if: steps.lock.outputs.proceed != 'false' && steps.detect.outputs.is_live == 'true'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          notify_live_detected
+
       # ─── 8. RECORD THE STREAM ────────────────────────────────────────────
       - name: "🎬 Record Stream"
         id: record
-        if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false'
+        if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false' && steps.lock.outputs.proceed != 'false'
         timeout-minutes: 300  # 5 hours max for recording
         continue-on-error: true
         run: |
