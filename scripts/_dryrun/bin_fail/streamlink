@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Failing streamlink mock for the FAILURE-PATH dry run.
+exit 1

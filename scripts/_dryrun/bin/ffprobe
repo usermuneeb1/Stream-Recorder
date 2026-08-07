@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# ffprobe mock: returns what the recorder's helpers parse.
+for a in "$@"; do
+  if [[ "$a" == *"show_streams"* ]]; then
+    echo "codec_type=video"
+    echo "codec_type=audio"
+    exit 0
+  fi
+  if [[ "$a" == *"width"* ]]; then echo "1920"; exit 0; fi
+  if [[ "$a" == *"height"* ]]; then echo "1080"; exit 0; fi
+  if [[ "$a" == *"duration"* ]]; then echo "600.000"; exit 0; fi
+done
+echo "0"
+exit 0
