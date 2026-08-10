@@ -1,8 +1,8 @@
 {
   "peak_days": [
     "Sunday",
-    "Thursday",
-    "Monday"
+    "Monday",
+    "Thursday"
   ],
   "peak_hours_pkt": [
     1,
@@ -18,15 +18,15 @@
     11,
     12
   ],
-  "avg_gap_days": 12.8,
+  "avg_gap_days": 12.6,
   "tiers": {
     "high": {
       "description": "Peak window \u2014 most likely to go live",
       "frequency_minutes": 3,
       "days": [
         "Sunday",
-        "Thursday",
-        "Monday"
+        "Monday",
+        "Thursday"
       ],
       "hours_pkt": [
         1,
@@ -48,8 +48,8 @@
       "frequency_minutes": 10,
       "days": [
         "Sunday",
-        "Thursday",
-        "Monday"
+        "Monday",
+        "Thursday"
       ],
       "hours_pkt": [
         0,
@@ -104,11 +104,11 @@
     }
   },
   "recommended_crons": [
-    "*/3 0,1,2,3,4,5,6,7,20,21,22,23 * * 0,4,1",
-    "*/10 8,9,10,11,12,13,14,15,16,17,18,19 * * 0,4,1",
+    "*/3 0,1,2,3,4,5,6,7,20,21,22,23 * * 0,1,4",
+    "*/10 8,9,10,11,12,13,14,15,16,17,18,19 * * 0,1,4",
     "*/30 * * * 2,3,5,6"
   ],
   "estimated_savings_percent": 44.0,
-  "generated_at": "2026-08-09T14:28:11.884946+00:00",
-  "based_on_recordings": 9
+  "generated_at": "2026-08-10T05:20:09.491102+00:00",
+  "based_on_recordings": 10
 }
