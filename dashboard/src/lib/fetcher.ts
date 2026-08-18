@@ -114,16 +114,24 @@ function mapStoryboard(s: any): Storyboard | undefined {
     : undefined;
 }
 
+function ytIdFromArchive(aid: string): string {
+  // Archive identifiers embed the YouTube ID: tml-2026-06-PYkqrEBc_zY-1781734865
+  const m = aid?.match?.(/tml-\d{4}-\d{2}(?:-\d+)?-([\w-]{11})-\d+$/);
+  return m ? m[1] : '';
+}
+
 function dedupAndMerge(records: Recording[]): Recording[] {
   const map = new Map<string, Recording>();
   for (const r of records) {
     const m = r.videoUrl?.match?.(/(?:v=|\/)([\w-]{11})/);
-    const ytId = m ? m[1] : '';
-    if (!ytId) continue;
+    const ytId = m ? m[1] : (ytIdFromArchive(r.archiveId || '') || (/^[\w-]{11}$/.test(r.videoId) ? r.videoId : ''));
+    // Fall back to the archive item id so legacy entries are never dropped.
+    const key = ytId || r.archiveId || r.videoId || '';
+    if (!key) continue;
 
-    const ex = map.get(ytId);
+    const ex = map.get(key);
     if (!ex) {
-      map.set(ytId, { ...r, videoId: ytId });
+      map.set(key, { ...r, videoId: ytId || key });
       continue;
     }
     const merged: Recording = { ...ex };
@@ -160,6 +168,7 @@ export async function fetchRecordings(): Promise<Recording[]> {
       date:            r.date || '',
       recordedAt:      r.recorded_at || '',
       videoUrl:        r.video_url || '',
+      archiveId:       r.archive_id || '',
       durationSec:     r.duration_sec || 0,
       durationFmt:     fmtDuration(r.duration_fmt || ''),
       sizeHuman:       r.size_human || '',

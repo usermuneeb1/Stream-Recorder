@@ -23,6 +23,7 @@ export interface Recording {
   date: string;            // YYYY-MM-DD
   recordedAt: string;      // ISO
   videoUrl: string;        // original YouTube watch URL
+  archiveId?: string;      // archive.org item identifier
   durationSec: number;
   durationFmt: string;     // "1h 56m"
   sizeHuman: string;       // "374.38 MB"

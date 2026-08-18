@@ -5,7 +5,7 @@
     <link>https://muslim-lantern-archive.vercel.app</link>
     <description>Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
     <language>en</language>
-    <lastBuildDate>Tue, 23 Jun 2026 06:49:13 +0000</lastBuildDate>
+    <lastBuildDate>Fri, 14 Aug 2026 21:44:04 +0000</lastBuildDate>
     <generator>generate-feeds.py</generator>
     <image><url>https://muslim-lantern-archive.vercel.app/logo.png</url><title>The Muslim Lantern — Stream Archive</title><link>https://muslim-lantern-archive.vercel.app</link></image>
     <itunes:author>Muneeb Ahmad</itunes:author>
@@ -15,14 +15,80 @@
     <itunes:category text="Religion &amp; Spirituality"><itunes:category text="Islam"/></itunes:category>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-15</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/y84vFOO8onU</link>
+      <guid isPermaLink="false">y84vFOO8onU</guid>
+      <pubDate>Fri, 14 Aug 2026 21:44:04 +0000</pubDate>
+      <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-15 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      <enclosure url="https://archive.org/download/tml-2026-08-y84vFOO8onU-1786743675/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-15.mp4" length="392569774" type="video/mp4"/>
+      <itunes:duration>01:56:51</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-y84vFOO8onU/thumbnail_y84vFOO8onU.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
+    <item>
+      <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/ASWJmIsyd9s</link>
+      <guid isPermaLink="false">ASWJmIsyd9s</guid>
+      <pubDate>Wed, 12 Aug 2026 23:49:34 +0000</pubDate>
+      <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      <enclosure url="https://archive.org/download/tml-2026-08-ASWJmIsyd9s-1786578401/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4" length="613184434" type="video/mp4"/>
+      <itunes:duration>02:46:41</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-ASWJmIsyd9s/thumbnail_ASWJmIsyd9s.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
+    <item>
+      <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/lZwdaI5i9MA</link>
+      <guid isPermaLink="false">lZwdaI5i9MA</guid>
+      <pubDate>Wed, 12 Aug 2026 20:58:19 +0000</pubDate>
+      <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      <enclosure url="https://archive.org/download/tml-2026-08-lZwdaI5i9MA-1786568243/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4" length="8997569" type="video/mp4"/>
+      <itunes:duration>00:02:42</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-lZwdaI5i9MA/thumbnail_lZwdaI5i9MA.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
+    <item>
+      <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-10</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/6AlPqgkHC-Q</link>
+      <guid isPermaLink="false">6AlPqgkHC-Q</guid>
+      <pubDate>Sun, 09 Aug 2026 22:32:41 +0000</pubDate>
+      <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-08-10 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      <enclosure url="https://archive.org/download/tml-2026-08-6AlPqgkHC-Q-1786314499/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-10.mp4" length="562086589" type="video/mp4"/>
+      <itunes:duration>02:29:08</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-6AlPqgkHC-Q/thumbnail_6AlPqgkHC-Q.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
+    <item>
+      <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-07-30</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/iWMtQ-tA6EA</link>
+      <guid isPermaLink="false">iWMtQ-tA6EA</guid>
+      <pubDate>Wed, 29 Jul 2026 22:50:37 +0000</pubDate>
+      <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-07-30 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      <enclosure url="https://archive.org/download/tml-2026-07-iWMtQ-tA6EA-1785365306/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-07-30.mp4" length="363884156" type="video/mp4"/>
+      <itunes:duration>01:40:48</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-iWMtQ-tA6EA/thumbnail_iWMtQ-tA6EA.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
+    <item>
+      <title>Forced Recording 2026-07-27</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/X05zRHM4kVs</link>
+      <guid isPermaLink="false">X05zRHM4kVs</guid>
+      <pubDate>Mon, 27 Jul 2026 05:35:05 +0000</pubDate>
+      <description>Forced Recording 2026-07-27 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      <enclosure url="https://archive.org/download/tml-2026-07-X05zRHM4kVs-1785130245/Forced_Recording_2026-07-27.mp4" length="1550589404" type="video/mp4"/>
+      <itunes:duration>00:46:06</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-X05zRHM4kVs/thumbnail_X05zRHM4kVs.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
+    <item>
       <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18</title>
       <link>https://muslim-lantern-archive.vercel.app/#/watch/PYkqrEBc_zY</link>
       <guid isPermaLink="false">PYkqrEBc_zY</guid>
-      <pubDate>Wed, 17 Jun 2026 22:28:47 +0000</pubDate>
+      <pubDate>Wed, 17 Jun 2026 22:28:45 +0000</pubDate>
       <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18 — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
       <enclosure url="https://ia902900.us.archive.org/5/items/tml-2026-06-PYkqrEBc_zY-1781734865/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-06-18.mp4" length="601490174" type="video/mp4"/>
       <itunes:duration>02:48:29</itunes:duration>
-      <itunes:image href="https://i.ytimg.com/vi/PYkqrEBc_zY/hqdefault.jpg"/>
+      <itunes:image href="https://archive.org/download/tml-thumb-PYkqrEBc_zY/thumbnail_PYkqrEBc_zY.jpg"/>
       <itunes:explicit>false</itunes:explicit>
     </item>
     <item>
@@ -64,7 +130,7 @@
       <guid isPermaLink="false">1-Rb7AkebH4</guid>
       <pubDate>Sun, 19 Apr 2026 00:00:00 +0000</pubDate>
       <description>Non-Muslims Question Islam Live! Muhammed Ali — Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
-      <enclosure url="https://ia802907.us.archive.org/11/items/tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4" length="479200000" type="video/mp4"/>
+      <enclosure url="https://ia800808.us.archive.org/0/items/tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4" length="479200000" type="video/mp4"/>
       <itunes:duration>02:44:12</itunes:duration>
       <itunes:image href="https://i.ytimg.com/vi/1-Rb7AkebH4/hqdefault.jpg"/>
       <itunes:explicit>false</itunes:explicit>

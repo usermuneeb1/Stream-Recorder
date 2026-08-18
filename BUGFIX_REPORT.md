@@ -3,8 +3,9 @@
 # This report claimed `actions/checkout@v7` "does not exist" and was "THE KILLER".
 # THAT IS NO LONGER TRUE. `actions/checkout@v7.0.0` was released on 2026-06-17
 # (v7.0.1 on 2026-07-20) and is the current Latest release. The repo correctly
-# uses checkout@v7. DO NOT run `mass-fix-checkout.sh` to downgrade to v4 — that
-# "fix" was already applied and then REVERTED (commit c0de20b) once v7 shipped.
+# uses checkout@v7. The `mass-fix-checkout.sh` downgrade script referenced below
+# was REMOVED from the repo (2026-08-18) because it is dangerous — that "fix"
+# was already applied and then REVERTED (commit c0de20b) once v7 shipped.
 #
 # Downgrading will NOT fix anything. The recording engine itself is sound.
 # For the current, verified bug list + fixes, see DEEP_BUG_FIX_REPORT.md.

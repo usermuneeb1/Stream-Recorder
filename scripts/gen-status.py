@@ -36,18 +36,29 @@ def badge(label, message, color):
 
 def main():
     recordings = load(os.path.join(DATA, "recordings.json"), [])
-    stats = load(os.path.join(ROOT, "stats.json"), {})
     yt = load(os.path.join(DATA, "youtube-stats.json"), {})
 
     total = len(recordings)
     total_gb = round(sum((r.get("size_bytes", 0) or 0) for r in recordings) / 1073741824, 2)
+    # Hours derived from the canonical dataset — never trust drifted stats.json
+    total_hours = round(sum((r.get("duration_sec", 0) or 0) for r in recordings) / 3600, 2)
     latest = recordings[0] if recordings else {}
 
+    # Preserve the previous timestamp when nothing changed (zero git noise).
+    prev = load(os.path.join(DATA, "system-status.json"), {})
+    updated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if isinstance(prev, dict) and prev.get("recordings_total") == total and prev.get("total_size_gb") == total_gb:
+        if prev.get("total_hours") == total_hours and prev.get("latest_recording") == {
+            "title": (recordings[0].get("title") if recordings else None),
+            "date": (recordings[0].get("date") if recordings else None),
+        }:
+            updated_at = prev.get("updated_at") or updated_at
+
     status = {
-        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_at": updated_at,
         "recordings_total": total,
         "total_size_gb": total_gb,
-        "total_hours": stats.get("total_hours"),
+        "total_hours": total_hours,
         "latest_recording": {
             "title": latest.get("title"),
             "date": latest.get("date"),

@@ -10,7 +10,7 @@
 [![Deploy Dashboard](https://img.shields.io/github/actions/workflow/status/usermuneeb1/Stream-Recorder/deploy-pages.yml?label=dashboard%20deploy&logo=github)](https://github.com/usermuneeb1/Stream-Recorder/actions/workflows/deploy-pages.yml)
 [![Database Audit](https://img.shields.io/github/actions/workflow/status/usermuneeb1/Stream-Recorder/database-audit.yml?label=database%20audit&logo=github)](https://github.com/usermuneeb1/Stream-Recorder/actions/workflows/database-audit.yml)
 
-**13 streams preserved · 23.5 hours of 1080p footage · 42 automated workflows · 6 independent storage mirrors**
+**11 unique streams preserved · 21.9 hours of 1080p footage · 43 automated workflows · 6 independent storage mirrors**
 
 </div>
 
@@ -98,7 +98,7 @@ Redundancy is the product: any single host can vanish and every recording surviv
 
 ---
 
-## 🤖 The 42-workflow fleet
+## 🤖 The 43-workflow fleet
 
 Beyond the main recorder, the repo is effectively a self-operating SRE team in YAML:
 
@@ -107,12 +107,25 @@ Beyond the main recorder, the repo is effectively a self-operating SRE team in Y
 | 🎬 **Recording** | `stream-recorder` (the brain), `stream-sniper` (go-live detection), `record-postprocess-test`, `cookieless-smoke-test`, `smart-schedule` (peak-window model), `youtube-ghost-host` |
 | ☁️ **Mirroring** | `upload`/`url-to-cloud`, `catbox-mirror`, `telegram-mirror`, `github-release-mirror`, `archive-to-mega`, `sync-archive-backups`, `repair-mirrors`, `cloud-refresh`, `source-health` |
 | 🛡️ **Security & secrets** | `secret-rotator`, `secret-scan`, `trufflehog`, `gitleaks`, `codeql`, `cookie-health` (cookie sentinel), `anonymize-archive` |
-| 🧪 **Quality gates** | `quality-check` (shellcheck + actionlint + build), `database-audit`, `install-self-test`, `setup-check`, `workflow-watchdog` |
+| 🧪 **Quality gates** | `quality-check` (shellcheck + actionlint + full python compile + data self-healing dry-run), `database-audit`, `data-repair` (weekly self-healing), `install-self-test`, `setup-check`, `workflow-watchdog` |
 | 🎨 **Enrichment** | `thumbnail-gen`, `storyboard-gen`, `chat-archiver`, `youtube-stats` |
 | 🗄️ **Data & backup** | `db-backup`, `import-archive-backups`, `weekly-summary`, `status`, `auto-issue` |
 | 🌐 **Publishing** | `deploy-pages` (GitHub Pages dashboard), plus Vercel deployment of the same build |
 | 🏪 **Account management** | `mega-account-manager`, `pixeldrain-account-manager`, `account-keepalive` |
 | 💬 **Community** | `discord-bot`, `youtube-to-archive` |
+
+---
+
+## 🩺 Data hygiene & self-healing
+
+The public dataset (`data/recordings.json`) is the single source of truth; everything else is derived. A dedicated repair tool keeps it honest:
+
+| Tool | What it does |
+|---|---|
+| `scripts/repair-archive-data.py` | **Idempotent dataset repair.** Dedupes recordings by the *real* YouTube ID (merging the richest entry — never dropping data), normalizes `video_id`/`video_url`, keeps the archive item id in `archive_id`, backfills `archive_direct`/`archive_node` via the archive.org metadata API (with offline filename-reconstruction fallback), then re-derives `stats.json`, `links.txt`, `system-status.json`, badges, RSS/podcast/JSON feeds and sitemap from the canonical list — **drift-proof stats by construction** (no more incremental counters that silently diverge). |
+| `scripts/database-audit.sh` | CI gate: validates JSON schema, unique `video_id`s, required fields, stats↔recordings consistency and feed freshness. Runs on every push. |
+| `🩺 data-repair` workflow | Weekly + on-data-change self-healing run of the repair tool in CI (where archive.org is reachable), committing any drift back. |
+| `📱 telegram-mirror` | Now resolves download URLs even when `archive_direct` is missing (metadata API → filename candidates), reports skipped/failed recordings honestly, and exits non-zero on failure instead of a silent green run. |
 
 ---
 
@@ -143,7 +156,7 @@ npm run build        # production build → dist/
 ## 🗂️ Repository map
 
 ```
-.github/workflows/   42 workflows — the "SRE team"
+.github/workflows/   43 workflows — the "SRE team"
 scripts/             the engine room
   detect-stream.sh      live detection (RSS + probe, any-pass-of-3)
   record-stream.sh      10-method recording cascade + VOD rescue
@@ -183,7 +196,7 @@ stats.json           aggregate stats
 
 | Layer | Tools |
 |---|---|
-| Orchestration | GitHub Actions (42 workflows), external cron-job.org pinger |
+| Orchestration | GitHub Actions (43 workflows), external cron-job.org pinger |
 | Capture | yt-dlp (nightly), ytarchive, streamlink, ffmpeg |
 | Evasion | Cloudflare WARP, bgutil PoToken, rotating clients |
 | Storage | Archive.org, GitHub Releases, MEGA, Pixeldrain, Gofile, Telegram |

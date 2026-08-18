@@ -24,6 +24,55 @@ LOG_CYAN="\033[1;36m"
 LOG_GRAY="\033[0;37m"
 LOG_BOLD="\033[1m"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  bc COMPATIBILITY SHIM
+#  GitHub runners ship `bc`, but minimal/offline environments often don't.
+#  This shim covers the exact subset of expressions this project uses
+#  (scale=N divisions, multiplications, numeric comparisons with -l) so every
+#  script keeps working even when bc is absent. Real bc is always preferred.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if ! command -v bc >/dev/null 2>&1; then
+    bc() {
+        local expr
+        if [[ "${1:-}" == "-l" || "${1:-}" == "-q" ]]; then
+            expr="${2:-}"
+        else
+            expr="${1:-}"
+        fi
+        # Piped usage: `echo "scale=2; 5 / 2" | bc` passes no arguments.
+        if [[ -z "$expr" ]]; then
+            expr=$(cat 2>/dev/null || echo 0)
+        fi
+        expr="${expr:-0}"
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -c '
+import sys, re
+e = sys.argv[1].strip()
+m = re.match(r"^scale=(\d+);\s*(.*)$", e, re.S)
+nd = int(m.group(1)) if m else None
+body = m.group(2) if m else e
+try:
+    v = eval(body, {"__builtins__": {}}, {})
+except Exception:
+    print(0); sys.exit(0)
+if isinstance(v, bool):
+    print(1 if v else 0)
+elif isinstance(v, int):
+    print(v)
+elif isinstance(v, float):
+    print(f"{v:.{nd}f}" if nd is not None else repr(v))
+else:
+    print(v)
+' "$expr" 2>/dev/null || echo 0
+        else
+            # Last resort: awk arithmetic for the simple patterns used here
+            awk -v e="$expr" 'BEGIN { gsub(/^scale=[0-9]+; /, "", e); if (e ~ /[<>]=?/) { split(e,a," "); print (a[1]+0 >= a[3]+0 || a[1]+0 > a[3]+0) ? 1 : 0 } else { printf "%.2f\n", e } }' 2>/dev/null || echo 0
+        fi
+    }
+    export -f bc 2>/dev/null || true
+fi
+
 _log_timestamp() {
     date '+%Y-%m-%d %H:%M:%S'
 }

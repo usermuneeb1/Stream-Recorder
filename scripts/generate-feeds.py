@@ -38,20 +38,33 @@ LANG = "en"
 COVER = f"{SITE}/logo.png"
 
 
+def extract_yt_id(r: dict) -> str:
+    """YouTube ID from video_url, video_id, or the archive item name."""
+    m = re.search(r"(?:v=|youtu\.be/|/shorts/|/live/)([\w-]{11})", r.get("video_url", ""))
+    if m:
+        return m.group(1)
+    vid = str(r.get("video_id") or "")
+    if re.fullmatch(r"[\w-]{11}", vid):
+        return vid
+    m = re.search(r"tml-\d{4}-\d{2}(?:-\d+)?-([\w-]{11})-\d+$", str(r.get("archive_id") or r.get("archive_link") or ""))
+    return m.group(1) if m else ""
+
+
 def load_recordings() -> list[dict]:
     data = json.loads(RECS.read_text())
     by_id: dict[str, dict] = {}
     for r in data:
         if "muslim lantern" not in r.get("channel", "").lower():
             continue
-        m = re.search(r"(?:v=|/)([\w-]{11})", r.get("video_url", ""))
-        if not m:
+        yt = extract_yt_id(r)
+        if not yt:
             continue
-        yt = m.group(1)
         ex = by_id.get(yt)
         if not ex or len(json.dumps(r)) > len(json.dumps(ex)):
             by_id[yt] = {**(ex or {}), **r}
             by_id[yt]["video_id"] = yt
+            if not by_id[yt].get("video_url"):
+                by_id[yt]["video_url"] = f"https://www.youtube.com/watch?v={yt}"
     return sorted(by_id.values(), key=lambda r: r.get("date", ""), reverse=True)
 
 
@@ -92,8 +105,21 @@ def iso(r: dict) -> str:
         return datetime.now(timezone.utc).isoformat()
 
 
+def last_build(items: list[dict]) -> str:
+    """Newest item's timestamp — stable across re-runs on a healthy dataset."""
+    dates = []
+    for r in items:
+        d = r.get("recorded_at") or (r.get("date", "") + "T00:00:00Z")
+        try:
+            dates.append(datetime.fromisoformat(d.replace("Z", "+00:00")))
+        except Exception:
+            pass
+    base = max(dates) if dates else datetime.now(timezone.utc)
+    return base.strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+
 def make_rss(items: list[dict], podcast: bool) -> str:
-    now = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+    now = last_build(items)
     extra_ns = ' xmlns:itunes="http://www.itunes.apple.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/"' if podcast else ""
     itunes_channel = ""
     if podcast:
@@ -185,7 +211,15 @@ def make_json_feed(items: list[dict]) -> str:
 
 
 def make_sitemap(items: list[dict]) -> str:
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    dates = []
+    for r in items:
+        d = r.get("recorded_at") or (r.get("date", "") + "T00:00:00Z")
+        try:
+            dates.append(datetime.fromisoformat(d.replace("Z", "+00:00")))
+        except Exception:
+            pass
+    base = max(dates) if dates else datetime.now(timezone.utc)
+    now = base.strftime("%Y-%m-%d")
     urls = [f"<url><loc>{SITE}/</loc><lastmod>{now}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>"]
     for r in items:
         urls.append(
