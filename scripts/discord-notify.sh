@@ -416,6 +416,7 @@ notify_recording_complete() {
         --arg bot_ver        "${RECORDER_VERSION:-3.0.0}" \
         --arg bot_name       "${RECORDER_NAME:-The Muslim Lantern}" \
         --arg repo_url       "https://github.com/${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}" \
+        --arg salvage_note   "$( [[ "${SALVAGED:-false}" == "true" ]] && echo "> ⚠️ **SALVAGED CAPTURE** — the recorder hit its timeout; the footage below was recovered from partial segments by the salvage pipeline and may be missing the final minutes.\n" )" \
         --argjson color      "$color" \
         '{
             username:   $username,
@@ -430,6 +431,7 @@ notify_recording_complete() {
                 title:       ("🔥  " + $title),
                 url:         $video_url,
                 description: (
+                    $salvage_note +
                     "> **" + $channel + "** live stream has been **recorded**, **processed**, and\n" +
                     "> **uploaded** to the cloud archive.\n" +
                     "\n" +

@@ -264,8 +264,14 @@ record_method_e() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # v6 FIX: attach cookies ONLY when verified valid/valid_unverified (same rule
+    # as Methods D/H/I). This method used to attach ANY cookie file, which let
+    # STALE cookies break a cookieless-first method — the exact failure mode the
+    # method ordering exists to prevent. Cookie-required streams are still
+    # covered by Methods A/B.
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -308,9 +314,11 @@ record_method_f() {
     local restart_flag="--hls-live-restart"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
     
-    # Use cookies with streamlink if available
+    # v6 FIX: same rule as Methods D/E/G/H/I — only attach cookies that passed
+    # health check. Stale cookies on streamlink can poison the HLS session.
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -342,8 +350,10 @@ record_method_g() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # v6 FIX: only attach cookies that passed health check (see Method E note).
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
+        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -602,7 +612,10 @@ record_method_j() {
   fi
 
   local err_log="${RECORD_DIR}/method_logs/last_err.log"
-  local manifest_url
+  local manifest_url resolve_rc
+  # v6 FIX: capture yt-dlp's exit code IMMEDIATELY. The previous version read
+  # "$?" AFTER running `tail`, so the failure log recorded tail's status (0)
+  # instead of yt-dlp's — every Method J failure looked like a mystery.
   manifest_url=$(timeout 60 yt-dlp \
     --no-download \
     --no-playlist \
@@ -610,17 +623,13 @@ record_method_j() {
     --quiet \
     -f "best" \
     -g \
-    "${video_url}" 2>"${err_log}" | head -1) || {
+    "${video_url}" 2>"${err_log}" | head -1)
+  resolve_rc=$?
+  if [[ $resolve_rc -ne 0 || -z "$manifest_url" ]]; then
     local err
     err=$(tail -3 "${err_log}" 2>/dev/null)
-    _log_method_failure "Method J" "$?" "$video_url" "$output_file" "${err}"
-    log_warn " Method J: could not resolve manifest URL"
-    return 1
-  }
-
-  if [[ -z "$manifest_url" ]]; then
-    _log_method_failure "Method J" "empty-manifest" "$video_url" "$output_file" "yt-dlp -g returned empty"
-    log_warn " Method J: empty manifest URL"
+    _log_method_failure "Method J" "$resolve_rc" "$video_url" "$output_file" "${err:-yt-dlp returned no manifest}"
+    log_warn " Method J: could not resolve manifest URL (rc=${resolve_rc})"
     return 1
   fi
 
@@ -907,12 +916,25 @@ record_stream() {
                     fi
                 done
                 if [[ "$is_ended" == "true" ]]; then
-                    log_info "Stream has verified ended — stopping recording loop"
+                    # v6: RSS SECOND OPINION before committing to "ended".
+                    # is_stream_still_live() can systematically false-negative on
+                    # WARP/GitHub IPs (consent walls omit isLiveNow — documented
+                    # incident EGbDB405YSw). The cookieless RSS path is a fully
+                    # independent code surface; if IT says live, keep recording.
+                    # Cost asymmetry: one extra segment attempt on a dead stream
+                    # (self-correcting) << truncating a still-live recording.
+                    if rss_channel_is_live "$video_id"; then
+                        log_warn "Cooldown said ended but RSS second opinion says STILL LIVE — continuing recording"
+                        is_ended="false"
+                    fi
+                fi
+                if [[ "$is_ended" == "true" ]]; then
+                    log_info "Stream has verified ended (page checks + RSS agree) — stopping recording loop"
                     break
                 fi
             fi
             
-            if is_stream_still_live "$video_id"; then
+            if is_stream_still_live "$video_id" || rss_channel_is_live "$video_id"; then
                 log_info "Stream is still live — recording next segment"
                 (( attempt++ ))
                 continue
