@@ -1,4 +1,4 @@
-// Privacy-friendly analytics. Loads Plausible only if VITE_PLAUSIBLE_DOMAIN
+// Privacy-friendly analytics. Loads Plausible only when VITE_PLAUSIBLE_DOMAIN
 // is set at build time. Zero cookies, no IP storage — no banner required.
 
 declare global { interface Window { plausible?: (event: string, opts?: any) => void } }
@@ -15,7 +15,6 @@ export function initAnalytics() {
   s.dataset.domain = DOMAIN;
   s.src = 'https://plausible.io/js/script.hash.outbound-links.js';
   document.head.appendChild(s);
-  // Provide a no-op so callers always work even when not loaded
   window.plausible = window.plausible || function () {
     (window.plausible as any).q = (window.plausible as any).q || [];
     (window.plausible as any).q.push(arguments);

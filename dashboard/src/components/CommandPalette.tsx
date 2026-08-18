@@ -1,132 +1,146 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Recording } from '../utils/dataFetcher';
+// Command palette — Ctrl/Cmd+K. Episodes + actions, fully keyboard-driven.
 
-interface P {
-  open: boolean;
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Ep } from '../types';
+import { fmtDate } from '../lib/format';
+import { nav } from './Nav';
+
+interface Props {
+  recs: Ep[];
+  onOpen: (ep: Ep) => void;
+  onSearch: () => void;
+  onSurprise: () => void;
   onClose: () => void;
-  recs: Recording[];
-  onOpenRec: (r: Recording) => void;
-  toggleTheme: () => void;
 }
 
-export function CommandPalette({ open, onClose, recs, onOpenRec, toggleTheme }: P) {
+interface Action {
+  id: string;
+  label: string;
+  hint: string;
+  run: () => void;
+}
+
+export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onClose }: Props) {
   const [q, setQ] = useState('');
-  const [idx, setIdx] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [sel, setSel] = useState(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (open) { setQ(''); setIdx(0); setTimeout(() => inputRef.current?.focus(), 20); }
-  }, [open]);
-
-  const filtered = recs.filter(r => {
-    if (!q.trim()) return true;
-    const s = q.toLowerCase();
-    return r.title.toLowerCase().includes(s)
-      || r.date.includes(s)
-      ;
-  }).slice(0, 8);
-
-  const actions = [
-    { id: 'theme',  label: 'Toggle theme',         icon: '◐', run: () => { toggleTheme(); onClose(); } },
-    { id: 'home',   label: 'Go home',              icon: '⌂', run: () => { window.location.hash = ''; onClose(); } },
-    { id: 'yt',     label: 'Open YouTube channel', icon: '▶', run: () => { window.open('https://youtube.com/@TheMuslimLantern', '_blank'); onClose(); } },
-  ].filter(a => !q.trim() || a.label.toLowerCase().includes(q.toLowerCase()));
-
-  const items = [
-    ...filtered.map(r => ({ kind: 'rec' as const, rec: r })),
-    ...actions.map(a => ({ kind: 'act' as const, act: a })),
-  ];
-
-  useEffect(() => {
-    if (!open) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 40);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'ArrowDown') { e.preventDefault(); setIdx(i => Math.min(items.length - 1, i + 1)); }
-      if (e.key === 'ArrowUp')   { e.preventDefault(); setIdx(i => Math.max(0, i - 1)); }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const it = items[idx];
-        if (!it) return;
-        if (it.kind === 'rec') { onOpenRec(it.rec); onClose(); }
-        else it.act.run();
-      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, idx, items, onClose, onOpenRec]);
+    return () => { clearTimeout(t); window.removeEventListener('keydown', onKey); };
+  }, [onClose]);
 
-  if (!open) return null;
+  const actions: Action[] = useMemo(() => [
+    { id: 'search', label: 'Search everything', hint: 'open full search', run: () => { onClose(); setTimeout(onSearch, 80); } },
+    { id: 'home',   label: 'Go home',           hint: '#/',             run: () => { onClose(); nav('#/'); } },
+    { id: 'browse', label: 'Browse the archive',hint: '#/browse',       run: () => { onClose(); nav('#/browse'); } },
+    { id: 'list',   label: 'Open My List',      hint: '#/my-list',      run: () => { onClose(); nav('#/my-list'); } },
+    { id: 'random', label: 'Surprise me',       hint: 'random episode', run: () => { onClose(); setTimeout(onSurprise, 60); } },
+    { id: 'yt',     label: 'Open YouTube channel', hint: '@TheMuslimLantern', run: () => { onClose(); window.open('https://youtube.com/@TheMuslimLantern', '_blank', 'noopener'); } },
+  ], [onClose, onSearch, onSurprise]);
+
+  const needle = q.trim().toLowerCase();
+
+  const eps = useMemo(() => {
+    if (!needle) return recs.slice(0, 6);
+    return recs.filter(r =>
+      r.title.toLowerCase().includes(needle) ||
+      r.date.includes(needle) ||
+      String(r.ep) === needle.replace(/^e/i, '')
+    ).slice(0, 8);
+  }, [recs, needle]);
+
+  const acts = useMemo(() => {
+    if (!needle) return actions;
+    return actions.filter(a => a.label.toLowerCase().includes(needle));
+  }, [actions, needle]);
+
+  const items = [
+    ...eps.map(ep => ({ kind: 'ep' as const, ep })),
+    ...acts.map(action => ({ kind: 'act' as const, action })),
+  ];
+
+  useEffect(() => { setSel(0); }, [q]);
+
+  useEffect(() => {
+    listRef.current?.querySelectorAll('[data-row]')[sel]?.scrollIntoView({ block: 'nearest' });
+  }, [sel]);
+
+  const run = (i: number) => {
+    const it = items[i];
+    if (!it) return;
+    if (it.kind === 'ep') { onClose(); setTimeout(() => onOpen(it.ep), 60); }
+    else it.action.run();
+  };
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(items.length - 1, s + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); run(sel); }
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4 fade-in" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)' }} />
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Command palette">
+      <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
       <div
-        onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-xl rounded-2xl border overflow-hidden pop-in glass-strong"
-        style={{ borderColor: 'var(--bd2)', boxShadow: 'var(--shadow-lg)' }}
+        className="palette-card absolute left-1/2 -translate-x-1/2 top-[14vh] w-[min(580px,92vw)] overflow-hidden"
+        style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(28px) saturate(160%)', WebkitBackdropFilter: 'blur(28px) saturate(160%)' }}
       >
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b" style={{ borderColor: 'var(--bd)' }}>
-          <svg className="w-4 h-4" style={{ color: 'var(--tx3)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+        <div className="flex items-center gap-3 px-5 h-14" style={{ borderBottom: '1px solid var(--line)' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--flame-2)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <input
             ref={inputRef}
             value={q}
-            onChange={e => { setQ(e.target.value); setIdx(0); }}
-            placeholder="Search recordings or run a command…"
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Jump to an episode or command…"
             className="flex-1 bg-transparent outline-none text-[14px]"
-            style={{ color: 'var(--tx)' }}
+            style={{ color: 'var(--ivory)' }}
           />
           <span className="kbd">esc</span>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto py-1.5">
+
+        <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-2">
           {items.length === 0 && (
-            <div className="px-4 py-8 text-center text-[13px]" style={{ color: 'var(--tx3)' }}>
-              No matches
-            </div>
+            <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--mist)' }}>Nothing matches “{q}”.</div>
           )}
-          {items.map((it, i) => {
-            const active = i === idx;
-            const style = active
-              ? { background: 'var(--bg4)', color: 'var(--tx)' }
-              : { color: 'var(--tx2)' };
-            if (it.kind === 'rec') {
-              return (
-                <button
-                  key={`r-${it.rec.videoId}`}
-                  onMouseEnter={() => setIdx(i)}
-                  onClick={() => { onOpenRec(it.rec); onClose(); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
-                  style={style}
-                >
-                  <img src={it.rec.thumbnail} alt="" className="w-12 h-7 object-cover rounded shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold line-clamp-1">{it.rec.title}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--tx3)' }}>{it.rec.date} · {it.rec.durationFmt}</div>
-                  </div>
-                  {active && <span className="kbd">↵</span>}
-                </button>
-              );
-            }
-            return (
-              <button
-                key={`a-${it.act.id}`}
-                onMouseEnter={() => setIdx(i)}
-                onClick={it.act.run}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
-                style={style}
-              >
-                <span className="w-12 text-center text-base" style={{ color: 'var(--tx3)' }}>{it.act.icon}</span>
-                <span className="text-[13px] font-semibold flex-1">{it.act.label}</span>
-                {active && <span className="kbd">↵</span>}
-              </button>
-            );
-          })}
-        </div>
-        <div className="px-4 py-2 border-t flex items-center justify-between text-[10.5px] font-medium" style={{ borderColor: 'var(--bd)', color: 'var(--tx3)' }}>
-          <span className="flex items-center gap-1.5"><span className="kbd">↑</span><span className="kbd">↓</span> navigate</span>
-          <span className="flex items-center gap-1.5"><span className="kbd">↵</span> select</span>
-          <span className="flex items-center gap-1.5"><span className="kbd">esc</span> close</span>
+          {items.map((it, i) => (
+            <button
+              key={it.kind === 'ep' ? it.ep.videoId : it.action.id}
+              data-row
+              onMouseEnter={() => setSel(i)}
+              onClick={() => run(i)}
+              className="w-full flex items-center gap-3.5 px-5 py-2.5 text-left transition-colors"
+              style={{ background: sel === i ? 'var(--flame-08)' : 'transparent' }}
+            >
+              {it.kind === 'ep' ? (
+                <>
+                  <img src={it.ep.thumbnail} alt="" className="w-20 aspect-video object-cover rounded-md flex-none"
+                    onError={e => { (e.target as HTMLImageElement).src = '/thumbnail.jpg'; }} loading="lazy" />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-semibold line-clamp-1" style={{ color: 'var(--ivory)' }}>{it.ep.title}</span>
+                    <span className="mono block text-[10px] mt-0.5" style={{ color: 'var(--shade)' }}>
+                      {fmtDate(it.ep.date)}{it.ep.durationFmt ? ` · ${it.ep.durationFmt}` : ''}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="orb-sm flex-none" style={{ width: 28, height: 28 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 2-9 12h7l-1 8 9-12h-7z" /></svg>
+                  </span>
+                  <span className="flex-1 text-[13px] font-semibold" style={{ color: 'var(--ivory)' }}>{it.action.label}</span>
+                  <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{it.action.hint}</span>
+                </>
+              )}
+              {sel === i && <span className="kbd flex-none">↵</span>}
+            </button>
+          ))}
         </div>
       </div>
     </div>

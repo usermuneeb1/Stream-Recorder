@@ -1,262 +1,196 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { fmtRelative } from '../utils/format';
+// Comments — "the intermission". Threads live as JSON files on Catbox, with
+// the index of URLs in this repo (data/comments/<videoId>.json), managed by
+// the serverless endpoint. Posts are rate-limited and sanitized server-side.
 
-interface Comment {
+import { useCallback, useEffect, useState } from 'react';
+import { fmtRelative, hueOf } from '../lib/format';
+import { getNick, setNick } from '../lib/storage';
+
+const API = 'https://muslim-lantern-archive.vercel.app/api/comments';
+
+interface CommentT {
   id: string;
   author: string;
   body: string;
-  parentId?: string | null;
+  parentId: string | null;
   createdAt: string;
-  url?: string; // catbox url it was loaded from (for keying)
 }
 
-interface P { videoId: string; onToast: (m: string) => void }
-
-const NICK_KEY = 'mla_nick_v1';
-const API = 'https://muslim-lantern-archive.vercel.app/api/comments';
-
-function avatarColor(name: string): string {
-  // Deterministic pleasing color from name
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
-  return `hsl(${h}, 60%, 45%)`;
+interface Props {
+  videoId: string;
+  toast: (msg: string) => void;
 }
 
-function initials(name: string): string {
-  return name.split(/\s+/).slice(0, 2).map(s => s[0]?.toUpperCase() || '').join('') || '·';
+function Avatar({ name }: { name: string }) {
+  const hue = hueOf(name || '?');
+  const initials = (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return (
+    <span
+      className="w-8 h-8 rounded-full flex items-center justify-center flex-none font-bold text-[11px]"
+      style={{ background: `hsl(${hue} 32% 22%)`, color: `hsl(${hue} 70% 72%)`, border: `1px solid hsl(${hue} 40% 30%)` }}
+    >
+      {initials}
+    </span>
+  );
 }
 
-export function Comments({ videoId, onToast }: P) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [author, setAuthor] = useState(() => localStorage.getItem(NICK_KEY) || '');
+export default function Comments({ videoId, toast }: Props) {
+  const [items, setItems] = useState<CommentT[] | null>(null);
+  const [nick, setNickState] = useState(getNick());
   const [body, setBody] = useState('');
-  const [replyTo, setReplyTo] = useState<Comment | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const taRef = useRef<HTMLTextAreaElement>(null);
+  const [replyTo, setReplyTo] = useState<CommentT | null>(null);
+  const [posting, setPosting] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
-  // Load comment index, then fetch each comment from catbox in parallel
   const load = useCallback(async () => {
-    setLoading(true);
+    setItems(null);
     try {
-      const r = await fetch(`${API}/${videoId}?_=${Date.now()}`);
-      if (!r.ok) throw new Error('index fetch failed');
-      const { urls }: { urls: string[] } = await r.json();
-      if (!urls?.length) { setComments([]); return; }
-
-      const results = await Promise.allSettled(urls.map(async u => {
-        const resp = await fetch(u);
-        if (!resp.ok) throw new Error('catbox fetch');
-        const c = await resp.json() as Comment;
-        c.url = u;
-        return c;
-      }));
-      const ok = results
-        .filter((x): x is PromiseFulfilledResult<Comment> => x.status === 'fulfilled')
-        .map(x => x.value)
-        .filter(c => c && c.id && c.body)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-      setComments(ok);
-    } catch (e) {
-      setComments([]);
-    } finally {
-      setLoading(false);
+      const r = await fetch(`${API}/${encodeURIComponent(videoId)}?_=${Date.now()}`);
+      const j = await r.json();
+      const urls: string[] = Array.isArray(j.urls) ? j.urls : [];
+      const fetched = await Promise.allSettled(urls.map(u => fetch(u).then(x => x.json()).catch(() => null)));
+      const list = fetched
+        .filter((f): f is PromiseFulfilledResult<any> => f.status === 'fulfilled' && f.value && f.value.id && f.value.body)
+        .map(f => f.value as CommentT)
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+      setItems(list);
+    } catch {
+      setItems([]);
     }
   }, [videoId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, reloadTick]);
 
-  const submit = useCallback(async () => {
-    const typedNick = author.trim();
-    const a = typedNick || 'Anonymous';
-    const b = body.trim();
-    if (b.length < 2) { onToast('Comment is too short'); return; }
-    if (b.length > 2000) { onToast('Comment is too long (max 2000 chars)'); return; }
-    setSubmitting(true);
-    // FIX #6 — only persist a nickname the user actually typed, so the
-    // input doesn't auto-fill with 'Anonymous' on every future visit.
-    if (typedNick) localStorage.setItem(NICK_KEY, typedNick);
+  const post = async () => {
+    const text = body.trim();
+    if (text.length < 2) { toast('Comment too short'); return; }
+    if (text.length > 2000) { toast('Comment too long (max 2000)'); return; }
+    setPosting(true);
     try {
-      const r = await fetch(`${API}/${videoId}`, {
+      const author = nick.trim() || 'Anonymous';
+      if (nick.trim()) setNick(nick.trim());
+      const r = await fetch(`${API}/${encodeURIComponent(videoId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ author: a, body: b, parentId: replyTo?.id || null }),
+        body: JSON.stringify({ author, body: text, parentId: replyTo?.id || null }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) { onToast(j.error || `Error ${r.status}`); setSubmitting(false); return; }
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       setBody('');
       setReplyTo(null);
-      onToast(replyTo ? 'Reply posted' : 'Comment posted');
-      // Wait a moment for jsDelivr to refresh, then reload
-      setTimeout(() => { load(); }, 1500);
-    } catch (e: any) {
-      onToast(`Network error: ${e.message || 'unknown'}`);
+      toast('Posted — refreshing…');
+      setTimeout(() => setReloadTick(t => t + 1), 1500);
+    } catch (e) {
+      toast(`Post failed: ${e instanceof Error ? e.message : 'network error'}`);
     } finally {
-      setSubmitting(false);
+      setPosting(false);
     }
-  }, [author, body, replyTo, videoId, onToast, load]);
-
-  // Roots + replies
-  const roots = comments.filter(c => !c.parentId);
-  const repliesOf = (id: string) => comments.filter(c => c.parentId === id);
-
-  const startReply = (c: Comment) => {
-    setReplyTo(c);
-    setTimeout(() => taRef.current?.focus(), 60);
   };
 
+  const roots = (items || []).filter(c => !c.parentId);
+  const repliesOf = (id: string) => (items || []).filter(c => c.parentId === id);
+
   return (
-    <section className="mt-8 px-4 sm:px-6 pb-12">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="font-display text-lg sm:text-xl font-bold flex items-center gap-2.5">
-          Comments
-          <span className="text-[12px] font-mono px-2 py-0.5 rounded-full" style={{ background: 'var(--bg3)', color: 'var(--tx3)' }}>
-            {loading ? '…' : comments.length}
-          </span>
-        </h2>
-        <button
-          onClick={load}
-          className="btn-ghost btn !py-1.5 !px-2.5"
-          title="Refresh comments"
-          aria-label="Refresh"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" d="M3 12a9 9 0 0115.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 01-15.5 6.3L3 16M3 21v-5h5" />
-          </svg>
+    <section className="mt-10" aria-label="Comments">
+      <div className="flex items-center gap-3 mb-6">
+        <span className="shelf-tick" />
+        <span className="eyebrow">Intermission talk</span>
+        <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{items ? `${roots.length} comment${roots.length === 1 ? '' : 's'}` : ''}</span>
+        <button className="btn-icon ml-auto" title="Refresh" aria-label="Refresh comments" onClick={() => setReloadTick(t => t + 1)}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3M21 3v6h-6" /></svg>
         </button>
       </div>
 
-      {/* Premium compose box — focus-within: red border, focused input
-          uses bottom-border-only style for a clean look */}
-      <div
-        className="rounded-[16px] p-5 mb-6 transition-colors duration-300"
-        style={{
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-subtle)',
-        }}
-        onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(198, 40, 40, 0.25)'; }}
-        onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'; }}
-      >
+      {/* Composer */}
+      <div className="rounded-xl p-4 mb-8 transition-colors focus-within:border-[var(--line-flame)]"
+        style={{ background: 'var(--ink-1)', border: '1px solid var(--line)' }}>
         {replyTo && (
-          <div className="flex items-center justify-between mb-4 pb-3 text-[12px]" style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-            <span>Replying to <strong style={{ color: 'var(--accent-glow)' }}>{replyTo.author}</strong></span>
-            <button onClick={() => setReplyTo(null)} className="btn-ghost btn !p-1.5" aria-label="Cancel reply">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" d="M6 6l12 12M6 18L18 6" />
-              </svg>
-            </button>
+          <div className="flex items-center gap-2 mb-3 text-[12px]" style={{ color: 'var(--mist)' }}>
+            Replying to <b style={{ color: 'var(--flame-1)' }}>{replyTo.author}</b>
+            <button className="ml-auto text-[11px] underline" style={{ color: 'var(--shade)' }} onClick={() => setReplyTo(null)}>cancel</button>
           </div>
         )}
-        <input
-          value={author}
-          onChange={e => setAuthor(e.target.value.slice(0, 40))}
-          placeholder="Your name"
-          className="w-full bg-transparent text-[13.5px] focus:outline-none transition-all py-2 mb-2"
-          style={{
-            color: 'var(--text-primary)',
-            borderBottom: '1px solid var(--border-subtle)',
-          }}
-          onFocus={e => { (e.target as HTMLElement).style.borderBottomColor = 'rgba(198, 40, 40, 0.4)'; }}
-          onBlur={e => { (e.target as HTMLElement).style.borderBottomColor = 'var(--border-subtle)'; }}
-          maxLength={40}
-        />
-        <textarea
-          ref={taRef}
-          value={body}
-          onChange={e => setBody(e.target.value.slice(0, 2000))}
-          placeholder="Share your thoughts on this video…"
-          rows={3}
-          className="w-full bg-transparent text-[14px] leading-relaxed focus:outline-none resize-y min-h-[76px] py-3"
-          style={{ color: 'var(--text-primary)' }}
-          maxLength={2000}
-          onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit(); }}
-        />
-        <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-          <span className="text-[10.5px] font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>
-            {body.length}/2000 · ⌘+↵ to post
-          </span>
-          <button
-            onClick={submit}
-            disabled={submitting || body.trim().length < 2}
-            className="btn btn-primary !py-2 !px-5"
-            style={{ opacity: submitting || body.trim().length < 2 ? .45 : 1 }}
-          >
-            {submitting
-              ? <><div className="w-3 h-3 rounded-full border-2 border-transparent border-t-white animate-spin"/> Posting…</>
-              : (replyTo ? 'Post reply' : 'Post comment')}
-          </button>
+        <div className="flex gap-3">
+          <Avatar name={nick || 'You'} />
+          <div className="flex-1">
+            <input
+              value={nick}
+              onChange={e => setNickState(e.target.value.slice(0, 40))}
+              placeholder="Name (optional)"
+              className="w-full bg-transparent outline-none text-[12px] font-semibold mb-2"
+              style={{ color: 'var(--ivory)' }}
+            />
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value.slice(0, 2000))}
+              onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') post(); }}
+              placeholder="Share a thought about this recording…"
+              rows={3}
+              className="w-full bg-transparent outline-none resize-y text-[13.5px] leading-relaxed"
+              style={{ color: 'var(--ivory)' }}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{body.length}/2000 · ⌘+↵ to post</span>
+              <button className="btn btn-flame !py-2 !px-5 !text-[12px]" disabled={posting || body.trim().length < 2} onClick={post}>
+                {posting ? 'Posting…' : 'Post'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── Thread list ────────────────────────────────────────────────── */}
-      {loading ? (
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
+      {/* Threads */}
+      {items === null ? (
+        <div className="flex flex-col gap-4">
+          {[0, 1, 2].map(i => (
             <div key={i} className="flex gap-3">
-              <div className="skel w-10 h-10 rounded-full shrink-0" />
-              <div className="flex-1">
-                <div className="skel h-3.5 w-32" />
-                <div className="skel h-3 w-full mt-2" />
-                <div className="skel h-3 w-4/5 mt-1.5" />
-              </div>
+              <div className="skel w-8 h-8 !rounded-full flex-none" />
+              <div className="flex-1"><div className="skel h-3 w-32 mb-2" /><div className="skel h-3 w-full max-w-md" /></div>
             </div>
           ))}
         </div>
       ) : roots.length === 0 ? (
-        <div className="text-center py-12 flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
-            <svg className="w-6 h-6" style={{ color: 'var(--text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-[14px] font-semibold" style={{ color: 'var(--text-secondary)' }}>No comments yet</p>
-            <p className="text-[12px] mt-1" style={{ color: 'var(--text-muted)' }}>Be the first to share your thoughts.</p>
-          </div>
+        <div className="py-10 text-center">
+          <p className="display text-lg mb-1.5">The room is quiet</p>
+          <p className="text-[12.5px]" style={{ color: 'var(--mist)' }}>Be the first to leave a thought.</p>
         </div>
       ) : (
-        <ul className="space-y-5">
+        <div className="flex flex-col gap-6">
           {roots.map(c => (
-            <li key={c.id} className="fade-up">
-              <CommentRow c={c} onReply={() => startReply(c)} />
+            <article key={c.id}>
+              <div className="flex gap-3">
+                <Avatar name={c.author} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2.5 mb-1">
+                    <span className="text-[13px] font-bold" style={{ color: 'var(--ivory)' }}>{c.author}</span>
+                    <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{fmtRelative(c.createdAt)}</span>
+                  </div>
+                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--mist)' }}>{c.body}</p>
+                  <button className="mono text-[10px] mt-1.5 hover:text-flame transition-colors" style={{ color: 'var(--shade)' }} onClick={() => setReplyTo(c)}>
+                    ↩ reply
+                  </button>
+                </div>
+              </div>
               {repliesOf(c.id).length > 0 && (
-                <ul className="mt-3 ml-12 space-y-3 pl-4 border-l" style={{ borderColor: 'var(--bd)' }}>
-                  {repliesOf(c.id).map(r => (
-                    <li key={r.id} className="fade-up">
-                      <CommentRow c={r} compact onReply={() => startReply(c) /* reply to parent */} />
-                    </li>
+                <div className="ml-11 mt-4 flex flex-col gap-4 pl-4" style={{ borderLeft: '2px solid var(--flame-12)' }}>
+                  {repliesOf(c.id).map(rc => (
+                    <div key={rc.id} className="flex gap-3">
+                      <Avatar name={rc.author} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2.5 mb-1">
+                          <span className="text-[12.5px] font-bold" style={{ color: 'var(--ivory)' }}>{rc.author}</span>
+                          <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{fmtRelative(rc.createdAt)}</span>
+                        </div>
+                        <p className="text-[12.5px] leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--mist)' }}>{rc.body}</p>
+                      </div>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
-            </li>
+            </article>
           ))}
-        </ul>
+        </div>
       )}
     </section>
-  );
-}
-
-function CommentRow({ c, onReply, compact }: { c: Comment; onReply: () => void; compact?: boolean }) {
-  const color = avatarColor(c.author);
-  return (
-    <div className="flex gap-3">
-      <div
-        className={`shrink-0 rounded-full flex items-center justify-center text-white font-bold ${compact ? 'w-8 h-8 text-[11px]' : 'w-10 h-10 text-[12px]'}`}
-        style={{ background: color }}
-        aria-hidden
-      >
-        {initials(c.author)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-semibold text-[13px]" style={{ color: 'var(--tx)' }}>{c.author}</span>
-          <span className="text-[10.5px] tabular-nums" style={{ color: 'var(--tx3)' }}>{fmtRelative(c.createdAt)}</span>
-        </div>
-        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--tx2)' }}>{c.body}</p>
-        <div className="flex items-center gap-1 mt-1.5">
-          <button onClick={onReply} className="btn-ghost btn !py-0.5 !px-1.5 !text-[11px]">Reply</button>
-        </div>
-      </div>
-    </div>
   );
 }

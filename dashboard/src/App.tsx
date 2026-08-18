@@ -1,202 +1,360 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fetchRecordings, type Recording } from './utils/dataFetcher';
-import { initAnalytics, track } from './utils/analytics';
-import { Header } from './components/Header';
-import { FeaturedStream } from './components/FeaturedStream';
-import { SlimHero } from './components/SlimHero';
-import { ContinueWatching } from './components/ContinueWatching';
-import { FilterBar, type SortKey, type FilterKey } from './components/FilterBar';
-import { StreamCard } from './components/StreamCard';
-import { WatchPage } from './components/WatchPage';
-import { NotFoundPage } from './components/NotFoundPage';
-import { Footer } from './components/Footer';
-import { Toast } from './components/Toast';
-import { CommandPalette } from './components/CommandPalette';
+// The Lantern Archive — app shell.
+// Hash routing, archive + YouTube-channel data loading, overlays, toasts,
+// and the home composition: trailer billboard → continue → channel shelves.
+// Shorts live in their own snap-scroll cinema (#/shorts).
 
-type Route =
-  | { kind: 'home' }
-  | { kind: 'watch'; rec: Recording }
-  | { kind: 'watch-pending'; id: string }
-  | { kind: 'notfound' };
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Ep, Route, StreamPrediction, SystemStatus } from './types';
+import { enrichRecordings, enrichYouTube } from './lib/enrich';
+import { fetchAllYouTube, fetchPrediction, fetchRecordings, fetchStatus, fetchYouTubeFeed } from './lib/fetcher';
+import { getList, toggleList as toggleStore } from './lib/storage';
+import { initAnalytics, track } from './lib/analytics';
+import { nav } from './components/Nav';
+import TopBar from './components/TopBar';
+import TabBar from './components/TabBar';
+import Hero from './components/Hero';
+import Shelf from './components/Shelf';
+import ContinueShelf from './components/ContinueShelf';
+import BrowsePage from './components/BrowsePage';
+import WatchPage from './components/WatchPage';
+import ShortsPage from './components/ShortsPage';
+import SystemPage from './components/SystemPage';
+import SearchOverlay from './components/SearchOverlay';
+import CommandPalette from './components/CommandPalette';
+import DetailsModal from './components/DetailsModal';
+import Footer from './components/Footer';
+import Splash from './components/Splash';
+import Toast from './components/Toast';
+import NotFound from './components/NotFound';
+import { HomeSkeleton } from './components/Skeletons';
 
-function initialRoute(): Route {
-  if (typeof window === 'undefined') return { kind: 'home' };
-  const m = (window.location.hash || '').match(/^#\/watch\/([^?]+)/);
-  if (m) return { kind: 'watch-pending', id: decodeURIComponent(m[1]) };
+function parseHash(all: Ep[]): Route {
+  const h = decodeURIComponent(window.location.hash || '#/');
+  if (h.startsWith('#/watch/')) {
+    const id = h.slice('#/watch/'.length).split('?')[0];
+    const rec = all.find(r => r.videoId === id);
+    return rec ? { kind: 'watch', rec } : all.length ? { kind: 'notfound' } : { kind: 'watch-pending', id };
+  }
+  if (h.startsWith('#/browse')) return { kind: 'browse' };
+  if (h.startsWith('#/shorts')) return { kind: 'shorts' };
+  if (h.startsWith('#/system')) return { kind: 'system' };
+  if (h.startsWith('#/my-list')) return { kind: 'mylist' };
+  if (h.startsWith('#/404')) return { kind: 'notfound' };
   return { kind: 'home' };
 }
 
 export default function App() {
-  const [recs, setRecs] = useState<Recording[]>([]);
+  const [recs, setRecs] = useState<Ep[]>([]);      // archive recordings (forced ones excluded)
+  const [ytLong, setYtLong] = useState<Ep[]>([]);  // channel long-form videos
+  const [ytShorts, setYtShorts] = useState<Ep[]>([]); // channel shorts
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState('');
-  const [qDebounced, setQDebounced] = useState('');
-  useEffect(() => {
-    const id = setTimeout(() => setQDebounced(q), 150);
-    return () => clearTimeout(id);
-  }, [q]);
-  const [route, setRoute] = useState<Route>(initialRoute);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [sort, setSort] = useState<SortKey>('newest');
-  const [filter, setFilter] = useState<FilterKey>('all');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
-  const [toast, setToast] = useState('');
+  const [route, setRoute] = useState<Route>(() => parseHash([]));
+  const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [prediction, setPrediction] = useState<StreamPrediction | null>(null);
+  const [live, setLive] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [details, setDetails] = useState<Ep | null>(null);
+  const [listTick, setListTick] = useState(0);
 
+  /* ── Data ─────────────────────────────────────────────────────────── */
   useEffect(() => {
     initAnalytics();
-    fetchRecordings().then(r => { setRecs(r); setLoading(false); });
+    let alive = true;
+    (async () => {
+      const [raw, st, pr, all, fed] = await Promise.all([
+        fetchRecordings(),
+        fetchStatus().catch(() => null),
+        fetchPrediction().catch(() => null),
+        fetchAllYouTube().catch(() => []),
+        fetchYouTubeFeed().catch(() => ({ videos: [], shorts: [] })),
+      ]);
+      if (!alive) return;
+      setRecs(enrichRecordings(raw).filter(r => !r.isForced));
+      setStatus(st);
+      setPrediction(pr);
+      setYtLong(all.map(v => enrichYouTube(v)));
+      setYtShorts(fed.shorts.map(v => enrichYouTube(v, true)));
+      setLoading(false);
+    })();
+    return () => { alive = false; };
   }, []);
 
+  /* ── Derived library ──────────────────────────────────────────────── */
+  // Watchable library, newest first: archive (richest metadata) + channel
+  // long-form. Shorts stay out — they live in their own cinema.
+  const all = useMemo(() => {
+    const seen = new Set(recs.map(r => r.videoId));
+    return [...recs, ...ytLong.filter(f => !seen.has(f.videoId))]
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [recs, ytLong]);
+
+  /* ── Routing ──────────────────────────────────────────────────────── */
   useEffect(() => {
     const sync = () => {
-      const h = window.location.hash || '';
-      const m = h.match(/^#\/watch\/([^?]+)/);
-      if (m) {
-        const id = decodeURIComponent(m[1]);
-        if (!recs.length) {
-          setRoute({ kind: 'watch-pending', id });
-          return;
-        }
-        const r = recs.find(x => x.videoId === id);
-        setRoute(r ? { kind: 'watch', rec: r } : { kind: 'notfound' });
-        return;
-      }
-      setRoute({ kind: 'home' });
+      setRoute(parseHash(all));
+      if (!window.location.hash.startsWith('#/watch')) window.scrollTo({ top: 0 });
     };
     sync();
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
-  }, [recs]);
+  }, [all]);
 
-  const open = useCallback((r: Recording) => {
-    window.location.hash = `/watch/${encodeURIComponent(r.videoId)}`;
-    window.scrollTo(0, 0);
-    track('watch', { id: r.videoId });
+  /* ── Global keyboard ──────────────────────────────────────────────── */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (searchOpen) { setSearchOpen(false); return; }
+        setSearchOpen(false);
+        setCmdOpen(v => !v);
+      } else if (e.key === '/' && !typing && !searchOpen && !cmdOpen && !details) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [searchOpen, cmdOpen, details]);
+
+  /* ── Actions ──────────────────────────────────────────────────────── */
+  const toast = useCallback((msg: string) => setToastMsg(msg), []);
+
+  const open = useCallback((ep: Ep) => {
+    track('watch', { id: ep.videoId });
+    nav(`#/watch/${encodeURIComponent(ep.videoId)}`);
   }, []);
 
-  const goHome = useCallback(() => { window.location.hash = ''; }, []);
-  const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
+  const toggleList = useCallback((id: string) => {
+    const now = toggleStore(id);
+    setListTick(t => t + 1);
+    toast(now ? 'Added to My List' : 'Removed from My List');
+  }, [toast]);
 
-  const filtered = useMemo(() => {
-    let xs = recs;
-    if (qDebounced.trim()) {
-      const s = qDebounced.toLowerCase();
-      xs = xs.filter(r => r.title.toLowerCase().includes(s) || r.date.includes(s));
-    }
-    if (filter === 'hd') xs = xs.filter(r => /1080|1440|2160|4k/i.test(r.resolution));
-    xs = [...xs];
-    switch (sort) {
-      case 'oldest':   xs.sort((a, b) => a.date.localeCompare(b.date)); break;
-      case 'longest':  xs.sort((a, b) => b.durationSec - a.durationSec); break;
-      case 'shortest': xs.sort((a, b) => a.durationSec - b.durationSec); break;
-      case 'largest':  xs.sort((a, b) => b.sizeGb - a.sizeGb); break;
-      default:         xs.sort((a, b) => b.date.localeCompare(a.date)); break;
-    }
-    return xs;
-  }, [recs, qDebounced, filter, sort]);
+  const surprise = useCallback(() => {
+    if (!all.length) return;
+    const pick = all[Math.floor(Math.random() * all.length)];
+    toast(`🎲 Surprise: ${pick.title.slice(0, 40)}…`);
+    open(pick);
+  }, [all, open, toast]);
 
-  if (route.kind === 'notfound') {
-    return <NotFoundPage onHome={goHome} />;
-  }
-  if (route.kind === 'watch-pending') {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
-        <div className="flex flex-col items-center">
-          <img src="/logo-vertical.pn.jpg" alt="" className="w-16 h-16 rounded-xl mb-4 animate-pulse" />
-          <p className="font-display text-lg" style={{ color: 'var(--gold-primary)' }}>Loading Recording</p>
-        </div>
-      </div>
-    );
-  }
-  if (route.kind === 'watch') {
-    return (
-      <>
-        <WatchPage
-          rec={route.rec}
-          onClose={goHome}
-          all={filtered.length ? filtered : recs}
-          onNav={open}
-          theme={theme}
-          onTheme={toggleTheme}
-          onToast={setToast}
-        />
-        <Toast msg={toast} onDone={() => setToast('')} />
-      </>
-    );
-  }
+  const listedIds = useMemo(() => new Set(getList()), [listTick, route.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const closeWatch = useCallback(() => nav('#/'), []);
+
+  /* ── Render ───────────────────────────────────────────────────────── */
+  const isWatch = route.kind === 'watch' || route.kind === 'watch-pending';
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
-      {loading && <div className="fixed top-0 left-0 right-0 h-1 z-50" style={{ background: 'var(--gradient-gold)', animation: 'shimmer 2s infinite' }} />}
-      
-      <Header
-        q={q}
-        setQ={setQ}
-        theme={theme}
-        toggleTheme={toggleTheme}
-        onOpenCmd={() => setCmdOpen(true)}
-        recordingsCount={recs.length}
-      />
+    <div className="relative min-h-dvh" style={{ background: 'var(--ink-0)' }}>
+      <Splash />
+      <div className="ambient-light" aria-hidden="true" />
+      <div className="grain" aria-hidden="true" />
 
-      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-8 pb-12">
-        <FeaturedStream recs={recs} onOpen={open} />
-        <SlimHero recs={recs} />
-        {!q.trim() && filter === 'all' && <ContinueWatching recs={recs} onOpen={open} />}
-        
-        <FilterBar
-          sort={sort}
-          setSort={setSort}
-          filter={filter}
-          setFilter={setFilter}
-          view={view}
-          setView={setView}
-          total={recs.length}
-          shown={filtered.length}
+      {!isWatch && (
+        <TopBar
+          route={route.kind}
+          listCount={listedIds.size}
+          onSearch={() => setSearchOpen(true)}
+          onCommand={() => setCmdOpen(true)}
+          onLive={setLive}
         />
+      )}
 
+      <main className="relative z-[1]">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="card-premium">
-                <div className="aspect-video w-full" style={{ background: 'var(--bg-elevated)' }} />
-                <div className="p-4 space-y-2">
-                  <div className="h-4 rounded" style={{ background: 'var(--bg-elevated)' }} />
-                  <div className="h-3 w-2/3 rounded" style={{ background: 'var(--bg-elevated)' }} />
-                </div>
-              </div>
-            ))}
+          <HomeSkeleton />
+        ) : route.kind === 'home' ? (
+          <div className="page-enter" key="home">
+            <Hero
+              recs={[...recs, ...ytLong.filter(v => !recs.some(r => r.videoId === v.videoId))]}
+              live={live}
+              prediction={prediction}
+              listedIds={listedIds}
+              onOpen={open}
+              onDetails={setDetails}
+              onToggleList={toggleList}
+            />
+
+            <div className="relative z-[2] -mt-[6vh] lg:-mt-[8vh] pb-10 flex flex-col gap-10 md:gap-12">
+              <ContinueShelf recs={all} onOpen={open} />
+              {recs.length > 0 && (
+                <Shelf
+                  label="The Archive"
+                  hint={`${recs.length} preserved recording${recs.length === 1 ? '' : 's'}`}
+                  recs={recs}
+                  listedIds={listedIds}
+                  onOpen={open}
+                  onDetails={setDetails}
+                  onToggleList={toggleList}
+                />
+              )}
+              {ytLong.length > 0 && (
+                <>
+                  <Shelf
+                    label="Latest from YouTube"
+                    hint="straight from the channel"
+                    recs={ytLong.slice(0, 14)}
+                    listedIds={listedIds}
+                    onOpen={open}
+                    onDetails={setDetails}
+                    onToggleList={toggleList}
+                  />
+                  {ytLong.length > 14 && (
+                    <Shelf
+                      label="More from the channel"
+                      hint={`${ytLong.length - 14} more video${ytLong.length - 14 === 1 ? '' : 's'}`}
+                      recs={ytLong.slice(14)}
+                      listedIds={listedIds}
+                      onOpen={open}
+                      onDetails={setDetails}
+                      onToggleList={toggleList}
+                    />
+                  )}
+                </>
+              )}
+              {ytShorts.length > 0 && (
+                <section className="shelf reveal-on-scroll">
+                  <div className="shelf-head">
+                    <span className="shelf-tick" />
+                    <span className="eyebrow">Shorts</span>
+                    <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>
+                      {ytShorts.length} vertical cuts
+                    </span>
+                    <a href="#/shorts" className="mono text-[10px] ml-auto flex items-center gap-1.5 transition-colors"
+                      style={{ color: 'var(--flame-1)' }}>
+                      Open the shorts cinema
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <div className="shelf-track">
+                      {ytShorts.slice(0, 12).map((s, i) => (
+                        <a
+                          key={s.videoId}
+                          href="#/shorts"
+                          className="card group !w-[132px] md:!w-[150px] reveal-on-scroll"
+                          style={{ animationDelay: `${i * 45}ms` }}
+                          aria-label={`Shorts: ${s.title}`}
+                        >
+                          <div className="card-art !aspect-[9/16]">
+                            <img src={s.thumbnail} alt="" loading="lazy" draggable={false}
+                              onError={e => { (e.target as HTMLImageElement).src = '/thumbnail.jpg'; }} />
+                            <div className="card-shade" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="orb" style={{ width: 40, height: 40 }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
+                              </span>
+                            </div>
+                            <span className="mono absolute bottom-2 left-2 right-2 text-[9px] font-semibold px-1.5 py-0.5 rounded line-clamp-2 leading-tight"
+                              style={{ background: 'rgba(8,4,5,.72)', color: '#fff' }}>
+                              {s.title}
+                            </span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
+
+            <Footer recs={recs} status={status} />
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-24 text-center">
-            <p className="font-display text-xl mb-2" style={{ color: 'var(--text-secondary)' }}>No recordings found</p>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Try adjusting your search or filters</p>
+        ) : route.kind === 'browse' ? (
+          <div className="page-enter" key="browse">
+            <BrowsePage
+              title="The Archive"
+              subtitle="Every preserved recording — filter by month and quality, or search by title and date."
+              recs={recs}
+              listedIds={listedIds}
+              onOpen={open}
+              onDetails={setDetails}
+              onToggleList={toggleList}
+            />
+            <Footer recs={recs} status={status} />
           </div>
-        ) : view === 'list' ? (
-          <div className="space-y-4">
-            {filtered.map((r, i) => (
-              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 50} view="list" onToast={setToast} />
-            ))}
+        ) : route.kind === 'shorts' ? (
+          <div key="shorts">
+            <ShortsPage shorts={ytShorts} />
+          </div>
+        ) : route.kind === 'system' ? (
+          <div className="page-enter" key="system">
+            <SystemPage recs={recs} status={status} prediction={prediction} ytCount={ytLong.length} />
+            <Footer recs={recs} status={status} />
+          </div>
+        ) : route.kind === 'mylist' ? (
+          <div className="page-enter" key="mylist">
+            <BrowsePage
+              title="My List"
+              subtitle={`${all.filter(r => listedIds.has(r.videoId)).length} saved video${all.filter(r => listedIds.has(r.videoId)).length === 1 ? '' : 's'} — kept on this device, ready when you are.`}
+              recs={all.filter(r => listedIds.has(r.videoId))}
+              listedIds={listedIds}
+              onOpen={open}
+              onDetails={setDetails}
+              onToggleList={toggleList}
+            />
+            <Footer recs={recs} status={status} />
+          </div>
+        ) : route.kind === 'watch' ? (
+          <WatchPage
+            key={route.rec.videoId}
+            rec={route.rec}
+            recs={all}
+            onClose={closeWatch}
+            onOpen={open}
+            toast={toast}
+          />
+        ) : route.kind === 'watch-pending' ? (
+          <div className="min-h-dvh flex flex-col items-center justify-center gap-6">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--flame-1)', boxShadow: '0 0 22px 7px var(--flame-glow)', animation: 'flame-flicker 2s ease-in-out infinite' }} />
+            <span className="mono text-[11px] tracking-[0.24em] uppercase" style={{ color: 'var(--mist)' }}>Loading recording…</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((r, i) => (
-              <StreamCard key={r.videoId} rec={r} onClick={() => open(r)} delay={i * 50} view="grid" onToast={setToast} featured={i === 0 && sort === 'newest'} />
-            ))}
+          <div className="page-enter" key="notfound">
+            <NotFound />
           </div>
         )}
       </main>
 
-      <Footer />
+      {!isWatch && (
+        <TabBar route={route.kind} onSearch={() => setSearchOpen(true)} />
+      )}
 
-      <CommandPalette
-        open={cmdOpen}
-        onClose={() => setCmdOpen(false)}
-        recs={recs}
-        onOpenRec={open}
-        toggleTheme={toggleTheme}
-      />
-      <Toast msg={toast} onDone={() => setToast('')} />
+      {/* Overlays */}
+      {searchOpen && (
+        <SearchOverlay
+          recs={all}
+          listedIds={listedIds}
+          onOpen={open}
+          onDetails={setDetails}
+          onToggleList={toggleList}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
+      {cmdOpen && (
+        <CommandPalette
+          recs={all}
+          onOpen={open}
+          onSearch={() => setSearchOpen(true)}
+          onSurprise={surprise}
+          onClose={() => setCmdOpen(false)}
+        />
+      )}
+      {details && (
+        <DetailsModal
+          ep={details}
+          recs={all}
+          listed={listedIds.has(details.videoId)}
+          onOpen={open}
+          onToggleList={toggleList}
+          onClose={() => setDetails(null)}
+        />
+      )}
+      {toastMsg && <Toast msg={toastMsg} onDone={() => setToastMsg('')} />}
     </div>
   );
 }

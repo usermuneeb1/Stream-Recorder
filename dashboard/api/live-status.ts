@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const CHANNEL_ID = 'UC5gkByQmQ1wQKZqQZqZqZq'; // The Muslim Lantern channel ID
+    const CHANNEL_ID = 'UCeCAQhKbU2ETNWxWxB94HgA'; // The Muslim Lantern channel ID
     const RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}`;
 
     // Fetch RSS feed
