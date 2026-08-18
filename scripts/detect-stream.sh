@@ -479,6 +479,62 @@ detect_method_4_rss() {
     return 0
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RSS SECOND OPINION (v6) — cookieless, IP-resistant liveness check
+#  The page-scrape + yt-dlp checks in is_stream_still_live() can systematically
+#  false-negative on WARP/GitHub datacenter IPs (documented incident EGbDB405YSw,
+#  2026-07-26). The channel RSS feed + isLiveNow check is a fully independent
+#  code path that needs no cookies and rarely gets consent-walled, so it makes
+#  an excellent tie-breaker: the recording cooldown consults this before
+#  committing to "stream ended", so one bad sweep can no longer stop a
+#  still-live recording.
+#  Returns 0 = channel is live right now, 1 = not live / inconclusive-safe.
+# ═══════════════════════════════════════════════════════════════════════════════
+rss_channel_is_live() {
+    local channel_input cid=""
+    channel_input=$(echo "${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}" | tr -d '[:space:]')
+
+    if [[ "$channel_input" =~ (UC[a-zA-Z0-9_-]{20,}) ]]; then
+        cid="${BASH_REMATCH[1]}"
+    else
+        local handle="${channel_input##*/}"
+        [[ "$handle" != "@"* ]] && handle="@${handle}"
+        cid=$(curl -s --max-time 15 "https://www.youtube.com/${handle}" 2>/dev/null \
+              | grep -oP '"externalId":"\K[^"]+' | head -1 || true)
+    fi
+    if [[ -z "$cid" ]]; then
+        log_debug "rss_channel_is_live: could not resolve channel id — inconclusive"
+        return 1
+    fi
+
+    local feed video_id
+    feed=$(curl -s --max-time 15 "https://www.youtube.com/feeds/videos.xml?channel_id=${cid}" 2>/dev/null) || return 1
+    video_id=$(echo "$feed" | grep -oP '<yt:videoId>\K[^<]+' | head -1 || true)
+    [[ -z "$video_id" ]] && return 1
+
+    # If the caller already knows the live video id, require the feed's newest
+    # entry to match it (protects against a NEW premiere masking the check).
+    local expected="${1:-}"
+    if [[ -n "$expected" && "$video_id" != "$expected" ]]; then
+        log_debug "rss_channel_is_live: newest feed video ${video_id} != expected ${expected}"
+        # Different newest video can still mean the expected one is live
+        # (feed orders by publish time); fall through to the page check below.
+        video_id="$expected"
+    fi
+
+    local ua watch
+    ua=$(rotate_user_agent)
+    watch=$(curl -s --max-time 20 -H "User-Agent: ${ua}" \
+        -H "Cookie: CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI" \
+        "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || return 1
+
+    if echo "$watch" | grep -qE '"isLiveNow":true|"liveBroadcastDetails":\{"isLiveNow":true'; then
+        log_debug "rss_channel_is_live: ${video_id} confirmed LIVE via RSS path"
+        return 0
+    fi
+    return 1
+}
+
 detect_live_stream() {
     log_header "🔍 LIVE STREAM DETECTION"
 

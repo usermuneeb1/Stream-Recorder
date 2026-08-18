@@ -77,7 +77,9 @@ Cookieless methods run **first** (stale cookies can never break a public recordi
 
 - **Race-condition guard** — detect→record re-checks "still live?" with any-pass-of-3 logic (incident-driven: each guard references a real lost stream)
 - **Segment-then-merge** — long streams record as numbered segments, losslessly concatenated (with re-encode + largest-segment fallbacks)
-- **Self-retry** — on failure, dispatches a fresh workflow run via the API
+- **🛟 Timeout salvage pipeline** — if the record step times out or crashes, `salvage-recording.sh` recovers the partial capture (moov-atom repair + merge) and feeds it into the normal post-process → upload → notify chain. A timeout now loses at most the final fragment, never the whole stream.
+- **RSS second-opinion liveness** — before the recorder decides a stream has ended, a cookieless RSS check double-verifies, so WARP/GitHub-IP false negatives can't truncate a still-live broadcast
+- **Self-retry** — on failure, dispatches a fresh workflow run via the API (falls back to the job's `GITHUB_TOKEN` when no PAT is set)
 - **Cloudflare WARP** masks the GitHub datacenter IP (a hard requirement — YouTube blocks raw GH IPs)
 - **bgutil PoToken provider** — solves YouTube's PO token / nsig challenge
 
