@@ -19,6 +19,7 @@ import BrowsePage from './components/BrowsePage';
 import WatchPage from './components/WatchPage';
 import ShortsPage from './components/ShortsPage';
 import SystemPage from './components/SystemPage';
+import InsightsPage from './components/InsightsPage';
 import SearchOverlay from './components/SearchOverlay';
 import CommandPalette from './components/CommandPalette';
 import DetailsModal from './components/DetailsModal';
@@ -38,6 +39,7 @@ function parseHash(all: Ep[]): Route {
   if (h.startsWith('#/browse')) return { kind: 'browse' };
   if (h.startsWith('#/shorts')) return { kind: 'shorts' };
   if (h.startsWith('#/system')) return { kind: 'system' };
+  if (h.startsWith('#/stats')) return { kind: 'stats' };
   if (h.startsWith('#/my-list')) return { kind: 'mylist' };
   if (h.startsWith('#/404')) return { kind: 'notfound' };
   return { kind: 'home' };
@@ -284,6 +286,11 @@ export default function App() {
         ) : route.kind === 'system' ? (
           <div className="page-enter" key="system">
             <SystemPage recs={recs} status={status} prediction={prediction} ytCount={ytLong.length} />
+            <Footer recs={recs} status={status} />
+          </div>
+        ) : route.kind === 'stats' ? (
+          <div className="page-enter" key="stats">
+            <InsightsPage recs={recs} status={status} prediction={prediction} />
             <Footer recs={recs} status={status} />
           </div>
         ) : route.kind === 'mylist' ? (

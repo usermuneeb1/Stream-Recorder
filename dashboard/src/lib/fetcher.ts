@@ -4,7 +4,15 @@
 
 import type { Chapter, Recording, StreamPrediction, Storyboard, SystemStatus, YTVideo } from '../types';
 
+// Data sources, tried in order:
+//   ''                      → relative /data/* — served by `vite dev` middleware
+//                             (and any self-host that mounts the repo data).
+//                             In production this 404s / returns the SPA shell,
+//                             which the non-HTML guard below skips.
+//   jsDelivr CDN @main      → primary production path (fast, cached)
+//   raw.githubusercontent   → final fallback
 const SOURCES = [
+  '',
   'https://cdn.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main',
   'https://raw.githubusercontent.com/usermuneeb1/Stream-Recorder/main',
 ];

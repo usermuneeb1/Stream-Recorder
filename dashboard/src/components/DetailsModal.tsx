@@ -26,7 +26,7 @@ export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, o
 
   const sorted = [...recs].sort((a, b) => b.date.localeCompare(a.date));
   const idx = sorted.findIndex(r => r.videoId === ep.videoId);
-  const neighbours = sorted.filter((r, i) => Math.abs(i - idx) === 1).slice(0, 2);
+  const neighbours = sorted.filter((_r, i) => Math.abs(i - idx) === 1).slice(0, 2);
   const more = sorted.filter(r => r.videoId !== ep.videoId).slice(0, 4);
 
   const vault = [

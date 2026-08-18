@@ -1,7 +1,30 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
+
+// In dev, serve the repo's data/ directory at /data/* so the app can read
+// the real archive index without depending on the CDN (works offline and in
+// sandboxed previews). Production builds never see this middleware.
+function serveLocalData() {
+  const DATA_ROOT = resolve(import.meta.dirname, '..', 'data');
+  return {
+    name: 'serve-local-data',
+    apply: 'serve' as const,
+    configureServer(server: any) {
+      server.middlewares.use('/data', (req: any, res: any, next: any) => {
+        const rel = decodeURIComponent((req.url || '').split('?')[0]).replace(/^\/+/, '');
+        const file = resolve(DATA_ROOT, rel);
+        if (file.startsWith(DATA_ROOT + sep) && existsSync(file)) {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(readFileSync(file, 'utf8'));
+          return;
+        }
+        next();
+      });
+    },
+  };
+}
 
 // FIX #21 — replace __BUILD_ID__ in dist/sw.js after build so each deploy
 // gets a unique service-worker cache version (kills stale-shell white-screen).
@@ -22,8 +45,14 @@ function stampServiceWorker() {
 }
 
 export default defineConfig({
-  plugins: [react(), stampServiceWorker()],
+  plugins: [react(), serveLocalData(), stampServiceWorker()],
   base: '/',
+  server: {
+    host: '0.0.0.0',
+    // Sandboxed preview hosts vary per session — allow any host so the
+    // live preview (and local LAN access) works out of the box.
+    allowedHosts: true,
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

@@ -275,6 +275,10 @@ export default function SystemPage({ recs, status, prediction, ytCount }: Props)
           View the machinery
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
         </a>
+        <a href="#/stats" className="btn btn-ghost !py-2.5 !px-5 !text-[12px]">
+          See the numbers
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+        </a>
       </div>
     </div>
   );
