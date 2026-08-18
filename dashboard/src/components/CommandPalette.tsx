@@ -39,6 +39,7 @@ export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onC
     { id: 'search', label: 'Search everything', hint: 'open full search', run: () => { onClose(); setTimeout(onSearch, 80); } },
     { id: 'home',   label: 'Go home',           hint: '#/',             run: () => { onClose(); nav('#/'); } },
     { id: 'browse', label: 'Browse the archive',hint: '#/browse',       run: () => { onClose(); nav('#/browse'); } },
+    { id: 'stats',  label: 'Archive insights',  hint: '#/stats',        run: () => { onClose(); nav('#/stats'); } },
     { id: 'list',   label: 'Open My List',      hint: '#/my-list',      run: () => { onClose(); nav('#/my-list'); } },
     { id: 'random', label: 'Surprise me',       hint: 'random episode', run: () => { onClose(); setTimeout(onSurprise, 60); } },
     { id: 'yt',     label: 'Open YouTube channel', hint: '@TheMuslimLantern', run: () => { onClose(); window.open('https://youtube.com/@TheMuslimLantern', '_blank', 'noopener'); } },

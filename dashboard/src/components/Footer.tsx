@@ -17,6 +17,7 @@ export default function Footer({ recs, status }: Props) {
     { label: 'Watch live', href: 'https://youtube.com/@TheMuslimLantern/live', ext: true },
     { label: 'RSS feed', href: '/feed.xml', ext: false },
     { label: 'Podcast', href: '/podcast.xml', ext: false },
+    { label: 'Archive insights', href: '#/stats', ext: false },
     { label: 'Recording engine', href: 'https://github.com/usermuneeb1/Stream-Recorder', ext: true },
   ];
 

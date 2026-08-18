@@ -89,6 +89,7 @@ export type Route =
   | { kind: 'browse' }
   | { kind: 'shorts' }
   | { kind: 'system' }
+  | { kind: 'stats' }
   | { kind: 'mylist' }
   | { kind: 'watch'; rec: Ep }
   | { kind: 'watch-pending'; id: string }

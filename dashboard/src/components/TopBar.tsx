@@ -27,6 +27,7 @@ export default function TopBar({ route, listCount, onSearch, onCommand, onLive }
     { label: 'Home', href: '#/', active: route === 'home' },
     { label: 'Archive', href: '#/browse', active: route === 'browse' },
     { label: 'Shorts', href: '#/shorts', active: route === 'shorts' },
+    { label: 'Insights', href: '#/stats', active: route === 'stats' },
     { label: 'System', href: '#/system', active: route === 'system' },
     { label: 'My List', href: '#/my-list', active: route === 'mylist' },
   ];
