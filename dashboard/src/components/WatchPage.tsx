@@ -19,7 +19,8 @@ import {
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
 
-import type { Ep } from '../types';
+import type { Ep, Guest } from '../types';
+import { fetchGuests } from '../lib/fetcher';
 import { nextUp as pickNext } from '../lib/enrich';
 import { copyText, fmtDate, fmtTime, isHD, resShort, shareLinks } from '../lib/format';
 import {
@@ -102,6 +103,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumeAsk, setResumeAsk] = useState<number | null>(null);
   const [tick, setTick] = useState(0);                  // rerun side effects on rec change
+  const [guests, setGuests] = useState<Guest[]>([]);
 
   const player = useRef<MediaPlayerInstance | null>(null);
   const next = pickNext(recs, rec.videoId);
@@ -136,6 +138,18 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     for (let i = 0; i < rec.chapters.length; i++) if (time >= rec.chapters[i].time) cur = i;
     return cur;
   }, [rec.chapters, time]);
+
+  /* ── Guests (join/leave) ──────────────────────────────────────────── */
+  useEffect(() => {
+    let live = true;
+    setGuests([]);
+    fetchGuests(rec.videoId).then(g => { if (live) setGuests(g); });
+    return () => { live = false; };
+  }, [rec.videoId]);
+
+  const activeGuest = useMemo(() => {
+    return guests.find(g => time >= g.join && time <= g.leave) ?? null;
+  }, [guests, time]);
 
   /* ── Reset per recording ─────────────────────────────────────────── */
   useEffect(() => {
@@ -453,6 +467,15 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                     </button>
                   )}
 
+                  {/* Guest name — shows on-screen while a guest is on air */}
+                  {activeGuest && playing && (
+                    <div className="guest-chip" aria-live="polite">
+                      <span className="guest-dot" />
+                      <span className="guest-label">Guest</span>
+                      <span className="guest-name">{activeGuest.name}</span>
+                    </div>
+                  )}
+
                   {/* One loader only: the player's own rotating buffer circle.
                       If the browser holds autoplay for a gesture, offer it. */}
                   {!litOnce && elapsed >= 8 && (
@@ -604,6 +627,36 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                           </div>
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Guests — join/leave timeline */}
+                {guests.length > 0 && (
+                  <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="shelf-tick" />
+                      <span className="eyebrow">Guests</span>
+                      <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{guests.length} appearance{guests.length === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                      {guests.map((g, i) => {
+                        const onAir = !!activeGuest && activeGuest.name === g.name;
+                        return (
+                          <button
+                            key={`${g.name}-${i}`}
+                            className={`chapter-card ${onAir ? 'active' : ''}`}
+                            onClick={() => seekTo(Math.max(0, g.join))}
+                          >
+                            <div className="mono idx text-[10px] mb-1.5" style={{ color: 'var(--shade)' }}>
+                              {fmtTime(g.join)} → {fmtTime(g.leave)}
+                            </div>
+                            <div className="text-[12.5px] font-semibold line-clamp-1 leading-snug" style={{ color: onAir ? 'var(--ivory)' : 'var(--mist)' }}>
+                              🎙️ {g.name}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

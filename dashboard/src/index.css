@@ -928,6 +928,40 @@ media-player .vds-buffering-indicator { display: none !important; }
 }
 .seek-veil .load-ring { width: 42px; height: 42px; }
 
+/* Guest "on air" name — shows top-left of the player while a guest speaks */
+.guest-chip {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  z-index: 32;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ivory);
+  background: var(--glass-strong);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--line-flame);
+  box-shadow: var(--shadow-lift);
+  animation: fade-in 0.3s var(--ease);
+  pointer-events: none;
+}
+.guest-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--flame-1);
+  box-shadow: 0 0 10px 2px var(--flame-glow);
+  animation: flame-flicker 1.6s ease-in-out infinite;
+}
+.guest-label {
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--shade); font-weight: 600;
+}
+.guest-name { color: var(--ivory); }
+
 /* Sound nudge on the watch page — "tap for sound" */
 .sound-chip {
   position: absolute;

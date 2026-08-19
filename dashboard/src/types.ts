@@ -16,6 +16,13 @@ export interface Chapter {
   label: string;
 }
 
+/** A guest appearance: name + join/leave timestamps (seconds). */
+export interface Guest {
+  name: string;
+  join: number;
+  leave: number;
+}
+
 export interface Recording {
   videoId: string;
   title: string;
