@@ -56,7 +56,7 @@ resolve_archive() {
 # Process each recording; enrich missing fields via jq.
 changed=0
 total=$(jq 'length' "$REC_FILE")
-for i in $(seq 0 $(( total - 1 ))); do
+for i in $(jq -r 'keys[]' "$REC_FILE"); do
   rec=$(jq ".[$i]" "$REC_FILE")
   vid=$(echo "$rec" | jq -r '.video_id // empty')
   arch=$(echo "$rec" | jq -r '.archive_link // empty')
@@ -72,11 +72,13 @@ for i in $(seq 0 $(( total - 1 ))); do
   node="${resolved[1]:-}"
 
   if [[ -n "$direct" ]]; then
-    REC_FILE_WRITE="$REC_FILE" REC_INDEX="$i" REC_DIRECT="$direct" REC_NODE="$node" jq \
-      '.[$ENV.REC_INDEX | tonumber] |= (.archive_direct = $ENV.REC_DIRECT
-        | (if ($ENV.REC_NODE != "") then .archive_node = $ENV.REC_NODE else . end))' \
-      "$REC_FILE" > "$REC_FILE.tmp"
-    mv "$REC_FILE.tmp" "$REC_FILE"
+    if [[ "$WRITE" == "true" ]]; then
+      REC_FILE_WRITE="$REC_FILE" REC_INDEX="$i" REC_DIRECT="$direct" REC_NODE="$node" jq \
+        '.[$ENV.REC_INDEX | tonumber] |= (.archive_direct = $ENV.REC_DIRECT
+          | (if ($ENV.REC_NODE != "") then .archive_node = $ENV.REC_NODE else . end))' \
+        "$REC_FILE" > "$REC_FILE.tmp"
+      mv "$REC_FILE.tmp" "$REC_FILE"
+    fi
     changed=$(( changed + 1 ))
     echo "   ✓ archive_direct=$(basename "$direct" 2>/dev/null || echo "$direct")"
     [[ -n "$node" ]] && echo "   ✓ archive_node=$node"
