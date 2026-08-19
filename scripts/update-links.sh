@@ -169,7 +169,6 @@ update_recordings_json() {
     log_header " UPDATING data/recordings.json (gallery)"
 
     # ── Pull first link of each provider from the "part|url;part|url" strings ──
-    local first_link
     first_link() { echo "$1" | cut -d';' -f1 | cut -d'|' -f2; }
 
     local archive_link pixeldrain_link gofile_link mega_link

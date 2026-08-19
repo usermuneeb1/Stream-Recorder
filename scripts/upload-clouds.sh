@@ -388,10 +388,10 @@ upload_to_archive() {
             -w '%{http_code}|%{exitcode}|%{time_total}' \
             -H "authorization: LOW ${access_key}:${secret_key}" \
             -H "x-archive-auto-make-bucket: 1" \
-            -H "x-archive-meta-title: Personal Media Backup" \
-            -H "x-archive-meta-creator: Media Archive Bot" \
+            -H "x-archive-meta-title: ${title}" \
+            -H "x-archive-meta-creator: ${channel}" \
             -H "x-archive-meta-date: ${record_date}" \
-            -H "x-archive-meta-description: Personal media backup file." \
+            -H "x-archive-meta-description: Live stream recording from ${channel}." \
             -H "x-archive-meta-mediatype: movies" \
             -H "x-archive-meta-collection: opensource_movies" \
             -H "x-archive-meta-subject: backup;media;personal;archive" \
@@ -659,9 +659,7 @@ upload_to_clouds() {
 
         log_separator
         local part_name
-        local basename_f
-        basename_f=$(basename "$f")
-        
+
         # HD-only pipeline (compressed/480p variant removed)
         if (( total_files <= 2 )); then
             part_name="HD"
