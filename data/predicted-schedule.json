@@ -15,10 +15,10 @@
     7,
     23
   ],
-  "avg_gap_days": 9.8,
+  "avg_gap_days": 10.7,
   "tiers": {
     "high": {
-      "description": "Peak window \u2014 most likely to go live",
+      "description": "Peak window, most likely to go live",
       "frequency_minutes": 3,
       "days": [
         "Thursday",
@@ -38,7 +38,7 @@
       ]
     },
     "medium": {
-      "description": "Shoulder hours \u2014 possible but less likely",
+      "description": "Shoulder hours, possible but less likely",
       "frequency_minutes": 10,
       "days": [
         "Thursday",
@@ -64,7 +64,7 @@
       ]
     },
     "low": {
-      "description": "Off-peak \u2014 safety net (never miss a surprise stream)",
+      "description": "Off-peak, safety net (never miss a surprise stream)",
       "frequency_minutes": 30,
       "days": [
         "Tuesday",
@@ -106,6 +106,6 @@
     "*/30 * * * 2,3,5,6"
   ],
   "estimated_savings_percent": 50.3,
-  "generated_at": "2026-08-19T04:30:30.127951+00:00",
-  "based_on_recordings": 13
+  "generated_at": "2026-08-19T14:26:06.941065+00:00",
+  "based_on_recordings": 12
 }
