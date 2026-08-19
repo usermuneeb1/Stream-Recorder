@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 📡 STREAM RECORDER — CLOUDFLARE WARP SETUP (HARDENED v4)                ║
-# ║ Installs + connects Cloudflare WARP to mask GitHub Actions IP.           ║
-# ║ v4 CHANGE: hard-exits if no IP change. Caller MUST treat exit≠0 as fatal ║
+# ║ STREAM RECORDER, CLOUDFLARE WARP SETUP (HARDENED v4)                         ║
+# ║ Installs + connects Cloudflare WARP to mask GitHub Actions IP.               ║
+# ║ v4 CHANGE: hard-exits if no IP change. Caller MUST treat exit≠0 as fatal     ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -10,11 +10,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 
 setup_warp() {
-  log_header "🌐 CLOUDFLARE WARP SETUP (hardened v4)"
+  log_header "CLOUDFLARE WARP SETUP (hardened v4)"
 
   # ── Skip if already connected (step 8 re-runs this) ────────────────────
   if [[ "${WARP_CONNECTED:-false}" == "true" ]]; then
-    log_ok "WARP already connected — skipping re-setup"
+    log_ok "WARP already connected, skipping re-setup"
     return 0
   fi
 
@@ -31,7 +31,7 @@ setup_warp() {
 
   # ── Check if WARP is enabled ───────────────────────────────────────────
   if [[ "${ENABLE_WARP:-true}" != "true" ]]; then
-    log_warn "WARP is disabled in config — skipping"
+    log_warn "WARP is disabled in config, skipping"
     set_output "warp_status" "disabled"
     set_env "WARP_CONNECTED" "false"
     return 0
@@ -147,7 +147,7 @@ setup_warp() {
   done
 
   if [[ "$connected" != "true" ]]; then
-    log_error "WARP failed after ${max_attempts} attempts — recording will NOT proceed"
+    log_error "WARP failed after ${max_attempts} attempts, recording will NOT proceed"
     set_env "WARP_CONNECTED" "false"
     set_output "warp_status" "failed"
     # v4 CHANGE: hard exit. The workflow treats non-zero as fatal.
@@ -162,7 +162,7 @@ setup_warp() {
   set_env "WARP_IP" "$new_ip"
 
   if [[ "$original_ip" == "$new_ip" ]]; then
-    log_error "IP did not change (${original_ip} → ${new_ip}) — WARP not routing"
+    log_error "IP did not change (${original_ip} → ${new_ip}), WARP not routing"
     set_env "WARP_CONNECTED" "false"
     set_output "warp_status" "connected-same-ip"
     # v4 CHANGE: hard exit. Same-IP means YouTube will still block us.
@@ -187,7 +187,7 @@ setup_warp() {
 # Fallback only used when this script is called directly (not from workflow).
 _warp_fallback() {
   log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  log_warn "WARP setup failed — caller should treat this as fatal"
+  log_warn "WARP setup failed, caller should treat this as fatal"
   log_warn "YouTube WILL block raw GitHub IPs for live-stream playback"
   log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   set_output "warp_status" "failed"

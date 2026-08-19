@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📊 System Status Generator                                                  ║
+# ║  System Status Generator                                                     ║
 # ║  Aggregates the public data files into data/system-status.json + shields.io  ║
 # ║  endpoint badges (data/badges/*.json) for the README and the dashboard.      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -60,7 +60,7 @@ def main():
     }
     write(os.path.join(DATA, "system-status.json"), status)
 
-    # README badges (no AI badge anymore — feature removed)
+    # README badges (no AI badge anymore, feature removed)
     write(os.path.join(BADGES, "recordings.json"), badge("recordings", total, "red"))
     write(os.path.join(BADGES, "storage.json"), badge("archived", f"{total_gb} GB", "orange"))
     write(os.path.join(BADGES, "subscribers.json"),

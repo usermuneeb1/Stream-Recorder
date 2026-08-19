@@ -1,9 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   ACCOUNT KEEP-ALIVE, Prevents MEGA file deletion                      ║
-# ║  Runs monthly to keep MEGA cloud accounts active.                          ║
-# ║                                                                            ║
-# ║  MEGA.nz:     Deletes files after 90 days of inactivity                   ║
-# ║  Archive.org: No keep-alive needed (truly permanent)                      ║
+# ║   ACCOUNT KEEP-ALIVE, prevents MEGA file deletion                            ║
+# ║  Runs monthly to keep MEGA cloud accounts active.                            ║
+# ║                                                                              ║
+# ║  MEGA.nz:     Deletes files after 90 days of inactivity                      ║
+# ║  Archive.org: No keep-alive needed (truly permanent)                         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Account keep-alive"
@@ -36,7 +36,7 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@v7
 
-      - name: "MEGA.nz, keep alive"
+      - name: "Keep MEGA.nz accounts alive"
         id: mega
         run: |
           echo "═══════════════════════════════════════"

@@ -1,13 +1,13 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  SMART SCHEDULE, Predict stream times + check for upcoming streams     ║
-# ║                                                                            ║
-# ║ Runs daily:                                                                ║
-# ║ 1. Analyzes past recordings to predict stream schedule                     ║
-# ║ 2. Scrapes YouTube for scheduled/upcoming streams                          ║
-# ║ 3. If a stream is scheduled, sends Discord alert with countdown            ║
-# ║ 4. Writes prediction data to data/ for the dashboard                       ║
-# ║                                                                            ║
-# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ║  SMART SCHEDULE, Predict stream times + check for upcoming streams           ║
+# ║                                                                              ║
+# ║ Runs daily:                                                                  ║
+# ║ 1. Analyzes past recordings to predict stream schedule                       ║
+# ║ 2. Scrapes YouTube for scheduled/upcoming streams                            ║
+# ║ 3. If a stream is scheduled, sends Discord alert with countdown              ║
+# ║ 4. Writes prediction data to data/ for the dashboard                         ║
+# ║                                                                              ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: Smart schedule

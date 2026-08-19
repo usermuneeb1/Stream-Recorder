@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 📅 YOUTUBE SCHEDULE SCRAPER — Detect Scheduled/Upcoming Streams            ║
-# ║                                                                            ║
-# ║ YouTube shows "Scheduled for <date>" on upcoming streams.                  ║
-# ║ This scrapes that info so you can:                                         ║
-# ║ 1. Know EXACTLY when the next stream is (no guessing)                      ║
-# ║ 2. Set a precise alarm to start polling 5min before                        ║
-# ║ 3. Send a Discord alert: "Next stream in 2 hours!"                        ║
-# ║ 4. Skip all polling until the scheduled time (massive savings)             ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT modify any existing scripts. Writes to data/ only.          ║
+# ║ YOUTUBE SCHEDULE SCRAPER, Detect Scheduled/Upcoming Streams                  ║
+# ║                                                                              ║
+# ║ YouTube shows "Scheduled for <date>" on upcoming streams.                    ║
+# ║ This scrapes that info so you can:                                           ║
+# ║ 1. Know EXACTLY when the next stream is (no guessing)                        ║
+# ║ 2. Set a precise alarm to start polling 5min before                          ║
+# ║ 3. Send a Discord alert: "Next stream in 2 hours!"                           ║
+# ║ 4. Skip all polling until the scheduled time (massive savings)               ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT modify any existing scripts. Writes to data/ only.            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
@@ -24,7 +24,7 @@ OUTPUT = os.path.join(ROOT, "data", "upcoming-streams.json")
 
 
 def log(msg):
-    print(f"  📅 Schedule: {msg}", flush=True)
+    print(f"  Schedule: {msg}", flush=True)
 
 
 def get_upcoming_streams(channel_handle):
@@ -135,13 +135,13 @@ def main():
     
     if upcoming:
         for stream in upcoming:
-            status = "🔴 LIVE NOW" if stream["status"] == "is_live" else "📅 Scheduled"
+            status = "LIVE NOW" if stream["status"] == "is_live" else "Scheduled"
             scheduled = stream.get("scheduled_utc", "unknown")
             log(f"  {status}: {stream['title']}")
             if scheduled != "unknown":
                 log(f"    Time: {scheduled}")
     elif page_schedule:
-        log(f"  📅 Found schedule info: {page_schedule}")
+        log(f"  Found schedule info: {page_schedule}")
     else:
         log("  No upcoming streams found")
     

@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   Archive.org → MEGA Migration                                           ║
-# ║  Downloads your entire Archive.org collection and re-uploads to MEGA.      ║
-# ║  Uses a CUSTOM MEGA account (not the round-robin auto-generated ones).     ║
-# ║  You can specify any MEGA account credentials per run.                     ║
+# ║   Archive.org → MEGA Migration                                               ║
+# ║  Downloads your entire Archive.org collection and re-uploads to MEGA.        ║
+# ║  Uses a CUSTOM MEGA account (not the round-robin auto-generated ones).       ║
+# ║  You can specify any MEGA account credentials per run.                       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Archive → MEGA migration"

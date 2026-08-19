@@ -2,7 +2,7 @@ name = "tg-stream"
 main = "worker.js"
 compatibility_date = "2026-06-22"
 
-# Free tier — no paid features used
+# Free tier, no paid features used
 workers_dev = true
 
 # Set the bot token AFTER deploy:

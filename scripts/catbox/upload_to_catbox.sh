@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🐱 CATBOX.MOE — Free Permanent File Hosting (200MB/file)                  ║
-# ║                                                                            ║
-# ║ No account needed. No expiry. Direct hotlink URLs.                         ║
-# ║ Perfect for: thumbnails, chat logs, transcripts, subtitles,                ║
-# ║              short clips, and small recordings.                            ║
-# ║                                                                            ║
-# ║ For files > 200MB: uses Litterbox (temp hosting, 72h) as overflow.         ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT touch any existing scripts/workflows.                       ║
-# ║       Standalone upload utility; call from upload-clouds.sh if desired.    ║
+# ║ CATBOX.MOE, Free Permanent File Hosting (200MB/file)                         ║
+# ║                                                                              ║
+# ║ No account needed. No expiry. Direct hotlink URLs.                           ║
+# ║ Perfect for: thumbnails, chat logs, transcripts, subtitles,                  ║
+# ║              short clips, and small recordings.                              ║
+# ║                                                                              ║
+# ║ For files > 200MB: uses Litterbox (temp hosting, 72h) as overflow.           ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT touch any existing scripts/workflows.                         ║
+# ║       Standalone upload utility; call from upload-clouds.sh if desired.      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -34,7 +34,7 @@ upload_to_catbox() {
 
     local attempt=1
     while (( attempt <= MAX_RETRIES )); do
-        echo "  🐱 Catbox: Uploading $(basename "$file") (attempt ${attempt}/${MAX_RETRIES})..."
+        echo "  Catbox: Uploading $(basename "$file") (attempt ${attempt}/${MAX_RETRIES})..."
 
         local response
         response=$(curl -s --max-time 600 \
@@ -49,7 +49,7 @@ upload_to_catbox() {
             return 0
         fi
 
-        echo "  ⚠️ Catbox: Failed (attempt ${attempt}) — ${response:0:200}"
+        echo "  ⚠️ Catbox: Failed (attempt ${attempt}), ${response:0:200}"
         (( attempt++ ))
         sleep 5
     done
@@ -73,7 +73,7 @@ upload_to_litterbox() {
 
     local attempt=1
     while (( attempt <= MAX_RETRIES )); do
-        echo "  🗑️ Litterbox: Uploading $(basename "$file") (${expiry} expiry, attempt ${attempt}/${MAX_RETRIES})..."
+        echo "  Litterbox: Uploading $(basename "$file") (${expiry} expiry, attempt ${attempt}/${MAX_RETRIES})..."
 
         local response
         response=$(curl -s --max-time 600 \
@@ -88,7 +88,7 @@ upload_to_litterbox() {
             return 0
         fi
 
-        echo "  ⚠️ Litterbox: Failed (attempt ${attempt}) — ${response:0:200}"
+        echo "  ⚠️ Litterbox: Failed (attempt ${attempt}), ${response:0:200}"
         (( attempt++ ))
         sleep 5
     done

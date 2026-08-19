@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  THUMBNAIL GENERATOR, Auto-generate branded thumbnails                 ║
-# ║                                                                            ║
-# ║ Extracts a frame from each recording, adds title/branding overlay,         ║
-# ║ uploads to Catbox as a permanent custom thumbnail.                         ║
-# ║                                                                            ║
-# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ║  THUMBNAIL GENERATOR, Auto-generate branded thumbnails                       ║
+# ║                                                                              ║
+# ║ Extracts a frame from each recording, adds title/branding overlay,           ║
+# ║ uploads to Catbox as a permanent custom thumbnail.                           ║
+# ║                                                                              ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: Thumbnail generator

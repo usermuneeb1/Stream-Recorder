@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   URL-to-Cloud Transfer, Download any file & upload to cloud            ║
-# ║  Uses GitHub Actions' fast internet (~10Gbps) as a transfer proxy.         ║
-# ║  Supports: Direct links, YouTube, social media, ANY web URL                ║
-# ║  Destinations: Gofile, Pixeldrain, Archive.org, MEGA.nz                    ║
+# ║   URL-to-Cloud Transfer, Download any file & upload to cloud                 ║
+# ║  Uses GitHub Actions' fast internet (~10Gbps) as a transfer proxy.           ║
+# ║  Supports: Direct links, YouTube, social media, ANY web URL                  ║
+# ║  Destinations: Gofile, Pixeldrain, Archive.org, MEGA.nz                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "URL-to-cloud transfer"

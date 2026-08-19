@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🟣 Pixeldrain — Push Active API Key to GitHub Secret                       ║
-# ║  Picks the healthiest account from accounts.csv (valid key, lowest usage)   ║
-# ║  and writes its API key into the repo secret PIXELDRAIN_API_KEY using the   ║
-# ║  GitHub REST API. This lets the existing upload pipeline rotate accounts    ║
-# ║  automatically without committing keys anywhere else.                       ║
-# ║                                                                            ║
-# ║  Env required: GH_PAT, GITHUB_REPOSITORY (owner/repo)                       ║
-# ║  Optional:     SECRET_NAME (default PIXELDRAIN_API_KEY)                     ║
-# ║  pip install: requests pynacl                                               ║
+# ║  Pixeldrain, Push Active API Key to GitHub Secret                            ║
+# ║  Picks the healthiest account from accounts.csv (valid key, lowest usage)    ║
+# ║  and writes its API key into the repo secret PIXELDRAIN_API_KEY using the    ║
+# ║  GitHub REST API. This lets the existing upload pipeline rotate accounts     ║
+# ║  automatically without committing keys anywhere else.                        ║
+# ║                                                                              ║
+# ║  Env required: GH_PAT, GITHUB_REPOSITORY (owner/repo)                        ║
+# ║  Optional:     SECRET_NAME (default PIXELDRAIN_API_KEY)                      ║
+# ║  pip install: requests pynacl                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import base64
@@ -81,7 +81,7 @@ def main():
     secret_name = os.environ.get("SECRET_NAME", "PIXELDRAIN_API_KEY").strip()
 
     if not gh_pat or not repo:
-        print("ℹ️ GH_PAT/GITHUB_REPOSITORY not set — skipping secret update")
+        print("ℹ️ GH_PAT/GITHUB_REPOSITORY not set, skipping secret update")
         return 0
 
     best = pick_best()

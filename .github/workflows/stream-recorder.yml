@@ -1,11 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   AUTOMATED STREAM RECORDER, MAIN WORKFLOW                              ║
-# ║  Runs every 5 minutes (Thu-Sun) to check for live streams and record them. ║
-# ║  Full lifecycle: Detect → Record → Process → Upload → Notify → Archive    ║
-# ║                                                                            ║
-# ║  Author : Muneeb Ahmad                                                    ║
-# ║  Version: 2.0.0                                                           ║
-# ║  Repo   : Public (unlimited GitHub Actions minutes)                       ║
+# ║   AUTOMATED STREAM RECORDER, MAIN WORKFLOW                                   ║
+# ║  Runs every 5 minutes (Thu-Sun) to check for live streams and record them.   ║
+# ║  Full lifecycle: Detect → Record → Process → Upload → Notify → Archive       ║
+# ║                                                                              ║
+# ║  Author : Muneeb Ahmad                                                       ║
+# ║  Version: 2.0.0                                                              ║
+# ║  Repo   : Public (unlimited GitHub Actions minutes)                          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Stream Recorder"
@@ -253,7 +253,7 @@ jobs:
           
           echo "disk_ok=true" >> $GITHUB_OUTPUT
 
-      - name: "⚠️ Notify, low disk space"
+      - name: "⚠️ Notify on low disk space"
         if: steps.disk_check.outputs.disk_ok != 'true'
         continue-on-error: true
         run: |
@@ -381,7 +381,7 @@ jobs:
       # that gap, recording starts on a dead stream and burns 30+ min on a
       # doomed run. Re-verify it is STILL live right before recording.
       # (This race condition lost HbS5TF1atFU on 2026-07-04.)
-      - name: "Recheck, still live?"
+      - name: "Recheck that the stream is still live"
         id: recheck
         if: steps.detect.outputs.is_live == 'true'
         timeout-minutes: 5
@@ -458,7 +458,7 @@ jobs:
             log_warn "Go-Live Sniper is already capturing this stream, main recorder deferring (no duplicate notification)."
           fi
 
-      - name: "Notify, live detected"
+      - name: "Notify that the stream went live"
         if: steps.lock.outputs.proceed != 'false' && steps.detect.outputs.is_live == 'true'
         run: |
           source scripts/utils.sh
@@ -495,7 +495,7 @@ jobs:
         run: bash scripts/upload-clouds.sh
 
       # ─── 11. SEND COMPLETE NOTIFICATION ─────────────────────────────────
-      - name: "✅ Notify, recording complete"
+      - name: "✅ Notify on recording complete"
         if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         run: |
           source scripts/utils.sh
@@ -524,7 +524,7 @@ jobs:
       # v4: include WHY each method failed. Was: "All recording methods failed"
       # (useless, no info about WHY). Now: includes WARP, PoToken, cookie,
       # IP state, plus last 50 lines of per-method failure log.
-      - name: "❌ Notify, recording failed"
+      - name: "❌ Notify on recording failure"
         # Only fire when recording was actually ATTEMPTED and failed. When the
         # recheck aborts (still_live=false), the dedicated "Stream Ended
         # Mid-Race" step already notifies, firing a second "Recording failed"

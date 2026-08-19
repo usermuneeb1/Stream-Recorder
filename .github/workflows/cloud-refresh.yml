@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   STREAM RECORDER, CLOUD LINK REFRESH WORKFLOW                          ║
-# ║  Runs every 3 days to keep Gofile/Pixeldrain links alive.                  ║
-# ║  Pings each link to reset the 60-day inactivity timer.                    ║
-# ║  Dead links are reported and can be restored from Archive.org.            ║
+# ║   STREAM RECORDER, CLOUD LINK REFRESH WORKFLOW                               ║
+# ║  Runs every 3 days to keep Gofile/Pixeldrain links alive.                    ║
+# ║  Pings each link to reset the 60-day inactivity timer.                       ║
+# ║  Dead links are reported and can be restored from Archive.org.               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Cloud link refresh"

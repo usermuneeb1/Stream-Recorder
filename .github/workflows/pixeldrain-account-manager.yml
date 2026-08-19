@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   Pixeldrain Account Manager, Generate & Maintain Pixeldrain Accounts   ║
-# ║    • Generates accounts via the official Pixeldrain API + temp emails       ║
-# ║    • Verifies via the e-mailed login link, stores the API key               ║
-# ║    • Keep-alive: calls GET /user on a schedule (cancels 7-day deletion)     ║
-# ║    • Optionally pushes the healthiest API key to PIXELDRAIN_API_KEY secret  ║
-# ║  Accounts are stored in scripts/pixeldrain/accounts.csv (committed).        ║
+# ║   Pixeldrain Account Manager, Generate & Maintain Pixeldrain Accounts        ║
+# ║    • Generates accounts via the official Pixeldrain API + temp emails        ║
+# ║    • Verifies via the e-mailed login link, stores the API key                ║
+# ║    • Keep-alive: calls GET /user on a schedule (cancels 7-day deletion)      ║
+# ║    • Optionally pushes the healthiest API key to PIXELDRAIN_API_KEY secret   ║
+# ║  Accounts are stored in scripts/pixeldrain/accounts.csv (committed).         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Pixeldrain account manager"

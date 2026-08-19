@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — SHARED UTILITIES                                     ║
-# ║  Author : Muneeb Ahmad                                                     ║
-# ║  Version: 2.0.0                                                            ║
-# ║  License: MIT                                                              ║
-# ║                                                                            ║
-# ║  This file contains all shared helper functions used across every script.   ║
-# ║  Every other script sources this file first.                               ║
+# ║  STREAM RECORDER, SHARED UTILITIES                                           ║
+# ║  Author : Muneeb Ahmad                                                       ║
+# ║  Version: 2.0.0                                                              ║
+# ║  License: MIT                                                                ║
+# ║                                                                              ║
+# ║  This file contains all shared helper functions used across every script.    ║
+# ║  Every other script sources this file first.                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -45,12 +45,12 @@ log_error() {
 }
 
 log_step() {
-    echo -e "${LOG_GRAY}[$(_log_timestamp)]${LOG_RESET} ${LOG_PURPLE}🔷 STEP ${LOG_RESET} │ $*"
+    echo -e "${LOG_GRAY}[$(_log_timestamp)]${LOG_RESET} ${LOG_PURPLE}STEP ${LOG_RESET} │ $*"
 }
 
 log_debug() {
     if [[ "${DEBUG:-false}" == "true" ]]; then
-        echo -e "${LOG_GRAY}[$(_log_timestamp)]${LOG_RESET} ${LOG_GRAY}🔍 DEBUG${LOG_RESET} │ $*"
+        echo -e "${LOG_GRAY}[$(_log_timestamp)]${LOG_RESET} ${LOG_GRAY}DEBUG${LOG_RESET} │ $*"
     fi
 }
 
@@ -112,7 +112,7 @@ calc_duration_seconds() {
 # ═══════════════════════════════════════════════════════════════════════════════
 #  THUMBNAIL RESOLVER
 #  Tests YouTube thumbnail URLs and returns the best one that actually loads.
-#  maxresdefault.jpg often returns 404 for live streams — this finds one that works.
+#  maxresdefault.jpg often returns 404 for live streams, this finds one that works.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 resolve_youtube_thumbnail() {
@@ -156,7 +156,7 @@ resolve_youtube_thumbnail() {
         return 0
     fi
     
-    # Absolute last resort — hqdefault (may show gray placeholder)
+    # Absolute last resort, hqdefault (may show gray placeholder)
     echo "https://i.ytimg.com/vi/${video_id}/hqdefault.jpg"
     return 0
 }
@@ -255,7 +255,7 @@ sanitize_filename() {
     echo "$name"
 }
 
-# Generate a safe output filename (no date — date is in metadata)
+# Generate a safe output filename (no date, date is in metadata)
 generate_output_filename() {
     local title="$1"
     local safe_title
@@ -394,7 +394,7 @@ github_api_read_content() {
 github_api_write() {
     local filepath="$1"
     local content="$2"
-    local message="${3:-📡 Auto-update: $filepath [$(now_pkt)]}"
+    local message="${3:-Auto-update: $filepath [$(now_pkt)]}"
     local repo="${GITHUB_REPOSITORY:-}"
     local token="${GH_PAT:-}"
     local max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}"
@@ -481,13 +481,13 @@ github_api_write() {
         # 409 Conflict (CAS), 422 (no-op or conflict), or 5xx → backoff + retry
         if [[ "$http_code" == "409" ]] || [[ "$http_code" == "422" ]] || [[ "$http_code" =~ ^5 ]]; then
             local backoff=$(( attempt * attempt ))   # 1, 4, 9, 16, 25 s
-            log_warn "GitHub returned ${http_code} for $filepath — retry $((attempt+1))/${max_attempts} in ${backoff}s"
+            log_warn "GitHub returned ${http_code} for $filepath, retry $((attempt+1))/${max_attempts} in ${backoff}s"
             sleep "$backoff"
             (( attempt++ ))
             continue
         fi
 
-        # Anything else (400, 401, 403, 404) is fatal — don't retry
+        # Anything else (400, 401, 403, 404) is fatal, don't retry
         local err_msg
         err_msg=$(echo "$response" | jq -r '.message // .error // "unknown"' 2>/dev/null)
         log_error "GitHub write failed (${http_code}): ${err_msg}"
@@ -579,7 +579,7 @@ get_file_size() {
 
 # Check if a file is a valid video (has video stream AND a readable duration).
 # A file that yt-dlp got SIGTERM'd mid-fragment often has a video codec stream
-# but no/zero duration — those crash the player and confuse the splitter.
+# but no/zero duration, those crash the player and confuse the splitter.
 is_valid_video() {
     local file="$1"
     local min_size="${2:-102400}"  # 100 KB default minimum
@@ -595,7 +595,7 @@ is_valid_video() {
     # Check for video stream
     ffprobe -v quiet -show_streams "$file" 2>/dev/null | grep -q "codec_type=video" || return 1
 
-    # FIX #13 — must also have a readable, non-zero duration. If it doesn't,
+    # FIX #13, must also have a readable, non-zero duration. If it doesn't,
     # the file is structurally damaged (missing moov atom is the usual cause
     # when timeout SIGTERM'd yt-dlp mid-fragment with --no-part). The caller
     # should then try a recovery remux.
@@ -626,7 +626,7 @@ recover_broken_video() {
         -c copy -movflags +faststart -avoid_negative_ts make_zero \
         "$recovered" 2>/dev/null && is_valid_video "$recovered"; then
         mv -f "$recovered" "$file"
-        log_ok "  recover_broken_video: ✓ recovered"
+        log_ok "  recover_broken_video: recovered"
         return 0
     fi
     rm -f "$recovered"
@@ -639,12 +639,12 @@ recover_broken_video() {
         -movflags +faststart \
         "$recovered" 2>/dev/null && is_valid_video "$recovered"; then
         mv -f "$recovered" "$file"
-        log_ok "  recover_broken_video: ✓ recovered via re-encode"
+        log_ok "  recover_broken_video: recovered via re-encode"
         return 0
     fi
     rm -f "$recovered"
 
-    log_error "  recover_broken_video: ✗ unrecoverable"
+    log_error "  recover_broken_video: unrecoverable"
     return 1
 }
 
@@ -717,7 +717,7 @@ load_config() {
         source "$config_file"
         log_debug "Configuration loaded from: $config_file"
     else
-        log_warn "Config file not found: $config_file — using defaults"
+        log_warn "Config file not found: $config_file, using defaults"
     fi
 }
 

@@ -7,12 +7,12 @@ Run from repo root:
     python3 scripts/generate-feeds.py
 
 Output:
-    dashboard/public/feed.xml      — RSS 2.0
-    dashboard/public/podcast.xml   — RSS 2.0 with <itunes:*> tags
-    dashboard/public/feed.json     — JSON Feed 1.1
-    dashboard/public/sitemap.xml   — sitemap for crawlers
+    dashboard/public/feed.xml, RSS 2.0
+    dashboard/public/podcast.xml, RSS 2.0 with <itunes:*> tags
+    dashboard/public/feed.json, JSON Feed 1.1
+    dashboard/public/sitemap.xml, sitemap for crawlers
 
-These files are committed to git so Vercel serves them as static assets — no
+These files are committed to git so Vercel serves them as static assets, no
 server-side rendering needed.
 """
 
@@ -30,7 +30,7 @@ RECS = ROOT / "data" / "recordings.json"
 OUT = ROOT / "dashboard" / "public"
 
 SITE = "https://muslim-lantern-archive.vercel.app"
-TITLE = "The Muslim Lantern — Stream Archive"
+TITLE = "The Muslim Lantern, Stream Archive"
 DESC = "Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically."
 AUTHOR = "Muneeb Ahmad"
 EMAIL = "noreply@muslim-lantern-archive.invalid"
@@ -130,7 +130,7 @@ def make_rss(items: list[dict], podcast: bool) -> str:
       <link>{escape(link)}</link>
       <guid isPermaLink="false">{escape(guid)}</guid>
       <pubDate>{pubdate(r)}</pubDate>
-      <description>{escape(title + ' — ' + DESC)}</description>
+      <description>{escape(title + ', ' + DESC)}</description>
       {enclosure}{itunes_item}
     </item>""")
 
@@ -211,10 +211,10 @@ def main() -> int:
     (OUT / "feed.json").write_text(make_json_feed(items))
     (OUT / "sitemap.xml").write_text(make_sitemap(items))
 
-    print(f"  ✓ feed.xml      ({(OUT / 'feed.xml').stat().st_size:,} bytes)")
-    print(f"  ✓ podcast.xml   ({(OUT / 'podcast.xml').stat().st_size:,} bytes)")
-    print(f"  ✓ feed.json     ({(OUT / 'feed.json').stat().st_size:,} bytes)")
-    print(f"  ✓ sitemap.xml   ({(OUT / 'sitemap.xml').stat().st_size:,} bytes)")
+    print(f"  feed.xml      ({(OUT / 'feed.xml').stat().st_size:,} bytes)")
+    print(f"  podcast.xml   ({(OUT / 'podcast.xml').stat().st_size:,} bytes)")
+    print(f"  feed.json     ({(OUT / 'feed.json').stat().st_size:,} bytes)")
+    print(f"  sitemap.xml   ({(OUT / 'sitemap.xml').stat().st_size:,} bytes)")
     return 0
 
 

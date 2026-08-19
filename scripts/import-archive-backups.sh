@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🏛️ IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                    ║
-# ║  Adds missing Internet Archive "Personal Media Backup" videos to gallery.   ║
+# ║  IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                         ║
+# ║  Adds missing Internet Archive "Personal Media Backup" videos to gallery.    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -127,7 +127,7 @@ _metadata_entry() {
 }
 
 import_archive_backups() {
-    log_header "🏛️ IMPORT ARCHIVE.ORG PERSONAL BACKUPS"
+    log_header "IMPORT ARCHIVE.ORG PERSONAL BACKUPS"
 
     local query="${ARCHIVE_QUERY:-$RAW_QUERY_DEFAULT}"
     local rows="${MAX_ITEMS:-100}"
@@ -193,12 +193,12 @@ import_archive_backups() {
     merged=$(jq -s '.[0] + .[1] | reduce .[] as $item ([]; if any(.[]; (.archive_link == $item.archive_link) or (.video_id == $item.video_id)) then . else . + [$item] end) | sort_by(.date) | reverse' <(echo "$entries") <(echo "$existing")) || return 1
 
     if [[ "$dry_run" == "true" ]]; then
-        log_warn "DRY_RUN=true — not writing data/recordings.json"
+        log_warn "DRY_RUN=true, not writing data/recordings.json"
         echo "$entries" | jq .
         return 0
     fi
 
-    github_api_write "data/recordings.json" "$merged" "🏛️ Import Archive.org personal backups ($(now_pkt))"
+    github_api_write "data/recordings.json" "$merged" "Import Archive.org personal backups ($(now_pkt))"
     log_ok "Imported $imported new backup video(s) into gallery"
 }
 

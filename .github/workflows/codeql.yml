@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   CodeQL, static security analysis for the dashboard (JS/TS)              ║
+# ║   CodeQL, static security analysis for the dashboard (JS/TS)                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "CodeQL"

@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   RECORD → POST-PROCESS TEST (ephemeral, zero side-effects)                ║
+# ║   RECORD → POST-PROCESS TEST (ephemeral, zero side-effects)                  ║
 # ║                                                                              ║
 # ║  Tests the EXACT record→post-process chain a live stream hits, but:          ║
 # ║   • captures only a 15-second slice of a PUBLIC video (not a live stream)    ║
 # ║   • runs the REAL scripts/post-process.sh (unchanged)                        ║
-# ║   • writes ONLY to /tmp, no upload, no commit, no Discord, no dashboard     ║
+# ║   • writes ONLY to /tmp, no upload, no commit, no Discord, no dashboard      ║
 # ║                                                                              ║
 # ║  This is the one part of the pipeline that was never tested end-to-end.      ║
 # ║  Dispatch-only (no schedule) so it never runs unless you ask.                ║
@@ -83,7 +83,7 @@ jobs:
           yt-dlp --skip-download --no-warnings --print "title=%(title)s | res=%(resolution)s | avail=%(availability)s" \
             "https://www.youtube.com/watch?v=$VID" 2>&1 | head -3
 
-      - name: "RECORD, method D (android_vr), 15s slice"
+      - name: "Record a 15s slice with method D (android_vr)"
         id: record
         run: |
           mkdir -p /tmp/stream-recorder
@@ -113,7 +113,7 @@ jobs:
             exit 1
           fi
 
-      - name: "POST-PROCESS, run the REAL post-process.sh"
+      - name: "Run the real post-process.sh"
         run: |
           export RECORD_DIR="/tmp/stream-recorder"
           export RECORDING_RAW_FILE="/tmp/stream-recorder/test_raw.mp4"

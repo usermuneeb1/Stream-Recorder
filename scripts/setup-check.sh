@@ -13,15 +13,15 @@ check_secret() {
         return 0
     fi
     if [[ "$required" == "true" ]]; then
-        echo "❌ ${name} (REQUIRED — missing)"
+        echo "❌ ${name} (REQUIRED, missing)"
         return 1
     fi
-    echo "⚪ ${name} (optional — not set)"
+    echo "${name} (optional, not set)"
     return 0
 }
 
 run_setup_check() {
-    log_header "🔧 SETUP CHECK — The Muslim Lantern Stream Recorder"
+    log_header "SETUP CHECK, The Muslim Lantern Stream Recorder"
     local failed=0
     local report=""
 
@@ -67,7 +67,7 @@ run_setup_check() {
     fi
 
     {
-        echo "## 🔧 Stream Recorder Setup Check"
+        echo "## Stream Recorder Setup Check"
         echo ""
         echo "**Channel:** \`${YOUTUBE_CHANNEL_ID:-${DEFAULT_CHANNEL_HANDLE:-@TheMuslimLantern}}\`"
         echo ""
@@ -79,12 +79,12 @@ run_setup_check() {
             echo "See [SETUP.md](SETUP.md) for step-by-step instructions."
         else
             echo "### ✅ All required secrets are set"
-            echo "Run **☪️ Stream Recorder** manually with \`wait_for_live\` or wait for Thu–Mon schedule."
+            echo "Run **Stream Recorder** manually with \`wait_for_live\` or wait for Thu, Mon schedule."
         fi
     } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 
     if (( failed > 0 )); then
-        log_error "Setup check failed — ${failed} required secret(s) missing"
+        log_error "Setup check failed, ${failed} required secret(s) missing"
         return 1
     fi
     log_ok "Setup check passed"

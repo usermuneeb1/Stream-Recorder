@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🎁 GitHub Releases video host — fast, free, permanent, no account farming    ║
+# ║  GitHub Releases video host, fast, free, permanent, no account farming       ║
 # ║                                                                              ║
 # ║  For each recording missing a github_release URL:                            ║
-# ║    1. Stream the .mp4 from its permanent Archive.org copy                     ║
-# ║    2. Create (or reuse) a GitHub Release tagged by the Archive identifier     ║
-# ║    3. Upload the .mp4 as a release asset (≤2 GiB/file, no total/bandwidth cap)║
-# ║    4. Save the permanent fast CDN URL into data/recordings.json               ║
+# ║    1. Stream the .mp4 from its permanent Archive.org copy                    ║
+# ║    2. Create (or reuse) a GitHub Release tagged by the Archive identifier    ║
+# ║    3. Upload the .mp4 as a release asset (≤2 GiB/file, no total/bandwidth ca ║
+# ║    4. Save the permanent fast CDN URL into data/recordings.json              ║
 # ║                                                                              ║
-# ║  Idempotent: skips recordings that already have github_release.               ║
-# ║  Safe: never deletes existing data; only adds github_release / github_direct. ║
+# ║  Idempotent: skips recordings that already have github_release.              ║
+# ║  Safe: never deletes existing data; only adds github_release / github_direct ║
 # ║                                                                              ║
-# ║  Env:  GITHUB_TOKEN (required)  REPO (owner/name)  GH_MAX_ITEMS (default 5)   ║
+# ║  Env:  GITHUB_TOKEN (required)  REPO (owner/name)  GH_MAX_ITEMS (default 5)  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
@@ -68,7 +68,7 @@ def safe_filename(rec):
 
 
 def ensure_release(tag, title):
-    """Return (release_id, upload_url_base) — create the release if absent."""
+    """Return (release_id, upload_url_base), create the release if absent."""
     code, body = gh("GET", f"{API}/repos/{REPO}/releases/tags/{tag}")
     if code == 200 and body.get("id"):
         return body["id"], body.get("assets", [])
@@ -117,7 +117,7 @@ def upload_asset(release_id, filepath, name):
 
 def main():
     if not TOKEN:
-        log("ℹ️ GITHUB_TOKEN not set — GitHub Releases upload skipped (no-op).")
+        log("ℹ️ GITHUB_TOKEN not set, GitHub Releases upload skipped (no-op).")
         return 0
     if not os.path.exists(RECORDINGS):
         log("❌ recordings.json not found")
@@ -131,7 +131,7 @@ def main():
         log("✅ All recordings already mirrored to GitHub Releases.")
         return 0
 
-    log(f"🎁 Uploading {len(todo)} video(s) to GitHub Releases...")
+    log(f"Uploading {len(todo)} video(s) to GitHub Releases...")
     for rec in todo:
         ident = identifier(rec)
         tag = f"v-{ident}"
@@ -146,21 +146,21 @@ def main():
         existing = next((a for a in assets if a.get("name") == name and a.get("state") == "uploaded"), None)
         if existing:
             dl = existing.get("browser_download_url")
-            log(f"   ♻️ asset already uploaded → {dl}")
+            log(f"   asset already uploaded → {dl}")
         else:
             with tempfile.TemporaryDirectory() as tmp:
                 dest = os.path.join(tmp, name)
-                log(f"   ⬇️ downloading source ({rec.get('size_human','?')})...")
+                log(f"   downloading source ({rec.get('size_human','?')})...")
                 if not download(archive_mp4_url(rec), dest):
                     continue
                 fsize = os.path.getsize(dest)
                 # GitHub Releases hard limit is 2 GiB per file. If a (very long)
-                # recording exceeds it, skip gracefully — Archive (B3ING) still
+                # recording exceeds it, skip gracefully, Archive (B3ING) still
                 # serves it, so playback is never broken.
                 if fsize > 2 * 1024 * 1024 * 1024 - (5 * 1024 * 1024):
-                    log(f"   ⏭️ {fsize//(1024*1024)} MB exceeds GitHub's 2 GiB limit — skipping (Archive will serve it).")
+                    log(f"   ⏭️ {fsize//(1024*1024)} MB exceeds GitHub's 2 GiB limit, skipping (Archive will serve it).")
                     continue
-                log(f"   ⬆️ uploading {name} ({fsize//(1024*1024)} MB) to release...")
+                log(f"   uploading {name} ({fsize//(1024*1024)} MB) to release...")
                 code, body = upload_asset(rid, dest, name)
                 if code not in (200, 201) or not body.get("browser_download_url"):
                     log(f"   ❌ upload failed ({code}): {str(body)[:200]}")

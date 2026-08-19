@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔴 MEGA Account Keep-Alive — Sign In to All Accounts                      ║
-# ║  Prevents MEGA accounts from becoming inactive.                            ║
+# ║  MEGA Account Keep-Alive, Sign In to All Accounts                            ║
+# ║  Prevents MEGA accounts from becoming inactive.                              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import csv
@@ -53,7 +53,7 @@ def _mega_login(email: str, password: str) -> tuple[bool, str]:
 
 def main() -> int:
     if not os.path.exists(CSV_FILE):
-        print("❌ No accounts.csv found — run generate_accounts.py first")
+        print("❌ No accounts.csv found, run generate_accounts.py first")
         with open(RESULTS_FILE, "w") as f:
             json.dump({"success": 0, "failed": 0, "total": 0, "accounts": []}, f, indent=2)
         return 1
@@ -80,7 +80,7 @@ def main() -> int:
                 results["success"] += 1
                 results["accounts"].append({"email": email, "status": "ok"})
             else:
-                print(f"❌ [{email}]: Login FAILED — {diagnostic}")
+                print(f"❌ [{email}]: Login FAILED, {diagnostic}")
                 results["failed"] += 1
                 results["accounts"].append({"email": email, "status": "failed", "error": diagnostic})
 
@@ -88,10 +88,10 @@ def main() -> int:
         json.dump(results, f, indent=2)
 
     print(f"\n{'=' * 50}")
-    print(f"📊 Results: {results['success']}/{results['total']} accounts active")
+    print(f"Results: {results['success']}/{results['total']} accounts active")
 
     if results["failed"] > 0:
-        print(f"⚠️ {results['failed']} accounts failed — may need regeneration")
+        print(f"⚠️ {results['failed']} accounts failed, may need regeneration")
         return 1
 
     print("✅ All accounts alive!")

@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   REPAIR MIRRORS FROM ARCHIVE.ORG                                         ║
-# ║  Reuploads missing/expired Gofile/Pixeldrain/MEGA mirrors from permanent    ║
-# ║  Archive.org copies and updates data/recordings.json.                       ║
+# ║   REPAIR MIRRORS FROM ARCHIVE.ORG                                            ║
+# ║  Reuploads missing/expired Gofile/Pixeldrain/MEGA mirrors from permanent     ║
+# ║  Archive.org copies and updates data/recordings.json.                        ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Repair cloud mirrors"

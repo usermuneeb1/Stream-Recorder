@@ -1,17 +1,17 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   GOFILE + DISCORD TEST (real upload + real notification, nothing else)    ║
+# ║   GOFILE + DISCORD TEST (real upload + real notification, nothing else)      ║
 # ║                                                                              ║
 # ║  Tests the upload→Discord tail of the pipeline on a REAL capture:            ║
 # ║   • captures a 15s slice of a PUBLIC video                                   ║
 # ║   • runs the REAL post-process.sh + upload-clouds.sh (GOFILE ONLY)           ║
-# ║   • fires the REAL notify_recording_complete (validates the null-payload fix)║
+# ║   • fires the REAL notify_recording_complete (validates the null-payload fix ║
 # ║                                                                              ║
 # ║  HARD GUARDRAILS:                                                            ║
 # ║   • contents: read  → CANNOT commit to recordings.json (dashboard untouched) ║
 # ║   • ARCHIVE_SKIP/MEGA_SKIP/PIXELDRAIN_SKIP=true → Gofile only                ║
 # ║   • No YouTube upload, no Archive.org upload                                 ║
 # ║   • Title marked [PIPELINE TEST] so the Discord post isn't mistaken for real ║
-# ║   • Dispatch-only, never runs on schedule                                   ║
+# ║   • Dispatch-only, never runs on schedule                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Gofile + Discord test"
@@ -73,7 +73,7 @@ jobs:
           echo "Using video: $VID"
           echo "video_id=$VID" >> "$GITHUB_OUTPUT"
 
-      - name: "RECORD, method D (android_vr), 15s slice"
+      - name: "Record a 15s slice with method D (android_vr)"
         run: |
           mkdir -p /tmp/stream-recorder
           cd /tmp/stream-recorder
@@ -99,7 +99,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           bash scripts/post-process.sh
 
-      - name: "UPLOAD, Gofile ONLY (real upload-clouds.sh)"
+      - name: "Upload to Gofile only (real upload-clouds.sh)"
         run: |
           export RECORD_DIR="/tmp/stream-recorder"
           cd "$GITHUB_WORKSPACE"
@@ -114,7 +114,7 @@ jobs:
           echo "UPLOAD_EXPECTED_COUNT=${UPLOAD_EXPECTED_COUNT:-0}"
           echo "GOFILE_LINKS=${GOFILE_LINKS:-<empty>}"
 
-      - name: "DISCORD, real notify_recording_complete (validates null-payload fix)"
+      - name: "Send Discord alert via notify_recording_complete (validates null-payload fix)"
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}

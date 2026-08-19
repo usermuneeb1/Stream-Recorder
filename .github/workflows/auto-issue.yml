@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   Auto-Issue Ticketing                                                     ║
+# ║   Auto-Issue Ticketing                                                       ║
 # ║  When a critical workflow fails, open (or update) a GitHub Issue with a link ║
-# ║  to the run. When that workflow next succeeds, auto-close the open issue.     ║
-# ║  Uses GITHUB_TOKEN (no extra secret). Deduplicates by a stable title.         ║
+# ║  to the run. When that workflow next succeeds, auto-close the open issue.    ║
+# ║  Uses GITHUB_TOKEN (no extra secret). Deduplicates by a stable title.        ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Auto-issue ticketing"

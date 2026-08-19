@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   Anonymize Archive.org Uploads, One-Time Fix                           ║
-# ║  Updates metadata on all old uploads to remove channel name/stream info.   ║
-# ║  Run once manually. New uploads are already anonymized.                    ║
+# ║   Anonymize Archive.org Uploads, One-Time Fix                                ║
+# ║  Updates metadata on all old uploads to remove channel name/stream info.     ║
+# ║  Run once manually. New uploads are already anonymized.                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Anonymize Archive.org"

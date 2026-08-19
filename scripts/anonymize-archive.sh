@@ -1,8 +1,8 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔒 Anonymize Old Archive.org Uploads                                      ║
-# ║  Updates metadata on ALL existing uploads to remove identifiable info.     ║
-# ║  Run once to fix old uploads. New uploads are already anonymous.           ║
+# ║  Anonymize Old Archive.org Uploads                                           ║
+# ║  Updates metadata on ALL existing uploads to remove identifiable info.       ║
+# ║  Run once to fix old uploads. New uploads are already anonymous.             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -euo pipefail
@@ -16,12 +16,12 @@ if [[ -z "$ACCESS" ]] || [[ -z "$SECRET" ]]; then
 fi
 
 echo "═══════════════════════════════════════"
-echo "🔒 Anonymizing Old Archive.org Uploads"
+echo "Anonymizing Old Archive.org Uploads"
 echo "═══════════════════════════════════════"
 
 # Search for all items uploaded by this account with "tml-" prefix
 # (old identifier format before anonymization)
-echo "🔍 Searching for old uploads with 'tml-' identifiers..."
+echo "Searching for old uploads with 'tml-' identifiers..."
 
 SEARCH_URL="https://archive.org/advancedsearch.php?q=identifier%3Atml-*&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=creator&rows=500&output=json"
 RESULTS=$(curl -s "$SEARCH_URL" 2>/dev/null || echo '{"response":{"docs":[]}}')
@@ -34,14 +34,14 @@ for d in docs:
 " 2>/dev/null || true)
 
 if [[ -z "$ITEMS" ]]; then
-    echo "✅ No old 'tml-' items found — nothing to anonymize"
+    echo "✅ No old 'tml-' items found, nothing to anonymize"
     echo ""
     echo "If you know specific identifiers, add them below."
     exit 0
 fi
 
 COUNT=$(echo "$ITEMS" | wc -l)
-echo "📊 Found $COUNT items to anonymize"
+echo "Found $COUNT items to anonymize"
 echo ""
 
 SUCCESS=0
@@ -51,7 +51,7 @@ while IFS= read -r identifier; do
     [[ -z "$identifier" ]] && continue
     
     echo "──────────────────────────────────────"
-    echo "📦 Updating: $identifier"
+    echo "Updating: $identifier"
     
     # Build JSON patch to replace metadata
     PATCH='[
@@ -105,8 +105,8 @@ done <<< "$ITEMS"
 
 echo ""
 echo "═══════════════════════════════════════"
-echo "🔒 Anonymization Complete"
+echo "Anonymization Complete"
 echo "  ✅ Success: $SUCCESS"
 echo "  ❌ Failed:  $FAILED"
-echo "  📊 Total:   $COUNT"
+echo "  Total:   $COUNT"
 echo "═══════════════════════════════════════"

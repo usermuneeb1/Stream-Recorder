@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🟣 Pixeldrain — Enable Embedded Playback on Accounts                      ║
-# ║  Calls PUT /api/user for each account in accounts.csv to enable:           ║
-# ║    • hotlinking_enabled  → files can be streamed on other sites (no 403)    ║
-# ║    • skip_file_viewer    → direct /api/file links skip the viewer page      ║
-# ║    • embed_domains       → your site domains allowed to embed               ║
-# ║                                                                            ║
-# ║  After this, any file uploaded with the account's API key plays embedded.   ║
-# ║                                                                            ║
-# ║  Env:  PIXELDRAIN_EMBED_DOMAINS (space separated, default = TML site)       ║
+# ║  Pixeldrain, Enable Embedded Playback on Accounts                            ║
+# ║  Calls PUT /api/user for each account in accounts.csv to enable:             ║
+# ║    • hotlinking_enabled  → files can be streamed on other sites (no 403)     ║
+# ║    • skip_file_viewer    → direct /api/file links skip the viewer page       ║
+# ║    • embed_domains       → your site domains allowed to embed                ║
+# ║                                                                              ║
+# ║  After this, any file uploaded with the account's API key plays embedded.    ║
+# ║                                                                              ║
+# ║  Env:  PIXELDRAIN_EMBED_DOMAINS (space separated, default = TML site)        ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import base64
@@ -62,7 +62,7 @@ def main():
         return 0
 
     print("═══════════════════════════════════════")
-    print(f"🟣 Enabling embedded playback on {len(rows)} account(s)")
+    print(f"Enabling embedded playback on {len(rows)} account(s)")
     print(f"   embed_domains = {domains}")
     print("═══════════════════════════════════════")
 

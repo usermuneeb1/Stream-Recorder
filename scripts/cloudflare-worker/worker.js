@@ -1,21 +1,21 @@
 /**
- * Cloudflare Worker — Telegram Video Streaming Proxy (HARDENED)
+ * Cloudflare Worker, Telegram Video Streaming Proxy (HARDENED)
  *
  * Streams videos that live in a Telegram channel through Cloudflare's CDN.
  * First request fetches from Telegram; the result is cached for 1 year at the edge.
  *
  * HARDENED vs the original (June 2026):
- *   ✗ Removed ?bot=<token> — the bot token MUST come from env.BOT_TOKEN.
+ *   Removed ?bot=<token>, the bot token MUST come from env.BOT_TOKEN.
  *     Accepting it from the URL leaked it into browser histories, public JSON
  *     files committed to git, and CDN access logs.
- *   ✗ Removed ?url=<encoded_telegram_url> — that turned the Worker into an
+ *   Removed ?url=<encoded_telegram_url>, that turned the Worker into an
  *     open proxy (SSRF + free bandwidth for anyone on the internet).
- *   ✗ Removed /stream/<base64_url> — same open-proxy risk.
- *   ✓ Only accepts ?file_id=<id>. Token is read from env.BOT_TOKEN only.
- *   ✓ Cache key is derived from file_id only (so the token never appears
+ *   Removed /stream/<base64_url>, same open-proxy risk.
+ *   Only accepts ?file_id=<id>. Token is read from env.BOT_TOKEN only.
+ *   Cache key is derived from file_id only (so the token never appears
  *     anywhere in cache metadata or CDN logs).
- *   ✓ Tighter CORS allow-list, explicit Vary: Origin, method allow-list.
- *   ✓ file_id is regex-validated (Telegram file_ids are 20–200 chars of
+ *   Tighter CORS allow-list, explicit Vary: Origin, method allow-list.
+ *   file_id is regex-validated (Telegram file_ids are 20-200 chars of
  *     [A-Za-z0-9_-]).
  *
  * Deploy:
@@ -66,7 +66,7 @@ export default {
       });
     }
 
-    // ── Edge cache check — key is file_id only, never the token ────────────
+    // ── Edge cache check, key is file_id only, never the token ────────────
     const cacheKey = new Request(`https://cache.local/file/${fileId}`, request);
     const cache = caches.default;
     let cached = await cache.match(cacheKey);
@@ -130,7 +130,7 @@ export default {
   },
 };
 
-// FIX #19 — don't echo ALLOWED_ORIGINS[0] back when the request origin isn't
+// FIX #19, don't echo ALLOWED_ORIGINS[0] back when the request origin isn't
 // allowed; that header would be wrong AND the browser would reject the
 // request anyway. Just omit Allow-Origin entirely so the browser blocks
 // cleanly with the correct error message in the console.
@@ -146,6 +146,6 @@ function corsHeaders(request) {
     headers['Access-Control-Allow-Origin'] = origin;
   }
   // Same-origin / no-CORS requests (no Origin header at all) still work fine
-  // — the browser doesn't need an Allow-Origin header for them.
+  //, the browser doesn't need an Allow-Origin header for them.
   return headers;
 }

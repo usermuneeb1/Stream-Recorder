@@ -1,6 +1,6 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   DATABASE AUDIT                                                          ║
-# ║  Validates archive data files and alerts on structural problems.            ║
+# ║   DATABASE AUDIT                                                             ║
+# ║  Validates archive data files and alerts on structural problems.             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Database audit"

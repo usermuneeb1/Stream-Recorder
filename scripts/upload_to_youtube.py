@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📤 YOUTUBE GHOST-HOST — Unlisted Upload with OAuth                        ║
-# ║                                                                             ║
-# ║  Uploads a video to YouTube as UNLISTED (not private, not public) so it     ║
-# ║  can be embedded via Invidious proxy for playback.                          ║
-# ║                                                                             ║
-# ║  Prerequisites:                                                             ║
-# ║    1. Google Cloud project with YouTube Data API v3 enabled                 ║
-# ║    2. OAuth 2.0 Desktop credentials (client_id + client_secret)             ║
-# ║    3. A refresh_token from a one-time OAuth consent flow                    ║
-# ║    4. Store as secrets: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET,           ║
-# ║       YOUTUBE_REFRESH_TOKEN                                                 ║
-# ║                                                                             ║
-# ║  Usage:  python3 scripts/upload_to_youtube.py <video.mp4>                  ║
-# ║  Env:    YOUTUBE_REFRESH_TOKEN (required)                                   ║
-# ║          YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET                           ║
-# ║          YOUTUBE_UPLOAD_TITLE  (optional, default "Backup - <filename>")   ║
-# ║          YOUTUBE_UPLOAD_DESC   (optional)                                   ║
-# ║          YOUTUBE_MORPHED=true  (optional label in title)                    ║
+# ║  YOUTUBE GHOST-HOST, Unlisted Upload with OAuth                              ║
+# ║                                                                              ║
+# ║  Uploads a video to YouTube as UNLISTED (not private, not public) so it      ║
+# ║  can be embedded via Invidious proxy for playback.                           ║
+# ║                                                                              ║
+# ║  Prerequisites:                                                              ║
+# ║    1. Google Cloud project with YouTube Data API v3 enabled                  ║
+# ║    2. OAuth 2.0 Desktop credentials (client_id + client_secret)              ║
+# ║    3. A refresh_token from a one-time OAuth consent flow                     ║
+# ║    4. Store as secrets: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET,            ║
+# ║       YOUTUBE_REFRESH_TOKEN                                                  ║
+# ║                                                                              ║
+# ║  Usage:  python3 scripts/upload_to_youtube.py <video.mp4>                    ║
+# ║  Env:    YOUTUBE_REFRESH_TOKEN (required)                                    ║
+# ║          YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET                            ║
+# ║          YOUTUBE_UPLOAD_TITLE  (optional, default "Backup - <filename>")     ║
+# ║          YOUTUBE_UPLOAD_DESC   (optional)                                    ║
+# ║          YOUTUBE_MORPHED=true  (optional label in title)                     ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
@@ -51,7 +51,7 @@ def log(msg):
 def get_credentials():
     """Build OAuth2 Credentials from the stored refresh token."""
     if not REFRESH_TOKEN:
-        log("❌ YOUTUBE_REFRESH_TOKEN not set — cannot upload.")
+        log("❌ YOUTUBE_REFRESH_TOKEN not set, cannot upload.")
         log("   To obtain one:")
         log("   1. Go to https://console.cloud.google.com/apis/credentials")
         log("   2. Create OAuth 2.0 Client ID (Desktop app)")
@@ -84,8 +84,8 @@ def upload_video(file_path: str) -> str:
     if CUSTOM_TITLE:
         title = CUSTOM_TITLE
     else:
-        prefix = "👻 " if IS_MORPHED else ""
-        title = f"{prefix}Backup — {file_name}"
+        prefix = "" if IS_MORPHED else ""
+        title = f"{prefix}Backup, {file_name}"
 
     description = CUSTOM_DESC or (
         "Automated backup via Stream-Recorder Ghost-Host.\n"
@@ -107,8 +107,8 @@ def upload_video(file_path: str) -> str:
         },
     }
 
-    log(f"   📤 Uploading to YouTube (unlisted): {file_name} ({file_size / 1024 / 1024:.1f} MB)")
-    log(f"   📝 Title: {title[:80]}")
+    log(f"   Uploading to YouTube (unlisted): {file_name} ({file_size / 1024 / 1024:.1f} MB)")
+    log(f"   Title: {title[:80]}")
 
     try:
         youtube = build("youtube", "v3", credentials=creds)
@@ -136,8 +136,8 @@ def upload_video(file_path: str) -> str:
 
         video_id = response.get("id", "")
         log("   ✅ Upload complete!")
-        log(f"   🆔 YouTube Video ID: {video_id}")
-        log(f"   🔗 URL: https://youtu.be/{video_id}")
+        log(f"   YouTube Video ID: {video_id}")
+        log(f"   URL: https://youtu.be/{video_id}")
 
         return video_id
 
@@ -147,19 +147,19 @@ def upload_video(file_path: str) -> str:
         log(f"   ❌ YouTube API error: {reason}")
 
         if reason == "quotaExceeded":
-            log("   💡 Daily upload quota exceeded (default is 6/day for verified accounts).")
+            log("   Daily upload quota exceeded (default is 6/day for verified accounts).")
             log("      Wait until your quota resets (midnight PT) or request more.")
         elif reason == "uploadLimit":
-            log("   💡 Upload limit reached. Wait and retry later.")
+            log("   Upload limit reached. Wait and retry later.")
         elif reason == "insufficientPermissions":
-            log("   💡 Your OAuth token doesn't have youtube.upload scope.")
+            log("   Your OAuth token doesn't have youtube.upload scope.")
             log("      Delete and re-authorize with the correct scopes.")
         elif reason in ("videoNotEligibleForUpload", "uploadLimitExceeded",
                         "tooLong", "videoTooLong"):
             # YouTube returns one of these when the file exceeds the 15-min
             # cap on unverified accounts. The actual message is usually
             # 'Account must be verified to upload videos longer than 15 minutes.'
-            log("   🔒 This account is NOT verified by phone.")
+            log("   This account is NOT verified by phone.")
             log("      Unverified accounts can only upload videos up to 15 minutes.")
             log("      Verify at: https://www.youtube.com/verify")
             log("      After verifying, set repo Variable YOUTUBE_VERIFIED=true.")

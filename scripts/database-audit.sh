@@ -73,7 +73,7 @@ _audit_stats_consistency() {
 }
 
 main() {
-    log_header "🧪 ARCHIVE DATABASE AUDIT"
+    log_header "ARCHIVE DATABASE AUDIT"
     _audit_json "stats.json"
     _audit_json "data/recordings.json"
     _audit_json "data/youtube-stats.json"
@@ -88,7 +88,7 @@ main() {
     local summary_file="${GITHUB_STEP_SUMMARY:-}"
     if [[ -n "$summary_file" ]]; then
         {
-            echo "## 🧪 Archive Database Audit"
+            echo "## Archive Database Audit"
             echo ""
             echo "| Result | Count |"
             echo "|---|---:|"

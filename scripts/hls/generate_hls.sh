@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🎬 HLS CHUNKED STREAMING — Multi-Host Video Distribution                  ║
-# ║                                                                            ║
-# ║ Converts MP4 recordings into HLS format (.m3u8 + .ts chunks).             ║
-# ║ Each chunk is tiny (~10s, ~5-15MB) so it can be hosted on ANY free         ║
-# ║ service — even Catbox (200MB limit).                                       ║
-# ║                                                                            ║
-# ║ Benefits:                                                                  ║
-# ║ • No single service sees the full file or bandwidth                        ║
-# ║ • Chunks can be spread across multiple free hosts                          ║
-# ║ • Adaptive bitrate possible (multiple quality levels)                      ║
-# ║ • Better buffering behavior than single-file streaming                     ║
-# ║ • If one host dies, only those chunks need re-uploading                    ║
-# ║                                                                            ║
-# ║ Usage: ./generate_hls.sh <input.mp4> <output_dir> [segment_duration]       ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT touch any existing scripts/workflows.                       ║
-# ║       Generates files in a new directory; nothing is overwritten.          ║
+# ║ HLS CHUNKED STREAMING, Multi-Host Video Distribution                         ║
+# ║                                                                              ║
+# ║ Converts MP4 recordings into HLS format (.m3u8 + .ts chunks).                ║
+# ║ Each chunk is tiny (~10s, ~5-15MB) so it can be hosted on ANY free           ║
+# ║ service, even Catbox (200MB limit).                                          ║
+# ║                                                                              ║
+# ║ Benefits:                                                                    ║
+# ║ • No single service sees the full file or bandwidth                          ║
+# ║ • Chunks can be spread across multiple free hosts                            ║
+# ║ • Adaptive bitrate possible (multiple quality levels)                        ║
+# ║ • Better buffering behavior than single-file streaming                       ║
+# ║ • If one host dies, only those chunks need re-uploading                      ║
+# ║                                                                              ║
+# ║ Usage: ./generate_hls.sh <input.mp4> <output_dir> [segment_duration]         ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT touch any existing scripts/workflows.                         ║
+# ║       Generates files in a new directory; nothing is overwritten.            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -40,7 +40,7 @@ generate_hls() {
     local safe_name
     safe_name=$(echo "$base_name" | sed 's/[^a-zA-Z0-9._-]/_/g')
 
-    echo "🎬 Generating HLS stream..."
+    echo "Generating HLS stream..."
     echo "   Input:    $input_file"
     echo "   Output:   $output_dir/"
     echo "   Segment:  ${seg_duration}s"
@@ -53,7 +53,7 @@ generate_hls() {
     start_time=$(date +%s)
 
     # 1080p stream (copy if already h264, otherwise re-encode)
-    echo "  📡 Creating 1080p stream..."
+    echo "  Creating 1080p stream..."
     ffmpeg -y -i "$input_file" \
         -c:v copy \
         -c:a aac -b:a 128k \
@@ -80,7 +80,7 @@ generate_hls() {
     fi
 
     # 480p stream (for low bandwidth)
-    echo "  📡 Creating 480p stream..."
+    echo "  Creating 480p stream..."
     ffmpeg -y -i "$input_file" \
         -c:v libx264 -preset fast -crf 28 \
         -vf "scale=-2:480" \
@@ -94,7 +94,7 @@ generate_hls() {
         2>/dev/null
 
     # ── Master playlist (adaptive bitrate) ────────────────────────────────────
-    echo "  📋 Creating master playlist..."
+    echo "  Creating master playlist..."
     cat > "${output_dir}/${safe_name}.m3u8" << EOF
 #EXTM3U
 #EXT-X-VERSION:3
@@ -114,7 +114,7 @@ EOF
 
     echo ""
     echo "  ✅ HLS generation complete!"
-    echo "  📊 Stats:"
+    echo "  Stats:"
     echo "     Chunks:   ${chunk_count} segments"
     echo "     Size:     ${total_size}"
     echo "     Time:     ${elapsed}s"
@@ -135,7 +135,7 @@ data = {
 }
 with open('${manifest}', 'w') as f:
     json.dump(data, f, indent=2)
-print(f'  📋 Manifest: {len(chunks)} chunks written to ${manifest}')
+print(f'  Manifest: {len(chunks)} chunks written to ${manifest}')
 "
     return 0
 }

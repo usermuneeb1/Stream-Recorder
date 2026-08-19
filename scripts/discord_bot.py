@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🤖 DISCORD COMMAND BOT — Remote Control Panel                             ║
-# ║                                                                            ║
-# ║ Control your entire Stream Recorder system from Discord.                   ║
-# ║ Uses Discord Interactions (slash commands) via webhook — NO gateway        ║
-# ║ connection needed. Runs as a Cloudflare Worker or Vercel Edge Function.    ║
-# ║                                                                            ║
-# ║ Commands:                                                                  ║
-# ║   /status     — System health (accounts, storage, last recording)         ║
-# ║   /record     — Trigger a recording via GitHub Actions workflow_dispatch   ║
-# ║   /accounts   — Show MEGA/GDrive/Pixeldrain account status                ║
-# ║   /refresh    — Trigger mirror repair workflow                             ║
-# ║   /latest     — Show the latest recording with links                      ║
-# ║                                                                            ║
-# ║ Deploy options:                                                            ║
-# ║   1. Cloudflare Worker (free, recommended)                                ║
-# ║   2. Vercel Edge Function (free, you already have Vercel)                 ║
-# ║   3. GitHub Actions on schedule (poll-based, no server needed)            ║
-# ║                                                                            ║
-# ║ This file implements Option 3: a GitHub Actions workflow that reads       ║
-# ║ commands from a Discord channel and responds. No server needed.           ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT touch any existing scripts/workflows.                      ║
+# ║ DISCORD COMMAND BOT, Remote Control Panel                                    ║
+# ║                                                                              ║
+# ║ Control your entire Stream Recorder system from Discord.                     ║
+# ║ Uses Discord Interactions (slash commands) via webhook, NO gateway           ║
+# ║ connection needed. Runs as a Cloudflare Worker or Vercel Edge Function.      ║
+# ║                                                                              ║
+# ║ Commands:                                                                    ║
+# ║   /status, System health (accounts, storage, last recording)                 ║
+# ║   /record, Trigger a recording via GitHub Actions workflow_dispatch          ║
+# ║   /accounts, Show MEGA/GDrive/Pixeldrain account status                      ║
+# ║   /refresh, Trigger mirror repair workflow                                   ║
+# ║   /latest, Show the latest recording with links                              ║
+# ║                                                                              ║
+# ║ Deploy options:                                                              ║
+# ║   1. Cloudflare Worker (free, recommended)                                   ║
+# ║   2. Vercel Edge Function (free, you already have Vercel)                    ║
+# ║   3. GitHub Actions on schedule (poll-based, no server needed)               ║
+# ║                                                                              ║
+# ║ This file implements Option 3: a GitHub Actions workflow that reads          ║
+# ║ commands from a Discord channel and responds. No server needed.              ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT touch any existing scripts/workflows.                         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import os
@@ -103,20 +103,20 @@ def cmd_status():
 
     fields = []
     if status:
-        fields.append({"name": "📊 Total Recordings", "value": str(status.get("total_recordings", "?")), "inline": True})
-        fields.append({"name": "⏱️ Total Hours", "value": f"{status.get('total_hours', 0):.1f}h", "inline": True})
-        fields.append({"name": "💾 Total Size", "value": f"{status.get('total_gb', 0):.2f} GB", "inline": True})
+        fields.append({"name": "Total Recordings", "value": str(status.get("total_recordings", "?")), "inline": True})
+        fields.append({"name": "Total Hours", "value": f"{status.get('total_hours', 0):.1f}h", "inline": True})
+        fields.append({"name": "Total Size", "value": f"{status.get('total_gb', 0):.2f} GB", "inline": True})
 
     if latest:
         fields.append({
-            "name": "🎬 Latest Recording",
-            "value": f"**{latest.get('title', 'Unknown')}**\n📅 {latest.get('date', '?')}\n⏱️ {latest.get('duration_fmt', '?')}",
+            "name": "Latest Recording",
+            "value": f"**{latest.get('title', 'Unknown')}**\n{latest.get('date', '?')}\n{latest.get('duration_fmt', '?')}",
             "inline": False,
         })
 
     send_discord_embed(
-        "📡 Stream Recorder — System Status",
-        f"[🌐 Dashboard]({DASHBOARD_URL})",
+        "Stream Recorder system status",
+        f"[Dashboard]({DASHBOARD_URL})",
         5763757,  # Green
         fields=fields,
         footer="Stream Recorder Bot",
@@ -134,24 +134,24 @@ def cmd_latest():
     if latest.get("github_release"):
         links.append(f"[▶️ GitHub CDN]({latest['github_release']})")
     if latest.get("archive_link"):
-        links.append(f"[🏛️ Archive.org]({latest['archive_link']})")
+        links.append(f"[Archive.org]({latest['archive_link']})")
     if latest.get("mega_link"):
-        links.append(f"[🔴 MEGA]({latest['mega_link']})")
+        links.append(f"[MEGA]({latest['mega_link']})")
     if latest.get("pixeldrain_link"):
-        links.append(f"[📥 Pixeldrain]({latest['pixeldrain_link']})")
+        links.append(f"[Pixeldrain]({latest['pixeldrain_link']})")
     if latest.get("telegram_link"):
-        links.append(f"[📱 Telegram]({latest['telegram_link']})")
+        links.append(f"[Telegram]({latest['telegram_link']})")
 
     fields = [
-        {"name": "📅 Date", "value": latest.get("date", "?"), "inline": True},
-        {"name": "⏱️ Duration", "value": latest.get("duration_fmt", "?"), "inline": True},
-        {"name": "💾 Size", "value": latest.get("size_human", "?"), "inline": True},
-        {"name": "🔗 Download Links", "value": "\n".join(links) if links else "No links", "inline": False},
+        {"name": "Date", "value": latest.get("date", "?"), "inline": True},
+        {"name": "Duration", "value": latest.get("duration_fmt", "?"), "inline": True},
+        {"name": "Size", "value": latest.get("size_human", "?"), "inline": True},
+        {"name": "Download Links", "value": "\n".join(links) if links else "No links", "inline": False},
     ]
 
     send_discord_embed(
-        f"🎬 {latest.get('title', 'Latest Recording')}",
-        f"[🌐 Watch on Dashboard]({DASHBOARD_URL}/watch/{latest.get('video_id', '')})",
+        f"{latest.get('title', 'Latest Recording')}",
+        f"[Watch on Dashboard]({DASHBOARD_URL}/watch/{latest.get('video_id', '')})",
         3447003,  # Blue
         fields=fields,
     )
@@ -161,7 +161,7 @@ def cmd_record():
     """Trigger a recording workflow."""
     if trigger_workflow("stream-recorder.yml"):
         send_discord_embed(
-            "🔴 Recording Triggered",
+            "Recording Triggered",
             "Stream recorder workflow dispatched. Check GitHub Actions for progress.",
             15736129,  # Red
         )
@@ -173,7 +173,7 @@ def cmd_refresh():
     """Trigger mirror repair."""
     if trigger_workflow("repair-mirrors.yml"):
         send_discord_embed(
-            "🔄 Mirror Refresh Triggered",
+            "Mirror Refresh Triggered",
             "Repair-mirrors workflow dispatched.",
             5763757,
         )
@@ -189,7 +189,7 @@ def cmd_accounts():
         accounts = status.get("accounts", {})
         for service, info in accounts.items():
             fields.append({
-                "name": f"{'🔴' if service == 'mega' else '🟢' if service == 'gdrive' else '🟣'} {service.upper()}",
+                "name": f"{'' if service == 'mega' else '' if service == 'gdrive' else ''} {service.upper()}",
                 "value": f"Active: {info.get('active', '?')} | Total: {info.get('total', '?')}",
                 "inline": True,
             })
@@ -198,7 +198,7 @@ def cmd_accounts():
         fields.append({"name": "ℹ️ Info", "value": "Account data not available in system-status.json. Add it!", "inline": False})
 
     send_discord_embed(
-        "👥 Account Status",
+        "Account Status",
         "Cloud storage account overview",
         10181046,  # Purple
         fields=fields,

@@ -49,7 +49,7 @@ def resolve_chat(app):
             log("⚠️", f"ID {cid} failed: {e}")
 
     # Last resort: try to find it by listing dialogs
-    log("🔍", "Searching dialogs for the channel...")
+    log("", "Searching dialogs for the channel...")
     try:
         for dialog in app.get_dialogs():
             chat = dialog.chat
@@ -79,11 +79,11 @@ def main():
         sys.exit(1)
 
     if not all([API_ID, API_HASH, SESSION]):
-        log("⏭️", "Telegram credentials not set — skipping")
+        log("⏭️", "Telegram credentials not set, skipping")
         sys.exit(0)
 
     fsize = os.path.getsize(path)
-    log("🚀", f"Uploading: {title} ({fmt(fsize)})")
+    log("", f"Uploading: {title} ({fmt(fsize)})")
 
     from pyrogram import Client
 
@@ -102,10 +102,10 @@ def main():
         chat_id = resolve_chat(app)
         if not chat_id:
             log("❌", f"Could not resolve channel ID: {CHAT_ID_RAW}")
-            log("💡", "Make sure the bot/account is a member of the channel")
+            log("", "Make sure the bot/account is a member of the channel")
             sys.exit(1)
 
-        caption = f"📡 **{title}**\n💾 {fmt(fsize)}\n☪️ Stream Archive"
+        caption = f"**{title}**\n{fmt(fsize)}\n☪️ Stream Archive"
         start = time.time()
 
         msg = app.send_document(
@@ -138,12 +138,12 @@ def main():
                     )
                     if fid:
                         f.write(f"telegram_file_id={fid}\n")
-                        log("🆔", f"file_id captured: {fid[:16]}…")
+                        log("", f"file_id captured: {fid[:16]}…")
                     else:
                         log("⚠️", f"Could not extract file_id from {type(msg).__name__}")
                 except Exception as e:
                     log("⚠️", f"file_id capture failed: {e}")
-            log("🔗", f"Link: {link}")
+            log("", f"Link: {link}")
 
     except Exception as e:
         log("❌", f"Upload failed: {e}")

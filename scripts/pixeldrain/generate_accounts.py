@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🟣 Pixeldrain Account Generator — Multi-Provider Edition                  ║
-# ║  Creates Pixeldrain accounts via the official API using temporary emails.   ║
-# ║  Flow per account:                                                          ║
-# ║    1. Create a temp email (Gmailnator → Mail.tm → Mail.gw → 1secmail)      ║
-# ║    2. POST /api/user/register  (username, email, password)                 ║
-# ║    3. Wait for the "login link" email, open it to verify the account       ║
-# ║    4. POST /api/user/login to obtain a permanent API key (auth_key)        ║
-# ║    5. Append the account + API key to accounts.csv                          ║
-# ║                                                                            ║
-# ║  The API key is what the uploader/rotation uses for uploads. Each account   ║
-# ║  gives free storage + its own download/transfer budget, so rotating across  ║
-# ║  many accounts avoids the per-file rate limit you hit with a single one.    ║
+# ║  Pixeldrain Account Generator, Multi-Provider Edition                        ║
+# ║  Creates Pixeldrain accounts via the official API using temporary emails.    ║
+# ║  Flow per account:                                                           ║
+# ║    1. Create a temp email (Gmailnator → Mail.tm → Mail.gw → 1secmail)        ║
+# ║    2. POST /api/user/register  (username, email, password)                   ║
+# ║    3. Wait for the "login link" email, open it to verify the account         ║
+# ║    4. POST /api/user/login to obtain a permanent API key (auth_key)          ║
+# ║    5. Append the account + API key to accounts.csv                           ║
+# ║                                                                              ║
+# ║  The API key is what the uploader/rotation uses for uploads. Each account    ║
+# ║  gives free storage + its own download/transfer budget, so rotating across   ║
+# ║  many accounts avoids the per-file rate limit you hit with a single one.     ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import argparse
@@ -84,7 +84,7 @@ def register(session, username, email, password):
         if data.get("success") or value == "login_link_sent" or r.status_code in (200, 201, 202):
             print(f"   ✅ register: {value or 'ok'}")
             return True
-        print(f"   ❌ register failed [{r.status_code}]: {value} — {data.get('message', r.text[:120])}")
+        print(f"   ❌ register failed [{r.status_code}]: {value}, {data.get('message', r.text[:120])}")
         return False
     except Exception as e:
         print(f"   ❌ register error: {e}")
@@ -128,7 +128,7 @@ def login_with_link(session, email, uid, lid):
         if key:
             print("   ✅ verified + API key obtained")
             return key
-        print(f"   ❌ link login failed: {data.get('value')} — {data.get('message', '')[:120]}")
+        print(f"   ❌ link login failed: {data.get('value')}, {data.get('message', '')[:120]}")
         return None
     except Exception as e:
         print(f"   ❌ link login error: {e}")
@@ -188,23 +188,23 @@ def try_create_account(password_override=None):
 
     for ProviderClass in providers:
         provider = ProviderClass()
-        print(f"📧 Provider: {provider.name}")
+        print(f"Provider: {provider.name}")
         email = provider.create_email()
         if not email:
             print(f"   ⏭️ {provider.name} could not create email")
             continue
-        print(f"   📨 {email}")
+        print(f"   {email}")
 
         session = requests.Session()
         if not register(session, username, email, password):
-            # username may be taken — refresh and retry same provider once
+            # username may be taken, refresh and retry same provider once
             username = make_username()
             if not register(session, username, email, password):
                 failed_providers.add(provider.name)
                 continue
 
         # Wait for the verification/login-link email.
-        print("   ⏳ waiting for login-link email...")
+        print("   waiting for login-link email...")
         body = None
         try:
             body = provider.wait_for_email(subject_contains="pixeldrain", timeout=180)
@@ -249,7 +249,7 @@ def main():
     args = parser.parse_args()
 
     print("═══════════════════════════════════════")
-    print(f"🟣 Generating {args.num} Pixeldrain account(s)")
+    print(f"Generating {args.num} Pixeldrain account(s)")
     print("═══════════════════════════════════════")
 
     created = 0
@@ -263,18 +263,18 @@ def main():
                 time.strftime("%Y-%m-%d"),
             ])
             created += 1
-            print("   💾 saved to accounts.csv")
+            print("   saved to accounts.csv")
         else:
             print("   ❌ account creation failed")
         time.sleep(random.uniform(2, 5))
 
     print("\n═══════════════════════════════════════")
-    print(f"✅ Done — {created}/{args.num} accounts created")
+    print(f"✅ Done, {created}/{args.num} accounts created")
     total = 0
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE) as f:
             total = max(0, sum(1 for _ in f) - 1)
-    print(f"📊 Total accounts on file: {total}")
+    print(f"Total accounts on file: {total}")
     print("═══════════════════════════════════════")
     # Non-zero exit if nothing was created (so the workflow can flag it).
     raise SystemExit(0 if created > 0 else 1)

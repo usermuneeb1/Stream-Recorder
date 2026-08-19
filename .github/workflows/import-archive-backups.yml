@@ -1,6 +1,6 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                    ║
-# ║  Adds missing Personal Media Backup Archive.org videos to the gallery.      ║
+# ║   IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                        ║
+# ║  Adds missing Personal Media Backup Archive.org videos to the gallery.       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Import archive backups"

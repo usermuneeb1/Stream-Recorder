@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — TRIPLE-LAYER LIVE STREAM DETECTION                   ║
-# ║  Uses 3 independent methods to detect if a YouTube channel is live.         ║
-# ║  If ANY method detects a live stream → proceed to recording.               ║
-# ║  If ALL methods find nothing → exit silently.                              ║
+# ║  STREAM RECORDER, TRIPLE-LAYER LIVE STREAM DETECTION                         ║
+# ║  Uses 3 independent methods to detect if a YouTube channel is live.          ║
+# ║  If ANY method detects a live stream → proceed to recording.                 ║
+# ║  If ALL methods find nothing → exit silently.                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  GLOBAL VARIABLES — set by detection methods
+#  GLOBAL VARIABLES, set by detection methods
 # ═══════════════════════════════════════════════════════════════════════════════
 
 DETECTED_VIDEO_ID=""
@@ -75,11 +75,11 @@ get_videos_url() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  FORCE RECORD — latest channel video when not live (manual testing)
+#  FORCE RECORD, latest channel video when not live (manual testing)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 detect_force_record() {
-    log_warn "FORCE_RECORD enabled — targeting latest channel video"
+    log_warn "FORCE_RECORD enabled, targeting latest channel video"
     local videos_url
     videos_url=$(get_videos_url)
     local -a cookies_args=()
@@ -98,12 +98,12 @@ detect_force_record() {
     DETECTED_CHANNEL="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
     DETECTED_THUMBNAIL="https://i.ytimg.com/vi/${DETECTED_VIDEO_ID}/maxresdefault.jpg"
     DETECTED_METHOD="force_record"
-    log_ok "FORCE_RECORD target: ${DETECTED_VIDEO_ID} — ${DETECTED_TITLE}"
+    log_ok "FORCE_RECORD target: ${DETECTED_VIDEO_ID}, ${DETECTED_TITLE}"
     return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  METHOD 1: /live Redirect Check (Fastest — 1-2 seconds)
+#  METHOD 1: /live Redirect Check (Fastest, 1-2 seconds)
 #  Checks if youtube.com/@channel/live redirects to a video page
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -190,12 +190,12 @@ detect_method_1_redirect() {
     DETECTED_METHOD="Redirect Check (/live)"
     DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
     
-    log_ok "Method 1: ✅ LIVE DETECTED — ${DETECTED_TITLE}"
+    log_ok "Method 1: ✅ LIVE DETECTED, ${DETECTED_TITLE}"
     return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  METHOD 2: yt-dlp JSON Dump (Reliable — 5-10 seconds)
+#  METHOD 2: yt-dlp JSON Dump (Reliable, 5-10 seconds)
 #  Uses yt-dlp to get stream metadata and check live status
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -251,7 +251,7 @@ detect_method_2_ytdlp() {
     
     # PREMIERE-AWARE MODE
     # When live_status='is_upcoming', the channel has a SCHEDULED PREMIERE that
-    # hasn't started yet. We treat it as "live" so the record step kicks in —
+    # hasn't started yet. We treat it as "live" so the record step kicks in, 
     # ytarchive --wait will then sit on the URL and grab the very first frame
     # the moment the countdown ends. Without this we'd bail and the streamer
     # would private the VOD before the next poll cycle picks it up.
@@ -273,7 +273,7 @@ detect_method_2_ytdlp() {
         return 1
     fi
     if [[ "$live_status" == "is_upcoming" ]]; then
-        log_ok "Method 2: Scheduled PREMIERE detected — will wait for go-live with ytarchive --wait"
+        log_ok "Method 2: Scheduled PREMIERE detected, will wait for go-live with ytarchive --wait"
     fi
     
     # Extract metadata
@@ -298,12 +298,12 @@ detect_method_2_ytdlp() {
     DETECTED_METHOD="yt-dlp JSON Dump"
     DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
     
-    log_ok "Method 2: ✅ LIVE DETECTED — ${DETECTED_TITLE}"
+    log_ok "Method 2: ✅ LIVE DETECTED, ${DETECTED_TITLE}"
     return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  METHOD 3: /streams Tab Scan (Most Thorough — 10-20 seconds)
+#  METHOD 3: /streams Tab Scan (Most Thorough, 10-20 seconds)
 #  Scans the channel's Streams tab for any currently live video
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -393,7 +393,7 @@ detect_method_3_streams_tab() {
     DETECTED_METHOD="Streams Tab Scan"
     DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
     
-    log_ok "Method 3: ✅ LIVE DETECTED — ${DETECTED_TITLE} by ${DETECTED_CHANNEL}"
+    log_ok "Method 3: ✅ LIVE DETECTED, ${DETECTED_TITLE} by ${DETECTED_CHANNEL}"
     return 0
 }
 
@@ -403,7 +403,7 @@ detect_method_3_streams_tab() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Method 4: RSS FEED (additive fallback — no cookies, very reliable)
+#  Method 4: RSS FEED (additive fallback, no cookies, very reliable)
 #  Resolves the channel UC id, reads the YouTube RSS feed for the newest video,
 #  and confirms it is currently live before reporting. Runs only after the
 #  primary 3 methods find nothing, so it never overrides existing behavior.
@@ -475,12 +475,12 @@ detect_method_4_rss() {
     DETECTED_METHOD="RSS Feed"
     DETECTED_URL="https://www.youtube.com/watch?v=${video_id}"
 
-    log_ok "Method 4: ✅ LIVE DETECTED via RSS — ${DETECTED_TITLE} by ${DETECTED_CHANNEL}"
+    log_ok "Method 4: ✅ LIVE DETECTED via RSS, ${DETECTED_TITLE} by ${DETECTED_CHANNEL}"
     return 0
 }
 
 detect_live_stream() {
-    log_header "🔍 LIVE STREAM DETECTION"
+    log_header "LIVE STREAM DETECTION"
 
     local channel="${YOUTUBE_CHANNEL_ID:-$DEFAULT_CHANNEL_HANDLE}"
     log_info "Monitoring channel: ${channel} (${CHANNEL_DISPLAY_NAME:-single channel})"
@@ -492,7 +492,7 @@ detect_live_stream() {
             _export_detection_results || return 1
             return 0
         fi
-        log_warn "FORCE_RECORD failed — falling back to normal live detection"
+        log_warn "FORCE_RECORD failed, falling back to normal live detection"
     fi
     
     # ── Method 1: Redirect Check (fastest) ───────────────────────────────────
@@ -527,7 +527,7 @@ detect_live_stream() {
 
     # ── All methods found nothing ────────────────────────────────────────────
     log_separator
-    log_info "All 4 detection methods completed — channel is NOT live"
+    log_info "All 4 detection methods completed, channel is NOT live"
     log_info "Detection completed at: $(now_pkt)"
     
     set_output "is_live" "false"
@@ -537,7 +537,7 @@ detect_live_stream() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  EXPORT HELPER — Write detection results to GitHub Actions outputs
+#  EXPORT HELPER, Write detection results to GitHub Actions outputs
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _export_detection_results() {
@@ -610,10 +610,10 @@ _export_detection_results() {
             local thumb_size
             thumb_size=$(wc -c < "$local_thumb" | tr -d ' ')
             if (( thumb_size > 5000 )); then
-                log_ok "Thumbnail downloaded locally (${thumb_size} bytes) — will attach to Discord"
+                log_ok "Thumbnail downloaded locally (${thumb_size} bytes), will attach to Discord"
                 set_env "LOCAL_THUMBNAIL_PATH" "$local_thumb"
             else
-                log_warn "Thumbnail too small (placeholder?) — trying yt-dlp"
+                log_warn "Thumbnail too small (placeholder?), trying yt-dlp"
                 rm -f "$local_thumb"
             fi
         fi
@@ -635,7 +635,7 @@ _export_detection_results() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  QUICK CHECK — Lightweight check if stream is still live (used during recording)
+#  QUICK CHECK, Lightweight check if stream is still live (used during recording)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 is_stream_still_live() {
@@ -647,7 +647,7 @@ is_stream_still_live() {
     local user_agent
     user_agent=$(rotate_user_agent)
     local bypass_cookie="CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI"
-    # Use the real YouTube auth cookies when available — YouTube frequently
+    # Use the real YouTube auth cookies when available, YouTube frequently
     # omits isLiveNow (and serves a consent/sign-in page) to unauthenticated
     # datacenter/WARP IPs even for genuinely-live streams. Detection already
     # authenticated successfully with these cookies; reuse them here so the
@@ -673,7 +673,7 @@ is_stream_still_live() {
     # embedded ytInitialPlayerResponse. We treat that as 'go-record-now'
     # because ytarchive --wait will sit on the URL until premiere starts.
     if grep -qE '"isUpcoming"\s*:\s*true' <<< "$video_page"; then
-        log_info "Scheduled premiere detected on $video_id — entering wait mode"
+        log_info "Scheduled premiere detected on $video_id, entering wait mode"
         return 0
     fi
     
@@ -699,7 +699,7 @@ is_stream_still_live() {
     # WARP/GitHub IPs (it reported "not live" for a genuinely-live stream,
     # EGbDB405YSw on 2026-07-26, which broke the recheck and triggered an
     # infinite detect→abort→retry→Discord-spam loop). The `web` client is what
-    # detection Method 2 uses successfully — retry with it before declaring the
+    # detection Method 2 uses successfully, retry with it before declaring the
     # stream not-live.
     local web_blob web_live web_status
     web_blob=$(timeout 30 yt-dlp --dump-json --no-download \

@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🧠 SMART SCHEDULE PREDICTOR — Predict When the Channel Goes Live          ║
-# ║                                                                            ║
-# ║ Analyzes past recordings from recordings.json to learn the channel's       ║
-# ║ streaming pattern, then writes a schedule so the cron-based workflow       ║
-# ║ only polls during likely-live windows instead of 24/7.                     ║
-# ║                                                                            ║
-# ║ WHY: Your recorder runs every 5 min, 24/7 = 288 workflow runs/day.        ║
-# ║      Most are wasted (channel only streams ~2-3x/week, certain hours).    ║
-# ║      This cuts wasted runs by ~70% while NEVER missing a stream.          ║
-# ║                                                                            ║
-# ║ HOW:                                                                       ║
-# ║ 1. Reads past stream dates/times from recordings.json                      ║
-# ║ 2. Finds preferred day-of-week + hour-of-day pattern                       ║
-# ║ 3. Generates an optimized cron schedule:                                   ║
-# ║    - HIGH frequency (every 3 min) during peak windows                      ║
-# ║    - MEDIUM frequency (every 10 min) ±2 hours around peaks                 ║
-# ║    - LOW frequency (every 30 min) during off-hours (safety net)            ║
-# ║ 4. Writes data/predicted-schedule.json for the dashboard                   ║
-# ║ 5. Optionally updates the workflow cron (via PR)                           ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT modify stream-recorder.yml directly.                        ║
-# ║       Only writes a prediction file. Manual opt-in to use it.              ║
+# ║ SMART SCHEDULE PREDICTOR, Predict When the Channel Goes Live                 ║
+# ║                                                                              ║
+# ║ Analyzes past recordings from recordings.json to learn the channel's         ║
+# ║ streaming pattern, then writes a schedule so the cron-based workflow         ║
+# ║ only polls during likely-live windows instead of 24/7.                       ║
+# ║                                                                              ║
+# ║ WHY: Your recorder runs every 5 min, 24/7 = 288 workflow runs/day.           ║
+# ║      Most are wasted (channel only streams ~2-3x/week, certain hours).       ║
+# ║      This cuts wasted runs by ~70% while NEVER missing a stream.             ║
+# ║                                                                              ║
+# ║ HOW:                                                                         ║
+# ║ 1. Reads past stream dates/times from recordings.json                        ║
+# ║ 2. Finds preferred day-of-week + hour-of-day pattern                         ║
+# ║ 3. Generates an optimized cron schedule:                                     ║
+# ║    - HIGH frequency (every 3 min) during peak windows                        ║
+# ║    - MEDIUM frequency (every 10 min) ±2 hours around peaks                   ║
+# ║    - LOW frequency (every 30 min) during off-hours (safety net)              ║
+# ║ 4. Writes data/predicted-schedule.json for the dashboard                     ║
+# ║ 5. Optionally updates the workflow cron (via PR)                             ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT modify stream-recorder.yml directly.                          ║
+# ║       Only writes a prediction file. Manual opt-in to use it.                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
@@ -37,7 +37,7 @@ TZ_OFFSET = timedelta(hours=5)  # PKT = UTC+5
 
 
 def log(msg):
-    print(f"  🧠 Predictor: {msg}", flush=True)
+    print(f"  Predictor: {msg}", flush=True)
 
 
 def load_recordings():
@@ -118,19 +118,19 @@ def generate_schedule(patterns):
         "avg_gap_days": round(avg_gap, 1),
         "tiers": {
             "high": {
-                "description": "Peak window — most likely to go live",
+                "description": "Peak window, most likely to go live",
                 "frequency_minutes": 3,
                 "days": peak_days,
                 "hours_pkt": sorted(peak_hours),
             },
             "medium": {
-                "description": "Shoulder hours — possible but less likely",
+                "description": "Shoulder hours, possible but less likely",
                 "frequency_minutes": 10,
                 "days": peak_days,
                 "hours_pkt": [h for h in range(24) if h not in peak_hours],
             },
             "low": {
-                "description": "Off-peak — safety net (never miss a surprise stream)",
+                "description": "Off-peak, safety net (never miss a surprise stream)",
                 "frequency_minutes": 30,
                 "days": [d for d in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] if d not in peak_days],
                 "hours_pkt": list(range(24)),
@@ -180,12 +180,12 @@ def generate_schedule(patterns):
 
 def main():
     if not os.path.exists(RECORDINGS):
-        log("No recordings.json found — skipping")
+        log("No recordings.json found, skipping")
         return 0
     
     recordings = load_recordings()
     if len(recordings) < 3:
-        log(f"Only {len(recordings)} recordings — need at least 3 for prediction")
+        log(f"Only {len(recordings)} recordings, need at least 3 for prediction")
         return 0
     
     log(f"Analyzing {len(recordings)} past recordings...")
@@ -200,7 +200,7 @@ def main():
     
     log("Generated optimized schedule:")
     for tier_name, tier in schedule["tiers"].items():
-        log(f"  {tier_name.upper()}: every {tier['frequency_minutes']}min — {tier['description']}")
+        log(f"  {tier_name.upper()}: every {tier['frequency_minutes']}min, {tier['description']}")
     log(f"Estimated workflow run savings: ~{schedule['estimated_savings_percent']}%")
     
     log("Recommended crons:")

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — SMART POST-PROCESSING & SPLITTING                    ║
-# ║  Stage 1: Repair & optimize (remux → re-encode fallback)                   ║
-# ║  Stage 2: Quality check & validation                                       ║
-# ║  Stage 3: Smart splitting (30-min parts at keyframes)                      ║
+# ║  STREAM RECORDER, SMART POST-PROCESSING & SPLITTING                          ║
+# ║  Stage 1: Repair & optimize (remux → re-encode fallback)                     ║
+# ║  Stage 2: Quality check & validation                                         ║
+# ║  Stage 3: Smart splitting (30-min parts at keyframes)                        ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -54,7 +54,7 @@ repair_and_optimize() {
                 "$output_file" 2>/dev/null)
 
             if [[ "$vcodec" == "vp9" ]] || [[ "$vcodec" == "vp8" ]] || [[ "$vcodec" == "av1" ]]; then
-                log_info "  ⚠️  VP9/VP8/AV1 codec detected — transcoding to H.264 for browser compatibility..."
+                log_info "  ⚠️  VP9/VP8/AV1 codec detected, transcoding to H.264 for browser compatibility..."
                 local h264_tmp="${output_file%.mp4}_h264tmp.mp4"
                 local encode_start_h264
                 encode_start_h264=$(now_epoch)
@@ -70,11 +70,11 @@ repair_and_optimize() {
                     log_ok "  H.264 transcode complete in ${e2}s"
                     log_ok "  Output: $(basename "$output_file") ($(format_size "$(get_file_size "$output_file")"))"
                 else
-                    log_warn "  H.264 transcode failed — keeping VP9 (file may not play inline in Safari)"
+                    log_warn "  H.264 transcode failed, keeping VP9 (file may not play inline in Safari)"
                     rm -f "$h264_tmp"
                 fi
             else
-                log_info "  Codec: ${vcodec} — browser compatible ✅"
+                log_info "  Codec: ${vcodec}, browser compatible ✅"
                 log_info "  Output: $(basename "$output_file") ($(format_size "$(get_file_size "$output_file")"))"
             fi
             return 0
@@ -118,7 +118,7 @@ repair_and_optimize() {
     fi
     
     # ── Attempt 3: Use raw file as-is ────────────────────────────────────────
-    log_warn "  Both repair methods failed — using raw file as-is"
+    log_warn "  Both repair methods failed, using raw file as-is"
     cp "$input_file" "$output_file"
     
     if [[ -f "$output_file" ]]; then
@@ -170,7 +170,7 @@ quality_check() {
     
     # Warn if duration seems too short
     if (( duration < 60 )); then
-        log_warn "  ⚠️ Recording is less than 1 minute — may be incomplete"
+        log_warn "  ⚠️ Recording is less than 1 minute, may be incomplete"
     fi
     
     log_ok "  Quality check passed"
@@ -191,7 +191,7 @@ smart_split() {
     
     # Check if user wants the whole file without splitting
     if [[ "${KEEP_WHOLE_FILE:-true}" == "true" ]]; then
-        log_info "  KEEP_WHOLE_FILE=true — uploading as ONE complete file (no splitting)"
+        log_info "  KEEP_WHOLE_FILE=true, uploading as ONE complete file (no splitting)"
         PROCESSED_FILES+=("$input_file")
         set_env "RECORD_PARTS" "1"
         set_output "parts_count" "1"
@@ -207,7 +207,7 @@ smart_split() {
     
     # Check if splitting is needed
     if (( duration <= max_segment_sec )); then
-        log_info "  Duration is within threshold — no splitting needed"
+        log_info "  Duration is within threshold, no splitting needed"
         PROCESSED_FILES+=("$input_file")
         set_env "RECORD_PARTS" "1"
         set_output "parts_count" "1"
@@ -262,7 +262,7 @@ smart_split() {
     fi
     
     # Fallback: keep unsplit file
-    log_warn "  Splitting failed — keeping as single file"
+    log_warn "  Splitting failed, keeping as single file"
     PROCESSED_FILES+=("$input_file")
     set_env "RECORD_PARTS" "1"
     set_output "parts_count" "1"
@@ -274,7 +274,7 @@ smart_split() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 post_process() {
-    log_header "⚙️ POST-PROCESSING ENGINE"
+    log_header "POST-PROCESSING ENGINE"
     
     local raw_file="${RECORDING_RAW_FILE:-}"
     
@@ -297,12 +297,12 @@ post_process() {
     
     # ── Stage 0: Pre-flight integrity check (FIX #13) ────────────────────────
     # If yt-dlp was killed by SIGTERM mid-fragment with --no-part, the raw
-    # file may have a damaged moov atom — ffmpeg -c copy will "succeed" on
+    # file may have a damaged moov atom, ffmpeg -c copy will "succeed" on
     # it but produce a non-seekable output. Try to recover BEFORE remux.
     if ! is_valid_video "$raw_file"; then
-        log_warn "Raw file failed pre-flight validation — attempting recovery"
+        log_warn "Raw file failed pre-flight validation, attempting recovery"
         if ! recover_broken_video "$raw_file"; then
-            log_error "Raw file is structurally damaged beyond recovery — cannot continue"
+            log_error "Raw file is structurally damaged beyond recovery, cannot continue"
             return 1
         fi
     fi
@@ -310,7 +310,7 @@ post_process() {
     # ── Stage 1: Repair & Optimize ───────────────────────────────────────────
     log_separator
     if ! repair_and_optimize "$raw_file" "$processed_file"; then
-        log_error "Stage 1 failed — cannot continue"
+        log_error "Stage 1 failed, cannot continue"
         return 1
     fi
     
@@ -323,7 +323,7 @@ post_process() {
     # ── Stage 2: Quality Check ───────────────────────────────────────────────
     log_separator
     if ! quality_check "$processed_file"; then
-        log_error "Stage 2 failed — file is invalid"
+        log_error "Stage 2 failed, file is invalid"
         return 1
     fi
     
@@ -339,21 +339,21 @@ post_process() {
     # variant has been removed from the pipeline entirely. No additional encode
     # pass, no extra uploads, no extra storage usage.
     
-    # ── Stage 4: Ensure Thumbnail (for Discord embed only — NOT uploaded to cloud) ──
+    # ── Stage 4: Ensure Thumbnail (for Discord embed only, NOT uploaded to cloud) ──
     if [[ "${SAVE_THUMBNAIL:-true}" == "true" ]]; then
         log_separator
         log_step "Checking Thumbnail (for Discord only)..."
         
-        # If detection already saved a valid local thumbnail, keep it — DON'T re-download
+        # If detection already saved a valid local thumbnail, keep it, DON'T re-download
         # (YouTube returns a gray placeholder after stream ends / for private streams)
         local existing_thumb="${LOCAL_THUMBNAIL_PATH:-}"
         if [[ -s "$existing_thumb" ]]; then
             local existing_size
             existing_size=$(wc -c < "$existing_thumb" | tr -d ' ')
             if (( existing_size > 5000 )); then
-                log_ok "Using thumbnail from detection phase (${existing_size} bytes) — skipping re-download"
+                log_ok "Using thumbnail from detection phase (${existing_size} bytes), skipping re-download"
             else
-                log_warn "Existing thumbnail too small (${existing_size}b) — trying re-download"
+                log_warn "Existing thumbnail too small (${existing_size}b), trying re-download"
                 existing_thumb=""
             fi
         else
@@ -374,7 +374,7 @@ post_process() {
                         log_ok "Thumbnail downloaded (${dl_size} bytes)"
                         set_env "LOCAL_THUMBNAIL_PATH" "$thumb_file"
                     else
-                        log_warn "Downloaded thumbnail is a placeholder (${dl_size}b) — discarding"
+                        log_warn "Downloaded thumbnail is a placeholder (${dl_size}b), discarding"
                         rm -f "$thumb_file"
                     fi
                 else

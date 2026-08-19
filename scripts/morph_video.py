@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  👻 YOUTUBE GHOST-HOST — Safe Video Morphing Engine                        ║
-# ║                                                                             ║
-# ║  Applies minimal, imperceptible transformations to defeat automated         ║
-# ║  Content ID matching while preserving watchable quality:                    ║
-# ║    1. Subtle 0.5° rotation (undetectable to human eye)                      ║
-# ║    2. Light noise floor (level 3, film-grain style)                         ║
-# ║    3. Pitch shift 0.8% (cannot hear it, hash-based detectors hate it)      ║
-# ║                                                                             ║
-# ║  When SKIP_MORPH=true (env var), passes through clean — useful for          ║
-# ║  unlisted backups where Content ID is not a concern.                        ║
-# ║                                                                             ║
-# ║  Usage:  python3 scripts/morph_video.py <input.mp4> <output.mp4>           ║
-# ║  Env:    SKIP_MORPH=true   →  pass-through copy (no morphing)              ║
+# ║  YOUTUBE GHOST-HOST, Safe Video Morphing Engine                              ║
+# ║                                                                              ║
+# ║  Applies minimal, imperceptible transformations to defeat automated          ║
+# ║  Content ID matching while preserving watchable quality:                     ║
+# ║    1. Subtle 0.5° rotation (undetectable to human eye)                       ║
+# ║    2. Light noise floor (level 3, film-grain style)                          ║
+# ║    3. Pitch shift 0.8% (cannot hear it, hash-based detectors hate it)        ║
+# ║                                                                              ║
+# ║  When SKIP_MORPH=true (env var), passes through clean, useful for            ║
+# ║  unlisted backups where Content ID is not a concern.                         ║
+# ║                                                                              ║
+# ║  Usage:  python3 scripts/morph_video.py <input.mp4> <output.mp4>             ║
+# ║  Env:    SKIP_MORPH=true   →  pass-through copy (no morphing)                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import os
@@ -45,7 +45,7 @@ def morph(input_path: str, output_path: str):
     skip = os.environ.get("SKIP_MORPH", "false").lower() in ("true", "1", "yes")
 
     if skip:
-        print("   ⏭️  SKIP_MORPH=true — copying clean (no morphing applied)")
+        print("   ⏭️  SKIP_MORPH=true, copying clean (no morphing applied)")
         subprocess.run(
             ["ffmpeg", "-y", "-i", input_path,
              "-c", "copy", "-movflags", "+faststart",
@@ -60,7 +60,7 @@ def morph(input_path: str, output_path: str):
     #  noise=alls=3:allf=t → level 3 noise (film grain, nearly invisible)
     #  asetrate=44100*1.008 → 0.8% pitch shift (imperceptible)
     #
-    # These values are intentionally MINIMAL — just enough to change the
+    # These values are intentionally MINIMAL, just enough to change the
     # binary fingerprint without affecting watchability.
     #
     # The rotate uses a black fill color (which gets mostly cropped out
@@ -68,7 +68,7 @@ def morph(input_path: str, output_path: str):
     # slight crop at edges is invisible).
 
     duration = get_video_duration(input_path)
-    print(f"   🎬 Input: {os.path.basename(input_path)} ({duration:.0f}s)")
+    print(f"   Input: {os.path.basename(input_path)} ({duration:.0f}s)")
 
     cmd = [
         "ffmpeg", "-y",
@@ -82,14 +82,14 @@ def morph(input_path: str, output_path: str):
         output_path,
     ]
 
-    print("   👻 Applying gentle morph (0.5° rotate, 0.8% pitch, level-3 noise)...")
+    print("   Applying gentle morph (0.5° rotate, 0.8% pitch, level-3 noise)...")
     subprocess.run(cmd, check=True)
 
     out_size = os.path.getsize(output_path)
     in_size = os.path.getsize(input_path)
     ratio = (out_size / in_size * 100) if in_size else 0
     print(f"   ✅ Morphed video saved to {output_path}")
-    print(f"   📊 Size: {out_size / 1024 / 1024:.1f} MB ({ratio:.0f}% of original)")
+    print(f"   Size: {out_size / 1024 / 1024:.1f} MB ({ratio:.0f}% of original)")
 
 
 if __name__ == "__main__":

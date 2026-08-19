@@ -1,6 +1,6 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   SYNC ARCHIVE BACKUPS → GALLERY + MIRRORS                               ║
-# ║  Imports missing personal-backup Archive.org items, then repairs mirrors.   ║
+# ║   SYNC ARCHIVE BACKUPS → GALLERY + MIRRORS                                   ║
+# ║  Imports missing personal-backup Archive.org items, then repairs mirrors.    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Sync archive backups + mirrors"

@@ -1,6 +1,6 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   QUALITY CHECK, Backend scripts + Dashboard build                       ║
-# ║  Fast validation gate for professional maintenance.                         ║
+# ║   QUALITY CHECK, Backend scripts + Dashboard build                           ║
+# ║  Fast validation gate for professional maintenance.                          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "✅ Quality check"

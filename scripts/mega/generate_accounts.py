@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔴 MEGA Account Generator — Multi-Provider Edition                        ║
-# ║  Generates MEGA.nz accounts using multiple temp email services.            ║
-# ║  Provider priority: Gmailnator → Mail.tm → Mail.gw → 1secmail            ║
-# ║                                                                            ║
-# ║  If Gmailnator email creation works but verification fails, it            ║
-# ║  automatically retries the FULL cycle with the next provider.             ║
+# ║  MEGA Account Generator, Multi-Provider Edition                              ║
+# ║  Generates MEGA.nz accounts using multiple temp email services.              ║
+# ║  Provider priority: Gmailnator → Mail.tm → Mail.gw → 1secmail                ║
+# ║                                                                              ║
+# ║  If Gmailnator email creation works but verification fails, it               ║
+# ║  automatically retries the FULL cycle with the next provider.                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import subprocess
@@ -53,12 +53,12 @@ def try_create_account(name, password, provider_classes=None):
             continue
 
         provider = ProviderClass()
-        print(f"📧 Trying {provider.name}...")
+        print(f"Trying {provider.name}...")
 
         # Step 1: Create email
         email = provider.create_email()
         if not email:
-            print(f"❌ {provider.name} — could not create email, trying next...")
+            print(f"❌ {provider.name}, could not create email, trying next...")
             continue
 
         print(f"✅ Got email: {email} ({provider.name})")
@@ -91,14 +91,14 @@ def try_create_account(name, password, provider_classes=None):
         timeout = 180 if provider.name == "Gmailnator" else 120
         email_body = wait_for_verification(
             provider,
-            subject_contains="",  # match ANY email — don't filter by subject
+            subject_contains="",  # match ANY email, don't filter by subject
             timeout=timeout
         )
 
         if not email_body:
-            print(f"> [{email}]: ❌ No verification email via {provider.name} — marking as unreliable")
+            print(f"> [{email}]: ❌ No verification email via {provider.name}, marking as unreliable")
             failed_providers.add(provider.name)
-            print("🔄 Retrying this account with next provider...")
+            print("Retrying this account with next provider...")
             continue
 
         # Step 4: Extract verification link
@@ -133,7 +133,7 @@ def try_create_account(name, password, provider_classes=None):
 
             if "registered successfully!" in str(verification.stdout):
                 print(f"> [{email}] ✅ Successfully registered and verified via {provider.name}")
-                print(f"  {email} — {password}")
+                print(f"  {email}, {password}")
 
                 with open(CSV_FILE, "a", newline='') as csvfile:
                     csvwriter = csv.writer(csvfile)
@@ -180,17 +180,17 @@ if __name__ == "__main__":
     provider_names = " → ".join([p.name for p in PROVIDERS])
 
     print("═══════════════════════════════════════")
-    print("🔴 MEGA Account Generator — Multi-Provider")
+    print("MEGA Account Generator, Multi-Provider")
     print("═══════════════════════════════════════")
-    print(f"📊 Generating {args.number} accounts...")
-    print(f"📧 Providers: {provider_names}")
-    print("🔄 Auto-fallback: if verification fails, retries with next provider")
+    print(f"Generating {args.number} accounts...")
+    print(f"Providers: {provider_names}")
+    print("Auto-fallback: if verification fails, retries with next provider")
     print("═══════════════════════════════════════")
 
     success_count = 0
     for i in range(args.number):
         print(f"\n{'─'*40}")
-        print(f"📦 Account {i+1}/{args.number}")
+        print(f"Account {i+1}/{args.number}")
         print(f"{'─'*40}")
 
         password = args.password or get_random_string(random.randint(8, 14))
@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
         if i < args.number - 1:
             delay = random.randint(3, 8)
-            print(f"\n⏳ Waiting {delay}s before next account...")
+            print(f"\nWaiting {delay}s before next account...")
             time.sleep(delay)
 
     print(f"\n{'═'*40}")
@@ -210,8 +210,8 @@ if __name__ == "__main__":
         with open(CSV_FILE) as f:
             total = sum(1 for _ in f) - 1
     print(f"✅ Done! {success_count}/{args.number} new accounts created")
-    print(f"📊 Total accounts in CSV: {total}")
+    print(f"Total accounts in CSV: {total}")
     print(f"✅ Accounts saved to {CSV_FILE}")
     if success_count == 0:
-        print("❌ No new MEGA accounts were created — failing workflow so you get a real signal")
+        print("❌ No new MEGA accounts were created, failing workflow so you get a real signal")
         exit(1)

@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   TruffleHog, deep secret scan of full git history                        ║
+# ║   TruffleHog, deep secret scan of full git history                           ║
 # ║  Complements gitleaks: scans the ENTIRE commit history (not just the diff)   ║
-# ║  with verification, catching credentials that were committed and later        ║
+# ║  with verification, catching credentials that were committed and later       ║
 # ║  removed but still live in history. Alerts Discord on findings.              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 

@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   STREAM RECORDER, WEEKLY SUMMARY WORKFLOW                              ║
-# ║  Runs every Monday at 10:00 UTC (3:00 PM PKT) to send weekly analytics.   ║
-# ║  Reads stats.json + links.txt and sends a premium Discord embed.          ║
+# ║   STREAM RECORDER, WEEKLY SUMMARY WORKFLOW                                   ║
+# ║  Runs every Monday at 10:00 UTC (3:00 PM PKT) to send weekly analytics.      ║
+# ║  Reads stats.json + links.txt and sends a premium Discord embed.             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Weekly summary"

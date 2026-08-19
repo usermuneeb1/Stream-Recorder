@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔴 MEGA CSV Format Converter                                              ║
-# ║  Converts old CSV format to new format (post May 2024).                    ║
-# ║  Based on: github.com/f-o/MEGA-Account-Generator (MIT License)            ║
+# ║  MEGA CSV Format Converter                                                   ║
+# ║  Converts old CSV format to new format (post May 2024).                      ║
+# ║  Based on: github.com/f-o/MEGA-Account-Generator (MIT License)               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import os

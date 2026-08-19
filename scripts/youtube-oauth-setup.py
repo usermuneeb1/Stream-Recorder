@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔑 YOUTUBE GHOST-HOST — OAuth Token Setup Helper                          ║
-# ║                                                                             ║
-# ║  Run this ONCE locally to get your refresh token:                           ║
-# ║    python youtube-oauth-setup.py                                            ║
-# ║                                                                             ║
-# ║  It will open a browser for you to authorize. After you grant access,       ║
-# ║  it saves youtube_token.json and prints the values for GitHub secrets.      ║
+# ║  YOUTUBE GHOST-HOST, OAuth Token Setup Helper                                ║
+# ║                                                                              ║
+# ║  Run this ONCE locally to get your refresh token:                            ║
+# ║    python youtube-oauth-setup.py                                             ║
+# ║                                                                              ║
+# ║  It will open a browser for you to authorize. After you grant access,        ║
+# ║  it saves youtube_token.json and prints the values for GitHub secrets.       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
@@ -18,7 +18,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
-# Accept both filenames — user might name it either way
+# Accept both filenames, user might name it either way
 CLIENT_SECRETS_FILE = None
 for name in ["client_secrets.json", "client_secret.json"]:
     if os.path.exists(name):
@@ -28,7 +28,7 @@ for name in ["client_secrets.json", "client_secret.json"]:
 
 def main():
     print("╔═══════════════════════════════════════════════════════════════╗")
-    print("║  🔑 YouTube OAuth Setup Helper                              ║")
+    print("║  YouTube OAuth Setup Helper                              ║")
     print("╚═══════════════════════════════════════════════════════════════╝")
     print()
 
@@ -48,12 +48,12 @@ def main():
         input("Press Enter to exit...")
         sys.exit(1)
 
-    print(f"📖 Loading {CLIENT_SECRETS_FILE}...")
+    print(f"Loading {CLIENT_SECRETS_FILE}...")
     flow = InstalledAppFlow.from_client_secrets_file(
         CLIENT_SECRETS_FILE, SCOPES
     )
 
-    print("🌐 Opening browser for authorization...")
+    print("Opening browser for authorization...")
     print("   A browser tab will open.")
     print("   Sign in with the YouTube account you want to upload to.")
     print("   Click 'Advanced' → 'Go to Stream Recorder (unsafe)' → Allow all.")

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — BULLETPROOF RECORDING ENGINE                          ║
-# ║  6-method, 3-attempt approach to guarantee successful recording.            ║
-# ║  Methods: web → tv → ios → android_vr → mweb → streamlink                ║
-# ║  Each attempt checks if stream is still live before retrying.              ║
+# ║  STREAM RECORDER, BULLETPROOF RECORDING ENGINE                               ║
+# ║  6-method, 3-attempt approach to guarantee successful recording.             ║
+# ║  Methods: web → tv → ios → android_vr → mweb → streamlink                    ║
+# ║  Each attempt checks if stream is still live before retrying.                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -48,12 +48,12 @@ export -f _log_method_failure
 CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PUBLIC_STREAM_ONLY (default: false — HYBRID mode)
+# PUBLIC_STREAM_ONLY (default: false, HYBRID mode)
 #   Set to "true" only if you NEVER want cookie-based methods to run.
 #
 #   HYBRID MODE (the default):
 #     • Cookieless methods (H ytarchive, I streamlink, D androidvr, C
-#       mediaconnect, G/E/F) run FIRST — fastest path, no cookie risk.
+#       mediaconnect, G/E/F) run FIRST, fastest path, no cookie risk.
 #     • Cookie-based methods (A web_creator, B tv_embedded) run as a
 #       fallback if the cookieless methods all bail. This is what catches
 #       sign-in-required / age-restricted / membership streams.
@@ -84,18 +84,18 @@ record_method_a() {
 
     # Permanent cookieless mode for public streams
     if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]]; then
-        log_info "  Method A: Skipped (PUBLIC_STREAM_ONLY=true — cookieless permanent mode)"
+        log_info "  Method A: Skipped (PUBLIC_STREAM_ONLY=true, cookieless permanent mode)"
         return 1
     fi
 
     # Skip if cookies are expired or missing
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
-        log_warn "  Method A: Cookies expired — skipping"
+        log_warn "  Method A: Cookies expired, skipping"
         return 1
     fi
     
     if [[ ! -f "$COOKIES_FILE" ]] || [[ ! -s "$COOKIES_FILE" ]]; then
-        log_warn "  Method A: No cookies file — skipping"
+        log_warn "  Method A: No cookies file, skipping"
         return 1
     fi
     
@@ -124,7 +124,7 @@ record_method_a() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD B: Cookies + tv_embedded Player
-#  Embedded TV player — bypasses n-challenge and most bot detection
+#  Embedded TV player, bypasses n-challenge and most bot detection
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_b() {
@@ -137,17 +137,17 @@ record_method_b() {
 
     # Permanent cookieless mode for public streams
     if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]]; then
-        log_info "  Method B: Skipped (PUBLIC_STREAM_ONLY=true — cookieless permanent mode)"
+        log_info "  Method B: Skipped (PUBLIC_STREAM_ONLY=true, cookieless permanent mode)"
         return 1
     fi
 
     if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
-        log_warn "  Method B: Cookies expired — skipping"
+        log_warn "  Method B: Cookies expired, skipping"
         return 1
     fi
     
     if [[ ! -f "$COOKIES_FILE" ]] || [[ ! -s "$COOKIES_FILE" ]]; then
-        log_warn "  Method B: No cookies file — skipping"
+        log_warn "  Method B: No cookies file, skipping"
         return 1
     fi
     
@@ -176,7 +176,7 @@ record_method_b() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD C: mediaconnect Player (No Cookies)
-#  Newer YouTube client — no PO token required (unlike ios)
+#  Newer YouTube client, no PO token required (unlike ios)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_c() {
@@ -208,14 +208,14 @@ record_method_c() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD D: Android VR Player (PROVEN WORKING)
-#  Bypasses n-challenge entirely — most reliable as of May 2026
+#  Bypasses n-challenge entirely, most reliable as of May 2026
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_d() {
     local video_url="$1"
     local output_file="$2"
     
-    log_info "  Method D: Android VR player (cookieless 1080p — primary)"
+    log_info "  Method D: Android VR player (cookieless 1080p, primary)"
     
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
@@ -251,7 +251,7 @@ record_method_d() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD E: Mobile Web Player
-#  mweb client with mobile user-agent — minimal bot detection
+#  mweb client with mobile user-agent, minimal bot detection
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_e() {
@@ -291,7 +291,7 @@ record_method_e() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD F: Streamlink (Completely Different Tool)
-#  Uses HLS directly, bypasses yt-dlp entirely — different codebase
+#  Uses HLS directly, bypasses yt-dlp entirely, different codebase
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_method_f() {
@@ -301,7 +301,7 @@ record_method_f() {
     log_info "  Method F: Streamlink (HLS direct)"
     
     if ! command -v streamlink &>/dev/null; then
-        log_warn "  Method F: streamlink not installed — skipping"
+        log_warn "  Method F: streamlink not installed, skipping"
         return 1
     fi
     
@@ -328,7 +328,7 @@ record_method_f() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD G: Plain yt-dlp (Default — No Player Override)
+#  RECORDING METHOD G: Plain yt-dlp (Default, No Player Override)
 #  Lets yt-dlp auto-select the best client. Most reliable general method.
 #  This is what "yt-dlp JSON Dump" detection method uses internally.
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -366,7 +366,7 @@ record_method_g() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  FILE VALIDATOR — Check if recorded file is valid
+#  FILE VALIDATOR, Check if recorded file is valid
 # ═══════════════════════════════════════════════════════════════════════════════
 
 validate_recorded_file() {
@@ -441,19 +441,19 @@ validate_recorded_file() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING ATTEMPT — Tries all 7 methods in sequence
+#  RECORDING ATTEMPT, Tries all 7 methods in sequence
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# APPEND-ONLY snippet — paste at the END of scripts/record-stream.sh, BEFORE
+# APPEND-ONLY snippet, paste at the END of scripts/record-stream.sh, BEFORE
 # the `attempt_recording()` function definition (around line 392). Nothing
 # above this line gets touched.
 #
 # Adds two new recording methods:
-#   H: ytarchive  — purpose-built YouTube live stream archiver, separate codebase
-#   I: streamlink (hardened) — independent of yt-dlp, with PoToken-aware retries
+#   H: ytarchive, purpose-built YouTube live stream archiver, separate codebase
+#   I: streamlink (hardened), independent of yt-dlp, with PoToken-aware retries
 #
-# Also defines _pot_args() — a helper that returns yt-dlp PoToken provider args
+# Also defines _pot_args(), a helper that returns yt-dlp PoToken provider args
 # if the local PoToken provider is running, or empty array otherwise.
 # Existing methods can opt-in by adding "" to their yt-dlp call.
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -462,7 +462,7 @@ validate_recorded_file() {
 # ── PoToken provider helper ─────────────────────────────────────────────────
 # Returns extractor-args that route yt-dlp through the local bgutil PoToken
 # HTTP service if it is reachable. Safe to call when the service isn't running
-# — it returns an empty array and yt-dlp behaves exactly as before.
+#, it returns an empty array and yt-dlp behaves exactly as before.
 _pot_args() {
     local -n _out=$1
     _out=()
@@ -491,14 +491,14 @@ record_method_h() {
     log_info "  Method H: ytarchive (cookieless, purpose-built for live)"
 
     if ! command -v ytarchive &>/dev/null; then
-        log_warn "  Method H: ytarchive not installed — skipping"
+        log_warn "  Method H: ytarchive not installed, skipping"
         return 1
     fi
 
     # ytarchive writes to <output>.<ext>, so strip the .mp4 we were given
     local base="${output_file%.mp4}"
 
-    # Optional cookies — only if verified valid (matches method D's logic)
+    # Optional cookies, only if verified valid (matches method D's logic)
     local -a cookies_args=()
     if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
         && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
@@ -523,7 +523,7 @@ record_method_h() {
     [[ "$status" == "124" ]] && return 0
 
     # ytarchive sometimes writes to <base>.mp4 directly, sometimes to
-    # <base>.f<itag>.mp4 — try to find what it actually produced.
+    # <base>.f<itag>.mp4, try to find what it actually produced.
     if [[ ! -f "$output_file" ]]; then
         local produced
         produced=$(ls -1t "${base}".* 2>/dev/null | grep -E '\.(mp4|mkv|ts|webm)$' | head -1 || true)
@@ -535,10 +535,10 @@ record_method_h() {
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD I: streamlink (HARDENED — DIFFERENT FROM EXISTING METHOD F)
+#  RECORDING METHOD I: streamlink (HARDENED, DIFFERENT FROM EXISTING METHOD F)
 #  Independent of yt-dlp. Hardened retry flags to survive longer outages, and
 #  uses ffmpeg for the final mux so we get a clean MP4 with faststart.
-#  Method F already uses streamlink but with default flags — this is the
+#  Method F already uses streamlink but with default flags, this is the
 #  "give it everything" variant for when F's defaults aren't enough.
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -549,7 +549,7 @@ record_method_i() {
     log_info "  Method I: streamlink (hardened retry, independent codebase)"
 
     if ! command -v streamlink &>/dev/null; then
-        log_warn "  Method I: streamlink not installed — skipping"
+        log_warn "  Method I: streamlink not installed, skipping"
         return 1
     fi
 
@@ -586,7 +586,7 @@ record_method_i() {
     return "$status"
 }
 
-# v4: RECORDING METHOD J — ffmpeg HLS direct (independent path)
+# v4: RECORDING METHOD J, ffmpeg HLS direct (independent path)
 # Resolves the HLS manifest URL via yt-dlp --get-url, then hands it to ffmpeg.
 # Catches cases where yt-dlp internal downloader hits n-challenge but ffmpeg
 # can still read the manifest.
@@ -597,7 +597,7 @@ record_method_j() {
   log_info " Method J: ffmpeg HLS direct (independent path)"
 
   if ! command -v ffmpeg &>/dev/null; then
-    log_warn " Method J: ffmpeg not installed — skipping"
+    log_warn " Method J: ffmpeg not installed, skipping"
     return 1
   fi
 
@@ -653,13 +653,13 @@ attempt_recording() {
     
     # ── METHOD ORDER (Option C: cookieless-first reliability) ──────────────
     # Verified 2026-06-14: android_vr + mediaconnect both return FULL 1080p
-    # WITHOUT cookies. So we try the proven cookieless methods FIRST — this means
+    # WITHOUT cookies. So we try the proven cookieless methods FIRST, this means
     # stale/expired YouTube cookies can NEVER block a public-stream recording.
     # The cookie-based methods (A/B) run only AFTER, as a bonus for the rare
     # members-only / age-restricted stream where cookies are actually required.
 
     local methods=(
-        "record_method_d"      # android_vr — NO PoToken (guide) — yt-dlp first
+        "record_method_d"      # android_vr, NO PoToken (guide), yt-dlp first
         "record_method_c"      # mediaconnect
         "record_method_g"      # plain yt-dlp
         "record_method_e"      # mweb
@@ -671,7 +671,7 @@ attempt_recording() {
         "record_method_b"      # cookies tv_embedded
     )
     # NOTE: this array MUST stay aligned 1:1 with `methods[]` above.
-    # (A previous version drifted out of order — 9/10 labels pointed at the
+    # (A previous version drifted out of order, 9/10 labels pointed at the
     # wrong method, so failure logs + the Discord diagnostic dump reported
     # the wrong tool. Reordering `methods[]` without updating this array
     # was the root cause.)
@@ -702,7 +702,7 @@ attempt_recording() {
             return 0
         }
         
-        log_warn "  Method ${method_names[$i]} — no valid file produced"
+        log_warn "  Method ${method_names[$i]}, no valid file produced"
         
         # Small delay between methods
         sleep "${METHOD_RETRY_DELAY:-5}"
@@ -713,7 +713,7 @@ attempt_recording() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SEGMENT MERGER — Combine multiple segments into one file
+#  SEGMENT MERGER, Combine multiple segments into one file
 # ═══════════════════════════════════════════════════════════════════════════════
 
 merge_segments() {
@@ -725,7 +725,7 @@ merge_segments() {
     fi
     
     if [[ ${#RECORDED_FILES[@]} -eq 1 ]]; then
-        log_info "Single segment — moving to output"
+        log_info "Single segment, moving to output"
         mv "${RECORDED_FILES[0]}" "$output_file"
         return 0
     fi
@@ -755,7 +755,7 @@ merge_segments() {
         return 0
     fi
     
-    log_warn "Lossless merge failed — trying re-encode merge..."
+    log_warn "Lossless merge failed, trying re-encode merge..."
     
     # Fallback: re-encode merge
     if ffmpeg -y -f concat -safe 0 -i "$concat_file" \
@@ -771,7 +771,7 @@ merge_segments() {
         return 0
     fi
     
-    log_warn "Merge failed — using largest single segment"
+    log_warn "Merge failed, using largest single segment"
     
     # Fallback: use the largest segment
     local largest_file=""
@@ -805,7 +805,7 @@ merge_segments() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 record_stream() {
-    log_header "🎬 BULLETPROOF RECORDING ENGINE"
+    log_header "BULLETPROOF RECORDING ENGINE"
     
     local video_url="${STREAM_URL:-}"
     local video_id="${STREAM_VIDEO_ID:-}"
@@ -822,13 +822,13 @@ record_stream() {
     log_info "Max Tries : ${MAX_RECORD_ATTEMPTS:-3} attempts × 10 methods = $((${MAX_RECORD_ATTEMPTS:-3} * 10)) chances"
     log_info "Started   : $(now_pkt)"
 
-    # v4: pre-flight liveness check — race-condition guard for streams that
+    # v4: pre-flight liveness check, race-condition guard for streams that
     # end between detection and recording (this lost HbS5TF1atFU).
     log_step "Pre-flight: verifying stream is still live..."
     if is_stream_still_live "$video_id"; then
-        log_ok "Pre-flight: stream is LIVE — proceeding"
+        log_ok "Pre-flight: stream is LIVE, proceeding"
     else
-        log_warn "Pre-flight: stream is NOT live anymore — falling through to VOD rescue"
+        log_warn "Pre-flight: stream is NOT live anymore, falling through to VOD rescue"
     fi
     
     # ── Prepare directories ──────────────────────────────────────────────────
@@ -876,7 +876,7 @@ record_stream() {
             log_warn "Attempt ${attempt} failed to produce a recording (${consecutive_failures} consecutive failure(s))"
             # If we've had 2+ consecutive failures on non-first attempt, stream is likely over
             if (( attempt > 1 && consecutive_failures >= 2 )) && [[ "$ever_succeeded" == "true" ]]; then
-                log_info "Multiple consecutive failures after a successful segment — stream has ended"
+                log_info "Multiple consecutive failures after a successful segment, stream has ended"
                 break
             fi
         fi
@@ -885,9 +885,9 @@ record_stream() {
         if (( attempt < max_attempts )); then
             
             # If custom duration mode, this was a single-shot run.
-            # Break immediately — don't loop or wait for live checks.
+            # Break immediately, don't loop or wait for live checks.
             if [[ "${CUSTOM_DURATION_MODE:-false}" == "true" ]]; then
-                log_info "Custom duration mode — single-shot recording complete. Breaking loop."
+                log_info "Custom duration mode, single-shot recording complete. Breaking loop."
                 break
             fi
             
@@ -907,17 +907,17 @@ record_stream() {
                     fi
                 done
                 if [[ "$is_ended" == "true" ]]; then
-                    log_info "Stream has verified ended — stopping recording loop"
+                    log_info "Stream has verified ended, stopping recording loop"
                     break
                 fi
             fi
             
             if is_stream_still_live "$video_id"; then
-                log_info "Stream is still live — recording next segment"
+                log_info "Stream is still live, recording next segment"
                 (( attempt++ ))
                 continue
             else
-                log_info "Stream has ended — stopping recording loop"
+                log_info "Stream has ended, stopping recording loop"
                 break
             fi
         fi
@@ -937,8 +937,8 @@ record_stream() {
     fi
     
     if [[ ${#RECORDED_FILES[@]} -eq 0 ]]; then
-        log_warn "═══ LIVE RECORDING FAILED — TRYING VOD RESCUE ═══"
-        log_info "All live methods failed — attempting to grab VOD replay before it goes private..."
+        log_warn "═══ LIVE RECORDING FAILED, TRYING VOD RESCUE ═══"
+        log_info "All live methods failed, attempting to grab VOD replay before it goes private..."
         
         # ── VOD RESCUE FALLBACK ──────────────────────────────────────────
         # After a stream ends, the VOD stays public for a few minutes
@@ -960,7 +960,7 @@ record_stream() {
         local vod_url="https://www.youtube.com/watch?v=${video_id}"
         while (( vod_wait_iters < max_vod_wait )); do
             if is_stream_still_live "$video_id"; then
-                log_warn "VOD wait: stream is STILL live — unexpected, breaking"
+                log_warn "VOD wait: stream is STILL live, unexpected, breaking"
                 break
             fi
             local http_code
@@ -970,7 +970,7 @@ record_stream() {
                 log_ok "VOD is now accessible (after $((vod_wait_iters * 60))s)"
                 break
             fi
-            log_info "VOD not yet available (HTTP $http_code) — waiting 60s more... [$((vod_wait_iters + 1))/${max_vod_wait}]"
+            log_info "VOD not yet available (HTTP $http_code), waiting 60s more... [$((vod_wait_iters + 1))/${max_vod_wait}]"
             sleep 60
             (( vod_wait_iters++ ))
         done
@@ -996,7 +996,7 @@ record_stream() {
             local client="${vod_methods[$i]}"
             local mname="${vod_method_names[$i]}"
             
-            log_info "  🆘 VOD Rescue attempt $((i+1))/${#vod_methods[@]}: ${mname}..."
+            log_info "  VOD Rescue attempt $((i+1))/${#vod_methods[@]}: ${mname}..."
             
             # Try downloading the full VOD (not live, just the replay)
             if timeout 1800 yt-dlp \
@@ -1015,13 +1015,13 @@ record_stream() {
                     local vod_size
                     vod_size=$(get_file_size "$vod_output")
                     if (( vod_size >= 5000000 )); then  # At least 5MB
-                        log_ok "  🆘 VOD Rescue SUCCESS! Method: ${mname} — $(format_size "$vod_size")"
+                        log_ok "  VOD Rescue SUCCESS! Method: ${mname}, $(format_size "$vod_size")"
                         RECORDED_FILES+=("$vod_output")
                         RECORDING_SUCCESS=true
                         vod_rescued=true
                         break
                     else
-                        log_warn "  VOD file too small ($(format_size "$vod_size")) — trying next method"
+                        log_warn "  VOD file too small ($(format_size "$vod_size")), trying next method"
                         rm -f "$vod_output"
                     fi
                 fi
@@ -1030,7 +1030,7 @@ record_stream() {
             # Also try with cookies if available (they might still work for VOD even if live failed)
             # Skipped entirely under PUBLIC_STREAM_ONLY=true (permanent cookieless mode)
             if [[ "$vod_rescued" != "true" ]] && [[ "${PUBLIC_STREAM_ONLY:-false}" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
-                log_info "  🆘 VOD Rescue retry with cookies: ${mname}..."
+                log_info "  VOD Rescue retry with cookies: ${mname}..."
                 if timeout 1800 yt-dlp \
                     --cookies "$COOKIES_FILE" \
                     --extractor-args "youtube:player_client=${client}" \
@@ -1047,7 +1047,7 @@ record_stream() {
                         local vod_size
                         vod_size=$(get_file_size "$vod_output")
                         if (( vod_size >= 5000000 )); then
-                            log_ok "  🆘 VOD Rescue SUCCESS (with cookies)! Method: ${mname} — $(format_size "$vod_size")"
+                            log_ok "  VOD Rescue SUCCESS (with cookies)! Method: ${mname}, $(format_size "$vod_size")"
                             RECORDED_FILES+=("$vod_output")
                             RECORDING_SUCCESS=true
                             vod_rescued=true

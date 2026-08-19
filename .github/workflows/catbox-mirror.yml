@@ -1,11 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  CATBOX MIRROR, Upload thumbnails/transcripts to Catbox.moe            ║
-# ║                                                                            ║
-# ║ Catbox = permanent, no account, direct hotlinks.                           ║
-# ║ Perfect for thumbnails, subtitles, chat logs (all < 200MB).               ║
-# ║ For videos > 200MB, uses Litterbox (72h temp) as warm-up CDN.             ║
-# ║                                                                            ║
-# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
+# ║  CATBOX MIRROR, upload thumbnails/transcripts to Catbox.moe                  ║
+# ║                                                                              ║
+# ║ Catbox = permanent, no account, direct hotlinks.                             ║
+# ║ Perfect for thumbnails, subtitles, chat logs (all < 200MB).                  ║
+# ║ For videos > 200MB, uses Litterbox (72h temp) as warm-up CDN.                ║
+# ║                                                                              ║
+# ║ SAFE: Standalone workflow. Does NOT modify existing workflows.               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: Catbox mirror

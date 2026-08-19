@@ -1,25 +1,25 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   GO-LIVE SNIPER, independent, redundant capture path                    ║
-# ║                                                                            ║
-# ║  Purpose: GUARANTEE a stream is captured the moment it goes live, because   ║
-# ║  the uploader privates the VOD afterward (no second chance).               ║
-# ║                                                                            ║
-# ║  How it differs from the main Stream Recorder:                              ║
-# ║    • Separate concurrency group ("stream-sniper") → never blocked by, and   ║
-# ║      never cancels, the main recorder.                                      ║
-# ║    • cancel-in-progress: FALSE → an active capture is never killed.         ║
-# ║    • Fast single-pass go-live check (no premiere/upcoming, no long waits).  ║
-# ║    • Coordinates with the main recorder via recording-lock.sh so the two    ║
-# ║      don't both record the same stream (rare duplicate at worst).           ║
-# ║                                                                            ║
-# ║  Triggers:                                                                  ║
-# ║    • repository_dispatch "ping-sniper"  ← external pinger (PRIMARY coverage)║
-# ║    • schedule "*/2 * * * *"            ← best-effort (GitHub throttles cron)║
-# ║    • workflow_dispatch                                                      ║
-# ║                                                                            ║
-# ║  Set up the external pinger to fire BOTH:                                   ║
-# ║    ping-recorder  → Stream Recorder   (the main loop)                       ║
-# ║    ping-sniper    → Go-Live Sniper    (this redundant watcher)              ║
+# ║   GO-LIVE SNIPER, independent, redundant capture path                        ║
+# ║                                                                              ║
+# ║  Purpose: GUARANTEE a stream is captured the moment it goes live, because    ║
+# ║  the uploader privates the VOD afterward (no second chance).                 ║
+# ║                                                                              ║
+# ║  How it differs from the main Stream Recorder:                               ║
+# ║    • Separate concurrency group ("stream-sniper") → never blocked by, and    ║
+# ║      never cancels, the main recorder.                                       ║
+# ║    • cancel-in-progress: FALSE → an active capture is never killed.          ║
+# ║    • Fast single-pass go-live check (no premiere/upcoming, no long waits).   ║
+# ║    • Coordinates with the main recorder via recording-lock.sh so the two     ║
+# ║      don't both record the same stream (rare duplicate at worst).            ║
+# ║                                                                              ║
+# ║  Triggers:                                                                   ║
+# ║    • repository_dispatch "ping-sniper"  ← external pinger (PRIMARY coverage) ║
+# ║    • schedule "*/2 * * * *"            ← best-effort (GitHub throttles cron) ║
+# ║    • workflow_dispatch                                                       ║
+# ║                                                                              ║
+# ║  Set up the external pinger to fire BOTH:                                    ║
+# ║    ping-recorder  → Stream Recorder   (the main loop)                        ║
+# ║    ping-sniper    → Go-Live Sniper    (this redundant watcher)               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Go-live sniper"
@@ -186,7 +186,7 @@ jobs:
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
 
-      - name: "✅ Notify, recording complete"
+      - name: "✅ Notify on recording complete"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         run: |
           source scripts/utils.sh; source scripts/discord-notify.sh
@@ -202,7 +202,7 @@ jobs:
         continue-on-error: true
         run: bash scripts/update-links.sh
 
-      - name: "❌ Notify, recording failed"
+      - name: "❌ Notify on recording failure"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success != 'true'
         run: |
           source scripts/utils.sh; source scripts/discord-notify.sh

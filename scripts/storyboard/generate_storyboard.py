@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🎞️  STORYBOARD GENERATOR — Hover-preview thumbnails for the player
+ STORYBOARD GENERATOR, Hover-preview thumbnails for the player
 
 For each recording, generates:
   • A single JPEG sprite sheet of frames (one every STORYBOARD_INTERVAL_SEC).
@@ -14,9 +14,9 @@ The dashboard's <MediaPlayer> reads `storyboard` and shows a tooltip
 preview as the user hovers the seek bar.
 
 SAFE:
-  - Standalone — does not touch existing scripts/workflows.
+  - Standalone, does not touch existing scripts/workflows.
   - Skips recordings that already have a working storyboard.
-  - Skips recordings under MIN_DURATION_SEC (default 10 min — too short to be useful).
+  - Skips recordings under MIN_DURATION_SEC (default 10 min, too short to be useful).
   - Hard time-cap of 4 minutes per recording so a stuck ffmpeg never hangs CI.
   - Hard limit of MAX_ITEMS recordings per run (default 3) so the job never
     blows past GitHub's 30-min ceiling.
@@ -58,7 +58,7 @@ RECS = ROOT / "data" / "recordings.json"
 # of the pipeline already has as repo secrets.
 ARCHIVE_ACCESS_KEY = os.environ.get("ARCHIVE_ACCESS_KEY", "").strip()
 ARCHIVE_SECRET_KEY = os.environ.get("ARCHIVE_SECRET_KEY", "").strip()
-# Single permanent bucket — every storyboard sprite lives here under
+# Single permanent bucket, every storyboard sprite lives here under
 # the video_id as filename. Saves on Archive.org item-creation rate limits.
 ARCHIVE_ITEM = os.environ.get(
     "STORYBOARD_ARCHIVE_ITEM",
@@ -66,24 +66,24 @@ ARCHIVE_ITEM = os.environ.get(
 )
 
 MAX_ITEMS      = int(os.environ.get("STORYBOARD_MAX_ITEMS", "3"))
-# 30s interval (was 10s) — 3× fewer frames means 3× faster ffmpeg pass.
+# 30s interval (was 10s), 3× fewer frames means 3× faster ffmpeg pass.
 # Long streams (3h) still get ~360 frames, plenty for hover previews.
 INTERVAL_SEC   = int(os.environ.get("STORYBOARD_INTERVAL_SEC", "30"))
 COLS           = int(os.environ.get("STORYBOARD_COLS", "10"))
-# Smaller tiles (was 160×90 → 120×68) — half the pixels, much faster to
+# Smaller tiles (was 160×90 → 120×68), half the pixels, much faster to
 # encode and a smaller final JPEG to upload to free hosts.
 THUMB_W        = int(os.environ.get("STORYBOARD_THUMB_W", "240"))
 THUMB_H        = int(os.environ.get("STORYBOARD_THUMB_H", "135"))
 MIN_DURATION   = int(os.environ.get("STORYBOARD_MIN_DURATION_SEC", "600"))
 FORCE          = os.environ.get("STORYBOARD_FORCE", "false").lower() in ("1", "true", "yes")
-# 8-minute ceiling (was 4) — long streams need more time to download frames
+# 8-minute ceiling (was 4), long streams need more time to download frames
 # from Archive.org over the network. ffmpeg itself is fast; the I/O is the
 # bottleneck.
 FFMPEG_TIMEOUT = int(os.environ.get("STORYBOARD_FFMPEG_TIMEOUT", "480"))
 
 
 def log(msg: str) -> None:
-    print(f"  🎞️  Storyboard: {msg}", flush=True)
+    print(f"   Storyboard: {msg}", flush=True)
 
 
 def best_source_url(r: dict) -> str:
@@ -149,7 +149,7 @@ def build_sprite(source_url: str, duration: int, out_path: pathlib.Path) -> Opti
     elapsed = int(time.time() - started)
     size = out_path.stat().st_size if out_path.exists() else 0
     if size < 5000:
-        log(f"sprite output too small ({size} bytes) — discarding")
+        log(f"sprite output too small ({size} bytes), discarding")
         return None
     log(f"sprite built in {elapsed}s ({size//1024} KB)")
 
@@ -204,10 +204,10 @@ def upload_archive(path: pathlib.Path, remote_name: str, content_type: str) -> O
     Uses the same S3-compatible endpoint + LOW auth pattern that the rest
     of the pipeline already uses for video uploads (see url-to-cloud.yml
     line 231). Includes x-archive-auto-make-bucket so the item is created
-    on first upload — subsequent uploads just add new files to it.
+    on first upload, subsequent uploads just add new files to it.
     """
     if not ARCHIVE_ACCESS_KEY or not ARCHIVE_SECRET_KEY:
-        log("ARCHIVE_ACCESS_KEY / ARCHIVE_SECRET_KEY not set — cannot upload")
+        log("ARCHIVE_ACCESS_KEY / ARCHIVE_SECRET_KEY not set, cannot upload")
         return None
     url = f"https://s3.us.archive.org/{ARCHIVE_ITEM}/{remote_name}"
     cmd = [
@@ -263,7 +263,7 @@ def main() -> int:
     data = json.loads(RECS.read_text())
     candidates = pick_candidates(data)
     if not candidates:
-        log("no candidates need storyboards — nothing to do")
+        log("no candidates need storyboards, nothing to do")
         return 0
 
     log(f"processing {len(candidates)} recording(s)")
@@ -276,29 +276,29 @@ def main() -> int:
             vid = rec.get("video_id", "")
             src = best_source_url(rec)
             duration = int(rec.get("duration_sec", 0) or 0)
-            log(f"── {vid} — {rec.get('title','')[:60]} ({duration//60} min)")
+            log(f"── {vid}, {rec.get('title','')[:60]} ({duration//60} min)")
 
             # Generate sprite into a tmp file (Archive.org-hosted, NOT git-hosted).
             sprite_path = tmp / f"{vid}.jpg"
             meta = build_sprite(src, duration, sprite_path)
             if not meta:
-                log("  ✗ sprite generation failed — skipping")
+                log("  sprite generation failed, skipping")
                 continue
 
             sprite_url = upload_archive(sprite_path, f"{vid}.jpg", "image/jpeg")
             if not sprite_url:
-                log("  ✗ sprite upload to Archive.org failed — skipping")
+                log("  sprite upload to Archive.org failed, skipping")
                 continue
-            log(f"  ✓ sprite uploaded: {sprite_url}")
+            log(f"  sprite uploaded: {sprite_url}")
 
             vtt_path = tmp / f"{vid}.vtt"
             vtt_text = build_vtt(meta, sprite_url, duration)
             vtt_path.write_text(vtt_text)
             vtt_url = upload_archive(vtt_path, f"{vid}.vtt", "text/vtt")
             if not vtt_url:
-                log("  ✗ vtt upload to Archive.org failed — skipping")
+                log("  vtt upload to Archive.org failed, skipping")
                 continue
-            log(f"  ✓ vtt uploaded:    {vtt_url}")
+            log(f"  vtt uploaded:    {vtt_url}")
 
             rec["storyboard"] = {
                 "url": sprite_url,
@@ -315,7 +315,7 @@ def main() -> int:
 
         if updated > 0:
             RECS.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-            log(f"✓ wrote {updated} storyboard entries to recordings.json")
+            log(f"wrote {updated} storyboard entries to recordings.json")
         else:
             log("nothing successfully generated")
 

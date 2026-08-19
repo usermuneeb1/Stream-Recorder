@@ -18,7 +18,7 @@ This script:
   4. Commits the cleaned recordings.json so the next ghost-host workflow
      picks them up as 'needs upload'.
 
-After this runs, manually trigger '👻 YouTube Ghost-Host' workflow to
+After this runs, manually trigger 'YouTube Ghost-Host' workflow to
 re-upload everything with embeddable=True.
 """
 import json
@@ -56,7 +56,7 @@ def main():
     for vid in sorted(ids_to_clear):
         try:
             yt.videos().delete(id=vid).execute()
-            print(f"  🗑️  deleted {vid}")
+            print(f"   deleted {vid}")
             deleted.append(vid)
         except HttpError as e:
             # 404 = already gone, count it as deleted so we still clear the field
@@ -79,7 +79,7 @@ def main():
             cleaned += 1
     RECS.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
     print(f"\nCleared youtube_id/youtube_unlisted from {cleaned} entries in recordings.json")
-    print("Next: trigger the '👻 YouTube Ghost-Host' workflow to re-upload with embedding enabled.")
+    print("Next: trigger the 'YouTube Ghost-Host' workflow to re-upload with embedding enabled.")
     return 0
 
 

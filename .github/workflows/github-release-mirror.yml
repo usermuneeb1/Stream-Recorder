@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   GitHub Releases Mirror, fast, free, permanent video hosting              ║
-# ║  Uploads each recording's .mp4 to a GitHub Release asset (≤2 GiB/file, no     ║
-# ║  total-size or bandwidth cap) and saves the fast Azure-CDN URL into           ║
+# ║   GitHub Releases Mirror, fast, free, permanent video hosting                ║
+# ║  Uploads each recording's .mp4 to a GitHub Release asset (≤2 GiB/file, no    ║
+# ║  total-size or bandwidth cap) and saves the fast Azure-CDN URL into          ║
 # ║  data/recordings.json so the player can use it as the #1 source.             ║
 # ║  Uses the built-in GITHUB_TOKEN, no extra secrets, no account farming.       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝

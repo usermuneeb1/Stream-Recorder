@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — AUTOMATED CLOUD LINK PRESERVATION v2.0              ║
-# ║  Runs every 3 days to keep Gofile/Pixeldrain links alive.                  ║
-# ║  Dead links → edits the original Discord message with Archive.org fallback ║
-# ║  Updates links.txt to mark expired links.                                  ║
+# ║  STREAM RECORDER, AUTOMATED CLOUD LINK PRESERVATION v2.0                     ║
+# ║  Runs every 3 days to keep Gofile/Pixeldrain links alive.                    ║
+# ║  Dead links → edits the original Discord message with Archive.org fallback   ║
+# ║  Updates links.txt to mark expired links.                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -44,7 +44,7 @@ check_link_alive() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  GOFILE REFRESH — Download 1KB to reset expiration timer
+#  GOFILE REFRESH, Download 1KB to reset expiration timer
 # ═══════════════════════════════════════════════════════════════════════════════
 
 refresh_gofile() {
@@ -58,7 +58,7 @@ refresh_gofile() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PIXELDRAIN REFRESH — Download 10% of file to reset expiration timer
+#  PIXELDRAIN REFRESH, Download 10% of file to reset expiration timer
 #  Pixeldrain requires downloading a meaningful portion of the file.
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -86,7 +86,7 @@ refresh_pixeldrain() {
     file_size=$(echo "$info_response" | jq -r '.size // 0' 2>/dev/null)
     
     if [[ -z "$file_size" ]] || [[ "$file_size" == "0" ]] || [[ "$file_size" == "null" ]]; then
-        log_warn "    Could not determine file size — downloading 50MB fallback chunk"
+        log_warn "    Could not determine file size, downloading 50MB fallback chunk"
         file_size=524288000  # assume 500MB → 10% = 50MB
     fi
     
@@ -194,7 +194,7 @@ parse_entries_from_links() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  EDIT DISCORD MESSAGE — Replace dead links with Archive.org fallback
+#  EDIT DISCORD MESSAGE, Replace dead links with Archive.org fallback
 # ═══════════════════════════════════════════════════════════════════════════════
 
 edit_discord_dead_links() {
@@ -207,7 +207,7 @@ edit_discord_dead_links() {
     timestamp=$(now_utc_iso)
     
     if [[ -z "$msg_id" ]] || [[ "$msg_id" == "null" ]]; then
-        log_warn "  No Discord message ID — cannot edit message for: $title"
+        log_warn "  No Discord message ID, cannot edit message for: $title"
         return 1
     fi
     
@@ -216,14 +216,14 @@ edit_discord_dead_links() {
     IFS=',' read -ra services <<< "$dead_services"
     for svc in "${services[@]}"; do
         case "$svc" in
-            gofile)     dead_list+="🟠 **Gofile** — ❌ Expired\n" ;;
-            pixeldrain) dead_list+="🔵 **Pixeldrain** — ❌ Expired\n" ;;
+            gofile)     dead_list+="**Gofile**, ❌ Expired\n" ;;
+            pixeldrain) dead_list+="**Pixeldrain**, ❌ Expired\n" ;;
         esac
     done
     
     local archive_field=""
     if [[ -n "$archive_url" ]]; then
-        archive_field="✅ **Archive.org** — [🔗 Still Available (PERMANENT)](${archive_url})"
+        archive_field="✅ **Archive.org**, [Still Available (PERMANENT)](${archive_url})"
     else
         archive_field="⚠️ No Archive.org backup available"
     fi
@@ -244,14 +244,14 @@ edit_discord_dead_links() {
                     name:     ("⚠️  LINKS UPDATED  ─  Some downloads expired"),
                     icon_url: $avatar
                 },
-                title:       ("📼  " + $title),
+                title:       (" " + $title),
                 description: (
                     "Some cloud download links for this recording have **expired**.\n" +
                     "Use the **Archive.org** permanent link instead.\n\n" +
                     "━━━━━ Link Status ━━━━━\n" +
                     $dead_list + "\n" +
                     $archive + "\n\n" +
-                    "🏛️ *Archive.org links never expire.*"
+                    "*Archive.org links never expire.*"
                 ),
                 color: 16744448,
                 footer: {
@@ -291,9 +291,9 @@ mark_dead_in_links_txt() {
 refresh_links() {
     local dry_run="${DRY_RUN:-false}"
     if [[ "$dry_run" == "true" ]]; then
-        log_warn "DRY_RUN=true — checking link health without refresh/download or git mutation"
+        log_warn "DRY_RUN=true, checking link health without refresh/download or git mutation"
     fi
-    log_header "🔄 CLOUD LINK PRESERVATION v2.0"
+    log_header "CLOUD LINK PRESERVATION v2.0"
     
     local refresh_start
     refresh_start=$(now_epoch)
@@ -303,12 +303,12 @@ refresh_links() {
     
     local links_content
     links_content=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
-        log_warn "Could not read recordings.json — nothing to refresh"
+        log_warn "Could not read recordings.json, nothing to refresh"
         return 0
     }
     
     if [[ -z "$links_content" ]]; then
-        log_info "links.txt is empty — nothing to refresh"
+        log_info "links.txt is empty, nothing to refresh"
         return 0
     fi
     
@@ -392,10 +392,10 @@ refresh_links() {
             if check_link_alive "$url"; then
                 (( total_alive++ ))
                 if [[ "$dry_run" == "true" ]]; then
-                    log_ok "    ✅ Alive — dry run, no refresh ping"
+                    log_ok "    ✅ Alive, dry run, no refresh ping"
                 elif refresh_gofile "$url"; then
                     (( total_refreshed++ ))
-                    log_ok "    ✅ Alive — timer reset (1KB)"
+                    log_ok "    ✅ Alive, timer reset (1KB)"
                 else
                     log_warn "    ⚠️ Alive but refresh ping failed"
                 fi
@@ -403,7 +403,7 @@ refresh_links() {
                 (( total_dead++ ))
                 dead_gofile_urls+=("$url")
                 updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
-                log_warn "    💀 DEAD — link expired"
+                log_warn "    DEAD, link expired"
             fi
             
             random_sleep 1 3
@@ -427,10 +427,10 @@ refresh_links() {
             if check_link_alive "$url"; then
                 (( total_alive++ ))
                 if [[ "$dry_run" == "true" ]]; then
-                    log_ok "    ✅ Alive — dry run, no refresh download"
+                    log_ok "    ✅ Alive, dry run, no refresh download"
                 elif refresh_pixeldrain "$url"; then
                     (( total_refreshed++ ))
-                    log_ok "    ✅ Alive — timer reset (10% downloaded)"
+                    log_ok "    ✅ Alive, timer reset (10% downloaded)"
                 else
                     log_warn "    ⚠️ Alive but 10% download failed"
                 fi
@@ -438,7 +438,7 @@ refresh_links() {
                 (( total_dead++ ))
                 dead_pixeldrain_urls+=("$url")
                 updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
-                log_warn "    💀 DEAD — link expired"
+                log_warn "    DEAD, link expired"
             fi
             
             random_sleep 2 5
@@ -505,7 +505,7 @@ refresh_links() {
                     fi
                     sleep 2  # Rate limit protection
                 else
-                    log_warn "    No message ID — cannot edit Discord message"
+                    log_warn "    No message ID, cannot edit Discord message"
                 fi
             fi
             
@@ -517,7 +517,7 @@ refresh_links() {
     if [[ "$updated_links" != "$links_content" ]] && [[ "$dry_run" != "true" ]]; then
         log_step "Saving updated links.txt (marking expired links)..."
         
-        if github_api_write "links.txt" "$updated_links" "🔄 Link refresh: ${total_dead} expired links marked [$(now_pkt)]"; then
+        if github_api_write "links.txt" "$updated_links" "Link refresh: ${total_dead} expired links marked [$(now_pkt)]"; then
             log_ok "links.txt updated with [EXPIRED] markers"
         else
             log_warn "Failed to update links.txt"
@@ -553,7 +553,7 @@ refresh_links() {
             }
         }')
     if [[ "$dry_run" != "true" ]]; then
-        github_api_write "data/source-health.json" "$health_json" "🔄 Source health updated ($(now_pkt))" >/dev/null 2>&1 || true
+        github_api_write "data/source-health.json" "$health_json" "Source health updated ($(now_pkt))" >/dev/null 2>&1 || true
     fi
     
     # ── Summary ──────────────────────────────────────────────────────────────

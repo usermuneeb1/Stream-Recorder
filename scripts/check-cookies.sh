@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — COOKIE HEALTH CHECK                                  ║
-# ║  Verifies YouTube cookies and sends Discord alerts before recordings fail.  ║
+# ║  STREAM RECORDER, COOKIE HEALTH CHECK                                        ║
+# ║  Verifies YouTube cookies and sends Discord alerts before recordings fail.   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -12,7 +12,7 @@ _cookie_alert() {
     local status="$1"
     local detail="$2"
 
-    # Suppressed under PUBLIC_STREAM_ONLY mode — the recorder runs cookieless
+    # Suppressed under PUBLIC_STREAM_ONLY mode, the recorder runs cookieless
     # so a stale/missing cookie is irrelevant to recording success. Posting
     # 'cookie warning' Discord alerts in this mode just confuses the user.
     if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]] || [[ "${FORCE_RECORD:-false}" == "true" ]]; then
@@ -34,7 +34,7 @@ _cookie_alert() {
 
     source "$SCRIPT_DIR/discord-notify.sh"
     notify_cookie_warning "$status" "$detail" || true
-    github_api_write "$throttle_file" "$now_ts" "🍪 Cookie ${status} alert sent" >/dev/null 2>&1 || true
+    github_api_write "$throttle_file" "$now_ts" "Cookie ${status} alert sent" >/dev/null 2>&1 || true
 }
 
 _cookie_fingerprint() {
@@ -52,13 +52,13 @@ _track_cookie_rotation() {
     now_ts=$(now_epoch)
 
     if [[ "$fingerprint" != "$previous" ]]; then
-        log_ok "New cookie file detected — resetting cookie age timer"
-        github_api_write "cookie_fingerprint.txt" "$fingerprint" "🍪 Cookie fingerprint updated ($(now_pkt))" >/dev/null 2>&1 || true
-        github_api_write "cookie_timestamp.txt" "$now_ts" "🍪 Cookie file updated ($(now_pkt))" >/dev/null 2>&1 || true
+        log_ok "New cookie file detected, resetting cookie age timer"
+        github_api_write "cookie_fingerprint.txt" "$fingerprint" "Cookie fingerprint updated ($(now_pkt))" >/dev/null 2>&1 || true
+        github_api_write "cookie_timestamp.txt" "$now_ts" "Cookie file updated ($(now_pkt))" >/dev/null 2>&1 || true
         # Clear old warning throttle files so a genuinely bad new cookie alerts immediately.
-        github_api_write "cookie_expired_warning_sent.txt" "0" "🍪 Reset expired cookie warning throttle" >/dev/null 2>&1 || true
-        github_api_write "cookie_unverified_warning_sent.txt" "0" "🍪 Reset unverified cookie warning throttle" >/dev/null 2>&1 || true
-        github_api_write "cookie_expiring_warning_sent.txt" "0" "🍪 Reset expiring cookie warning throttle" >/dev/null 2>&1 || true
+        github_api_write "cookie_expired_warning_sent.txt" "0" "Reset expired cookie warning throttle" >/dev/null 2>&1 || true
+        github_api_write "cookie_unverified_warning_sent.txt" "0" "Reset unverified cookie warning throttle" >/dev/null 2>&1 || true
+        github_api_write "cookie_expiring_warning_sent.txt" "0" "Reset expiring cookie warning throttle" >/dev/null 2>&1 || true
     fi
 }
 
@@ -100,12 +100,12 @@ _check_expiry_window() {
 }
 
 check_cookie_health() {
-    log_header "🍪 COOKIE HEALTH CHECK"
+    log_header "COOKIE HEALTH CHECK"
     
     local cookies_file="${COOKIES_FILE:-cookies.txt}"
     
     if [[ ! -f "$cookies_file" ]] || [[ ! -s "$cookies_file" ]]; then
-        log_warn "No cookies file found — cookieless mode"
+        log_warn "No cookies file found, cookieless mode"
         set_env "COOKIE_STATUS" "no_cookies"
         set_output "cookie_status" "no_cookies"
         _cookie_alert "expired" "no cookie file"
@@ -152,7 +152,7 @@ check_cookie_health() {
         -H "User-Agent: ${user_agent}" \
         -H "Accept-Language: en-US,en;q=0.9" \
         "https://www.youtube.com/" 2>/dev/null) || {
-        log_warn "Could not reach YouTube from GitHub runner — skipping Discord alert"
+        log_warn "Could not reach YouTube from GitHub runner, skipping Discord alert"
         set_env "COOKIE_STATUS" "check_failed"
         set_output "cookie_status" "check_failed"
         return 0
@@ -169,7 +169,7 @@ check_cookie_health() {
     fi
     
     if [[ "$logged_in" == "true" ]]; then
-        log_ok "🍪 Cookies are VALID — logged into YouTube ✅"
+        log_ok "Cookies are VALID, logged into YouTube ✅"
         set_env "COOKIE_STATUS" "valid"
         set_output "cookie_status" "valid"
     else
@@ -177,7 +177,7 @@ check_cookie_health() {
         # YouTube often hides logged-in indicators from datacenter/GitHub IPs,
         # even when yt-dlp can still use the cookies successfully. Only expired,
         # expiring, or old cookies should trigger Discord alerts by default.
-        log_warn "🍪 Cookie login could not be verified from GitHub Actions homepage check"
+        log_warn "Cookie login could not be verified from GitHub Actions homepage check"
         log_info "No Discord alert sent: session cookies exist and are not expired/near-expiry"
         set_env "COOKIE_STATUS" "valid_unverified"
         set_output "cookie_status" "valid_unverified"
@@ -185,7 +185,7 @@ check_cookie_health() {
     
     local warn_days="${COOKIE_WARNING_DAYS:-14}"
     if [[ "$age_days" =~ ^[0-9]+$ ]] && (( age_days >= warn_days )); then
-        log_warn "Cookies are ${age_days} days old — refresh soon"
+        log_warn "Cookies are ${age_days} days old, refresh soon"
         _cookie_alert "warning" "$age_days"
     fi
     

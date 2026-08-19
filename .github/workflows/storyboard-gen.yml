@@ -1,12 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   STORYBOARD GENERATOR, Hover-preview tiles for the player              ║
-# ║                                                                            ║
-# ║ For each new recording, builds a sprite sheet (1 frame every 10s) and a    ║
-# ║ WebVTT cues file, uploads them to Catbox (permanent CDN), and writes       ║
-# ║ the URLs back to recordings.json. The dashboard player picks them up and   ║
-# ║ shows a YouTube-style preview when you hover the seek bar.                 ║
-# ║                                                                            ║
-# ║ SAFE: Standalone, additive. Does NOT modify other workflows.               ║
+# ║   STORYBOARD GENERATOR, Hover-preview tiles for the player                   ║
+# ║                                                                              ║
+# ║ For each new recording, builds a sprite sheet (1 frame every 10s) and a      ║
+# ║ WebVTT cues file, uploads them to Catbox (permanent CDN), and writes         ║
+# ║ the URLs back to recordings.json. The dashboard player picks them up and     ║
+# ║ shows a YouTube-style preview when you hover the seek bar.                   ║
+# ║                                                                              ║
+# ║ SAFE: Standalone, additive. Does NOT modify other workflows.                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: Storyboard generator

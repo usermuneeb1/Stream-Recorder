@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🛠️ MIRROR REPAIR — Restore missing/expired public mirrors from Archive.org ║
-# ║  Reads data/recordings.json, downloads the permanent Archive.org file,      ║
-# ║  reuploads to selected mirrors, and updates data/recordings.json.           ║
+# ║  MIRROR REPAIR, Restore missing/expired public mirrors from Archive.org      ║
+# ║  Reads data/recordings.json, downloads the permanent Archive.org file,       ║
+# ║  reuploads to selected mirrors, and updates data/recordings.json.            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -11,7 +11,7 @@ source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/upload-clouds.sh"
 
 REPAIR_DIR="${REPAIR_DIR:-/tmp/stream-repair}"
-# FORCE=true skips all "alive" checks — always re-uploads every mirror.
+# FORCE=true skips all "alive" checks, always re-uploads every mirror.
 # Useful when links appear alive (HTTP 200) but are actually expired.
 FORCE_REPAIR="${FORCE_REPAIR:-false}"
 mkdir -p "$REPAIR_DIR"
@@ -128,11 +128,11 @@ _update_recording_links() {
             mirrors_repaired_at: $checked
           }
         else . end)' <<< "$current") || return 1
-    github_api_write "data/recordings.json" "$updated" "🛠️ Mirror repair: ${video_id}" >/dev/null
+    github_api_write "data/recordings.json" "$updated" "Mirror repair: ${video_id}" >/dev/null
 }
 
 repair_mirrors() {
-    log_header "🛠️ MIRROR REPAIR FROM ARCHIVE.ORG"
+    log_header "MIRROR REPAIR FROM ARCHIVE.ORG"
 
     local target_video="${TARGET_VIDEO_ID:-}"
     local max_items="${MAX_ITEMS:-3}"
@@ -169,7 +169,7 @@ repair_mirrors() {
         ((idx++)); ((checked++))
 
         log_separator
-        log_info "Checking: ${video_id} — ${title}"
+        log_info "Checking: ${video_id}, ${title}"
 
         local need_gofile=false need_pixel=false need_mega=false
         if [[ "$destinations" == *gofile* ]]; then
@@ -183,7 +183,7 @@ repair_mirrors() {
         fi
 
         if [[ "$need_gofile" != true && "$need_pixel" != true && "$need_mega" != true ]]; then
-            log_ok "  Mirrors already present/alive — skipping"
+            log_ok "  Mirrors already present/alive, skipping"
             continue
         fi
 

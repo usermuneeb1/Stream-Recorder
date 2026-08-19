@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📧 Multi-Provider Temp Email System                                       ║
-# ║  Supports multiple temp email services with automatic fallback:            ║
-# ║                                                                            ║
-# ║    1. Gmailnator  — REAL Gmail addresses (@gmail.com) via RapidAPI        ║
-# ║    2. Mail.tm     — 1 domain, REST API, pymailtm library                  ║
-# ║    3. Mail.gw     — Multiple domains, same API as Mail.tm                  ║
-# ║    4. 1secmail    — 7 domains, simple REST API (MEGA may block)            ║
-# ║                                                                            ║
-# ║  Gmailnator is #1 because MEGA NEVER blocks @gmail.com addresses.         ║
-# ║  The system tries each provider in order with automatic fallback.          ║
+# ║  Multi-Provider Temp Email System                                            ║
+# ║  Supports multiple temp email services with automatic fallback:              ║
+# ║                                                                              ║
+# ║    1. Gmailnator, REAL Gmail addresses (@gmail.com) via RapidAPI             ║
+# ║    2. Mail.tm, 1 domain, REST API, pymailtm library                          ║
+# ║    3. Mail.gw, Multiple domains, same API as Mail.tm                         ║
+# ║    4. 1secmail, 7 domains, simple REST API (MEGA may block)                  ║
+# ║                                                                              ║
+# ║  Gmailnator is #1 because MEGA NEVER blocks @gmail.com addresses.            ║
+# ║  The system tries each provider in order with automatic fallback.            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import requests
@@ -30,13 +30,13 @@ def find_url(text):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PROVIDER 1: Gmailnator — REAL Gmail addresses (BEST for MEGA)
+#  PROVIDER 1: Gmailnator, REAL Gmail addresses (BEST for MEGA)
 #  Uses RapidAPI Gmailnator endpoint. Requires RAPIDAPI_KEY secret.
 #  Gmail addresses are NEVER blocked by MEGA.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class GmailnatorProvider:
-    """Gmailnator — Real @gmail.com addresses via RapidAPI. MEGA trusts Gmail."""
+    """Gmailnator, Real @gmail.com addresses via RapidAPI. MEGA trusts Gmail."""
     name = "Gmailnator"
     BASE_URL = "https://gmailnator.p.rapidapi.com/api"
 
@@ -47,7 +47,7 @@ class GmailnatorProvider:
     def create_email(self):
         """Generate a Gmail address using Gmailnator API."""
         if not self.api_key:
-            print(f"  [{self.name}] RAPIDAPI_KEY not set — skipping")
+            print(f"  [{self.name}] RAPIDAPI_KEY not set, skipping")
             return None
 
         headers = {
@@ -56,7 +56,7 @@ class GmailnatorProvider:
             "x-rapidapi-key": self.api_key,
         }
 
-        # Use gmail plus and dot tricks — these look like real Gmail accounts
+        # Use gmail plus and dot tricks, these look like real Gmail accounts
         # Priority: private types first (more reliable), then public
         email_types = [
             ["private_gmail_plus", "private_gmail_dot"],
@@ -81,7 +81,7 @@ class GmailnatorProvider:
                         print(f"  [{self.name}] ✅ Created: {self.email} ({email_type})")
                         return self.email
                 elif resp.status_code == 429:
-                    print(f"  [{self.name}] Rate limited — waiting 5s...")
+                    print(f"  [{self.name}] Rate limited, waiting 5s...")
                     time.sleep(5)
                 else:
                     print(f"  [{self.name}] HTTP {resp.status_code}: {resp.text[:100]}")
@@ -122,14 +122,14 @@ class GmailnatorProvider:
                     msg_count = data.get("message_count", len(messages))
 
                     if poll_count <= 3 or poll_count % 5 == 0:
-                        print(f"  [{self.name}] Poll #{poll_count} ({elapsed}s) — {msg_count} messages found")
+                        print(f"  [{self.name}] Poll #{poll_count} ({elapsed}s), {msg_count} messages found")
 
                     if messages:
                         # Show what we found
                         for msg in messages:
                             subj = msg.get("subject", "N/A")
                             sender = msg.get("from", "N/A")
-                            print(f"  [{self.name}] 📨 From: {sender} | Subject: {subj}")
+                            print(f"  [{self.name}] From: {sender} | Subject: {subj}")
 
                         # Pick the best message (MEGA verification)
                         target_msg = None
@@ -165,12 +165,12 @@ class GmailnatorProvider:
                             print(f"  [{self.name}] ⚠️ Read message HTTP {msg_resp.status_code}")
 
                 elif resp.status_code == 429:
-                    print(f"  [{self.name}] ⚠️ Rate limited on inbox check — waiting 10s")
+                    print(f"  [{self.name}] ⚠️ Rate limited on inbox check, waiting 10s")
                     time.sleep(10)
                     continue
                 elif resp.status_code == 404:
                     if poll_count <= 2:
-                        print(f"  [{self.name}] Inbox not ready yet (404) — waiting...")
+                        print(f"  [{self.name}] Inbox not ready yet (404), waiting...")
                 else:
                     if poll_count <= 3:
                         print(f"  [{self.name}] Inbox HTTP {resp.status_code}: {resp.text[:100]}")
@@ -180,7 +180,7 @@ class GmailnatorProvider:
 
             time.sleep(8)  # Poll every 8s to conserve API calls
 
-        print(f"  [{self.name}] ⏰ Timeout after {poll_count} polls ({timeout}s)")
+        print(f"  [{self.name}] Timeout after {poll_count} polls ({timeout}s)")
         return None
 
 
@@ -189,7 +189,7 @@ class GmailnatorProvider:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class MailTmProvider:
-    """Mail.tm — Uses pymailtm library. Proven to work with MEGA."""
+    """Mail.tm, Uses pymailtm library. Proven to work with MEGA."""
     name = "Mail.tm"
 
     def __init__(self):
@@ -251,7 +251,7 @@ class MailTmProvider:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class MailGwProvider:
-    """Mail.gw — Multiple domains, REST API compatible with Mail.tm."""
+    """Mail.gw, Multiple domains, REST API compatible with Mail.tm."""
     name = "Mail.gw"
     BASE_URL = "https://api.mail.gw"
 
@@ -337,11 +337,11 @@ class MailGwProvider:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PROVIDER 4: 1secmail (direct REST API — fallback only)
+#  PROVIDER 4: 1secmail (direct REST API, fallback only)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class OneSecMailProvider:
-    """1secmail.com — 7 domains, simple API. MEGA may block these domains."""
+    """1secmail.com, 7 domains, simple API. MEGA may block these domains."""
     name = "1secmail"
     BASE_URL = "https://www.1secmail.com/api/v1/"
 
@@ -407,16 +407,16 @@ class OneSecMailProvider:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  MULTI-PROVIDER MANAGER — Tries each provider with automatic fallback
+#  MULTI-PROVIDER MANAGER, Tries each provider with automatic fallback
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Provider order:
-#   1. Gmailnator — BEST: real @gmail.com, MEGA never blocks Gmail
-#   2. Mail.tm    — GOOD: proven to work, but temp domains could get blocked
-#   3. Mail.gw    — OK: alternative to Mail.tm
-#   4. 1secmail   — LAST RESORT: MEGA usually blocks these domains
+#   1. Gmailnator, BEST: real @gmail.com, MEGA never blocks Gmail
+#   2. Mail.tm, GOOD: proven to work, but temp domains could get blocked
+#   3. Mail.gw, OK: alternative to Mail.tm
+#   4. 1secmail, LAST RESORT: MEGA usually blocks these domains
 PROVIDERS = [
-    GmailnatorProvider,   # Real Gmail addresses — MEGA trusts these 100%
+    GmailnatorProvider,   # Real Gmail addresses, MEGA trusts these 100%
     MailTmProvider,        # Mail.tm fallback (proven, but detectable)
     MailGwProvider,        # Mail.gw fallback (different domains)
     OneSecMailProvider,    # 1secmail last resort (usually blocked by MEGA)
@@ -433,14 +433,14 @@ def get_temp_email(provider_classes=None):
 
     for ProviderClass in provider_classes:
         provider = ProviderClass()
-        print(f"📧 Trying {provider.name}...")
+        print(f"Trying {provider.name}...")
 
         email = provider.create_email()
         if email:
             print(f"✅ Got email from {provider.name}: {email}")
             return provider, email
         else:
-            print(f"❌ {provider.name} failed — trying next provider...")
+            print(f"❌ {provider.name} failed, trying next provider...")
 
     print("❌ All email providers failed!")
     return None, None
@@ -451,7 +451,7 @@ def wait_for_verification(provider, subject_contains="verify", timeout=120):
     Wait for a verification email using the provider instance.
     Returns email body text or None.
     """
-    print(f"📨 Waiting for email via {provider.name} (timeout: {timeout}s)...")
+    print(f"Waiting for email via {provider.name} (timeout: {timeout}s)...")
     body = provider.wait_for_email(subject_contains=subject_contains, timeout=timeout)
 
     if body:
@@ -465,18 +465,18 @@ def wait_for_verification(provider, subject_contains="verify", timeout=120):
 # Test if run directly
 if __name__ == "__main__":
     print("═══════════════════════════════════════")
-    print("📧 Multi-Provider Temp Email Test")
+    print("Multi-Provider Temp Email Test")
     print("═══════════════════════════════════════")
 
     provider, email = get_temp_email()
     if email:
         print(f"\n✅ Success! Email: {email}")
         print(f"   Provider: {provider.name}")
-        print("\n⏳ Waiting 30s for any incoming email...")
+        print("\nWaiting 30s for any incoming email...")
         body = wait_for_verification(provider, subject_contains="", timeout=30)
         if body:
-            print(f"\n📨 Email body:\n{body[:500]}")
+            print(f"\nEmail body:\n{body[:500]}")
         else:
-            print("\n📭 No emails received (expected for a test)")
+            print("\nNo emails received (expected for a test)")
     else:
         print("\n❌ Could not create temp email from any provider")

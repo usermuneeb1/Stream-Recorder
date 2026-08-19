@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🎨 AI THUMBNAIL GENERATOR — Auto-Generate Custom Thumbnails               ║
-# ║                                                                            ║
-# ║ When YouTube thumbnails break (stream deleted, private, etc.), this        ║
-# ║ generates a branded fallback thumbnail from the video itself:              ║
-# ║                                                                            ║
-# ║ 1. Extracts a good frame from the video (10% into the stream)             ║
-# ║ 2. Adds title overlay text + channel branding                              ║
-# ║ 3. Uploads to Catbox (permanent) + Archive.org                            ║
-# ║ 4. Updates recordings.json with the custom thumbnail                       ║
-# ║                                                                            ║
-# ║ Also generates thumbnails for clips (auto-clip).                           ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT touch any existing scripts. Additive only.                  ║
+# ║ AI THUMBNAIL GENERATOR, Auto-Generate Custom Thumbnails                      ║
+# ║                                                                              ║
+# ║ When YouTube thumbnails break (stream deleted, private, etc.), this          ║
+# ║ generates a branded fallback thumbnail from the video itself:                ║
+# ║                                                                              ║
+# ║ 1. Extracts a good frame from the video (10% into the stream)                ║
+# ║ 2. Adds title overlay text + channel branding                                ║
+# ║ 3. Uploads to Catbox (permanent) + Archive.org                               ║
+# ║ 4. Updates recordings.json with the custom thumbnail                         ║
+# ║                                                                              ║
+# ║ Also generates thumbnails for clips (auto-clip).                             ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT touch any existing scripts. Additive only.                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import json
@@ -26,7 +26,7 @@ RECORDINGS = os.path.join(ROOT, "data", "recordings.json")
 
 
 def log(msg):
-    print(f"  🎨 ThumbGen: {msg}", flush=True)
+    print(f"  ThumbGen: {msg}", flush=True)
 
 
 def extract_frame(source_url, timestamp_sec, output_path):
@@ -146,7 +146,7 @@ def main():
         source = (rec.get("github_direct") or rec.get("archive_node")
                   or rec.get("archive_direct") or "")
 
-        log(f"\n🖼️ {title}")
+        log(f"\n{title}")
 
         # Extract frame at 10% into the video (skip intro)
         frame_time = max(60, int(duration * 0.1)) if duration else 60
@@ -177,7 +177,7 @@ def main():
         with open(RECORDINGS, "w") as f:
             json.dump(recs, f, indent=2)
             f.write("\n")
-        log("📋 Updated recordings.json")
+        log("Updated recordings.json")
 
     return 0
 

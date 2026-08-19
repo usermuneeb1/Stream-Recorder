@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   Database Backup, snapshot the gallery index                              ║
+# ║   Database Backup, snapshot the gallery index                                ║
 # ║  Keeps timestamped copies of data/recordings.json in data/backups/ so the    ║
-# ║  archive index can never be lost. Prunes to the 30 most recent backups.       ║
+# ║  archive index can never be lost. Prunes to the 30 most recent backups.      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Database backup"

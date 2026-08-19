@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# archive-chat.sh — preserve a stream's live chat BEFORE the video goes private.
+# archive-chat.sh, preserve a stream's live chat BEFORE the video goes private.
 #
 # Streams routinely flip to private hours after airing; once that happens the
 # chat is gone forever. This runs immediately after a recording lands (and on
@@ -25,12 +25,12 @@ if [[ -s "$out" ]]; then
   exit 0
 fi
 
-echo "⬇  capturing live chat for $video_id (while still public)…"
+echo " capturing live chat for $video_id (while still public)…"
 if ! yt-dlp --skip-download --write-subs --sub-langs live_chat \
       --no-warnings -o "/tmp/mla-chat/%(id)s" \
       "https://www.youtube.com/watch?v=$video_id"; then
   echo "⚠  yt-dlp could not fetch chat (private or none available)"
-  exit 0   # not fatal — the video may simply have no chat replay
+  exit 0   # not fatal, the video may simply have no chat replay
 fi
 
 raw=$(ls /tmp/mla-chat/"$video_id"*.live_chat.json 2>/dev/null | head -1 || true)
@@ -41,4 +41,4 @@ fi
 
 node "$REPO_DIR/scripts/convert-chat.mjs" "$raw" "$out"
 rm -f "$raw"
-echo "✓ chat preserved → data/chat/$video_id.json"
+echo "chat preserved → data/chat/$video_id.json"

@@ -1,6 +1,6 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   WORKFLOW WATCHDOG                                                       ║
-# ║  Alerts Discord when critical automation workflows fail.                    ║
+# ║   WORKFLOW WATCHDOG                                                          ║
+# ║  Alerts Discord when critical automation workflows fail.                     ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Workflow watchdog"

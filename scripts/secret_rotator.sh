@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🔐 SECRET ROTATOR — Auto-Rotate Cloud Account Credentials                 ║
-# ║                                                                            ║
-# ║ Picks the healthiest available account from each cloud service's CSV       ║
-# ║ and updates the corresponding GitHub Secret automatically.                 ║
-# ║                                                                            ║
-# ║ Checks account health by attempting a lightweight operation:               ║
-# ║ • MEGA: megatools ls (login test)                                          ║
-# ║ • Pixeldrain: GET /user (API key validation)                               ║
-# ║ • Archive.org: ia configure test                                           ║
-# ║                                                                            ║
-# ║ On failure: marks account as "dead" in CSV, picks next healthy one,        ║
-# ║             updates the GitHub Secret, sends Discord alert.                ║
-# ║                                                                            ║
-# ║ Required env vars:                                                         ║
-# ║   GH_TOKEN   — GitHub PAT with repo + secrets scope                       ║
-# ║                                                                            ║
-# ║ SAFE: Does NOT modify any existing scripts. Only updates GitHub Secrets    ║
-# ║       and marks accounts in CSVs. Existing rotation logic is untouched.   ║
+# ║ SECRET ROTATOR, Auto-Rotate Cloud Account Credentials                        ║
+# ║                                                                              ║
+# ║ Picks the healthiest available account from each cloud service's CSV         ║
+# ║ and updates the corresponding GitHub Secret automatically.                   ║
+# ║                                                                              ║
+# ║ Checks account health by attempting a lightweight operation:                 ║
+# ║ • MEGA: megatools ls (login test)                                            ║
+# ║ • Pixeldrain: GET /user (API key validation)                                 ║
+# ║ • Archive.org: ia configure test                                             ║
+# ║                                                                              ║
+# ║ On failure: marks account as "dead" in CSV, picks next healthy one,          ║
+# ║             updates the GitHub Secret, sends Discord alert.                  ║
+# ║                                                                              ║
+# ║ Required env vars:                                                           ║
+# ║   GH_TOKEN, GitHub PAT with repo + secrets scope                             ║
+# ║                                                                              ║
+# ║ SAFE: Does NOT modify any existing scripts. Only updates GitHub Secrets      ║
+# ║       and marks accounts in CSVs. Existing rotation logic is untouched.      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -26,7 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}"
 DISCORD_WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-${DISCORD_WEBHOOK_URL:-}}"
 
-log() { echo "  🔐 Rotator: $*"; }
+log() { echo "  Rotator: $*"; }
 
 # ── Send Discord alert ────────────────────────────────────────────────────────
 discord_alert() {
@@ -78,8 +78,8 @@ rotate_mega() {
             if [[ -n "${GH_TOKEN:-}" ]]; then
                 echo "$email" | gh secret set MEGA_EMAIL --repo "$REPO" 2>/dev/null || true
                 echo "$password" | gh secret set MEGA_PASSWORD --repo "$REPO" 2>/dev/null || true
-                log "🔑 Updated MEGA_EMAIL + MEGA_PASSWORD secrets → ${email}"
-                discord_alert "🔐 MEGA Secret Rotated" "Active account: \`${email}\`" 5763757
+                log "Updated MEGA_EMAIL + MEGA_PASSWORD secrets → ${email}"
+                discord_alert "MEGA Secret Rotated" "Active account: \`${email}\`" 5763757
             fi
             found=true
             break
@@ -90,7 +90,7 @@ rotate_mega() {
 
     if [[ "$found" == "false" ]]; then
         log "⚠️ All MEGA accounts are dead!"
-        discord_alert "🚨 MEGA: All Accounts Dead!" "All ${total} MEGA accounts failed login. Generate new ones!" 15158332
+        discord_alert "MEGA: All Accounts Dead!" "All ${total} MEGA accounts failed login. Generate new ones!" 15158332
         return 1
     fi
     return 0
@@ -117,8 +117,8 @@ rotate_pixeldrain() {
 
             if [[ -n "${GH_TOKEN:-}" ]]; then
                 echo "$api_key" | gh secret set PIXELDRAIN_API_KEY --repo "$REPO" 2>/dev/null || true
-                log "🔑 Updated PIXELDRAIN_API_KEY secret"
-                discord_alert "🔐 Pixeldrain Secret Rotated" "Active key: \`${api_key:0:8}...\`" 5763757
+                log "Updated PIXELDRAIN_API_KEY secret"
+                discord_alert "Pixeldrain Secret Rotated" "Active key: \`${api_key:0:8}...\`" 5763757
             fi
             found=true
             break
@@ -129,7 +129,7 @@ rotate_pixeldrain() {
 
     if [[ "$found" == "false" ]]; then
         log "⚠️ All Pixeldrain API keys are dead!"
-        discord_alert "🚨 Pixeldrain: All Keys Dead!" "Generate new accounts!" 15158332
+        discord_alert "Pixeldrain: All Keys Dead!" "Generate new accounts!" 15158332
         return 1
     fi
     return 0

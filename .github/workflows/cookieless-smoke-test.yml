@@ -1,12 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   COOKIELESS SMOKE TEST                                                   ║
-# ║  Proves all cookieless recording methods can still pull 1080p from your     ║
-# ║  channel BEFORE a stream goes live. Run this any time you want assurance.   ║
+# ║   COOKIELESS SMOKE TEST                                                      ║
+# ║  Proves all cookieless recording methods can still pull 1080p from your      ║
+# ║  channel BEFORE a stream goes live. Run this any time you want assurance.    ║
 # ║                                                                              ║
-# ║  Tests against the most recent PUBLIC video on @TheMuslimLantern, downloads ║
-# ║  a tiny 10-second slice with each method, and verifies real 1920×1080 mp4   ║
-# ║  bytes come back. No cookies used. Fails loudly if any method breaks so you ║
-# ║  get a Discord alert hours/days before your next live stream.               ║
+# ║  Tests against the most recent PUBLIC video on @TheMuslimLantern, downloads  ║
+# ║  a tiny 10-second slice with each method, and verifies real 1920×1080 mp4    ║
+# ║  bytes come back. No cookies used. Fails loudly if any method breaks so you  ║
+# ║  get a Discord alert hours/days before your next live stream.                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Cookieless smoke test"

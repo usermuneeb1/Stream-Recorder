@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔒 RECORDING LOCK — coordinates the main recorder + go-live sniper         ║
-# ║                                                                            ║
-# ║  Prevents both the main "Stream Recorder" and the "Go-Live Sniper" from    ║
-# ║  capturing the SAME stream at the same time (wasteful duplicate).          ║
-# ║                                                                            ║
-# ║  DESIGN PRINCIPLE = FAIL-SAFE TOWARD CAPTURE:                              ║
-# ║    Any error (API hiccup, corrupt lock, network) defaults to "proceed"     ║
-# ║    (record). The ONLY thing that makes lock_acquire return "busy" is a     ║
-# ║    clear, fresh lock held by the OTHER component for the same video.        ║
-# ║    Skipping a recording = a lost stream (the VOD gets privated). A rare    ║
-# ║    duplicate recording is infinitely preferable to a missed one.            ║
-# ║                                                                            ║
-# ║  Usage:                                                                    ║
-# ║    source scripts/recording-lock.sh                                        ║
-# ║    lock_acquire "<video_id>" "recorder"  && echo proceed                   ║
-# ║    ... record ...                                                          ║
-# ║    lock_release "<video_id>"                                               ║
+# ║  RECORDING LOCK, coordinates the main recorder + go-live sniper              ║
+# ║                                                                              ║
+# ║  Prevents both the main "Stream Recorder" and the "Go-Live Sniper" from      ║
+# ║  capturing the SAME stream at the same time (wasteful duplicate).            ║
+# ║                                                                              ║
+# ║  DESIGN PRINCIPLE = FAIL-SAFE TOWARD CAPTURE:                                ║
+# ║    Any error (API hiccup, corrupt lock, network) defaults to "proceed"       ║
+# ║    (record). The ONLY thing that makes lock_acquire return "busy" is a       ║
+# ║    clear, fresh lock held by the OTHER component for the same video.         ║
+# ║    Skipping a recording = a lost stream (the VOD gets privated). A rare      ║
+# ║    duplicate recording is infinitely preferable to a missed one.             ║
+# ║                                                                              ║
+# ║  Usage:                                                                      ║
+# ║    source scripts/recording-lock.sh                                          ║
+# ║    lock_acquire "<video_id>" "recorder"  && echo proceed                     ║
+# ║    ... record ...                                                            ║
+# ║    lock_release "<video_id>"                                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 # (No set -e: this file is sourced. Every path must be fail-safe.)
 
 LOCK_FILE="${RECORDING_LOCK_FILE:-data/recording_lock.json}"
-LOCK_TTL="${RECORDING_LOCK_TTL:-21600}"   # 6h — longer than any stream + processing
+LOCK_TTL="${RECORDING_LOCK_TTL:-21600}"   # 6h, longer than any stream + processing
 
 # Acquire the lock for $1 (video_id) as $2 (owner: recorder|sniper).
 # Returns 0 = acquired (or error → proceed); 1 = busy (another component owns it).
@@ -60,7 +60,7 @@ lock_acquire() {
                 : # proceed to (re)write below
             else
                 # Someone else (or another run) is actively recording this / another video.
-                log_warn "🔒 Lock busy: '$vid' held by '$ow' (age $(( (now - ts) / 60 )) min) — deferring to avoid duplicate capture"
+                log_warn "Lock busy: '$vid' held by '$ow' (age $(( (now - ts) / 60 )) min), deferring to avoid duplicate capture"
                 return 1
             fi
         fi
@@ -75,8 +75,8 @@ lock_acquire() {
         --argjson ts "$(date '+%s')" \
         --arg at "$(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M:%S PKT' 2>/dev/null)" \
         '{video_id:$v, owner:$o, started_at_epoch:$ts, started_at:$at}' 2>/dev/null) || return 0
-    github_api_write "$LOCK_FILE" "$payload" "🔒 Recording lock acquired: $my_video ($owner)" >/dev/null 2>&1 || return 0
-    log_ok "🔒 Lock acquired: $my_video ($owner)"
+    github_api_write "$LOCK_FILE" "$payload" "Recording lock acquired: $my_video ($owner)" >/dev/null 2>&1 || return 0
+    log_ok "Lock acquired: $my_video ($owner)"
     return 0
 }
 
@@ -87,7 +87,7 @@ lock_release() {
     local payload
     payload=$(jq -n --argjson ts "$(date '+%s')" \
         '{video_id:null, owner:null, released_at_epoch:$ts}' 2>/dev/null) || return 0
-    github_api_write "$LOCK_FILE" "$payload" "🔓 Recording lock released${my_video:+: $my_video}" >/dev/null 2>&1 || true
-    log_info "🔓 Lock released"
+    github_api_write "$LOCK_FILE" "$payload" "Recording lock released${my_video:+: $my_video}" >/dev/null 2>&1 || true
+    log_info "Lock released"
     return 0
 }

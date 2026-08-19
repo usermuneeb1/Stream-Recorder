@@ -1,6 +1,6 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   COOKIE HEALTH SENTINEL                                                  ║
-# ║  Runs independently so YouTube cookie problems alert before a live stream.  ║
+# ║   COOKIE HEALTH SENTINEL                                                     ║
+# ║  Runs independently so YouTube cookie problems alert before a live stream.   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Cookie health sentinel"

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🟣 Pixeldrain Account Keep-Alive / Health Check                           ║
-# ║  Calls GET /api/user with each account's API key. A successful call counts  ║
-# ║  as account activity, which cancels Pixeldrain's 7-day inactivity deletion  ║
-# ║  and confirms the key still works. Writes signin_results.json.             ║
+# ║  Pixeldrain Account Keep-Alive / Health Check                                ║
+# ║  Calls GET /api/user with each account's API key. A successful call counts   ║
+# ║  as account activity, which cancels Pixeldrain's 7-day inactivity deletion   ║
+# ║  and confirms the key still works. Writes signin_results.json.               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import base64
@@ -59,7 +59,7 @@ def main():
     success = 0
     failed = 0
     print("═══════════════════════════════════════")
-    print(f"🟣 Pixeldrain keep-alive — {total} account(s)")
+    print(f"Pixeldrain keep-alive, {total} account(s)")
     print("═══════════════════════════════════════")
 
     for i, row in enumerate(rows, 1):
@@ -76,7 +76,7 @@ def main():
         time.sleep(1)
 
     print("───────────────────────────────────────")
-    print(f"✅ Alive: {success}   ❌ Failed: {failed}   📊 Total: {total}")
+    print(f"✅ Alive: {success}   ❌ Failed: {failed}   Total: {total}")
 
     json.dump(
         {"total": total, "success": success, "failed": failed, "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ")},

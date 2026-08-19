@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   YouTube Channel → Archive.org                                          ║
-# ║  Downloads entire YouTube channels/playlists and archives them.            ║
-# ║  Each playlist → separate Archive.org group. Full metadata.               ║
-# ║  Downloads ONE video at a time → upload → delete → next (saves disk).     ║
-# ║  Resumable: re-run and it skips already-archived videos.                   ║
-# ║  Requires YOUTUBE_COOKIES secret for bot bypass.                           ║
+# ║   YouTube Channel → Archive.org                                              ║
+# ║  Downloads entire YouTube channels/playlists and archives them.              ║
+# ║  Each playlist → separate Archive.org group. Full metadata.                  ║
+# ║  Downloads ONE video at a time → upload → delete → next (saves disk).        ║
+# ║  Resumable: re-run and it skips already-archived videos.                     ║
+# ║  Requires YOUTUBE_COOKIES secret for bot bypass.                             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "YouTube → Archive.org"

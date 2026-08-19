@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — MULTI-CLOUD REDUNDANCY UPLOAD                        ║
-# ║  Uploads every recording to multiple independent cloud services:            ║
-# ║    1. Gofile       — No account needed, 10-day retention                   ║
-# ║    2. Pixeldrain   — 60 days, 10GB/file, download links                    ║
-# ║    3. Archive.org  — PERMANENT, never expires, full metadata                ║
-# ║    4. MEGA.nz      — PERMANENT, 20GB free, auto-rotating accounts          ║
-# ║  Each upload is independent — one failure doesn't stop the others.          ║
+# ║  STREAM RECORDER, MULTI-CLOUD REDUNDANCY UPLOAD                              ║
+# ║  Uploads every recording to multiple independent cloud services:             ║
+# ║    1. Gofile, No account needed, 10-day retention                            ║
+# ║    2. Pixeldrain, 60 days, 10GB/file, download links                         ║
+# ║    3. Archive.org, PERMANENT, never expires, full metadata                   ║
+# ║    4. MEGA.nz, PERMANENT, 20GB free, auto-rotating accounts                  ║
+# ║  Each upload is independent, one failure doesn't stop the others.            ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -52,7 +52,7 @@ upload_to_gofile() {
     local part_name="$2"
     local api_key="${GOFILE_API_KEY:-}"
 
-    log_info "  🟠 Gofile: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+    log_info "  Gofile: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
 
     local max_retries="${GOFILE_MAX_RETRIES:-3}"
     local attempt=1
@@ -95,13 +95,13 @@ upload_to_gofile() {
             local speed fsize
             fsize=$(get_file_size "$file")
             (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  Gofile: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+            log_ok "  Gofile: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
             log_info "  Gofile: Link → ${link}"
             GOFILE_LINKS+=("${part_name}|${link}")
             return 0
         fi
 
-        log_warn "  Gofile: Upload failed on ${endpoint} (attempt ${attempt}) — ${upload_response:0:200}"
+        log_warn "  Gofile: Upload failed on ${endpoint} (attempt ${attempt}), ${upload_response:0:200}"
         (( attempt++ ))
         endpoint_idx=$(( (endpoint_idx + 1) % ${#endpoints[@]} ))
         sleep 5
@@ -127,7 +127,7 @@ upload_to_pixeldrain() {
     local part_name="$2"
     local api_key="${PIXELDRAIN_API_KEY:-}"
 
-    log_info "  🔵 Pixeldrain: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+    log_info "  Pixeldrain: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
 
     local max_retries="${PIXELDRAIN_MAX_RETRIES:-3}"
     local attempt=1
@@ -157,7 +157,7 @@ upload_to_pixeldrain() {
                 "https://pixeldrain.com/api/file/${safe_filename}" \
                 2>/dev/null) || true
         else
-            # ── POST multipart — anonymous upload (no API key) ─────────────────
+            # ── POST multipart, anonymous upload (no API key) ─────────────────
             # Pixeldrain allows anonymous POST uploads; the file is not linked
             # to any user account. Files are public by default.
             # POST returns: {"success":true,"id":"abc123"} on HTTP 200
@@ -186,7 +186,7 @@ upload_to_pixeldrain() {
             local speed fsize
             fsize=$(get_file_size "$file")
             (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  Pixeldrain: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+            log_ok "  Pixeldrain: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
             log_info "  Pixeldrain: Link → ${link}"
             PIXELDRAIN_LINKS+=("${part_name}|${link}")
             return 0
@@ -196,19 +196,19 @@ upload_to_pixeldrain() {
         local err_val err_msg
         err_val=$(echo "$json_body" | jq -r '.value   // empty' 2>/dev/null)
         err_msg=$(echo "$json_body" | jq -r '.message // empty' 2>/dev/null)
-        log_warn "  Pixeldrain: attempt ${attempt} — HTTP=${http_code} error='${err_val:-?}' msg='${err_msg:-no message}'"
+        log_warn "  Pixeldrain: attempt ${attempt}, HTTP=${http_code} error='${err_val:-?}' msg='${err_msg:-no message}'"
 
         # Early-exit on permanent errors (no point retrying)
         if [[ "$err_val" == "file_too_large" ]]; then
-            log_error "  Pixeldrain: File exceeds size limit — cannot upload this file"
+            log_error "  Pixeldrain: File exceeds size limit, cannot upload this file"
             return 1
         fi
         if [[ "$err_val" == "unauthorized" ]] && [[ -z "$api_key" ]]; then
-            log_error "  Pixeldrain: Unauthorized on anonymous POST — add PIXELDRAIN_API_KEY to GitHub Secrets"
+            log_error "  Pixeldrain: Unauthorized on anonymous POST, add PIXELDRAIN_API_KEY to GitHub Secrets"
             return 1
         fi
         if [[ "$err_val" == "name_too_long" ]]; then
-            log_error "  Pixeldrain: Filename too long (max 255 chars) — safe_filename=${safe_filename}"
+            log_error "  Pixeldrain: Filename too long (max 255 chars), safe_filename=${safe_filename}"
             return 1
         fi
 
@@ -223,7 +223,7 @@ upload_to_pixeldrain() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SERVICE 3: MEGA.NZ UPLOAD
-#  PERMANENT encrypted cloud storage — 20GB free.
+#  PERMANENT encrypted cloud storage, 20GB free.
 #  Uses megatools CLI: megaput (upload) + megals -e (get public link).
 #  Requires: MEGA_EMAIL, MEGA_PASSWORD
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -235,11 +235,11 @@ upload_to_mega() {
     local mega_pass="${MEGA_PASSWORD:-}"
 
     if [[ -z "$mega_email" ]] || [[ -z "$mega_pass" ]]; then
-        log_warn "  MEGA.nz: Missing credentials — skipping (need MEGA_EMAIL, MEGA_PASSWORD)"
+        log_warn "  MEGA.nz: Missing credentials, skipping (need MEGA_EMAIL, MEGA_PASSWORD)"
         return 1
     fi
 
-    log_info "  🔴 MEGA.nz: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+    log_info "  MEGA.nz: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
     local upload_start
     upload_start=$(now_epoch)
 
@@ -300,12 +300,12 @@ EOF
             (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
 
             if [[ -n "$public_link" ]]; then
-                log_ok "  MEGA.nz: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+                log_ok "  MEGA.nz: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
                 log_info "  MEGA.nz: Link → ${public_link} (PERMANENT)"
                 MEGA_LINKS+=("${part_name}|${public_link}")
             else
-                # File uploaded but couldn't get public link — still a success
-                log_ok "  MEGA.nz: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+                # File uploaded but couldn't get public link, still a success
+                log_ok "  MEGA.nz: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
                 log_warn "  MEGA.nz: File uploaded but public link unavailable (check mega.nz account)"
                 MEGA_LINKS+=("${part_name}|https://mega.nz (check account)")
             fi
@@ -327,10 +327,10 @@ EOF
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SERVICE 4: ARCHIVE.ORG UPLOAD
-#  PERMANENT storage — files NEVER expire. Rich metadata.
+#  PERMANENT storage, files NEVER expire. Rich metadata.
 #
 #  ROOT CAUSE OF PAST FAILURES:
-#   • Emoji in filename (🔴) inside S3 URL → curl fails immediately (exit 3/6)
+#   • Emoji in filename () inside S3 URL → curl fails immediately (exit 3/6)
 #   • Fix: strip emoji + use ASCII-only filename in the S3 URL
 #   • Also: improved error logging with curl exit code decoding
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -342,11 +342,11 @@ upload_to_archive() {
     local secret_key="${ARCHIVE_SECRET_KEY:-}"
 
     if [[ -z "$access_key" ]] || [[ -z "$secret_key" ]]; then
-        log_warn "  Archive.org: ARCHIVE_ACCESS_KEY / ARCHIVE_SECRET_KEY not set — skipping"
+        log_warn "  Archive.org: ARCHIVE_ACCESS_KEY / ARCHIVE_SECRET_KEY not set, skipping"
         return 1
     fi
 
-    log_info "  🏛️  Archive.org: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
+    log_info "   Archive.org: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
 
     # Identifier must be alphanumeric + hyphens only (Archive.org bucket name)
     local video_id="${STREAM_VIDEO_ID:-unknown}"
@@ -362,7 +362,7 @@ upload_to_archive() {
     local record_date
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
 
-    # Safe filename for S3 URL — Archive.org S3 URL cannot contain emoji/UTF-8
+    # Safe filename for S3 URL, Archive.org S3 URL cannot contain emoji/UTF-8
     local raw_filename safe_filename
     raw_filename=$(basename "$file")
     safe_filename=$(make_safe_filename "$raw_filename")
@@ -413,7 +413,7 @@ upload_to_archive() {
             local speed fsize
             fsize=$(get_file_size "$file")
             (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  Archive.org: ✅ Upload complete — ${upload_elapsed}s (${speed}/s)"
+            log_ok "  Archive.org: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
             log_info "  Archive.org: Link → ${link} (PERMANENT)"
             ARCHIVE_LINKS+=("${part_name}|${link}|${identifier}")
 
@@ -421,7 +421,7 @@ upload_to_archive() {
             # Prefer the path the recorder reported; fall back to the default.
             local chat_file="${RECORD_CHAT_FILE:-${RECORD_DIR:-/tmp/stream-recorder}/chat.json}"
             if [[ -f "$chat_file" ]] && [[ $(wc -c < "$chat_file" 2>/dev/null || echo 0) -gt 50 ]]; then
-                log_info "  🏛️  Archive.org: Uploading chat.json ($(wc -c < "$chat_file") bytes)..."
+                log_info "   Archive.org: Uploading chat.json ($(wc -c < "$chat_file") bytes)..."
                 curl -s -o /dev/null \
                     --max-time 300 --location \
                     -H "authorization: LOW ${access_key}:${secret_key}" \
@@ -440,12 +440,12 @@ upload_to_archive() {
 
         # Decode curl exit codes for actionable diagnostics
         case "$curl_exit" in
-            0)  log_warn "  Archive.org: HTTP ${http_code} (attempt ${attempt}) — server rejected upload" ;;
-            3)  log_warn "  Archive.org: curl exit 3 — bad URL (likely unsafe chars in filename '${safe_filename}')" ;;
-            6)  log_warn "  Archive.org: curl exit 6 — DNS failure, cannot resolve s3.us.archive.org" ;;
-            7)  log_warn "  Archive.org: curl exit 7 — connection refused; Archive.org may be blocking this GitHub Actions IP range" ;;
-            28) log_warn "  Archive.org: curl exit 28 — timed out after ${time_total}s (file may be too large for ${UPLOAD_TIMEOUT:-7200}s timeout)" ;;
-            35) log_warn "  Archive.org: curl exit 35 — SSL handshake failed" ;;
+            0)  log_warn "  Archive.org: HTTP ${http_code} (attempt ${attempt}), server rejected upload" ;;
+            3)  log_warn "  Archive.org: curl exit 3, bad URL (likely unsafe chars in filename '${safe_filename}')" ;;
+            6)  log_warn "  Archive.org: curl exit 6, DNS failure, cannot resolve s3.us.archive.org" ;;
+            7)  log_warn "  Archive.org: curl exit 7, connection refused; Archive.org may be blocking this GitHub Actions IP range" ;;
+            28) log_warn "  Archive.org: curl exit 28, timed out after ${time_total}s (file may be too large for ${UPLOAD_TIMEOUT:-7200}s timeout)" ;;
+            35) log_warn "  Archive.org: curl exit 35, SSL handshake failed" ;;
             *)  log_warn "  Archive.org: curl exit ${curl_exit} / HTTP ${http_code} (attempt ${attempt})" ;;
         esac
 
@@ -462,9 +462,9 @@ upload_to_archive() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  THUMBNAIL → CLOUD (not stored in git repo)
-#  1) MEGA — permanent copy in YOUR account (/Root/TheMuslimLantern/thumbnails/)
-#  2) Archive.org image — hotlink URL for dashboard (works when YouTube thumb dies)
-#  3) Gofile direct — fallback display URL
+#  1) MEGA, permanent copy in YOUR account (/Root/TheMuslimLantern/thumbnails/)
+#  2) Archive.org image, hotlink URL for dashboard (works when YouTube thumb dies)
+#  3) Gofile direct, fallback display URL
 #  Pixeldrain skipped by default (GitHub Actions datacenter IPs are often blocked)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -558,7 +558,7 @@ upload_thumbnail_to_cloud() {
 
     upload_thumbnail_to_mega "$thumb_file" || log_warn "MEGA thumbnail upload failed"
 
-    upload_thumbnail_to_archive "$thumb_file" || log_warn "Archive thumbnail upload failed — trying Gofile..."
+    upload_thumbnail_to_archive "$thumb_file" || log_warn "Archive thumbnail upload failed, trying Gofile..."
 
     if [[ -z "${THUMBNAIL_CLOUD_URL:-}" ]]; then
         local gf_response gf_status gf_code gf_link
@@ -603,12 +603,12 @@ upload_thumbnail_to_cloud() {
     if [[ -n "${THUMBNAIL_MEGA_URL:-}" || -n "${THUMBNAIL_CLOUD_URL:-}" ]]; then
         return 0
     fi
-    log_warn "Thumbnail cloud upload incomplete — dashboard may fall back to YouTube image"
+    log_warn "Thumbnail cloud upload incomplete, dashboard may fall back to YouTube image"
     return 1
 }
 
 upload_to_clouds() {
-    log_header "☁️ MULTI-CLOUD REDUNDANCY UPLOAD"
+    log_header "MULTI-CLOUD REDUNDANCY UPLOAD"
 
     UPLOAD_START_TIME=$(now_epoch)
 
@@ -653,7 +653,7 @@ upload_to_clouds() {
     for f in "${FILES[@]}"; do
         (( file_num++ ))
         if [[ ! -f "$f" ]]; then
-            log_warn "File not found: $f — skipping"
+            log_warn "File not found: $f, skipping"
             continue
         fi
 
@@ -680,7 +680,7 @@ upload_to_clouds() {
             if upload_to_gofile "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  Gofile: First attempt failed — retrying after 10s..."
+                log_warn "  Gofile: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_gofile "$f" "$part_name"; then
                     (( svc_success++ ))
@@ -696,7 +696,7 @@ upload_to_clouds() {
             if upload_to_pixeldrain "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  Pixeldrain: First attempt failed — retrying after 10s..."
+                log_warn "  Pixeldrain: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_pixeldrain "$f" "$part_name"; then
                     (( svc_success++ ))
@@ -712,7 +712,7 @@ upload_to_clouds() {
             if upload_to_archive "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  Archive.org: First attempt failed — retrying after 10s..."
+                log_warn "  Archive.org: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_archive "$f" "$part_name"; then
                     (( svc_success++ ))
@@ -728,7 +728,7 @@ upload_to_clouds() {
             if upload_to_mega "$f" "$part_name"; then
                 (( svc_success++ ))
             else
-                log_warn "  MEGA.nz: First attempt failed — retrying after 10s..."
+                log_warn "  MEGA.nz: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_mega "$f" "$part_name"; then
                     (( svc_success++ ))
@@ -745,7 +745,7 @@ upload_to_clouds() {
 
     log_separator
 
-    # Dashboard thumbnail (cloud URL — not committed to repo)
+    # Dashboard thumbnail (cloud URL, not committed to repo)
     upload_thumbnail_to_cloud || true
 
     log_separator

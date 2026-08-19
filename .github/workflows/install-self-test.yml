@@ -1,13 +1,13 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   INSTALL SELF-TEST                                                       ║
-# ║  Runs the EXACT install commands the real Stream Recorder uses, on the      ║
-# ║  same runner image, to catch install-step bugs BEFORE they kill a recording.║
+# ║   INSTALL SELF-TEST                                                          ║
+# ║  Runs the EXACT install commands the real Stream Recorder uses, on the       ║
+# ║  same runner image, to catch install-step bugs BEFORE they kill a recording. ║
 # ║                                                                              ║
-# ║  History: 2026-06-26 lost a live recording because                          ║
-# ║      rm /tmp/ytarchive.zip → Operation not permitted (created by sudo curl) ║
-# ║  killed the install step under bash -e. This workflow exists so any future  ║
-# ║  install-step regression fails LOUDLY in CI/PR review instead of silently   ║
-# ║  during the next live stream.                                               ║
+# ║  History: 2026-06-26 lost a live recording because                           ║
+# ║      rm /tmp/ytarchive.zip → Operation not permitted (created by sudo curl)  ║
+# ║  killed the install step under bash -e. This workflow exists so any future   ║
+# ║  install-step regression fails LOUDLY in CI/PR review instead of silently    ║
+# ║  during the next live stream.                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Install self-test"
@@ -138,7 +138,7 @@ jobs:
       # stream-recorder.yml hasn't gained new commands that aren't replayed
       # here. Compares a fingerprint of the install lines.
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Drift check, keep self-test in sync with real workflow"
+      - name: "Drift check against the real workflow"
         run: |
           REAL=$(awk '/Install Dependencies/,/Start PoToken Provider/' .github/workflows/stream-recorder.yml \
                  | grep -E "^\s*(sudo|pip3|curl|sed -i|chmod)" | wc -l)

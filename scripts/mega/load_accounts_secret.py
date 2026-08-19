@@ -21,7 +21,7 @@ OUT = SCRIPT_DIR / "accounts.csv"
 def main() -> int:
     raw = os.environ.get("MEGA_ACCOUNTS_JSON", "").strip()
     if not raw:
-        print("ℹ️ MEGA_ACCOUNTS_JSON not set — using repo/local accounts.csv if present")
+        print("ℹ️ MEGA_ACCOUNTS_JSON not set, using repo/local accounts.csv if present")
         return 0
 
     try:

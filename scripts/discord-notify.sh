@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — PREMIUM DISCORD NOTIFICATIONS v3.0                   ║
-# ║  7 notification types with rich professional embeds.                        ║
-# ║  Built entirely with jq — no heredoc / no backtick bash escaping issues.   ║
-# ║                                                                             ║
-# ║  All 7 types:                                                               ║
-# ║    1. 🔴 LIVE DETECTED         → ALERTS channel                            ║
-# ║    2. ✅ RECORDING COMPLETE     → RECORDINGS channel                        ║
-# ║    3. ❌ RECORDING FAILED       → ALERTS channel                            ║
-# ║    4. 📊 WEEKLY SUMMARY         → REPORTS channel                           ║
-# ║    5. 🔄 LINKS REFRESHED        → REPORTS channel                           ║
-# ║    6. 🟢 SYSTEM HEALTH          → REPORTS channel                           ║
-# ║    7. 🍪 COOKIE WARNING         → ALERTS channel                            ║
+# ║  STREAM RECORDER, PREMIUM DISCORD NOTIFICATIONS v3.0                         ║
+# ║  7 notification types with rich professional embeds.                         ║
+# ║  Built entirely with jq, no heredoc / no backtick bash escaping issues.      ║
+# ║                                                                              ║
+# ║  All 7 types:                                                                ║
+# ║    1. LIVE DETECTED         → ALERTS channel                                 ║
+# ║    2. RECORDING COMPLETE     → RECORDINGS channel                            ║
+# ║    3. RECORDING FAILED       → ALERTS channel                                ║
+# ║    4. WEEKLY SUMMARY         → REPORTS channel                               ║
+# ║    5. LINKS REFRESHED        → REPORTS channel                               ║
+# ║    6. SYSTEM HEALTH          → REPORTS channel                               ║
+# ║    7. COOKIE WARNING         → ALERTS channel                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -48,7 +48,7 @@ send_discord_webhook() {
     webhook_url=$(get_webhook_url "$channel_type")
 
     if [[ -z "$webhook_url" ]]; then
-        log_warn "No Discord webhook for '${channel_type}' — skipping embed"
+        log_warn "No Discord webhook for '${channel_type}', skipping embed"
         return 0
     fi
 
@@ -156,7 +156,7 @@ patch_discord_webhook() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 1: 🔴 LIVE STREAM DETECTED
+#  NOTIFICATION 1: LIVE STREAM DETECTED
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_live_detected() {
@@ -176,13 +176,13 @@ notify_live_detected() {
     local timestamp
     timestamp=$(now_utc_iso)
 
-    local cookie_icon="🟢"
-    [[ "$cookie_status" == "expired" ]]      && cookie_icon="🔴"
-    [[ "$cookie_status" == "no_cookies" ]]   && cookie_icon="🟡"
-    [[ "$cookie_status" == "check_failed" ]] && cookie_icon="❓"
+    local cookie_icon=""
+    [[ "$cookie_status" == "expired" ]]      && cookie_icon=""
+    [[ "$cookie_status" == "no_cookies" ]]   && cookie_icon=""
+    [[ "$cookie_status" == "check_failed" ]] && cookie_icon=""
 
-    local warp_val="🔴 Off"
-    [[ "${WARP_CONNECTED:-false}" == "true" ]] && warp_val="🟢 Active"
+    local warp_val="Off"
+    [[ "${WARP_CONNECTED:-false}" == "true" ]] && warp_val="Active"
 
     # Resolve best working thumbnail URL (tests maxres → sd → hq → mq)
     if [[ -n "$video_id" ]]; then
@@ -221,37 +221,37 @@ notify_live_detected() {
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     ("🔴  LIVE NOW  ─  " + $channel),
+                    name:     (" LIVE NOW  ─  " + $channel),
                     icon_url: $avatar,
                     url:      $url
                 },
-                title:       ("🎬  " + $title),
+                title:       (" " + $title),
                 url:         $url,
                 description: (
-                    "> 🔴 **STREAM IS LIVE — RECORDING STARTED**\n" +
+                    "> **STREAM IS LIVE, RECORDING STARTED**\n" +
                     "> \n" +
                     "> A live stream from **" + $channel + "** has been\n" +
                     "> detected and recording is now **active**.\n" +
                     "\n" +
                     "╔══════════════════════════════════════╗\n" +
-                    "║  🎯 **Recording Engine Active**            ║\n" +
+                    "║  **Recording Engine Active**            ║\n" +
                     "║  7 methods × 3 retries = 21 chances    ║\n" +
-                    "║  ☁️ Triple cloud upload on completion    ║\n" +
+                    "║  Triple cloud upload on completion    ║\n" +
                     "╚══════════════════════════════════════╝"
                 ),
                 color: 16711680,
                 image: { url: $thumbnail },
                 fields: [
-                    { name: "⸻⸻⸻⸻⸻⸻⸻", value: "**📡  System Status**", inline: false },
-                    { name: "🕐  Detected",      value: $dtime,                inline: true  },
-                    { name: "🔍  Method",         value: ("`" + $method + "`"), inline: true  },
-                    { name: "🍪  Cookies",        value: $cookie,              inline: true  },
-                    { name: "💾  Disk Free",      value: $disk,                inline: true  },
-                    { name: "🌐  WARP",           value: $warp,                inline: true  },
-                    { name: "🎛️  Status",        value: "```diff\n+ 🔴 LIVE — RECORDING IN PROGRESS\n```", inline: false }
+                    { name: "⸻⸻⸻⸻⸻⸻⸻", value: "** System Status**", inline: false },
+                    { name: " Detected",      value: $dtime,                inline: true  },
+                    { name: " Method",         value: ("`" + $method + "`"), inline: true  },
+                    { name: " Cookies",        value: $cookie,              inline: true  },
+                    { name: " Disk Free",      value: $disk,                inline: true  },
+                    { name: " WARP",           value: $warp,                inline: true  },
+                    { name: " Status",        value: "```diff\n+ LIVE, RECORDING IN PROGRESS\n```", inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Recording in progress…  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Recording in progress…  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -260,9 +260,9 @@ notify_live_detected() {
                 {
                     type: 1,
                     components: [
-                        { type: 2, style: 5, label: "🔴 Watch Live", url: $url },
-                        { type: 2, style: 5, label: "📊 Dashboard", url: $dash_url },
-                        { type: 2, style: 5, label: "⚙️ Actions", url: ($repo_url + "/actions") }
+                        { type: 2, style: 5, label: "Watch Live", url: $url },
+                        { type: 2, style: 5, label: "Dashboard", url: $dash_url },
+                        { type: 2, style: 5, label: "Actions", url: ($repo_url + "/actions") }
                     ]
                 }
             ]
@@ -272,7 +272,7 @@ notify_live_detected() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 2: ✅ RECORDING COMPLETE
+#  NOTIFICATION 2: RECORDING COMPLETE
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_recording_complete() {
@@ -313,10 +313,10 @@ notify_recording_complete() {
     local warp_ip="${WARP_IP:-N/A}"
 
     # Color based on upload success
-    local color=5763757         # green — all good
-    [[ "$upload_count" == "0" ]]                     && color=15158332   # red — all failed
+    local color=5763757         # green, all good
+    [[ "$upload_count" == "0" ]]                     && color=15158332   # red, all failed
     [[ "$upload_count" != "0" ]] && \
-    [[ "$upload_count" != "$upload_total" ]]          && color=16761095   # amber — partial
+    [[ "$upload_count" != "$upload_total" ]]          && color=16761095   # amber, partial
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
     # HD links only (compressed/480p variant removed from pipeline)
@@ -380,15 +380,15 @@ notify_recording_complete() {
 
     # Build upload status summary line
     local upstatus=""
-    upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "🟠 Gofile ✅"; else echo "🟠 Gofile ❌"; fi)
+    upstatus+=$(if [[ -n "$gofile_url" ]]; then echo "Gofile ✅"; else echo "Gofile ❌"; fi)
     upstatus+=" · "
-    upstatus+=$(if [[ -n "$pixeldrain_url" ]]; then echo "🟣 Pixeldrain ✅"; else echo "🟣 Pixeldrain ❌"; fi)
+    upstatus+=$(if [[ -n "$pixeldrain_url" ]]; then echo "Pixeldrain ✅"; else echo "Pixeldrain ❌"; fi)
     upstatus+=" · "
-    upstatus+=$(if [[ -n "$archive_url" ]]; then echo "🏛 Archive.org ✅"; else echo "🏛 Archive.org ❌"; fi)
+    upstatus+=$(if [[ -n "$archive_url" ]]; then echo "Archive.org ✅"; else echo "Archive.org ❌"; fi)
     upstatus+=" · "
-    upstatus+=$(if [[ -n "$mega_url" ]]; then echo "🔴 MEGA ✅"; else echo "🔴 MEGA ❌"; fi)
+    upstatus+=$(if [[ -n "$mega_url" ]]; then echo "MEGA ✅"; else echo "MEGA ❌"; fi)
     
-    # Compressed/480p variant removed from pipeline — HD-only
+    # Compressed/480p variant removed from pipeline, HD-only
 
     local payload
     payload=$(jq -n \
@@ -427,7 +427,7 @@ notify_recording_complete() {
                     url:      $video_url,
                     icon_url: $avatar
                 },
-                title:       ("🔥  " + $title),
+                title:       (" " + $title),
                 url:         $video_url,
                 description: (
                     "> **" + $channel + "** live stream has been **recorded**, **processed**, and\n" +
@@ -435,12 +435,12 @@ notify_recording_complete() {
                     "\n" +
                     "```ansi\n" +
                     "\u001b[1;32m╔══════════════════════════════════════╗\u001b[0m\n" +
-                    "\u001b[1;32m║\u001b[0m  ⏱  Duration   " + $duration + "\n" +
-                    "\u001b[1;32m║\u001b[0m  💾  File Size  " + $size + "\n" +
-                    "\u001b[1;32m║\u001b[0m  📐  Resolution " + $resolution + "\n" +
-                    "\u001b[1;32m║\u001b[0m  📅  Date       " + $date + "\n" +
-                    "\u001b[1;32m║\u001b[0m  📦  Parts      " + $parts + "\n" +
-                    "\u001b[1;32m║\u001b[0m  ☁️  Uploads   " + $uploads + " services\n" +
+                    "\u001b[1;32m║\u001b[0m   Duration   " + $duration + "\n" +
+                    "\u001b[1;32m║\u001b[0m   File Size  " + $size + "\n" +
+                    "\u001b[1;32m║\u001b[0m   Resolution " + $resolution + "\n" +
+                    "\u001b[1;32m║\u001b[0m   Date       " + $date + "\n" +
+                    "\u001b[1;32m║\u001b[0m   Parts      " + $parts + "\n" +
+                    "\u001b[1;32m║\u001b[0m   Uploads   " + $uploads + " services\n" +
                     "\u001b[1;32m╚══════════════════════════════════════╝\u001b[0m\n" +
                     "```"
                 ),
@@ -448,27 +448,27 @@ notify_recording_complete() {
                 image: { url: $thumbnail },
                 fields: (
                     [
-                        { name: "⸻⸻⸻⸻⸻⸻⸻", value: ("**☁️  Upload Status**\n" + $upstatus), inline: false },
+                        { name: "⸻⸻⸻⸻⸻⸻⸻", value: ("** Upload Status**\n" + $upstatus), inline: false },
                         
                         (if ($gofile_url != "" or $pixeldrain_url != "" or $archive_url != "" or $mega_url != "") then
-                            { name: "╔══  📀 HD  ══════════════════════╗", value: ("**Original quality** • " + $size), inline: false }
+                            { name: "╔══  HD  ══════════════════════╗", value: ("**Original quality** • " + $size), inline: false }
                         else empty end),
-                        (if $gofile_url      != "" then { name: "🟠  Gofile",         value: ("[▶️ Watch / ⬇️ Download](" + $gofile_url + ")"),         inline: true } else empty end),
-                        (if $pixeldrain_url  != "" then { name: "🟣  Pixeldrain",     value: ("[⬇️ Download](" + $pixeldrain_url + ")"),                inline: true } else empty end),
-                        (if $archive_url     != "" then { name: "🏛️  Archive.org",  value: ("[🔗 Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
-                        (if $mega_url        != "" then { name: "🔴  MEGA.nz",      value: ("[⬇️ Download (Permanent)](" + $mega_url + ")"),               inline: true } else empty end),
+                        (if $gofile_url      != "" then { name: " Gofile",         value: ("[▶️ Watch / Download](" + $gofile_url + ")"),         inline: true } else empty end),
+                        (if $pixeldrain_url  != "" then { name: " Pixeldrain",     value: ("[Download](" + $pixeldrain_url + ")"),                inline: true } else empty end),
+                        (if $archive_url     != "" then { name: " Archive.org",  value: ("[Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
+                        (if $mega_url        != "" then { name: " MEGA.nz",      value: ("[Download (Permanent)](" + $mega_url + ")"),               inline: true } else empty end),
                         
                         
                         (if ($gofile_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "") then
-                            { name: "❌  Downloads",  value: "All cloud uploads failed — files may be lost. Check workflow logs.", inline: false }
+                            { name: "❌  Downloads",  value: "All cloud uploads failed, files may be lost. Check workflow logs.", inline: false }
                         else empty end),
-                        { name: "⸻⸻⸻⸻⸻⸻⸻", value: "**📋  Additional Info**", inline: false },
-                        { name: "💬  Live Chat",    value: $chat_status,   inline: true },
-                        { name: "📺  Original",     value: ("[Watch on YT](" + $video_url + ")"), inline: true }
+                        { name: "⸻⸻⸻⸻⸻⸻⸻", value: "** Additional Info**", inline: false },
+                        { name: " Live Chat",    value: $chat_status,   inline: true },
+                        { name: " Original",     value: ("[Watch on YT](" + $video_url + ")"), inline: true }
                     ]
                 ),
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Permanently Archived  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Permanently Archived  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -479,10 +479,10 @@ notify_recording_complete() {
                     type: 1,
                     components: (
                         [
-                            (if $pixeldrain_url != "" then { type: 2, style: 5, label: "🟣 Pixeldrain", url: $pixeldrain_url } else empty end),
-                            (if $gofile_url != "" then { type: 2, style: 5, label: "🟠 Gofile", url: $gofile_url } else empty end),
-                            { type: 2, style: 5, label: "📺 Watch Original", url: $video_url },
-                            { type: 2, style: 5, label: "📊 Dashboard", url: $dash_url }
+                            (if $pixeldrain_url != "" then { type: 2, style: 5, label: "Pixeldrain", url: $pixeldrain_url } else empty end),
+                            (if $gofile_url != "" then { type: 2, style: 5, label: "Gofile", url: $gofile_url } else empty end),
+                            { type: 2, style: 5, label: "Watch Original", url: $video_url },
+                            { type: 2, style: 5, label: "Dashboard", url: $dash_url }
                         ]
                     )
                 },
@@ -490,14 +490,14 @@ notify_recording_complete() {
                 {
                     type: 1,
                     components: [
-                        { type: 2, style: 5, label: "🏛️ Archive.org (Permanent)", url: $archive_url }
+                        { type: 2, style: 5, label: "Archive.org (Permanent)", url: $archive_url }
                     ]
                 } else empty end),
                 (if $mega_url != "" then
                 {
                     type: 1,
                     components: [
-                        { type: 2, style: 5, label: "🔴 MEGA.nz (Permanent)", url: $mega_url }
+                        { type: 2, style: 5, label: "MEGA.nz (Permanent)", url: $mega_url }
                     ]
                 } else empty end)
             ]
@@ -519,7 +519,7 @@ notify_recording_complete() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 3: ❌ RECORDING FAILED
+#  NOTIFICATION 3: RECORDING FAILED
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_recording_failed() {
@@ -586,12 +586,12 @@ notify_recording_failed() {
                 color: 15158332,
                 thumbnail: { url: $thumbnail },
                 fields: [
-                    { name: "⏰  Failed At",    value: $fail_time,    inline: true  },
-                    { name: "🔄  Retry Status", value: $retry_info,   inline: true  },
-                    { name: "📊  Dashboard",    value: ("[📂 View Archive →](" + $dash_url + ")"), inline: false }
+                    { name: " Failed At",    value: $fail_time,    inline: true  },
+                    { name: " Retry Status", value: $retry_info,   inline: true  },
+                    { name: " Dashboard",    value: ("[View Archive →](" + $dash_url + ")"), inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Auto-retry dispatched  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Auto-retry dispatched  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -602,7 +602,7 @@ notify_recording_failed() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 4: 📊 WEEKLY SUMMARY
+#  NOTIFICATION 4: WEEKLY SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_weekly_summary() {
@@ -620,16 +620,16 @@ notify_weekly_summary() {
     local timestamp
     timestamp=$(now_utc_iso)
     
-    # Calculate dynamically string dates for "Apr 13 — Apr 17, 2026"
+    # Calculate dynamically string dates for "Apr 13, Apr 17, 2026"
     local start_date
     start_date=$(date -d "7 days ago" '+%b %d' 2>/dev/null || date -v-7d '+%b %d' 2>/dev/null || echo "1 Week Ago")
     local end_date
     end_date=$(date '+%b %d, %Y')
     
-    local greeting="😴 No Activity"
-    local status="No streams recorded this week 😴"
+    local greeting="No Activity"
+    local status="No streams recorded this week "
     if [[ "$week_streams" != "0" ]]; then
-        greeting="🎉 Great Week"
+        greeting="Great Week"
         status="${week_streams} streams successfully archived."
     fi
     if [[ -n "$streams_list" && "$streams_list" != *"No streams"* ]]; then
@@ -647,7 +647,7 @@ notify_weekly_summary() {
         --arg week_hours     "$week_hours" \
         --arg week_gb        "$week_gb" \
         --arg avg_duration   "$avg_duration" \
-        --arg date_range     "${start_date} — ${end_date}" \
+        --arg date_range     "${start_date}, ${end_date}" \
         --arg greeting       "$greeting" \
         --arg status         "$status" \
         --arg timestamp      "$timestamp" \
@@ -661,28 +661,28 @@ notify_weekly_summary() {
                     name:     "The Muslim Lantern • Weekly Report",
                     icon_url: $avatar
                 },
-                title: ("📊  WEEKLY PERFORMANCE REPORT\n" + $date_range),
+                title: (" WEEKLY PERFORMANCE REPORT\n" + $date_range),
                 description: (
-                    $greeting + " — Here'\''s your automated recording system'\''s weekly performance breakdown.\n\n" +
+                    $greeting + ", Here'\''s your automated recording system'\''s weekly performance breakdown.\n\n" +
                     "━━━━━ This Week ━━━━━\n" + 
-                    "📹  **Streams**\n" + $week_streams + " recorded\n" +
-                    "⏱️  **Hours**\n" + $week_hours + "h captured\n" +
-                    "💾  **Storage**\n" + $week_gb + " GB saved\n" +
-                    "📏  **Avg Duration**\n" + $avg_duration + "h per stream\n" +
-                    "☁️  **Uploads**\nAll links active ✅\n" +
-                    "🛡️  **System**\n🟢 Operational\n\n" +
+                    " **Streams**\n" + $week_streams + " recorded\n" +
+                    " **Hours**\n" + $week_hours + "h captured\n" +
+                    " **Storage**\n" + $week_gb + " GB saved\n" +
+                    " **Avg Duration**\n" + $avg_duration + "h per stream\n" +
+                    " **Uploads**\nAll links active ✅\n" +
+                    " **System**\nOperational\n\n" +
                     
                     "━━━━━ Recordings ━━━━━\n" +
-                    "📝  **This Week'\''s Streams**\n" + $status + "\n\n" +
+                    " **This Week'\''s Streams**\n" + $status + "\n\n" +
                     
                     "━━━━━ All-Time Stats ━━━━━\n" +
-                    "🏆  **Total Streams**\n" + $total_streams + "\n" +
-                    "⏰  **Total Hours**\n" + $total_hours + "h\n" +
-                    "📦  **Total Storage**\n" + $total_gb + " GB\n"
+                    " **Total Streams**\n" + $total_streams + "\n" +
+                    " **Total Hours**\n" + $total_hours + "h\n" +
+                    " **Total Storage**\n" + $total_gb + " GB\n"
                 ),
                 color: 5793522,
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Weekly Report  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Weekly Report  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -693,7 +693,7 @@ notify_weekly_summary() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 5: 🔄 LINKS REFRESHED
+#  NOTIFICATION 5: LINKS REFRESHED
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_links_refreshed() {
@@ -730,25 +730,25 @@ notify_links_refreshed() {
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     ("🔄  LINKS REFRESHED  ·  " + $status_icon),
+                    name:     (" LINKS REFRESHED  ·  " + $status_icon),
                     icon_url: $avatar
                 },
                 title:       "Download Link Health Check",
                 description: (
                     "Periodic link refresh complete. All download links have been pinged to prevent expiry.\n\n" +
-                    "> 📁 **Gofile** — Expires after 10 days of inactivity\n" +
-                    "> 💧 **Pixeldrain** — Expires after 60 days of inactivity\n" +
-                    "> 🏛️ **Archive.org** — Permanently safely archived"
+                    "> **Gofile**, Expires after 10 days of inactivity\n" +
+                    "> **Pixeldrain**, Expires after 60 days of inactivity\n" +
+                    "> **Archive.org**, Permanently safely archived"
                 ),
                 color: 5763757,
                 fields: [
-                    { name: "🔗  Links Checked",   value: ("`" + $checked + "`"),   inline: true  },
+                    { name: " Links Checked",   value: ("`" + $checked + "`"),   inline: true  },
                     { name: "✅  Active Links",    value: ("`" + $active + "`"),    inline: true  },
                     { name: "❌  Expired Links",   value: ("`" + $expired + "`"),   inline: true  },
-                    { name: "🕐  Refreshed At",    value: $rtime,                   inline: false }
+                    { name: " Refreshed At",    value: $rtime,                   inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Link Refresh  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  Link Refresh  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -759,7 +759,7 @@ notify_links_refreshed() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 6a: ⚠️ DISK / SYSTEM ALERT (alerts channel)
+#  NOTIFICATION 6a: DISK / SYSTEM ALERT (alerts channel)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_system_health() {
@@ -787,7 +787,7 @@ notify_system_health() {
                     title: "⚠️ Disk Space Too Low",
                     description: $msg,
                     color: 15105570,
-                    fields: [{ name: "⏰ Time", value: $time, inline: true }],
+                    fields: [{ name: "Time", value: $time, inline: true }],
                     footer: { text: ("☪️ " + $bot_name + " v" + $bot_ver) },
                     timestamp: $timestamp
                 }]
@@ -812,13 +812,13 @@ _notify_system_health_check() {
     local check_time
     check_time=$(now_pkt)
 
-    local cookie_icon="🟢 Valid"
-    [[ "$cookie_status" == "expired" ]]      && cookie_icon="🔴 Expired"
-    [[ "$cookie_status" == "no_cookies" ]]   && cookie_icon="🟡 None"
-    [[ "$cookie_status" == "check_failed" ]] && cookie_icon="❓ Unknown"
+    local cookie_icon="Valid"
+    [[ "$cookie_status" == "expired" ]]      && cookie_icon="Expired"
+    [[ "$cookie_status" == "no_cookies" ]]   && cookie_icon="None"
+    [[ "$cookie_status" == "check_failed" ]] && cookie_icon="Unknown"
 
-    local warp_val="🔴 Off"
-    [[ "$warp" == "true" ]] && warp_val="🟢 Connected"
+    local warp_val="Off"
+    [[ "$warp" == "true" ]] && warp_val="Connected"
 
     local yt_dlp_ver
     yt_dlp_ver=$(yt-dlp --version 2>/dev/null || echo "N/A")
@@ -841,22 +841,22 @@ _notify_system_health_check() {
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     "🟢  SYSTEM HEALTH CHECK",
+                    name:     " SYSTEM HEALTH CHECK",
                     icon_url: $avatar
                 },
                 title:       "Recorder System Status",
                 description: "Automated health check results for the stream recorder bot.",
                 color: 10181046,
                 fields: [
-                    { name: "💾  Disk Space",   value: $disk,           inline: true  },
-                    { name: "🍪  Cookies",       value: $cookie_icon,    inline: true  },
-                    { name: "🌐  WARP",          value: $warp_val,       inline: true  },
-                    { name: "🤖  yt-dlp",        value: ("`" + $yt_dlp_ver + "`"),  inline: true  },
-                    { name: "🕐  Checked At",    value: $check_time,     inline: false },
-                    { name: "📊  Dashboard",     value: ("[Open Archive →](" + $dash_url + ")"), inline: false }
+                    { name: " Disk Space",   value: $disk,           inline: true  },
+                    { name: " Cookies",       value: $cookie_icon,    inline: true  },
+                    { name: " WARP",          value: $warp_val,       inline: true  },
+                    { name: " yt-dlp",        value: ("`" + $yt_dlp_ver + "`"),  inline: true  },
+                    { name: " Checked At",    value: $check_time,     inline: false },
+                    { name: " Dashboard",     value: ("[Open Archive →](" + $dash_url + ")"), inline: false }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  System Health  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  System Health  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp
@@ -867,7 +867,7 @@ _notify_system_health_check() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  NOTIFICATION 7: 🍪 COOKIE WARNING
+#  NOTIFICATION 7: COOKIE WARNING
 # ═══════════════════════════════════════════════════════════════════════════════
 
 notify_cookie_warning() {
@@ -882,20 +882,20 @@ notify_cookie_warning() {
     local warn_time
     warn_time=$(now_pkt)
 
-    local warn_title="Cookies Expired — Action Required"
+    local warn_title="Cookies Expired, Action Required"
     local warn_desc="Your YouTube cookies have **expired or failed verification**. Live recording may fail until they are renewed."
     local warn_color=15158332
-    local field_label="📅  Cookie Age"
+    local field_label=" Cookie Age"
     local field_value="${days_old} days"
     if [[ "$status" == "warning" ]]; then
-        warn_title="Cookie Age Warning — Update Soon"
+        warn_title="Cookie Age Warning, Update Soon"
         warn_desc="Your YouTube cookies are getting old (**${days_old} days**). They may expire soon. Update them proactively to avoid missed recordings."
         warn_color=16744448
     elif [[ "$status" == "expiring" ]]; then
-        warn_title="Cookie Expiry Warning — Update Soon"
+        warn_title="Cookie Expiry Warning, Update Soon"
         warn_desc="Your YouTube cookies are close to their browser expiry (**${days_old}**). Refresh them now to avoid missing a live stream."
         warn_color=16744448
-        field_label="⏳  Expires In"
+        field_label=" Expires In"
         field_value="$days_old"
     elif [[ "$status" == "unverified" ]]; then
         warn_title="Cookie Verification Warning"
@@ -925,7 +925,7 @@ notify_cookie_warning() {
             avatar_url: $avatar,
             embeds: [{
                 author: {
-                    name:     ("🍪  COOKIE ALERT  ·  " + $status),
+                    name:     (" COOKIE ALERT  ·  " + $status),
                     icon_url: $avatar
                 },
                 title:       $warn_title,
@@ -934,9 +934,9 @@ notify_cookie_warning() {
                 fields: [
                     { name: $field_label,        value: ("`" + $field_value + "`"),   inline: true  },
                     { name: "⚠️  Status",        value: ("`" + $status + "`"),         inline: true  },
-                    { name: "🕐  Alert At",       value: $warn_time,                   inline: true  },
+                    { name: " Alert At",       value: $warn_time,                   inline: true  },
                     {
-                        name:  "🔧  How to Fix (3 steps)",
+                        name:  " How to Fix (3 steps)",
                         value: (
                             "**1.** Open Chrome/Kiwi → YouTube → sign in\n" +
                             "**2.** Use *Get cookies.txt LOCALLY* extension → Export\n" +
@@ -947,7 +947,7 @@ notify_cookie_warning() {
                     }
                 ],
                 footer: {
-                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  ⚠️ UPDATE COOKIES  ·  Made with ❤️ by Muneeb Ahmad"),
+                    text:     ("☪️ " + $bot_name + " v" + $bot_ver + "  ·  ⚠️ UPDATE COOKIES  ·  Made with by Muneeb Ahmad"),
                     icon_url: $avatar
                 },
                 timestamp: $timestamp

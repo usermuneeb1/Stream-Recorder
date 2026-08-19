@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   MEGA Account Manager, Generate & Maintain MEGA.nz Accounts           ║
-# ║  Uses github.com/f-o/MEGA-Account-Generator approach:                     ║
-# ║    • Generates accounts with temporary Mail.tm emails                     ║
-# ║    • Auto-verifies via email link                                         ║
-# ║    • Signs into all accounts monthly to prevent deletion                  ║
-# ║  Accounts are stored in accounts.csv (committed to repo).                 ║
+# ║   MEGA Account Manager, Generate & Maintain MEGA.nz Accounts                 ║
+# ║  Uses github.com/f-o/MEGA-Account-Generator approach:                        ║
+# ║    • Generates accounts with temporary Mail.tm emails                        ║
+# ║    • Auto-verifies via email link                                            ║
+# ║    • Signs into all accounts monthly to prevent deletion                     ║
+# ║  Accounts are stored in accounts.csv (committed to repo).                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "MEGA account manager"

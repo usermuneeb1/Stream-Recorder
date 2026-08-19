@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔴 MEGA Account Rotation — Smart Credential Selection                     ║
-# ║  Picks the best MEGA account from accounts.csv for uploading.              ║
-# ║  Strategy: round-robin across accounts to distribute storage usage.        ║
-# ║                                                                            ║
-# ║  Integration:                                                              ║
-# ║    • Called by upload-clouds.sh before MEGA upload                         ║
-# ║    • Sets MEGA_EMAIL and MEGA_PASSWORD environment variables               ║
-# ║    • Falls back to GitHub Secrets if no accounts.csv exists                ║
+# ║  MEGA Account Rotation, Smart Credential Selection                           ║
+# ║  Picks the best MEGA account from accounts.csv for uploading.                ║
+# ║  Strategy: round-robin across accounts to distribute storage usage.          ║
+# ║                                                                              ║
+# ║  Integration:                                                                ║
+# ║    • Called by upload-clouds.sh before MEGA upload                           ║
+# ║    • Sets MEGA_EMAIL and MEGA_PASSWORD environment variables                 ║
+# ║    • Falls back to GitHub Secrets if no accounts.csv exists                  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -53,7 +53,7 @@ select_mega_account() {
                 password=$(echo "$account_line" | cut -d',' -f2 | tr -d '"' | tr -d ' ')
 
                 if [[ -n "$email" ]] && [[ -n "$password" ]]; then
-                    # Export for upload-clouds.sh (stateless rotation — nothing
+                    # Export for upload-clouds.sh (stateless rotation, nothing
                     # to persist).
                     export MEGA_EMAIL="$email"
                     export MEGA_PASSWORD="$password"
@@ -61,7 +61,7 @@ select_mega_account() {
                     echo "MEGA_EMAIL=${email}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
                     echo "MEGA_PASSWORD=${password}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
 
-                    echo "🔴 MEGA: Using account ${next_index}/${total_accounts}: ${email}"
+                    echo "MEGA: Using account ${next_index}/${total_accounts}: ${email}"
                     return 0
                 fi
             fi
@@ -74,7 +74,7 @@ select_mega_account() {
 
     # Priority 2: Fall back to GitHub Secrets (manual MEGA_EMAIL / MEGA_PASSWORD)
     if [[ -n "${MEGA_EMAIL:-}" ]] && [[ -n "${MEGA_PASSWORD:-}" ]]; then
-        echo "🔴 MEGA: Using credentials from GitHub Secrets (MEGA_EMAIL)"
+        echo "MEGA: Using credentials from GitHub Secrets (MEGA_EMAIL)"
         return 0
     fi
 

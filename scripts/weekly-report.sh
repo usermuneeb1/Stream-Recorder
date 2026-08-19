@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — WEEKLY ANALYTICS REPORT                              ║
-# ║  Generates a detailed weekly summary from stats.json and links.txt.        ║
-# ║  Sends a premium Discord embed every Monday at 3:00 PM PKT.               ║
+# ║  STREAM RECORDER, WEEKLY ANALYTICS REPORT                                    ║
+# ║  Generates a detailed weekly summary from stats.json and links.txt.          ║
+# ║  Sends a premium Discord embed every Monday at 3:00 PM PKT.                  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/utils.sh"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 generate_weekly_report() {
-    log_header "📊 WEEKLY ANALYTICS REPORT"
+    log_header "WEEKLY ANALYTICS REPORT"
     
     # ── Read stats.json ──────────────────────────────────────────────────────
     log_step "Reading statistics..."
@@ -66,7 +66,7 @@ generate_weekly_report() {
         # Build the per-stream list (markdown bullets).
         streams_list=$(echo "$recs_content" | jq -r --arg s "$week_start" --arg e "$today" '
             [ .[] | select(.date >= $s and .date <= $e) ]
-            | map("• **" + ((.title // "Untitled")[0:40]) + "** — " + (.date // "?") + " — " + (.duration_fmt // "?") + " — " + (.size_human // "?"))
+            | map("• **" + ((.title // "Untitled")[0:40]) + "**, " + (.date // "?") + ", " + (.duration_fmt // "?") + ", " + (.size_human // "?"))
             | join("\\n")' 2>/dev/null || echo "")
     fi
     
@@ -79,7 +79,7 @@ generate_weekly_report() {
     
     # Default streams list if empty
     if [[ -z "$streams_list" ]]; then
-        streams_list="*No streams recorded this week* 😴"
+        streams_list="*No streams recorded this week* "
     fi
     
     log_info "This week: ${weekly_streams} streams, ${weekly_hours}h, ${weekly_gb} GB"

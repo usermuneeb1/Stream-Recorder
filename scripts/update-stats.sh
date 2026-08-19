@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — PERSISTENT STATISTICS ENGINE                          ║
-# ║  Tracks lifetime recording statistics in stats.json via GitHub API.         ║
-# ║  Every recording updates: total_streams, total_hours, total_gb, averages.  ║
+# ║  STREAM RECORDER, PERSISTENT STATISTICS ENGINE                               ║
+# ║  Tracks lifetime recording statistics in stats.json via GitHub API.          ║
+# ║  Every recording updates: total_streams, total_hours, total_gb, averages.    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 set -uo pipefail
@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/utils.sh"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 update_stats() {
-    log_header "📊 UPDATING STATISTICS"
+    log_header "UPDATING STATISTICS"
     
     local duration_sec="${RECORD_DURATION_SEC:-0}"
     local size_bytes="${RECORD_SIZE_BYTES:-0}"
@@ -54,7 +54,7 @@ update_stats() {
         src_gofile=$(echo "$existing_stats" | jq -r '.sources.gofile // 0' 2>/dev/null)
         log_info "Existing: ${total_streams} streams, ${total_hours}h, ${total_gb} GB"
     else
-        log_info "No existing stats — creating from scratch"
+        log_info "No existing stats, creating from scratch"
     fi
     
     # ── Calculate new totals ─────────────────────────────────────────────────
@@ -64,7 +64,7 @@ update_stats() {
     total_hours=$(echo "scale=2; $total_hours + $duration_hours" | bc)
     total_gb=$(echo "scale=2; $total_gb + $size_gb" | bc)
     avg_duration=$(echo "scale=2; $total_hours / $total_streams" | bc)
-    # Normalize bc output — bc omits leading zero (.13 → 0.13) which breaks jq tonumber
+    # Normalize bc output, bc omits leading zero (.13 → 0.13) which breaks jq tonumber
     [[ "$total_hours"   == .* ]] && total_hours="0${total_hours}"
     [[ "$total_gb"      == .* ]] && total_gb="0${total_gb}"
     [[ "$avg_duration"  == .* ]] && avg_duration="0${avg_duration}"
@@ -120,7 +120,7 @@ update_stats() {
     # ── Write to GitHub ──────────────────────────────────────────────────────
     log_step "Saving stats.json to GitHub..."
     
-    if github_api_write "stats.json" "$new_stats" "📊 Stats update: ${total_streams} streams, ${total_hours}h, ${total_gb} GB"; then
+    if github_api_write "stats.json" "$new_stats" "Stats update: ${total_streams} streams, ${total_hours}h, ${total_gb} GB"; then
         log_ok "Statistics updated successfully"
     else
         log_error "Failed to update stats.json"
@@ -142,7 +142,7 @@ update_stats() {
     
     # ── Update Last Video ID (for duplicate detection) ───────────────────────
     if [[ -n "${STREAM_VIDEO_ID:-}" ]]; then
-        github_api_write "last_video_id.txt" "$STREAM_VIDEO_ID" "📝 Record last video ID: ${STREAM_VIDEO_ID}" >/dev/null 2>&1 || true
+        github_api_write "last_video_id.txt" "$STREAM_VIDEO_ID" "Record last video ID: ${STREAM_VIDEO_ID}" >/dev/null 2>&1 || true
     fi
 
     # ── Update dashboard feed (data/recordings.json) ───────────────────────
@@ -156,7 +156,7 @@ update_recordings_json() {
     [[ -z "$vid" ]] && return 0
     local expected="${CHANNEL_DISPLAY_NAME:-${RECORDER_NAME:-The Muslim Lantern}}"
     if [[ -n "${STREAM_CHANNEL:-}" ]] && [[ "${STREAM_CHANNEL}" != *"Muslim Lantern"* ]]; then
-        log_warn "Skipping recordings.json — not ${expected}"
+        log_warn "Skipping recordings.json, not ${expected}"
         return 0
     fi
 
@@ -234,7 +234,7 @@ update_recordings_json() {
             if any(.[]; .video_id == $item.video_id) then . else . + [$item] end
           )
     ' 2>/dev/null) || merged="[$entry]"
-    github_api_write "data/recordings.json" "$merged" "📊 Dashboard: ${STREAM_TITLE:-recording}" >/dev/null 2>&1 || true
+    github_api_write "data/recordings.json" "$merged" "Dashboard: ${STREAM_TITLE:-recording}" >/dev/null 2>&1 || true
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
