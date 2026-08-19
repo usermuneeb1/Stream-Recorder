@@ -58,6 +58,26 @@ export async function fetchGuests(videoId: string): Promise<Guest[]> {
   return [];
 }
 
+/** Topics per recording, from data/topics.json (keyed by video id). */
+export async function fetchTopics(): Promise<Record<string, string[]>> {
+  for (const base of SOURCES) {
+    try {
+      const r = await fetch(`${base}/data/topics.json`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && typeof j === 'object' && !Array.isArray(j)) {
+        const out: Record<string, string[]> = {};
+        for (const [vid, v] of Object.entries(j)) {
+          if (vid === '_comment') continue;
+          if (Array.isArray(v)) out[vid] = v.filter((t: any) => typeof t === 'string').map((t: string) => t.trim()).filter(Boolean);
+        }
+        return out;
+      }
+    } catch { /* next mirror */ }
+  }
+  return {};
+}
+
 async function fetchFirstJson<T = unknown>(path: string): Promise<T | null> {
   for (const base of SOURCES) {
     try {

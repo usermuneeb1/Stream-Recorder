@@ -270,6 +270,23 @@ img { -webkit-user-drag: none; }
 }
 .chip-hd { color: var(--flame-1); border-color: var(--line-flame); }
 
+/* Topic tag — series / subject / format label on cards and the watch page */
+.topic-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--flame-1);
+  background: var(--flame-08);
+  border: 1px solid var(--line-flame);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.topic-chip-lg { font-size: 11px; padding: 3px 11px; }
+
 .badge-new {
   font-family: var(--font-mono);
   font-size: 9.5px;

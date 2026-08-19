@@ -571,6 +571,12 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                 </div>
                 <h1 className="display text-[clamp(24px,3.4vw,40px)] leading-[1.02] text-balance mb-5">{rec.title}</h1>
 
+                {rec.topics && rec.topics.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-6 -mt-3">
+                    {rec.topics.map(t => <span key={t} className="topic-chip topic-chip-lg">{t}</span>)}
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap mb-8">
                   <button

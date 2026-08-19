@@ -14,7 +14,7 @@ function hash(s: string): number {
   return h;
 }
 
-export function enrichRecordings(recs: Recording[]): Ep[] {
+export function enrichRecordings(recs: Recording[], topics: Record<string, string[]> = {}): Ep[] {
   const chrono = [...recs].sort((a, b) => a.date.localeCompare(b.date));
   const epOf = new Map<string, number>();
   chrono.forEach((r, i) => epOf.set(r.videoId, i + 1));
@@ -29,12 +29,13 @@ export function enrichRecordings(recs: Recording[]): Ep[] {
       matchPct: 91 + (hash(r.videoId) % 9),
       isNew: Date.now() - d.getTime() < 14 * 864e5,
       isForced: /forced\s+recording/i.test(r.title || ''),
+      topics: topics[r.videoId] || [],
     };
   });
 }
 
 /** Channel-feed video → Ep. Plays via the YouTube provider; no archive mirrors. */
-export function enrichYouTube(v: YTVideo, isShort = false): Ep {
+export function enrichYouTube(v: YTVideo, isShort = false, topics: Record<string, string[]> = {}): Ep {
   const d = new Date(v.published || 0);
   return {
     videoId: v.videoId,
@@ -62,6 +63,7 @@ export function enrichYouTube(v: YTVideo, isShort = false): Ep {
     fromYouTube: true,
     isShort,
     viewCount: v.views || 0,
+    topics: topics[v.videoId] || [],
   };
 }
 
