@@ -323,12 +323,16 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const shareUrl = (withTime: boolean) =>
     `${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}${withTime && time > 5 ? `?t=${Math.floor(time)}` : ''}`;
 
+  // Permanent mirrors first, so a viewer always lands on a link that can't
+  // expire (Archive.org, GitHub, MEGA). Temp hosts (Pixeldrain ~60d, Gofile
+  // ~10d) are listed last and labeled "temporary" so a dead link is expected
+  // there, never the default.
   const vault = [
-    { label: 'MEGA', href: rec.megaLink, color: '#d92753' },
-    { label: 'Pixeldrain', href: rec.pixeldrainLink, color: '#4f9ee8' },
-    { label: 'Gofile', href: rec.gofileLink, color: '#3ba97c' },
-    { label: 'GitHub', href: rec.githubDirect || rec.githubRelease, color: '#9aa0a6' },
-    { label: 'Archive.org', href: rec.archiveLink, color: '#e50914' },
+    { label: 'Archive.org', href: rec.archiveLink, color: '#e50914', perm: true },
+    { label: 'GitHub', href: rec.githubDirect || rec.githubRelease, color: '#9aa0a6', perm: true },
+    { label: 'MEGA', href: rec.megaLink, color: '#d92753', perm: true },
+    { label: 'Pixeldrain', href: rec.pixeldrainLink, color: '#4f9ee8', perm: false },
+    { label: 'Gofile', href: rec.gofileLink, color: '#3ba97c', perm: false },
   ].filter(v => v.href);
 
   const R = 26, CIRC = 2 * Math.PI * R;
@@ -722,12 +726,15 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                       style={{ background: 'var(--ink-2)', color: 'var(--ivory)' }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: v.color, boxShadow: `0 0 8px ${v.color}` }} />
                       {v.label}
+                      <span className="mono text-[9px] uppercase tracking-wide" style={{ color: v.perm ? 'var(--flame-2)' : 'var(--shade)' }}>
+                        {v.perm ? 'permanent' : 'temporary'}
+                      </span>
                       <svg className="ml-auto" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--shade)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
                     </a>
                   ))}
                 </div>
                 <div className="mono text-[9.5px] mt-3 leading-relaxed" style={{ color: 'var(--shade)' }}>
-                  Each mirror holds the same 1080p file. If one dims, another lights.
+                  Permanent mirrors never expire. Temporary ones auto-refresh before they lapse.
                 </div>
               </div>
 
