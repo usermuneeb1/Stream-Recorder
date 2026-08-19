@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🧪 GOFILE + DISCORD TEST (real upload + real notification, nothing else)    ║
+# ║   GOFILE + DISCORD TEST (real upload + real notification, nothing else)    ║
 # ║                                                                              ║
 # ║  Tests the upload→Discord tail of the pipeline on a REAL capture:            ║
 # ║   • captures a 15s slice of a PUBLIC video                                   ║
@@ -11,16 +11,16 @@
 # ║   • ARCHIVE_SKIP/MEGA_SKIP/PIXELDRAIN_SKIP=true → Gofile only                ║
 # ║   • No YouTube upload, no Archive.org upload                                 ║
 # ║   • Title marked [PIPELINE TEST] so the Discord post isn't mistaken for real ║
-# ║   • Dispatch-only — never runs on schedule                                   ║
+# ║   • Dispatch-only, never runs on schedule                                   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🧪 Gofile + Discord Test"
+name: "Gofile + Discord test"
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read   # read-only — this workflow CANNOT modify your repo/dashboard
+  contents: read  # read-only, this workflow CANNOT modify your repo/dashboard
 
 defaults:
   run:
@@ -35,14 +35,14 @@ env:
 
 jobs:
   test:
-    name: "🧪 record → gofile → discord"
+    name: "Record → Gofile → Discord"
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg jq bc curl megatools
@@ -52,11 +52,11 @@ jobs:
           yt-dlp --version
           ffmpeg -version | head -1
 
-      - name: "🌐 Setup Cloudflare WARP"
+      - name: "Setup Cloudflare WARP"
         continue-on-error: true
         run: bash scripts/setup-warp.sh
 
-      - name: "🎯 Pick a public video"
+      - name: "Pick a public video"
         id: pick
         run: |
           VID=""
@@ -73,7 +73,7 @@ jobs:
           echo "Using video: $VID"
           echo "video_id=$VID" >> "$GITHUB_OUTPUT"
 
-      - name: "🎬 RECORD — Method D (android_vr), 15s slice"
+      - name: "RECORD, method D (android_vr), 15s slice"
         run: |
           mkdir -p /tmp/stream-recorder
           cd /tmp/stream-recorder
@@ -91,7 +91,7 @@ jobs:
           [[ -f test_raw.mp4 ]] || { echo "❌ no raw file"; exit 1; }
           echo "✅ raw: $(stat -c%s test_raw.mp4) bytes"
 
-      - name: "⚙️ POST-PROCESS (real post-process.sh)"
+      - name: "POST-PROCESS (real post-process.sh)"
         run: |
           export RECORD_DIR="/tmp/stream-recorder"
           export RECORDING_RAW_FILE="/tmp/stream-recorder/test_raw.mp4"
@@ -99,7 +99,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           bash scripts/post-process.sh
 
-      - name: "☁️ UPLOAD — GOFILE ONLY (real upload-clouds.sh)"
+      - name: "UPLOAD, Gofile ONLY (real upload-clouds.sh)"
         run: |
           export RECORD_DIR="/tmp/stream-recorder"
           cd "$GITHUB_WORKSPACE"
@@ -114,7 +114,7 @@ jobs:
           echo "UPLOAD_EXPECTED_COUNT=${UPLOAD_EXPECTED_COUNT:-0}"
           echo "GOFILE_LINKS=${GOFILE_LINKS:-<empty>}"
 
-      - name: "📢 DISCORD — real notify_recording_complete (validates null-payload fix)"
+      - name: "DISCORD, real notify_recording_complete (validates null-payload fix)"
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
@@ -125,7 +125,7 @@ jobs:
           source scripts/discord-notify.sh
           # Set the inputs notify_recording_complete reads. Title is clearly a
           # TEST so the Discord post is never mistaken for a real archive entry.
-          export STREAM_TITLE="🧪 [PIPELINE TEST] record → gofile → discord (15s slice) — NOT a real archive entry"
+          export STREAM_TITLE="[PIPELINE TEST] record → gofile → discord (15s slice), NOT a real archive entry"
           export STREAM_CHANNEL="The Muslim Lantern (test)"
           export STREAM_URL="https://www.youtube.com/watch?v=${{ steps.pick.outputs.video_id }}"
           export STREAM_VIDEO_ID="${{ steps.pick.outputs.video_id }}"
@@ -137,16 +137,16 @@ jobs:
           notify_recording_complete && echo "✅ Discord notification sent (check recordings channel)" \
             || { echo "❌ notify_recording_complete failed"; exit 1; }
 
-      - name: "🧹 Cleanup"
+      - name: "Cleanup"
         if: always()
         run: |
           rm -rf /tmp/stream-recorder
           echo "✅ Test files removed. NOTHING was committed to recordings.json. Dashboard untouched."
 
-      - name: "📋 Summary"
+      - name: "Summary"
         if: always()
         run: |
-          echo "## 🧪 Gofile + Discord Test" >> "$GITHUB_STEP_SUMMARY"
+          echo "##  Gofile + Discord Test" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Real Gofile upload + real Discord notification on a 15s public-video slice." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"

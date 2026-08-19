@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🧱 INSTALL SELF-TEST                                                       ║
+# ║   INSTALL SELF-TEST                                                       ║
 # ║  Runs the EXACT install commands the real Stream Recorder uses, on the      ║
 # ║  same runner image, to catch install-step bugs BEFORE they kill a recording.║
 # ║                                                                              ║
@@ -10,7 +10,7 @@
 # ║  during the next live stream.                                               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🧱 Install Self-Test"
+name: "Install self-test"
 
 on:
   # Run on every PR that touches install-related files
@@ -23,7 +23,7 @@ on:
   # Run daily so an upstream URL change (yt-dlp release moved, ytarchive
   # version gone, apt mirror dead) gets caught before the next live stream
   schedule:
-    - cron: "30 5 * * *"   # 10:30 Karachi — before evening streams
+    - cron: "30 5 * * *"  # 10:30 Karachi, before evening streams
   workflow_dispatch:
 
 permissions:
@@ -44,26 +44,26 @@ env:
 
 jobs:
   self-test:
-    name: "🧱 Install runs cleanly on ubuntu-24.04"
+    name: "Install runs cleanly on ubuntu-24.04"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
       # ─────────────────────────────────────────────────────────────────────
       # Step 1: Replay EXACTLY the install block from stream-recorder.yml.
       # If we ever drift, this test will pass while the real workflow breaks
-      # — so we also do a structural check below to keep them in sync.
+      #, so we also do a structural check below to keep them in sync.
       # ─────────────────────────────────────────────────────────────────────
-      - name: "📦 Replay real install block"
+      - name: "Replay real install block"
         id: install
         shell: bash {0}
         run: |
           set -u
           set +o pipefail
 
-          echo "📦 Installing required tools..."
+          echo "Installing required tools..."
 
           sudo apt-get update -qq || echo "::warning::apt update returned non-zero (continuing)"
           sudo apt-get install -y -qq ffmpeg jq bc curl python3 megatools
@@ -73,7 +73,7 @@ jobs:
           sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
           sudo chmod a+rx /usr/local/bin/yt-dlp
 
-          # ytarchive — the line that lost a recording on 2026-06-26
+          # ytarchive, the line that lost a recording on 2026-06-26
           YTA_VER="0.5.0"
           sudo curl -L "https://github.com/Kethsar/ytarchive/releases/download/v${YTA_VER}/ytarchive_linux_amd64.zip" -o /tmp/ytarchive.zip
           sudo unzip -o /tmp/ytarchive.zip -d /usr/local/bin/
@@ -119,7 +119,7 @@ jobs:
           check "megatools (megaput)" megaput --version
 
           {
-            echo "## 🧱 Install Self-Test"
+            echo "##  Install Self-Test"
             echo ""
             if (( ${#FAILED[@]} == 0 )); then
               echo "**✅ All ${#FAILED[@]} tools installed cleanly**"
@@ -129,16 +129,16 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if (( ${#FAILED[@]} > 0 )); then
-              echo "::error::Install regression — ${FAILED[*]}"
+              echo "::error::Install regression, ${FAILED[*]}"
               exit 1
           fi
 
       # ─────────────────────────────────────────────────────────────────────
-      # Step 3: Structural drift check — ensure the install block in
+      # Step 3: Structural drift check, ensure the install block in
       # stream-recorder.yml hasn't gained new commands that aren't replayed
       # here. Compares a fingerprint of the install lines.
       # ─────────────────────────────────────────────────────────────────────
-      - name: "🔍 Drift check — keep self-test in sync with real workflow"
+      - name: "Drift check, keep self-test in sync with real workflow"
         run: |
           REAL=$(awk '/Install Dependencies/,/Start PoToken Provider/' .github/workflows/stream-recorder.yml \
                  | grep -E "^\s*(sudo|pip3|curl|sed -i|chmod)" | wc -l)
@@ -150,7 +150,7 @@ jobs:
             echo "::warning::Real install block has $REAL commands but self-test only mirrors $TEST. Update install-self-test.yml so it stays representative."
           fi
 
-      - name: "📢 Discord alert on failure"
+      - name: "Discord alert on failure"
         if: failure()
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-$DISCORD_WEBHOOK_URL}"
@@ -158,9 +158,9 @@ jobs:
           jq -n \
             --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{
-              username: "🧱 Install Self-Test",
+              username: "Install Self-Test",
               embeds: [{
-                title: "🚨 Install step regression detected",
+                title: "Install step regression detected",
                 description: ("The install block used by Stream Recorder failed in CI. **A live recording would fail right now.** Fix before the next stream.\n\n[View run](" + $run + ")"),
                 color: 15158332
               }]

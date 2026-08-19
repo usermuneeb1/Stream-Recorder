@@ -1,12 +1,12 @@
-name: "👻 YouTube Ghost-Host"
+name: "YouTube ghost-host"
 
 on:
   # AUTO-TRIGGER: after every successful Stream Recorder run, attempt to
   # ghost-host any new recordings that landed in data/recordings.json.
   # The script itself skips anything that already has a youtube_id, so
-  # this is safe to run on every recording event — never re-uploads.
+  # this is safe to run on every recording event, never re-uploads.
   workflow_run:
-    workflows: ["☪️ The Muslim Lantern — Stream Recorder"]
+    workflows: ["Stream Recorder"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -23,12 +23,12 @@ on:
 env:
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   TZ: Asia/Karachi
-  # 🔐 Phone-verified YouTube accounts can upload up to 12h / 256 GB per video.
+  #  Phone-verified YouTube accounts can upload up to 12h / 256 GB per video.
   # Unverified accounts are capped at 15 minutes per upload.
   # Set repo Variable YOUTUBE_VERIFIED=true once your channel is phone-verified
   # (Settings → Variables → Actions → New repository variable).
   # Until then, this workflow will skip videos > 15min instead of trying and
-  # failing silently — which is what was happening before.
+  # failing silently, which is what was happening before.
   YOUTUBE_VERIFIED: ${{ vars.YOUTUBE_VERIFIED || 'false' }}
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
   ghost-all:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
-    # Skip the auto-trigger when the parent Stream Recorder failed —
+    # Skip the auto-trigger when the parent Stream Recorder failed, 
     # there's nothing new to ghost-host. Always allow manual dispatch.
     if: >
       github.event_name == 'workflow_dispatch' ||
@@ -100,7 +100,7 @@ jobs:
               eligible.append(r)
 
           if skipped_too_long:
-              print(f'\\n⚠️  Skipping {len(skipped_too_long)} recording(s) — too long for current account verification:')
+              print(f'\\n⚠️  Skipping {len(skipped_too_long)} recording(s), too long for current account verification:')
               for vid, t, m in skipped_too_long[:20]:
                   print(f'    • {vid}  ({m} min)  {t}')
               if not VERIFIED:
@@ -155,7 +155,7 @@ jobs:
               print(f'\n{\"=\"*60}')
               print(f'[{i+1}/{len(todo)}] {title}')
               if not url:
-                  print('   Could not resolve a direct mp4 URL — skipping'); continue
+                  print('   Could not resolve a direct mp4 URL, skipping'); continue
               print(f'   URL: {url[:120]}')
               print(f'   Downloading...')
               dl = subprocess.run(
@@ -167,16 +167,16 @@ jobs:
                   print(f'   curl failed (exit {dl.returncode}): {(dl.stderr or \"\")[:200]}')
                   continue
 
-              # Require ≥10 MB and a real mp4 magic header — guards against
+              # Require ≥10 MB and a real mp4 magic header, guards against
               # accidentally downloading an HTML error page or directory
               # listing that happens to be > 10 KB.
               if not os.path.exists('/tmp/input.mp4') or os.path.getsize('/tmp/input.mp4') < 10_000_000:
-                  print(f'   Download too small ({os.path.getsize(\"/tmp/input.mp4\") if os.path.exists(\"/tmp/input.mp4\") else 0} bytes) — skipping'); continue
+                  print(f'   Download too small ({os.path.getsize(\"/tmp/input.mp4\") if os.path.exists(\"/tmp/input.mp4\") else 0} bytes), skipping'); continue
               with open('/tmp/input.mp4', 'rb') as f:
                   head = f.read(16)
               # mp4/mov files have 'ftyp' at offset 4
               if b'ftyp' not in head:
-                  print(f'   Not a valid mp4 (first bytes: {head[:16].hex()}) — skipping')
+                  print(f'   Not a valid mp4 (first bytes: {head[:16].hex()}), skipping')
                   continue
 
               print(f'   Downloaded: {os.path.getsize(\"/tmp/input.mp4\")/1024/1024:.0f} MB')
@@ -220,7 +220,7 @@ jobs:
                       except Exception:
                           pass
                   if not ok:
-                      print(f'   ⚠️  Upload {yt_id} did not become reachable within 60s — discarding')
+                      print(f'   ⚠️  Upload {yt_id} did not become reachable within 60s, discarding')
                       print('       (YouTube likely rejected the video after accepting it.')
                       print('        Will retry on next ghost-host run.)')
                       yt_id = ''
@@ -254,8 +254,8 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "👻 YouTube Ghost-Host: all recordings"
-          # Retry-with-rebase: long ghost-host runs (30–60 min for 3-hour
+          git commit -m "YouTube Ghost-Host: all recordings"
+          # Retry-with-rebase: long ghost-host runs (30-60 min for 3-hour
           # videos) frequently race against sibling workflows / Dependabot
           # commits. Without this loop, the new youtube_id values were lost
           # and the workflow would re-upload the same video next time.
@@ -267,5 +267,5 @@ jobs:
             echo "Push attempt $attempt failed; retrying after $((attempt * 10))s..."
             sleep $((attempt * 10))
           done
-          echo "::error::Push failed after 5 attempts — youtube_id values from this run are NOT persisted in recordings.json"
+          echo "::error::Push failed after 5 attempts, youtube_id values from this run are NOT persisted in recordings.json"
           exit 1

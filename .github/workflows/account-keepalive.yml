@@ -1,18 +1,18 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔄 ACCOUNT KEEP-ALIVE — Prevents MEGA file deletion                      ║
+# ║   ACCOUNT KEEP-ALIVE, Prevents MEGA file deletion                      ║
 # ║  Runs monthly to keep MEGA cloud accounts active.                          ║
 # ║                                                                            ║
 # ║  MEGA.nz:     Deletes files after 90 days of inactivity                   ║
 # ║  Archive.org: No keep-alive needed (truly permanent)                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🔄 Account Keep-Alive"
+name: "Account keep-alive"
 
 on:
   schedule:
     # Run on the 1st and 15th of every month at 10:00 UTC (3:00 PM PKT)
     - cron: "0 10 1 * *"     # 1st of month
-    - cron: "0 10 15 * *"    # 15th of month (safety — twice a month)
+    - cron: "0 10 15 * *"  # 15th of month (safety, twice a month)
   workflow_dispatch:           # Manual trigger
 
 env:
@@ -25,7 +25,7 @@ env:
 
 jobs:
   keepalive:
-    name: "🔄 Keep Accounts Active"
+    name: "Keep accounts active"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -33,14 +33,14 @@ jobs:
       contents: read
 
     steps:
-      - name: "📥 Checkout Repository"
+      - name: "Checkout repository"
         uses: actions/checkout@v7
 
-      - name: "🔴 MEGA.nz — Keep Alive"
+      - name: "MEGA.nz, keep alive"
         id: mega
         run: |
           echo "═══════════════════════════════════════"
-          echo "🔴 MEGA.nz Keep-Alive"
+          echo "MEGA.nz Keep-Alive"
           echo "═══════════════════════════════════════"
 
           sudo apt-get update -qq
@@ -56,28 +56,28 @@ jobs:
             echo "Password = ${MEGA_PASSWORD}" >> /tmp/.megarc
             chmod 600 /tmp/.megarc
 
-            echo "📂 Signing into main MEGA account..."
+            echo "Signing into main MEGA account..."
             if megals --config /tmp/.megarc /Root/ 2>/dev/null; then
               FILE_COUNT=$(megals --config /tmp/.megarc -R /Root/ 2>/dev/null | wc -l)
-              echo "✅ Main account alive — $FILE_COUNT files"
+              echo "✅ Main account alive, $FILE_COUNT files"
               MEGA_OK=$((MEGA_OK + 1))
               MEGA_TOTAL=$((MEGA_TOTAL + 1))
 
               USAGE=$(megadf --config /tmp/.megarc 2>/dev/null | head -3 || echo "N/A")
-              echo "📊 Storage: $USAGE"
+              echo "Storage: $USAGE"
             else
               echo "❌ Main account sign-in failed"
               MEGA_TOTAL=$((MEGA_TOTAL + 1))
             fi
             rm -f /tmp/.megarc
           else
-            echo "⚠️ MEGA_EMAIL/MEGA_PASSWORD not set — skipping main account"
+            echo "⚠️ MEGA_EMAIL/MEGA_PASSWORD not set, skipping main account"
           fi
 
           # Method 2: Sign into ALL generated accounts from tracked accounts.csv.
           if [[ -f scripts/mega/accounts.csv ]]; then
             echo ""
-            echo "📂 Signing into generated accounts (accounts.csv)..."
+            echo "Signing into generated accounts (accounts.csv)..."
             pip3 install --quiet -r scripts/mega/requirements.txt 2>/dev/null || true
 
             if python3 scripts/mega/signin_accounts.py; then
@@ -95,7 +95,7 @@ jobs:
             fi
             rm -f scripts/mega/signin_results.json
           else
-            echo "ℹ️ No accounts.csv — no generated accounts to check"
+            echo "ℹ️ No accounts.csv, no generated accounts to check"
           fi
 
           # Set output
@@ -108,7 +108,7 @@ jobs:
           fi
           echo "files=${MEGA_OK}/${MEGA_TOTAL}" >> $GITHUB_OUTPUT
 
-      - name: "📡 Send Discord Report"
+      - name: "Send Discord report"
         if: always()
         run: |
           MEGA_STATUS="${{ steps.mega.outputs.status }}"
@@ -146,19 +146,19 @@ jobs:
               username: $username,
               avatar_url: $avatar,
               embeds: [{
-                title: "🔄 Monthly Account Keep-Alive",
+                title: "Monthly Account Keep-Alive",
                 description: (
                   "> **Automatic activity ping** to prevent cloud services\n" +
                   "> from deleting recordings due to inactivity.\n\n" +
-                  "**📅 Date:** " + $date + "\n\n" +
-                  "**🔴 MEGA.nz:** " + $mega + "\n" +
+                  "** Date:** " + $date + "\n\n" +
+                  "** MEGA.nz:** " + $mega + "\n" +
                   "*(Deletes files after 90 days of inactivity)*\n\n" +
-                  "**🏛️ Archive.org:** ✅ No action needed\n" +
-                  "*(Truly permanent — no inactivity rules)*"
+                  "** Archive.org:** ✅ No action needed\n" +
+                  "*(Truly permanent, no inactivity rules)*"
                 ),
                 color: $color,
                 footer: {
-                  text: "☪️ Account Keep-Alive · Runs twice monthly · Made with ❤️ by Muneeb Ahmad"
+                  text: "☪️ Account Keep-Alive. Runs twice monthly."
                 },
                 timestamp: $timestamp
               }]

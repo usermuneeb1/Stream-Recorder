@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🛡️ CodeQL — static security analysis for the dashboard (JS/TS)              ║
+# ║   CodeQL, static security analysis for the dashboard (JS/TS)              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🛡️ CodeQL"
+name: "CodeQL"
 
 on:
   push:
@@ -24,13 +24,13 @@ jobs:
   analyze:
     runs-on: ubuntu-24.04
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "🧰 Init CodeQL"
+      - name: "Init CodeQL"
         uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
 
-      - name: "🔍 Analyze"
+      - name: "Analyze"
         uses: github/codeql-action/analyze@v4

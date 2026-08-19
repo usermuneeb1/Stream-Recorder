@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🛠️ REPAIR MIRRORS FROM ARCHIVE.ORG                                         ║
+# ║   REPAIR MIRRORS FROM ARCHIVE.ORG                                         ║
 # ║  Reuploads missing/expired Gofile/Pixeldrain/MEGA mirrors from permanent    ║
 # ║  Archive.org copies and updates data/recordings.json.                       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🛠️ Repair Cloud Mirrors"
+name: "Repair cloud mirrors"
 
 on:
   workflow_dispatch:
@@ -65,21 +65,21 @@ env:
 
 jobs:
   repair:
-    name: "🛠️ Repair mirrors"
+    name: "Repair mirrors"
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq aria2 megatools bc python3
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh
 
-      - name: "🛠️ Repair from Archive.org"
+      - name: "Repair from Archive.org"
         env:
           TARGET_VIDEO_ID: ${{ github.event.inputs.video_id }}
           MAX_ITEMS: ${{ github.event.inputs.max_items || '3' }}
@@ -87,9 +87,9 @@ jobs:
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: bash scripts/repair-mirrors.sh
 
-      - name: "📋 Summary"
+      - name: "Summary"
         if: always()
         run: |
-          echo "## 🛠️ Mirror Repair" >> "$GITHUB_STEP_SUMMARY"
+          echo "##  Mirror Repair" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Completed at $(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')" >> "$GITHUB_STEP_SUMMARY"

@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🟣 Pixeldrain Account Manager — Generate & Maintain Pixeldrain Accounts   ║
+# ║   Pixeldrain Account Manager, Generate & Maintain Pixeldrain Accounts   ║
 # ║    • Generates accounts via the official Pixeldrain API + temp emails       ║
 # ║    • Verifies via the e-mailed login link, stores the API key               ║
 # ║    • Keep-alive: calls GET /user on a schedule (cancels 7-day deletion)     ║
@@ -7,7 +7,7 @@
 # ║  Accounts are stored in scripts/pixeldrain/accounts.csv (committed).        ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🟣 Pixeldrain Account Manager"
+name: "Pixeldrain account manager"
 
 on:
   workflow_dispatch:
@@ -52,28 +52,28 @@ env:
 
 jobs:
   pixeldrain-manager:
-    name: "🟣 Pixeldrain Account Manager"
+    name: "Pixeldrain account manager"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: write
 
     steps:
-      - name: "📥 Checkout Repository"
+      - name: "Checkout repository"
         uses: actions/checkout@v7
 
-      - name: "🐍 Set up Python"
+      - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: "📦 Install Dependencies"
+      - name: "Install dependencies"
         run: |
           pip3 install --quiet -r scripts/pixeldrain/requirements.txt pynacl
           echo "python3: $(python3 --version)"
 
       # ─── GENERATE ──────────────────────────────────────────────────────────
-      - name: "🟣 Generate Pixeldrain Accounts"
+      - name: "Generate Pixeldrain accounts"
         id: generate
         if: >-
           github.event_name == 'workflow_dispatch' &&
@@ -92,7 +92,7 @@ jobs:
           echo "status=$([[ $RC -eq 0 ]] && echo success || echo failed)" >> "$GITHUB_OUTPUT"
 
       # ─── KEEP-ALIVE ────────────────────────────────────────────────────────
-      - name: "🔄 Keep-Alive Health Check"
+      - name: "Keep-alive health check"
         id: signin
         if: >-
           github.event_name == 'schedule' ||
@@ -115,7 +115,7 @@ jobs:
           fi
 
       # ─── ENABLE EMBEDDED PLAYBACK ──────────────────────────────────────────
-      - name: "🖼️ Enable Embedded Playback (hotlink + embed_domains)"
+      - name: "Enable embedded playback (hotlink + embed_domains)"
         if: >-
           github.event_name == 'schedule' ||
           github.event.inputs.action == 'configure' ||
@@ -124,7 +124,7 @@ jobs:
         run: python3 configure_embed.py || echo "⚠️ embed config skipped/failed"
 
       # ─── PUSH BEST API KEY TO SECRET ───────────────────────────────────────
-      - name: "🔐 Update PIXELDRAIN_API_KEY Secret"
+      - name: "Update PIXELDRAIN_API_KEY secret"
         if: >-
           github.event_name == 'schedule' ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.push_secret == 'true')
@@ -132,7 +132,7 @@ jobs:
         run: python3 load_accounts_secret.py || echo "⚠️ secret update skipped/failed"
 
       # ─── COMMIT ────────────────────────────────────────────────────────────
-      - name: "💾 Commit Account Changes"
+      - name: "Commit account changes"
         if: always()
         run: |
           rm -f scripts/pixeldrain/signin_results.json
@@ -141,12 +141,12 @@ jobs:
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder.local"
-          git commit -m "🟣 Pixeldrain accounts updated — $(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')"
+          git commit -m "Pixeldrain accounts updated, $(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')"
           [[ -n "${GH_PAT:-}" ]] && git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}.git"
           git push && echo "✅ Pushed"
 
       # ─── DISCORD REPORT ────────────────────────────────────────────────────
-      - name: "📡 Send Discord Report"
+      - name: "Send Discord report"
         if: always()
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
@@ -166,7 +166,7 @@ jobs:
           DESC="**Action:** \`${ACTION}\`\n"
           [[ -n "$GEN_STATUS" ]] && DESC+="**Generated:** ${GEN_STATUS} (total on file: ${GEN_TOTAL})\n"
           [[ -n "$SI_STATUS" ]]  && DESC+="**Keep-alive:** ${SI_OK:-0}/${SI_TOTAL:-0} alive, ${SI_FAIL:-0} failed\n"
-          DESC+="\n☁️ Provider: **Pixeldrain** · 📧 Mail.tm/Gmailnator · ⏰ 1st & 15th monthly"
+          DESC+="\n Provider: **Pixeldrain** ·  Mail.tm/Gmailnator ·  1st & 15th monthly"
 
           PAYLOAD=$(jq -n \
             --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \

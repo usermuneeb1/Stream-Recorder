@@ -1,9 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🍪 COOKIE HEALTH SENTINEL                                                  ║
+# ║   COOKIE HEALTH SENTINEL                                                  ║
 # ║  Runs independently so YouTube cookie problems alert before a live stream.  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🍪 Cookie Health Sentinel"
+name: "Cookie health sentinel"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DISABLED: The recorder runs in permanent cookieless mode (PUBLIC_STREAM_ONLY=true)
@@ -43,21 +43,21 @@ env:
 
 jobs:
   cookie-health:
-    name: "🍪 Verify YouTube Cookies"
+    name: "Verify YouTube cookies"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq coreutils
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh
 
-      - name: "🍪 Prepare cookies"
+      - name: "Prepare cookies"
         run: |
           if [[ -z "${YOUTUBE_COOKIES:-}" ]]; then
             echo "⚠️ YOUTUBE_COOKIES secret is empty"
@@ -76,15 +76,15 @@ jobs:
           chmod 600 cookies.txt
           echo "Prepared cookies: $(wc -l < cookies.txt) lines"
 
-      - name: "🔎 Run cookie health check"
+      - name: "Run cookie health check"
         id: check
         run: bash scripts/check-cookies.sh
 
-      - name: "📋 Summary"
+      - name: "Summary"
         if: always()
         run: |
           source scripts/utils.sh
-          echo "## 🍪 Cookie Health Sentinel" >> "$GITHUB_STEP_SUMMARY"
+          echo "##  Cookie Health Sentinel" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"

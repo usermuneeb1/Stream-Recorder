@@ -1,10 +1,10 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 STREAM RECORDER — WEEKLY SUMMARY WORKFLOW                              ║
+# ║   STREAM RECORDER, WEEKLY SUMMARY WORKFLOW                              ║
 # ║  Runs every Monday at 10:00 UTC (3:00 PM PKT) to send weekly analytics.   ║
 # ║  Reads stats.json + links.txt and sends a premium Discord embed.          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "📊 Weekly Summary"
+name: "Weekly summary"
 
 on:
   schedule:
@@ -26,35 +26,35 @@ env:
 
 jobs:
   summary:
-    name: "📊 Generate Weekly Report"
+    name: "Generate weekly report"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
-      - name: "📥 Checkout Repository"
+      - name: "Checkout repository"
         uses: actions/checkout@v7
 
-      - name: "📦 Install Dependencies"
+      - name: "Install dependencies"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq jq bc curl python3
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh
 
-      - name: "📊 Generate & Send Weekly Report"
+      - name: "Generate & send weekly report"
         run: bash scripts/weekly-report.sh
 
-      - name: "📋 Summary"
+      - name: "Summary"
         if: always()
         run: |
           source scripts/utils.sh
           
-          echo "## 📊 Weekly Summary Report" >> $GITHUB_STEP_SUMMARY
+          echo "##  Weekly Summary Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| ⏰ Generated | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
-          echo "| 📹 This Week | ${WEEKLY_TOTAL_STREAMS:-0} streams |" >> $GITHUB_STEP_SUMMARY
-          echo "| ⏱️ Hours | ${WEEKLY_TOTAL_HOURS:-0}h |" >> $GITHUB_STEP_SUMMARY
-          echo "| 💾 Size | ${WEEKLY_TOTAL_GB:-0} GB |" >> $GITHUB_STEP_SUMMARY
-          echo "| 📏 Lifetime | ${LIFETIME_TOTAL_STREAMS:-0} streams |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Generated | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
+          echo "|  This Week | ${WEEKLY_TOTAL_STREAMS:-0} streams |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Hours | ${WEEKLY_TOTAL_HOURS:-0}h |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Size | ${WEEKLY_TOTAL_GB:-0} GB |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Lifetime | ${LIFETIME_TOTAL_STREAMS:-0} streams |" >> $GITHUB_STEP_SUMMARY

@@ -1,11 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📦 Archive.org → MEGA Migration                                           ║
+# ║   Archive.org → MEGA Migration                                           ║
 # ║  Downloads your entire Archive.org collection and re-uploads to MEGA.      ║
 # ║  Uses a CUSTOM MEGA account (not the round-robin auto-generated ones).     ║
 # ║  You can specify any MEGA account credentials per run.                     ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "📦 Archive → MEGA Migration"
+name: "Archive → MEGA migration"
 
 on:
   workflow_dispatch:
@@ -44,21 +44,21 @@ env:
 
 jobs:
   migrate:
-    name: "📦 Archive → MEGA"
+    name: "Archive → MEGA"
     runs-on: ubuntu-24.04
     timeout-minutes: 350
 
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install Tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq megatools aria2 python3
           echo "✅ Tools installed"
 
-      - name: "🔑 Setup MEGA Account"
+      - name: "Setup MEGA account"
         run: |
           M_EMAIL="${{ github.event.inputs.mega_email }}"
           M_PASS="${{ github.event.inputs.mega_password }}"
@@ -69,7 +69,7 @@ jobs:
           echo "Password = ${M_PASS}" >> /tmp/.megarc
           chmod 600 /tmp/.megarc
 
-          echo "🔑 Testing MEGA login..."
+          echo "Testing MEGA login..."
           if megals --config /tmp/.megarc /Root/ 2>/dev/null; then
             echo "✅ MEGA login OK: ${M_EMAIL}"
           else
@@ -80,13 +80,13 @@ jobs:
           # Create destination folder if needed
           if [[ "$FOLDER" != "/Root/" ]] && [[ "$FOLDER" != "/Root" ]]; then
             megamkdir --config /tmp/.megarc "$FOLDER" 2>/dev/null || true
-            echo "📁 Folder ready: $FOLDER"
+            echo "Folder ready: $FOLDER"
           fi
 
           # Check storage
           megadf --config /tmp/.megarc 2>/dev/null || true
 
-      - name: "📦 Download from Archive.org & Upload to MEGA"
+      - name: "Download from Archive.org & upload to MEGA"
         id: migrate
         run: |
           QUERY="${{ github.event.inputs.archive_query }}"
@@ -96,14 +96,14 @@ jobs:
           [[ "$MAX_ITEMS" == "0" ]] && MAX_ITEMS=9999
 
           echo "═══════════════════════════════════════"
-          echo "📦 Archive.org → MEGA Migration"
+          echo "Archive.org → MEGA Migration"
           echo "  Query: $QUERY"
           echo "  MEGA folder: $FOLDER"
           echo "  Max items: $MAX_ITEMS"
           echo "═══════════════════════════════════════"
 
           # Search Archive.org for items (use --data-urlencode to let curl handle encoding)
-          echo "🔍 Searching Archive.org..."
+          echo "Searching Archive.org..."
           RESULTS=$(curl -s -G "https://archive.org/advancedsearch.php" \
             --data-urlencode "q=${QUERY}" \
             --data-urlencode "fl[]=identifier" \
@@ -133,7 +133,7 @@ jobs:
           fi
 
           TOTAL=$(echo "$IDENTIFIERS" | wc -l)
-          echo "📊 Found $TOTAL items to migrate"
+          echo "Found $TOTAL items to migrate"
           echo ""
 
           SUCCESS=0
@@ -146,7 +146,7 @@ jobs:
             COUNT=$((COUNT + 1))
 
             echo "──────────────────────────────────────"
-            echo "📦 [$COUNT/$TOTAL] $identifier"
+            echo "[$COUNT/$TOTAL] $identifier"
             echo "  Title: $title"
 
             # Get list of files in this item
@@ -159,13 +159,13 @@ jobs:
               name = f.get('name', '')
               fmt = f.get('format', '')
               size = f.get('size', '0')
-              # Only get video files (mp4, mkv, etc.) — skip metadata/thumbs
+              # Only get video files (mp4, mkv, etc.), skip metadata/thumbs
               if name.endswith(('.mp4', '.mkv', '.webm', '.avi', '.mov', '.ts')):
                   print(f'{name}|{size}')
           " 2>/dev/null || true)
 
             if [[ -z "$FILES" ]]; then
-              echo "  ⚠️ No video files found — skipping"
+              echo "  ⚠️ No video files found, skipping"
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
@@ -174,7 +174,7 @@ jobs:
               [[ -z "$filename" ]] && continue
 
               SIZE_MB=$((filesize / 1024 / 1024))
-              echo "  ⬇️ Downloading: $filename ($SIZE_MB MB)"
+              echo "   Downloading: $filename ($SIZE_MB MB)"
 
               DOWNLOAD_URL="https://archive.org/download/${identifier}/${filename}"
               LOCAL_FILE="/tmp/transfer/${filename}"
@@ -204,7 +204,7 @@ jobs:
               mv "$LOCAL_FILE" "$UPLOAD_FILE" 2>/dev/null || UPLOAD_FILE="$LOCAL_FILE"
 
               # Upload to MEGA
-              echo "  ⬆️ Uploading to MEGA: $FOLDER/$UNIQUE_NAME"
+              echo "   Uploading to MEGA: $FOLDER/$UNIQUE_NAME"
               if megaput --config /tmp/.megarc --no-ask-password --path "$FOLDER/" "$UPLOAD_FILE" 2>&1; then
                 echo "  ✅ Uploaded: $UNIQUE_NAME"
                 SUCCESS=$((SUCCESS + 1))
@@ -230,11 +230,11 @@ jobs:
           done <<< "$IDENTIFIERS"
 
           echo "═══════════════════════════════════════"
-          echo "📦 Migration Complete"
+          echo "Migration Complete"
           echo "  ✅ Uploaded: $SUCCESS files"
           echo "  ❌ Failed:   $FAILED files"
           echo "  ⏭️ Skipped:  $SKIPPED items (no video)"
-          echo "  📊 Total:    $TOTAL items processed"
+          echo "   Total:    $TOTAL items processed"
           echo "═══════════════════════════════════════"
 
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
@@ -242,13 +242,13 @@ jobs:
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
           echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
 
-      - name: "🧹 Cleanup"
+      - name: "Cleanup"
         if: always()
         run: |
           rm -f /tmp/.megarc
           rm -rf /tmp/transfer
 
-      - name: "📡 Send Discord Report"
+      - name: "Send Discord report"
         if: always()
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
@@ -280,19 +280,19 @@ jobs:
               username: $username,
               avatar_url: $avatar,
               embeds: [{
-                title: "📦 Archive → MEGA Migration Complete",
+                title: "Archive → MEGA Migration Complete",
                 description: (
                   "> Migrated Archive.org collection to MEGA.\n\n" +
-                  "**🔴 MEGA Account:** `" + $email + "`\n" +
-                  "**📁 Folder:** `" + $folder + "`\n\n" +
+                  "** MEGA Account:** `" + $email + "`\n" +
+                  "** Folder:** `" + $folder + "`\n\n" +
                   "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
                   "✅ **Uploaded:** " + $success + " files\n" +
                   "❌ **Failed:** " + $failed + " files\n" +
                   "⏭️ **Skipped:** " + $skipped + " items\n" +
-                  "📊 **Total:** " + $total + " items processed"
+                  "**Total:** " + $total + " items processed"
                 ),
                 color: $color,
-                footer: { text: "📦 Archive → MEGA Migration" },
+                footer: { text: "Archive → MEGA migration" },
                 timestamp: $timestamp
               }]
             }')

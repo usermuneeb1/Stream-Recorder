@@ -1,4 +1,4 @@
-name: "🔧 Patch YouTube Embedding"
+name: "Patch YouTube embedding"
 
 on:
   workflow_dispatch: {}
@@ -15,7 +15,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Google API client
+      - name: Install google API client
         run: pip3 install --quiet google-auth google-auth-oauthlib google-api-python-client
 
       - name: Extract YouTube credentials
@@ -38,7 +38,7 @@ jobs:
           git config user.email "stream-recorder-bot@users.noreply.github.com"
           if ! git diff --quiet -- data/recordings.json; then
             git add data/recordings.json
-            git commit -m "🔧 Reset youtube_id/youtube_unlisted for non-embeddable videos"
+            git commit -m "Reset youtube_id/youtube_unlisted for non-embeddable videos"
             git push
           else
             echo "No changes to commit."

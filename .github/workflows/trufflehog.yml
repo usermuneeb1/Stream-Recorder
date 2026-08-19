@@ -1,11 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🐷 TruffleHog — deep secret scan of full git history                        ║
+# ║   TruffleHog, deep secret scan of full git history                        ║
 # ║  Complements gitleaks: scans the ENTIRE commit history (not just the diff)   ║
 # ║  with verification, catching credentials that were committed and later        ║
 # ║  removed but still live in history. Alerts Discord on findings.              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🐷 TruffleHog Deep Scan"
+name: "TruffleHog deep scan"
 
 on:
   schedule:
@@ -19,26 +19,26 @@ jobs:
   scan:
     runs-on: ubuntu-24.04
     steps:
-      - name: "📥 Checkout (full history)"
+      - name: "Checkout (full history)"
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: "🐷 Run TruffleHog"
+      - name: "Run TruffleHog"
         id: th
         uses: trufflesecurity/trufflehog@main
         continue-on-error: true
         with:
           extra_args: --results=verified,unknown
 
-      - name: "📡 Notify Discord if secrets found"
+      - name: "Notify Discord if secrets found"
         if: steps.th.outcome == 'failure'
         run: |
           WEBHOOK="${{ secrets.DISCORD_WEBHOOK_ALERTS }}"
           [[ -z "$WEBHOOK" ]] && WEBHOOK="${{ secrets.DISCORD_WEBHOOK_URL }}"
           [[ -z "$WEBHOOK" ]] && exit 0
           curl -s -o /dev/null -H "Content-Type: application/json" -d '{
-            "username": "🐷 TruffleHog",
+            "username": "TruffleHog",
             "embeds": [{
               "title": "⚠️ Secrets found in git history",
               "description": "TruffleHog detected credentials in the commit history. Review the run and ROTATE any exposed secret immediately.",

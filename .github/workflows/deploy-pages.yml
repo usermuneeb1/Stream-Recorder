@@ -1,5 +1,5 @@
 # Deploy the public dashboard to GitHub Pages (fixes 404 when Pages is not manually enabled).
-name: "🌐 Deploy Dashboard"
+name: "Deploy dashboard"
 
 on:
   push:
@@ -17,37 +17,37 @@ concurrency:
 
 jobs:
   deploy:
-    name: "Publish GitHub Pages"
+    name: "Publish GitHub pages"
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "🔧 Setup Node.js"
+      - name: "Setup Node.js"
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: "📡 Generate RSS / podcast / sitemap feeds"
+      - name: "Generate RSS / podcast / sitemap feeds"
         run: python3 scripts/generate-feeds.py
 
-      - name: "📦 Install & Build Command Center"
+      - name: "Install & build command center"
         working-directory: dashboard
         run: |
           npm install
           npm run build
 
-      - name: "🌐 Configure Pages"
+      - name: "Configure pages"
         uses: actions/configure-pages@v6
 
-      - name: "📦 Upload site"
+      - name: "Upload site"
         uses: actions/upload-pages-artifact@v5
         with:
           path: dashboard/dist
 
-      - name: "🚀 Deploy"
+      - name: "Deploy"
         id: deployment
         uses: actions/deploy-pages@v5

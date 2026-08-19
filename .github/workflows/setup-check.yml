@@ -1,5 +1,5 @@
 # One-click validation that all required GitHub secrets are configured.
-name: "🔧 Setup Check"
+name: "Setup check"
 
 on:
   workflow_dispatch:
@@ -25,12 +25,12 @@ env:
 
 jobs:
   check:
-    name: "Validate Secrets"
+    name: "Validate secrets"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - name: "🔧 Run Setup Check"
+      - name: "Run setup check"
         run: |
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh

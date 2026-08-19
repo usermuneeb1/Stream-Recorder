@@ -1,9 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🚨 WORKFLOW WATCHDOG                                                       ║
+# ║   WORKFLOW WATCHDOG                                                       ║
 # ║  Alerts Discord when critical automation workflows fail.                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🚨 Workflow Watchdog"
+name: "Workflow watchdog"
 
 on:
   schedule:
@@ -37,19 +37,19 @@ env:
 
 jobs:
   watchdog:
-    name: "🚨 Check recent failures"
+    name: "Check recent failures"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq
 
-      - name: "🚨 Inspect workflows"
+      - name: "Inspect workflows"
         run: |
           set -euo pipefail
           LOOKBACK="${{ github.event.inputs.lookback_hours }}"
@@ -72,13 +72,13 @@ jobs:
             | select((.status == "completed") and (.conclusion != "success") and (.conclusion != "cancelled"))
             | select((.updated_at | fromdateiso8601) >= $since)
             | select(($critical | split(" ")) as $c | $c | index(.path | split("/")[-1]))
-            | "- **" + .name + "** — `" + .conclusion + "` — " + .html_url
+            | "- **" + .name + "**, `" + .conclusion + "`, " + .html_url
           ')
 
           COUNT=$(printf '%s\n' "$FAILURES" | sed '/^$/d' | wc -l | tr -d ' ')
           echo "Found $COUNT recent critical failure(s)"
           {
-            echo "## 🚨 Workflow Watchdog"
+            echo "##  Workflow Watchdog"
             echo ""
             echo "Lookback: ${LOOKBACK}h"
             echo "Failures: ${COUNT}"
@@ -103,7 +103,7 @@ jobs:
               username: $username,
               avatar_url: $avatar,
               embeds: [{
-                title: "🚨 Critical Workflow Failure Detected",
+                title: "Critical Workflow Failure Detected",
                 description: ("Recent automation failures in `" + $repo + "` within the last **" + $lookback + "h**:\n\n" + $failures),
                 color: 15158332,
                 timestamp: $ts

@@ -1,11 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🚀 URL-to-Cloud Transfer — Download any file & upload to cloud            ║
+# ║   URL-to-Cloud Transfer, Download any file & upload to cloud            ║
 # ║  Uses GitHub Actions' fast internet (~10Gbps) as a transfer proxy.         ║
 # ║  Supports: Direct links, YouTube, social media, ANY web URL                ║
 # ║  Destinations: Gofile, Pixeldrain, Archive.org, MEGA.nz                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🚀 URL-to-Cloud Transfer"
+name: "URL-to-cloud transfer"
 
 on:
   workflow_dispatch:
@@ -30,12 +30,12 @@ on:
           - mega
           - all
       mega_email:
-        description: "MEGA email (only for mega/all — leave empty for default)"
+        description: "MEGA email (only for mega/all, leave empty for default)"
         required: false
         default: ""
         type: string
       mega_password:
-        description: "MEGA password (only for mega/all — leave empty for default)"
+        description: "MEGA password (only for mega/all, leave empty for default)"
         required: false
         default: ""
         type: string
@@ -68,22 +68,22 @@ env:
 
 jobs:
   transfer:
-    name: "🚀 Download & Upload"
+    name: "Download & upload"
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install Tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq megatools aria2 bc ffmpeg python3-pip
           pip3 install -q yt-dlp 2>/dev/null || pip install -q yt-dlp
           echo "✅ Tools installed (aria2 + yt-dlp + megatools + ffmpeg)"
 
-      - name: "⬇️ Download File"
+      - name: "Download file"
         id: download
         run: |
           URL="${{ github.event.inputs.file_url }}"
@@ -91,7 +91,7 @@ jobs:
           QUALITY="${{ github.event.inputs.quality }}"
 
           echo "═══════════════════════════════════════"
-          echo "⬇️ Downloading..."
+          echo "Downloading..."
           echo "  URL: $URL"
           echo "═══════════════════════════════════════"
 
@@ -101,7 +101,7 @@ jobs:
           STREAMING_SITES="youtube.com|youtu.be|twitter.com|x.com|instagram.com|facebook.com|tiktok.com|twitch.tv|dailymotion.com|vimeo.com|reddit.com|rumble.com|bitchute.com|odysee.com|streamable.com|kick.com|bilibili.com"
 
           if echo "$URL" | grep -qiE "$STREAMING_SITES"; then
-            echo "🎬 Detected streaming URL — using yt-dlp"
+            echo "Detected streaming URL, using yt-dlp"
 
             # Set quality format
             case "$QUALITY" in
@@ -121,7 +121,7 @@ jobs:
               "$URL" 2>&1
 
           else
-            echo "📦 Direct file URL — using aria2c"
+            echo "Direct file URL, using aria2c"
 
             aria2c -x 16 -s 16 -k 1M \
               --max-tries=5 \
@@ -129,7 +129,7 @@ jobs:
               --dir=/tmp/transfer \
               --console-log-level=notice \
               "$URL" 2>&1 || {
-                echo "⚠️ aria2 failed — trying curl..."
+                echo "⚠️ aria2 failed, trying curl..."
                 curl -L -o "/tmp/transfer/downloaded_file" \
                   --max-time 7200 \
                   --retry 3 \
@@ -142,7 +142,7 @@ jobs:
                  xargs ls -S 2>/dev/null | head -1)
 
           if [[ -z "$FILE" ]] || [[ ! -f "$FILE" ]]; then
-            echo "❌ Download failed — no file found"
+            echo "❌ Download failed, no file found"
             ls -la /tmp/transfer/ 2>/dev/null || true
             exit 1
           fi
@@ -165,14 +165,14 @@ jobs:
           echo "filesize=$FILESIZE" >> $GITHUB_OUTPUT
           echo "filesize_mb=$FILESIZE_MB" >> $GITHUB_OUTPUT
 
-      - name: "☁️ Upload to Gofile"
+      - name: "Upload to Gofile"
         if: >-
           github.event.inputs.destination == 'gofile' ||
           github.event.inputs.destination == 'all'
         id: gofile
         run: |
           FILE="${{ steps.download.outputs.filepath }}"
-          echo "🟠 Uploading to Gofile..."
+          echo "Uploading to Gofile..."
 
           SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name' 2>/dev/null || echo "store1")
           RESPONSE=$(curl -s --max-time 3600 -F "file=@$FILE" "https://${SERVER}.gofile.io/uploadFile")
@@ -185,7 +185,7 @@ jobs:
             echo "❌ Gofile upload failed: $RESPONSE"
           fi
 
-      - name: "☁️ Upload to Pixeldrain"
+      - name: "Upload to Pixeldrain"
         if: >-
           github.event.inputs.destination == 'pixeldrain' ||
           github.event.inputs.destination == 'all'
@@ -193,7 +193,7 @@ jobs:
         run: |
           FILE="${{ steps.download.outputs.filepath }}"
           FILENAME="${{ steps.download.outputs.filename }}"
-          echo "🟣 Uploading to Pixeldrain..."
+          echo "Uploading to Pixeldrain..."
 
           RESPONSE=$(curl -s --max-time 3600 -T "$FILE" \
             -u ":${PIXELDRAIN_API_KEY}" \
@@ -208,7 +208,7 @@ jobs:
             echo "❌ Pixeldrain upload failed: $RESPONSE"
           fi
 
-      - name: "☁️ Upload to Archive.org"
+      - name: "Upload to Archive.org"
         if: >-
           github.event.inputs.destination == 'archive' ||
           github.event.inputs.destination == 'all'
@@ -219,7 +219,7 @@ jobs:
           TITLE="${{ github.event.inputs.archive_title }}"
           [[ -z "$TITLE" ]] && TITLE="Personal Media Backup"
 
-          echo "🏛️ Uploading to Archive.org..."
+          echo "Uploading to Archive.org..."
 
           TIMESTAMP=$(date '+%s')
           DATE_STR=$(date '+%Y-%m-%d')
@@ -249,14 +249,14 @@ jobs:
             echo "❌ Archive.org failed: HTTP $HTTP_CODE"
           fi
 
-      - name: "☁️ Upload to MEGA"
+      - name: "Upload to MEGA"
         if: >-
           github.event.inputs.destination == 'mega' ||
           github.event.inputs.destination == 'all'
         id: mega
         run: |
           FILE="${{ steps.download.outputs.filepath }}"
-          echo "🔴 Uploading to MEGA..."
+          echo "Uploading to MEGA..."
 
           M_EMAIL="${{ github.event.inputs.mega_email }}"
           M_PASS="${{ github.event.inputs.mega_password }}"
@@ -281,7 +281,7 @@ jobs:
           fi
           rm -f /tmp/.megarc
 
-      - name: "📡 Send Discord Report"
+      - name: "Send Discord report"
         if: always()
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
@@ -299,18 +299,18 @@ jobs:
           TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
           FIELDS="[]"
-          FIELDS=$(echo "$FIELDS" | jq --arg v "${FILENAME:-unknown}" '. + [{"name":"📄 File","value":("`" + $v + "`"),"inline":true}]')
-          FIELDS=$(echo "$FIELDS" | jq --arg v "${FILESIZE:-0} MB" '. + [{"name":"💾 Size","value":$v,"inline":true}]')
-          FIELDS=$(echo "$FIELDS" | jq --arg v "${DEST}" '. + [{"name":"☁️ Destination","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${FILENAME:-unknown}" '. + [{"name":"File","value":("`" + $v + "`"),"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${FILESIZE:-0} MB" '. + [{"name":"Size","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${DEST}" '. + [{"name":"Destination","value":$v,"inline":true}]')
 
           # Truncate URL for display
           SHORT_URL=$(echo "$URL" | head -c 80)
-          FIELDS=$(echo "$FIELDS" | jq --arg v "$SHORT_URL" '. + [{"name":"🔗 Source","value":("`" + $v + "`"),"inline":false}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "$SHORT_URL" '. + [{"name":"Source","value":("`" + $v + "`"),"inline":false}]')
 
-          [[ -n "$GOFILE" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[🔗 Download]($GOFILE)" '. + [{"name":"🟠 Gofile","value":$v,"inline":true}]')
-          [[ -n "$PIXELDRAIN" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[🔗 Download]($PIXELDRAIN)" '. + [{"name":"🟣 Pixeldrain","value":$v,"inline":true}]')
-          [[ -n "$ARCHIVE" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[🔗 Permanent]($ARCHIVE)" '. + [{"name":"🏛️ Archive.org","value":$v,"inline":true}]')
-          [[ -n "$MEGA" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "$MEGA" '. + [{"name":"🔴 MEGA","value":("`" + $v + "`"),"inline":true}]')
+          [[ -n "$GOFILE" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[ Download]($GOFILE)" '. + [{"name":"Gofile","value":$v,"inline":true}]')
+          [[ -n "$PIXELDRAIN" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[ Download]($PIXELDRAIN)" '. + [{"name":"Pixeldrain","value":$v,"inline":true}]')
+          [[ -n "$ARCHIVE" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "[ Permanent]($ARCHIVE)" '. + [{"name":"Archive.org","value":$v,"inline":true}]')
+          [[ -n "$MEGA" ]] && FIELDS=$(echo "$FIELDS" | jq --arg v "$MEGA" '. + [{"name":"MEGA","value":("`" + $v + "`"),"inline":true}]')
 
           PAYLOAD=$(jq -n \
             --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
@@ -321,11 +321,11 @@ jobs:
               username: $username,
               avatar_url: $avatar,
               embeds: [{
-                title: "🚀 URL-to-Cloud Transfer Complete",
+                title: "URL-to-Cloud Transfer Complete",
                 description: "> Downloaded and uploaded via GitHub Actions fast internet.\n> Supports direct files, YouTube, Twitter, Instagram & more.",
                 color: 5763757,
                 fields: $fields,
-                footer: { text: "🚀 URL-to-Cloud Transfer" },
+                footer: { text: "URL-to-Cloud Transfer" },
                 timestamp: $timestamp
               }]
             }')

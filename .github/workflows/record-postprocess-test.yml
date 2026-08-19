@@ -1,16 +1,16 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🎬 RECORD → POST-PROCESS TEST (ephemeral, zero side-effects)                ║
+# ║   RECORD → POST-PROCESS TEST (ephemeral, zero side-effects)                ║
 # ║                                                                              ║
 # ║  Tests the EXACT record→post-process chain a live stream hits, but:          ║
 # ║   • captures only a 15-second slice of a PUBLIC video (not a live stream)    ║
 # ║   • runs the REAL scripts/post-process.sh (unchanged)                        ║
-# ║   • writes ONLY to /tmp — no upload, no commit, no Discord, no dashboard     ║
+# ║   • writes ONLY to /tmp, no upload, no commit, no Discord, no dashboard     ║
 # ║                                                                              ║
 # ║  This is the one part of the pipeline that was never tested end-to-end.      ║
 # ║  Dispatch-only (no schedule) so it never runs unless you ask.                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🎬 Record→Post-Process Test"
+name: "Record → post-process test"
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ on:
         default: ""
 
 permissions:
-  contents: read   # read-only — this workflow CANNOT commit anything
+  contents: read  # read-only, this workflow CANNOT commit anything
 
 defaults:
   run:
@@ -36,14 +36,14 @@ env:
 
 jobs:
   test:
-    name: "🎬 record→post-process on a real capture"
+    name: "Record → post-process on a real capture"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg jq bc curl
@@ -53,11 +53,11 @@ jobs:
           yt-dlp --version
           ffmpeg -version | head -1
 
-      - name: "🌐 Setup Cloudflare WARP"
+      - name: "Setup Cloudflare WARP"
         continue-on-error: true
         run: bash scripts/setup-warp.sh
 
-      - name: "🎯 Pick a public video"
+      - name: "Pick a public video"
         id: pick
         run: |
           VID="${{ github.event.inputs.video_id }}"
@@ -75,7 +75,7 @@ jobs:
           fi
           # Known-good fallback (verified public 1080p) if auto-pick found nothing
           if [[ -z "$VID" ]]; then
-            echo "Auto-pick found nothing — using known-good fallback."
+            echo "Auto-pick found nothing, using known-good fallback."
             VID="RATmDJ9Roh4"
           fi
           echo "Using video: $VID"
@@ -83,13 +83,13 @@ jobs:
           yt-dlp --skip-download --no-warnings --print "title=%(title)s | res=%(resolution)s | avail=%(availability)s" \
             "https://www.youtube.com/watch?v=$VID" 2>&1 | head -3
 
-      - name: "🎬 RECORD — Method D (android_vr), 15s slice"
+      - name: "RECORD, method D (android_vr), 15s slice"
         id: record
         run: |
           mkdir -p /tmp/stream-recorder
           cd /tmp/stream-recorder
           VID="${{ steps.pick.outputs.video_id }}"
-          echo "Recording 15s slice with Method D (android_vr) — same flags as record-stream.sh..."
+          echo "Recording 15s slice with Method D (android_vr), same flags as record-stream.sh..."
           if timeout 120 yt-dlp \
               --extractor-args "youtube:player_client=android_vr" \
               --no-part --no-continue --no-check-certificates \
@@ -113,7 +113,7 @@ jobs:
             exit 1
           fi
 
-      - name: "⚙️ POST-PROCESS — run the REAL post-process.sh"
+      - name: "POST-PROCESS, run the REAL post-process.sh"
         run: |
           export RECORD_DIR="/tmp/stream-recorder"
           export RECORDING_RAW_FILE="/tmp/stream-recorder/test_raw.mp4"
@@ -141,15 +141,15 @@ jobs:
           echo "resolution=$(ffprobe -v quiet -select_streams v:0 -show_entries stream=width,height -of csv=p=0 $OUT)"
           echo "codec=$(ffprobe -v quiet -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 $OUT)"
 
-      - name: "🧹 Cleanup (ephemeral — nothing persists)"
+      - name: "Cleanup (ephemeral, nothing persists)"
         run: |
           rm -rf /tmp/stream-recorder
           echo "✅ Test files removed. No uploads, no commits, no dashboard changes."
 
-      - name: "📋 Summary"
+      - name: "Summary"
         if: always()
         run: |
-          echo "## 🎬 Record→Post-Process Test" >> "$GITHUB_STEP_SUMMARY"
+          echo "##  Record→Post-Process Test" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Captured a 15s slice of a **public** video with Method D (android_vr), ran the real \`post-process.sh\` on it." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"

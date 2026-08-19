@@ -1,9 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  ✅ QUALITY CHECK — Backend scripts + Dashboard build                       ║
+# ║   QUALITY CHECK, Backend scripts + Dashboard build                       ║
 # ║  Fast validation gate for professional maintenance.                         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "✅ Quality Check"
+name: "✅ Quality check"
 
 on:
   workflow_dispatch:
@@ -30,19 +30,19 @@ concurrency:
 
 jobs:
   backend-scripts:
-    name: "🐚 Bash / Workflow Hygiene"
+    name: "Bash / workflow hygiene"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install linters"
+      - name: "Install linters"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck jq python3
 
-      - name: "🔎 Bash syntax"
+      - name: "Bash syntax"
         run: |
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           for f in scripts/*.sh; do
@@ -50,16 +50,16 @@ jobs:
             bash -n "$f"
           done
 
-      - name: "🔎 ShellCheck"
+      - name: "Shellcheck"
         run: |
           # Treat correctness findings as failures; allow style/warning noise for now.
           shellcheck -x -S error scripts/*.sh
 
-      - name: "🔎 Python syntax"
+      - name: "Python syntax"
         run: |
           python3 -m py_compile scripts/mega/*.py
 
-      - name: "🔎 GitHub Actions lint"
+      - name: "GitHub actions lint"
         run: |
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
           # Run actionlint's workflow semantics checks. Shell scripts are already
@@ -67,10 +67,10 @@ jobs:
           # shellcheck integration to avoid duplicate/noisy inline-workflow style findings.
           ./actionlint -color -shellcheck ""
 
-      - name: "🧪 Database audit"
+      - name: "Database audit"
         run: bash scripts/database-audit.sh
 
-      - name: "🔐 Secret reference summary"
+      - name: "Secret reference summary"
         run: |
           echo "## Referenced GitHub Secrets" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -79,7 +79,7 @@ jobs:
             | sort -u >> "$GITHUB_STEP_SUMMARY" || true
 
   dashboard:
-    name: "🖥️ Dashboard Lint + Build"
+    name: "Dashboard lint + build"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
@@ -87,21 +87,21 @@ jobs:
         shell: bash
         working-directory: dashboard
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "🔧 Setup Node.js"
+      - name: "Setup Node.js"
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      - name: "📦 Install dependencies"
+      - name: "Install dependencies"
         run: npm ci
 
-      - name: "🔎 Lint"
+      - name: "Lint"
         run: echo "lint skipped"
 
-      - name: "🏗️ Build"
+      - name: "Build"
         run: npm run build

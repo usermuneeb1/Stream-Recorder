@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📺 YouTube Channel → Archive.org                                          ║
+# ║   YouTube Channel → Archive.org                                          ║
 # ║  Downloads entire YouTube channels/playlists and archives them.            ║
 # ║  Each playlist → separate Archive.org group. Full metadata.               ║
 # ║  Downloads ONE video at a time → upload → delete → next (saves disk).     ║
@@ -7,7 +7,7 @@
 # ║  Requires YOUTUBE_COOKIES secret for bot bypass.                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "📺 YouTube → Archive.org"
+name: "YouTube → Archive.org"
 
 on:
   workflow_dispatch:
@@ -71,15 +71,15 @@ env:
 
 jobs:
   archive:
-    name: "📺 Archive YouTube"
+    name: "Archive YouTube"
     runs-on: ubuntu-24.04
     timeout-minutes: 350
 
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install Tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq aria2 ffmpeg python3-pip
@@ -100,38 +100,38 @@ jobs:
           echo "✅ Tools installed"
           yt-dlp --version
 
-      - name: "🌐 Setup Cloudflare WARP (bypass datacenter IP block)"
+      - name: "Setup Cloudflare WARP (bypass datacenter IP block)"
         uses: sebst/actions-warp@v1
         continue-on-error: true
         with:
           tos: YES
 
-      - name: "🌐 Verify WARP Connection"
+      - name: "Verify WARP connection"
         continue-on-error: true
         run: |
-          echo "🌐 Checking WARP connection..."
+          echo "Checking WARP connection..."
           TRACE=$(curl -s --max-time 10 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null || echo "")
           if echo "$TRACE" | grep -q "warp=on"; then
-            echo "✅ WARP is ON — traffic routed through Cloudflare"
+            echo "✅ WARP is ON, traffic routed through Cloudflare"
           else
-            echo "⚠️ WARP not detected — may still use datacenter IP"
+            echo "⚠️ WARP not detected, may still use datacenter IP"
           fi
           IP=$(curl -s --max-time 10 https://ifconfig.me 2>/dev/null || echo 'unknown')
-          echo "🌐 Current IP: $IP"
+          echo "Current IP: $IP"
 
-      - name: "🍪 Setup YouTube Cookies"
+      - name: "Setup YouTube cookies"
         run: |
           if [[ -n "$YOUTUBE_COOKIES" ]]; then
             printf '%s\n' "$YOUTUBE_COOKIES" > /tmp/cookies.txt
             chmod 600 /tmp/cookies.txt
             echo "✅ YouTube cookies loaded ($(wc -l < /tmp/cookies.txt) lines)"
           else
-            echo "⚠️ No YOUTUBE_COOKIES secret — YouTube may block downloads"
+            echo "⚠️ No YOUTUBE_COOKIES secret, YouTube may block downloads"
             echo "   To fix: export cookies from browser → add as YOUTUBE_COOKIES secret"
             touch /tmp/cookies.txt
           fi
 
-      - name: "📺 Process YouTube Content"
+      - name: "Process YouTube content"
         id: process
         run: |
           export PATH="$HOME/.deno/bin:$PATH"
@@ -161,13 +161,13 @@ jobs:
           PROXY_ARGS=""
           if [[ -n "$PROXY" ]]; then
             PROXY_ARGS="--proxy $PROXY"
-            echo "  🔀 Proxy: $PROXY"
+            echo "   Proxy: $PROXY"
           fi
 
           # Anti-bot: sleep between requests + use web_creator client
           YTDLP_ARGS="$COOKIE_ARGS $PROXY_ARGS --sleep-requests 3 --min-sleep-interval 5 --max-sleep-interval 20 --extractor-args youtube:player_client=web_creator"
 
-          # Quality format — enforce minimum 720p
+          # Quality format, enforce minimum 720p
           case "$QUALITY" in
             "1080p") FORMAT="bestvideo[height<=1080][height>=720]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height>=720]" ;;
             "720p")  FORMAT="bestvideo[height<=720][height>=720]+bestaudio/bestvideo[height<=720]+bestaudio/best[height>=720]" ;;
@@ -176,7 +176,7 @@ jobs:
           esac
 
           echo "═══════════════════════════════════════"
-          echo "📺 YouTube Channel → Archive.org"
+          echo "YouTube Channel → Archive.org"
           echo "  URL: $URL"
           echo "  Mode: $MODE"
           echo "  Quality: $QUALITY"
@@ -186,7 +186,7 @@ jobs:
 
           # ─── Step 1: Get channel/playlist info ───
           echo ""
-          echo "🔍 Scanning YouTube content..."
+          echo "Scanning YouTube content..."
 
           yt-dlp --flat-playlist -J $YTDLP_ARGS "$URL" 2>/dev/null > /tmp/yt_info.json || {
             echo "❌ Failed to fetch YouTube info"
@@ -214,10 +214,10 @@ jobs:
           archive_prefix=$(echo "${archive_prefix}-HD" | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-80)
 
           echo ""
-          echo "📺 Channel: $CHANNEL"
-          echo "📋 Type: $YT_TYPE"
-          echo "📊 Entries: $ENTRY_COUNT"
-          echo "🏷️ Archive prefix: $archive_prefix"
+          echo "Channel: $CHANNEL"
+          echo "Type: $YT_TYPE"
+          echo "Entries: $ENTRY_COUNT"
+          echo "Archive prefix: $archive_prefix"
 
           # ─── Step 2: Extract video list ───
           python3 << 'PYEOF' > /tmp/video_list.tsv
@@ -245,24 +245,24 @@ jobs:
           PLAYLIST_COUNT=$(grep -c "^PLAYLIST" /tmp/video_list.tsv 2>/dev/null || true)
           [[ -z "$PLAYLIST_COUNT" ]] && PLAYLIST_COUNT=0
 
-          echo "📊 Found: $VIDEO_COUNT videos, $PLAYLIST_COUNT sub-playlists"
+          echo "Found: $VIDEO_COUNT videos, $PLAYLIST_COUNT sub-playlists"
 
           # ─── LIST-ONLY MODE ───
           if [[ "$MODE" == "list-only" ]]; then
             echo ""
             echo "═══════════════════════════════════════"
-            echo "📋 LIST MODE — No downloads"
+            echo "LIST MODE, No downloads"
             echo "═══════════════════════════════════════"
 
             if [[ "$PLAYLIST_COUNT" -gt 0 ]]; then
-              echo "📂 Sub-Playlists:"
+              echo "Sub-Playlists:"
               grep "^PLAYLIST" /tmp/video_list.tsv | while IFS=$'\t' read -r _ pid ptitle purl; do
-                echo "  📁 $ptitle"
+                echo "   $ptitle"
               done
             fi
 
             if [[ "$VIDEO_COUNT" -gt 0 ]]; then
-              echo "🎬 Videos:"
+              echo "Videos:"
               C=0
               grep "^VIDEO" /tmp/video_list.tsv | while IFS=$'\t' read -r _ vid vtitle vpl vdur; do
                 C=$((C + 1))
@@ -280,8 +280,8 @@ jobs:
           # ─── UPLOAD MODE ───
           echo ""
           echo "═══════════════════════════════════════"
-          echo "🚀 UPLOAD MODE — Download → Upload → Delete → Next"
-          echo "  💾 Disk: ONE video at a time (max ~2GB used)"
+          echo "UPLOAD MODE, Download → Upload → Delete → Next"
+          echo "   Disk: ONE video at a time (max ~2GB used)"
           echo "═══════════════════════════════════════"
 
           SUCCESS=0
@@ -321,11 +321,11 @@ jobs:
             if [[ "$SKIP_EXISTING" == "true" ]]; then
               HAS_VIDEO=$(curl -s --max-time 15 "https://archive.org/metadata/$ITEM_ID" 2>/dev/null | python3 -c "import sys, json; print('yes' if any('${vid}' in f.get('name','') for f in json.load(sys.stdin).get('files',[])) else 'no')" 2>/dev/null || echo "no")
               if [[ "$HAS_VIDEO" == "yes" ]]; then
-                echo "  ⏭️ Already in Archive.org item ${ITEM_ID} — skipping"
+                echo "  ⏭️ Already in Archive.org item ${ITEM_ID}, skipping"
                 SKIPPED=$((SKIPPED + 1))
                 return
               else
-                echo "  🔄 Video not in Archive.org item ${ITEM_ID} yet — will upload"
+                echo "   Video not in Archive.org item ${ITEM_ID} yet, will upload"
               fi
             fi
 
@@ -336,7 +336,7 @@ jobs:
             # Try multiple player clients as fallback
             local download_ok=false
             for client in "${PLAYER_CLIENTS[@]}"; do
-              echo "  ⬇️ Downloading (client: $client)..."
+              echo "   Downloading (client: $client)..."
               if yt-dlp \
                 -f "$FORMAT" \
                 --merge-output-format mp4 \
@@ -373,7 +373,7 @@ jobs:
                 SAFE_FILENAME=$(basename "$FILE" | sed 's/[^a-zA-Z0-9._-]/-/g')
                 DATE_STR=$(date '+%Y-%m-%d')
 
-                echo "  ⬆️ Uploading to Archive.org ($SIZE_MB MB)..."
+                echo "   Uploading to Archive.org ($SIZE_MB MB)..."
 
                 HTTP_CODE=$(curl -g -s -o /dev/null -w '%{http_code}' \
                   --max-time 7200 \
@@ -410,7 +410,7 @@ jobs:
             # ─── EARLY ABORT: stop if too many consecutive failures ───
             if [[ "$CONSECUTIVE_FAILS" -ge "$MAX_CONSECUTIVE_FAILS" ]]; then
               echo ""
-              echo "🛑 ABORTING: $MAX_CONSECUTIVE_FAILS consecutive failures!"
+              echo "ABORTING: $MAX_CONSECUTIVE_FAILS consecutive failures!"
               echo "   YouTube is blocking all downloads."
               echo "   Possible fixes:"
               echo "   1. Re-export fresh cookies from browser → update YOUTUBE_COOKIES secret"
@@ -424,11 +424,11 @@ jobs:
 
             # CRITICAL: Delete video to save disk space
             rm -rf /tmp/transfer/*
-            echo "  🗑️ Cleaned up disk"
+            echo "   Cleaned up disk"
 
             # Show remaining disk
             DISK_FREE=$(df -h /tmp | tail -1 | awk '{print $4}')
-            echo "  💾 Disk free: $DISK_FREE"
+            echo "   Disk free: $DISK_FREE"
 
             sleep 2
           }
@@ -436,19 +436,19 @@ jobs:
           # ─── Process sub-playlists (channel URL) ───
           if [[ "$PLAYLIST_COUNT" -gt 0 ]]; then
             echo ""
-            echo "📂 Processing $PLAYLIST_COUNT playlists..."
+            echo "Processing $PLAYLIST_COUNT playlists..."
 
             while IFS=$'\t' read -r _ pid ptitle purl; do
               echo ""
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "📁 Playlist: $ptitle"
+              echo "Playlist: $ptitle"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
               PLAYLIST_ARGS=""
               [[ -n "$MAX_VIDEOS" ]] && PLAYLIST_ARGS="--playlist-end $MAX_VIDEOS"
 
               yt-dlp --flat-playlist -J $PLAYLIST_ARGS $YTDLP_ARGS "$purl" 2>/dev/null > /tmp/sub_playlist.json || {
-                echo "  ⚠️ Could not fetch playlist — skipping"
+                echo "  ⚠️ Could not fetch playlist, skipping"
                 continue
               }
 
@@ -464,7 +464,7 @@ jobs:
           SUBEOF
 
               SUB_COUNT=$(wc -l < /tmp/sub_videos.tsv)
-              echo "  📊 $SUB_COUNT videos in playlist"
+              echo "   $SUB_COUNT videos in playlist"
 
               SAFE_PLAYLIST=$(echo "$ptitle" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
               ARCHIVE_PREFIX="${archive_prefix}-${SAFE_PLAYLIST}"
@@ -477,7 +477,7 @@ jobs:
 
                 echo ""
                 echo "  ──────────────────────────────"
-                echo "  🎬 [$VCOUNT/$SUB_COUNT] $vtitle"
+                echo "   [$VCOUNT/$SUB_COUNT] $vtitle"
 
                 process_video "$vid" "$vtitle" "$vplaylist" "$ARCHIVE_PREFIX"
 
@@ -489,7 +489,7 @@ jobs:
           # ─── Process direct videos (playlist URL) ───
           if [[ "$VIDEO_COUNT" -gt 0 ]] && [[ "$PLAYLIST_COUNT" -eq 0 ]]; then
             echo ""
-            echo "🎬 Processing $VIDEO_COUNT videos..."
+            echo "Processing $VIDEO_COUNT videos..."
 
             SAFE_PLAYLIST=$(echo "$YT_TITLE" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-50)
             ARCHIVE_PREFIX="${archive_prefix}-${SAFE_PLAYLIST}"
@@ -506,7 +506,7 @@ jobs:
 
               echo ""
               echo "  ──────────────────────────────"
-              echo "  🎬 [$VCOUNT/$VIDEO_COUNT] $vtitle"
+              echo "   [$VCOUNT/$VIDEO_COUNT] $vtitle"
 
               process_video "$vid" "$vtitle" "$vplaylist" "$ARCHIVE_PREFIX"
 
@@ -515,16 +515,16 @@ jobs:
 
           echo ""
           echo "═══════════════════════════════════════"
-          echo "📺 Archival Complete"
+          echo "Archival Complete"
           echo "  ✅ Uploaded: $SUCCESS"
           echo "  ❌ Failed:   $FAILED"
           echo "  ⏭️ Skipped:  $SKIPPED"
-          echo "  📊 Total:    $TOTAL"
+          echo "   Total:    $TOTAL"
           echo "═══════════════════════════════════════"
           echo ""
           if [[ "$FAILED" -gt 0 ]]; then
             RESUME=$((TOTAL - FAILED + 1))
-            echo "💡 To resume: re-run with start_from=$RESUME and skip_existing=true"
+            echo "To resume: re-run with start_from=$RESUME and skip_existing=true"
           fi
 
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
@@ -533,13 +533,13 @@ jobs:
           echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
           echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
 
-      - name: "🧹 Cleanup"
+      - name: "Cleanup"
         if: always()
         run: |
           rm -f /tmp/cookies.txt
           rm -rf /tmp/transfer
 
-      - name: "📡 Send Discord Report"
+      - name: "Send Discord report"
         if: always()
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
@@ -558,16 +558,16 @@ jobs:
           [[ "$FAILED" -gt 0 ]] 2>/dev/null && COLOR=16744448
 
           FIELDS="[]"
-          FIELDS=$(echo "$FIELDS" | jq --arg v "${CHANNEL:-Unknown}" '. + [{"name":"📺 Channel","value":$v,"inline":true}]')
-          FIELDS=$(echo "$FIELDS" | jq --arg v "$MODE" '. + [{"name":"⚙️ Mode","value":$v,"inline":true}]')
-          FIELDS=$(echo "$FIELDS" | jq --arg v "${{ github.event.inputs.quality }}" '. + [{"name":"🎥 Quality","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${CHANNEL:-Unknown}" '. + [{"name":"Channel","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "$MODE" '. + [{"name":"Mode","value":$v,"inline":true}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "${{ github.event.inputs.quality }}" '. + [{"name":"Quality","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq '. + [{"name":"\u200b","value":"\u200b","inline":false}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "${SUCCESS:-0}" '. + [{"name":"✅ Uploaded","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "${FAILED:-0}" '. + [{"name":"❌ Failed","value":$v,"inline":true}]')
           FIELDS=$(echo "$FIELDS" | jq --arg v "${SKIPPED:-0}" '. + [{"name":"⏭️ Skipped","value":$v,"inline":true}]')
 
           SHORT_URL=$(echo "$URL" | head -c 60)
-          FIELDS=$(echo "$FIELDS" | jq --arg v "$SHORT_URL" '. + [{"name":"🔗 Source","value":("`" + $v + "`"),"inline":false}]')
+          FIELDS=$(echo "$FIELDS" | jq --arg v "$SHORT_URL" '. + [{"name":"Source","value":("`" + $v + "`"),"inline":false}]')
 
           PAYLOAD=$(jq -n \
             --arg username "${BOT_USERNAME:-☪️ The Muslim Lantern}" \
@@ -579,11 +579,11 @@ jobs:
               username: $username,
               avatar_url: $avatar,
               embeds: [{
-                title: "📺 YouTube → Archive.org Complete",
-                description: "> YouTube channel/playlist archived to Archive.org\n> One video at a time — disk safe. Resumable.",
+                title: "YouTube → Archive.org Complete",
+                description: "> YouTube channel/playlist archived to Archive.org\n> One video at a time, disk safe. Resumable.",
                 color: $color,
                 fields: $fields,
-                footer: { text: "📺 YouTube Channel Archiver" },
+                footer: { text: "YouTube Channel Archiver" },
                 timestamp: $timestamp
               }]
             }')

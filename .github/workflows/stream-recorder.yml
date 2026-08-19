@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📡 AUTOMATED STREAM RECORDER — MAIN WORKFLOW                              ║
+# ║   AUTOMATED STREAM RECORDER, MAIN WORKFLOW                              ║
 # ║  Runs every 5 minutes (Thu-Sun) to check for live streams and record them. ║
 # ║  Full lifecycle: Detect → Record → Process → Upload → Notify → Archive    ║
 # ║                                                                            ║
@@ -8,7 +8,7 @@
 # ║  Repo   : Public (unlimited GitHub Actions minutes)                       ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "☪️ The Muslim Lantern — Stream Recorder"
+name: "Stream Recorder"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  TRIGGERS
@@ -16,13 +16,13 @@ name: "☪️ The Muslim Lantern — Stream Recorder"
 
 on:
   # Scheduled: Every 5 minutes. GitHub silently throttles this on inactive
-  # repos — see https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#schedule
+  # repos, see https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows#schedule
   # We supplement with repository_dispatch from an external 5-min pinger
   # (see PINGER.md) which is NOT throttled, giving real 5-min coverage.
   schedule:
     - cron: "*/5 * * * *"
 
-  # External pinger trigger — call this via:
+  # External pinger trigger, call this via:
   #   POST /repos/usermuneeb1/Stream-Recorder/dispatches
   #   { "event_type": "ping-recorder" }
   # The pinger fires every 5 min from cron-job.org (or any external scheduler)
@@ -30,7 +30,7 @@ on:
   repository_dispatch:
     types: [ping-recorder]
 
-  # Manual trigger — run manually, optionally waiting for the stream to go live
+  # Manual trigger, run manually, optionally waiting for the stream to go live
   workflow_dispatch:
     inputs:
       force_record:
@@ -60,7 +60,7 @@ on:
         type: boolean
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CONCURRENCY — Only one recording at a time, never cancel running jobs
+#  CONCURRENCY, Only one recording at a time, never cancel running jobs
 # ═══════════════════════════════════════════════════════════════════════════════
 
 concurrency:
@@ -74,7 +74,7 @@ concurrency:
 env:
   # Main webhook (fallback if specific channels not set)
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-  # Channel-specific webhooks (optional — falls back to main if not set)
+  # Channel-specific webhooks (optional, falls back to main if not set)
   DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
   DISCORD_WEBHOOK_LINKS: ${{ secrets.DISCORD_WEBHOOK_LINKS }}
   DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
@@ -85,7 +85,7 @@ env:
   YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
   ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
   ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
-  # MEGA.nz (PERMANENT — 20GB free, auto-rotating accounts)
+  # MEGA.nz (PERMANENT, 20GB free, auto-rotating accounts)
   MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
   # Pixeldrain (60-day retention, 10GB/file)
@@ -95,10 +95,10 @@ env:
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
   RECORD_DIR: /tmp/stream-recorder
   COOKIES_FILE: cookies.txt
-  # Permanent cookieless mode — the channel only streams public broadcasts.
+  # Permanent cookieless mode, the channel only streams public broadcasts.
   # HYBRID mode (default 'false'): cookieless methods try first, cookie
   # methods (A/B) catch sign-in-required streams as fallback. Real failure on
-  # 2026-06-27 stream WOqZf9Myz_c returned LOGIN_REQUIRED — pure cookieless
+  # 2026-06-27 stream WOqZf9Myz_c returned LOGIN_REQUIRED, pure cookieless
   # mode could never have recorded it. Set repo variable
   # PUBLIC_STREAM_ONLY=true ONLY if you're certain all streams are fully
   # public AND never restricted.
@@ -111,7 +111,7 @@ env:
 
 jobs:
   record:
-    name: "🎬 Detect & Record"
+    name: "Detect & record"
     runs-on: ubuntu-24.04
     timeout-minutes: 360   # 6 hours max
 
@@ -121,18 +121,18 @@ jobs:
 
     steps:
       # ─── 0. AUTO-CLEANUP OLD RUNS ────────────────────────────────────────
-      - name: "🧹 Cleanup Old Workflow Runs"
+      - name: "Cleanup old workflow runs"
         continue-on-error: true
         run: |
           # Delete old completed runs to keep Actions tab clean (keep latest 5).
           # This step is intentionally best-effort and must never block recording.
-          echo "🧹 Cleaning up old workflow runs..."
+          echo "Cleaning up old workflow runs..."
           if [[ -z "${GH_PAT:-}" ]]; then
-            echo "ℹ️ GH_PAT not set — skipping workflow cleanup"
+            echo "ℹ️ GH_PAT not set, skipping workflow cleanup"
             exit 0
           fi
           if ! command -v jq >/dev/null 2>&1; then
-            echo "ℹ️ jq not available yet — skipping workflow cleanup"
+            echo "ℹ️ jq not available yet, skipping workflow cleanup"
             exit 0
           fi
           RUNS=$(curl -fsS -H "Authorization: token ${GH_PAT}" \
@@ -149,11 +149,11 @@ jobs:
           echo "✅ Deleted ${deleted} old runs"
 
       # ─── 1. CHECKOUT REPOSITORY ──────────────────────────────────────────
-      - name: "📥 Checkout Repository"
+      - name: "Checkout repository"
         uses: actions/checkout@v7
 
       # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
-      - name: "📦 Install Dependencies"
+      - name: "Install dependencies"
         # IMPORTANT: do NOT use `set -e` here. The install step has several
         # best-effort operations (pip installs, /tmp cleanup, root-owned file
         # removal) and a single benign failure was killing the whole job and
@@ -163,7 +163,7 @@ jobs:
         run: |
           set -u   # catch undefined vars, but NOT -e (no abort on cmd failure)
           set +o pipefail
-          echo "📦 Installing required tools..."
+          echo "Installing required tools..."
 
           # Update package list
           sudo apt-get update -qq || echo "::warning::apt update returned non-zero (continuing)"
@@ -194,7 +194,7 @@ jobs:
           # Install streamlink and chat-downloader
           pip3 install --quiet streamlink chat-downloader
 
-          # Strip Windows CRLF line endings — these corrupt JSON payloads
+          # Strip Windows CRLF line endings, these corrupt JSON payloads
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
 
           # Make scripts executable
@@ -225,15 +225,15 @@ jobs:
             echo "::error::Critical tools missing: ${MISSING[*]}"
             exit 1
           fi
-          echo "✅ All critical tools present — recording can proceed"
+          echo "✅ All critical tools present, recording can proceed"
 
 
-      - name: "💾 Check Disk Space"
+      - name: "Check disk space"
         id: disk_check
         run: |
           source scripts/utils.sh
           
-          log_header "💾 DISK SPACE CHECK"
+          log_header "DISK SPACE CHECK"
           
           available=$(get_disk_space_gb)
           total=$(get_total_disk_gb)
@@ -245,7 +245,7 @@ jobs:
           log_info "Available: ${available} GB / ${total} GB (${used}% used)"
           
           if ! check_disk_space 3; then
-            log_error "Insufficient disk space — aborting"
+            log_error "Insufficient disk space, aborting"
             echo "disk_ok=false" >> $GITHUB_OUTPUT
             echo "DISK_LOW=true" >> $GITHUB_ENV
             exit 0
@@ -253,21 +253,21 @@ jobs:
           
           echo "disk_ok=true" >> $GITHUB_OUTPUT
 
-      - name: "⚠️ Notify — Low Disk Space"
+      - name: "⚠️ Notify, low disk space"
         if: steps.disk_check.outputs.disk_ok != 'true'
         continue-on-error: true
         run: |
           source scripts/utils.sh
           source scripts/discord-notify.sh
-          notify_system_health "disk_low" "Runner has less than ${MIN_DISK_SPACE_GB:-3} GB free — recording skipped."
+          notify_system_health "disk_low" "Runner has less than ${MIN_DISK_SPACE_GB:-3} GB free, recording skipped."
 
       # ─── 5. PREPARE COOKIES ──────────────────────────────────────────────
-      - name: "🍪 Prepare Cookies"
+      - name: "Prepare cookies"
         if: steps.disk_check.outputs.disk_ok == 'true'
         run: |
           source scripts/utils.sh
           
-          log_header "🍪 COOKIE PREPARATION"
+          log_header "COOKIE PREPARATION"
           
           if [[ -n "${YOUTUBE_COOKIES:-}" ]]; then
             # Try base64 decode first, then fall back to plaintext
@@ -294,42 +294,42 @@ jobs:
               if head -1 cookies.txt | grep -qi "netscape\|mozilla\|#"; then
                 log_ok "Cookie format validated (Netscape/Mozilla)"
               else
-                log_warn "Cookie format may be invalid — proceeding anyway"
+                log_warn "Cookie format may be invalid, proceeding anyway"
               fi
             else
               log_warn "Cookie file is empty"
               rm -f cookies.txt
             fi
           else
-            log_info "No YOUTUBE_COOKIES secret set — will use cookieless methods"
+            log_info "No YOUTUBE_COOKIES secret set, will use cookieless methods"
           fi
 
       # ─── 5b. CHECK COOKIE HEALTH ──────────────────────────────────────────
-      - name: "🍪 Check Cookie Health"
+      - name: "Check cookie health"
         if: steps.disk_check.outputs.disk_ok == 'true'
         continue-on-error: true
         run: bash scripts/check-cookies.sh
 
       # ─── 5c. SETUP CLOUDFLARE WARP (HARD REQUIREMENT in v4) ──────────────────
       # Masks GitHub Actions IP. If WARP cannot install, register, connect,
-      # or change our IP, we ABORT — proceeding with raw GitHub IP is
+      # or change our IP, we ABORT, proceeding with raw GitHub IP is
       # pointless because YouTube blocks every yt-dlp/ytarchive/streamlink
       # client on it. (v4: removed `continue-on-error: true`)
-      - name: "🌐 Setup Cloudflare WARP"
+      - name: "Setup Cloudflare WARP"
         id: warp
         if: steps.disk_check.outputs.disk_ok == 'true'
         run: bash scripts/setup-warp.sh
 
-      - name: "⛔ Abort — WARP Failed"
+      - name: "Abort, WARP failed"
         if: steps.warp.outcome == 'failure'
         run: |
-          echo "::error::WARP did not connect — every recording method would fail"
+          echo "::error::WARP did not connect, every recording method would fail"
           echo "::error::Aborting. Verify WARP availability in your runner region."
           echo "::error::If WARP cannot connect, set ENABLE_WARP=false (not recommended)"
           exit 1
 
       # ─── 6. DETECT LIVE STREAM ───────────────────────────────────────────
-      - name: "🔍 Detect Live Stream"
+      - name: "Detect live stream"
         id: detect
         if: steps.disk_check.outputs.disk_ok == 'true'
         timeout-minutes: 310
@@ -352,24 +352,24 @@ jobs:
           # repository_dispatch, this gives near-continuous coverage even
           # when GitHub silently skips cron ticks.
           if [[ "$WAIT_MODE" != "true" ]] && [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
-            echo "🕐 Auto wait-for-live (scheduled trigger) — polling for 1h"
+            echo "Auto wait-for-live (scheduled trigger), polling for 1h"
             WAIT_MODE="true"
             MAX_H=1
           fi
 
           if [[ "$WAIT_MODE" == "true" ]]; then
-            echo "🕐 Wait-for-live mode: polling every 60s for up to ${MAX_H}h…"
+            echo "Wait-for-live mode: polling every 60s for up to ${MAX_H}h…"
             MAX_POLLS=$(( MAX_H * 60 ))
             POLL=0
             while (( POLL < MAX_POLLS )); do
               bash scripts/detect-stream.sh
-              # detect-stream.sh sets is_live in GITHUB_OUTPUT — check it
+              # detect-stream.sh sets is_live in GITHUB_OUTPUT, check it
               if grep -q "is_live=true" "$GITHUB_OUTPUT" 2>/dev/null; then
-                echo "✅ Stream is LIVE — proceeding to record!"
+                echo "✅ Stream is LIVE, proceeding to record!"
                 break
               fi
               POLL=$(( POLL + 1 ))
-              echo "[poll $POLL/$MAX_POLLS] Not live yet — sleeping 60s…"
+              echo "[poll $POLL/$MAX_POLLS] Not live yet, sleeping 60s…"
               sleep 60
             done
           else
@@ -381,20 +381,20 @@ jobs:
       # that gap, recording starts on a dead stream and burns 30+ min on a
       # doomed run. Re-verify it is STILL live right before recording.
       # (This race condition lost HbS5TF1atFU on 2026-07-04.)
-      - name: "🔁 Recheck — Still Live?"
+      - name: "Recheck, still live?"
         id: recheck
         if: steps.detect.outputs.is_live == 'true'
         timeout-minutes: 5
         run: |
           source scripts/utils.sh
-          log_header "🔁 LIVE RECHECK (any-pass)"
+          log_header "LIVE RECHECK (any-pass)"
           # Race-condition guard: confirm the stream is still live before recording.
           #
           # We run up to 3 checks but PROCEED as soon as ANY one confirms live.
           # Why any-pass (not all-must-pass): a single transient false-negative
           # must NOT abort a genuinely-live recording. Over WARP IPv6, YouTube
           # frequently serves a consent/sign-in page that omits isLiveNow even
-          # for a stream that is actively live — so is_stream_still_live can
+          # for a stream that is actively live, so is_stream_still_live can
           # return false on a live stream. The previous "all 3 must pass"
           # logic turned one such hiccup into an abort.
           #
@@ -406,7 +406,7 @@ jobs:
           #   • false-positive (record a just-ended stream) → produces a
           #     short/empty file that is_valid_video() rejects → self-correcting.
           # If the stream truly ended, all 3 checks fail and we still abort.
-          # v5 FIX: recheck is ADVISORY ONLY — it NEVER aborts a confirmed-live
+          # v5 FIX: recheck is ADVISORY ONLY, it NEVER aborts a confirmed-live
           # stream. is_stream_still_live() systematically false-negatives on
           # Cloudflare WARP / GitHub IPs (YouTube serves a consent page that
           # omits isLiveNow even for genuinely live streams), which caused an
@@ -414,22 +414,22 @@ jobs:
           # (2026-07-26) that was LIVE the entire time. Detection already
           # confirmed live via 4 independent methods, so an inconclusive recheck
           # must NOT throw the recording away. If the stream truly ended, the
-          # recording validator (is_valid_video) rejects the empty file — self-
+          # recording validator (is_valid_video) rejects the empty file, self-
           # correcting. Cost of false-abort (total loss + spam) >> cost of
           # recording a just-ended stream (rejected empty file).
           still_live=true
           for i in 1 2 3; do
             if is_stream_still_live "${{ steps.detect.outputs.video_id }}"; then
-              log_ok "Check $i confirmed live — proceeding to record"
+              log_ok "Check $i confirmed live, proceeding to record"
               break
             else
-              log_warn "Check $i inconclusive (common on WARP IPs) — proceeding anyway"
+              log_warn "Check $i inconclusive (common on WARP IPs), proceeding anyway"
               [[ $i -lt 3 ]] && sleep 2
             fi
           done
           echo "still_live=$still_live" >> "$GITHUB_OUTPUT"
 
-      - name: "⏭️  Skip Recording — Stream Ended Mid-Race"
+      - name: "⏭️ Skip recording, stream ended mid-race"
         if: steps.recheck.outputs.still_live == 'false'
         run: |
           source scripts/utils.sh
@@ -441,10 +441,10 @@ jobs:
 
       # ─── 7c. RECORDING LOCK + LIVE NOTIFICATION (coordinate with Sniper) ─
       # The lock prevents both the recorder AND the sniper from capturing the
-      # same stream. The "🔴 LIVE" notification is sent ONLY by the path that
-      # wins the lock — no more duplicate Discord messages.
+      # same stream. The "LIVE" notification is sent ONLY by the path that
+      # wins the lock, no more duplicate Discord messages.
       # Fail-safe: any lock error → proceed=true (always prefer to record).
-      - name: "🔒 Acquire recording lock"
+      - name: "Acquire recording lock"
         id: lock
         if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false'
         continue-on-error: true
@@ -455,10 +455,10 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
-            log_warn "Go-Live Sniper is already capturing this stream — main recorder deferring (no duplicate notification)."
+            log_warn "Go-Live Sniper is already capturing this stream, main recorder deferring (no duplicate notification)."
           fi
 
-      - name: "🔴 Notify — Live Detected"
+      - name: "Notify, live detected"
         if: steps.lock.outputs.proceed != 'false' && steps.detect.outputs.is_live == 'true'
         run: |
           source scripts/utils.sh
@@ -466,7 +466,7 @@ jobs:
           notify_live_detected
 
       # ─── 8. RECORD THE STREAM ────────────────────────────────────────────
-      - name: "🎬 Record Stream"
+      - name: "Record stream"
         id: record
         if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false' && steps.lock.outputs.proceed != 'false'
         timeout-minutes: 300  # 5 hours max for recording
@@ -477,25 +477,25 @@ jobs:
             export MAX_RECORD_DURATION=$(( CUSTOM_DUR * 60 ))
             export CUSTOM_DURATION_MODE=true
             export MAX_RECORD_ATTEMPTS=1
-            echo "⏱️ Custom duration active: Recording from NOW for $CUSTOM_DUR minutes (no --live-from-start, single attempt)."
+            echo "Custom duration active: Recording from NOW for $CUSTOM_DUR minutes (no --live-from-start, single attempt)."
           fi
           bash scripts/record-stream.sh
 
       # ─── 9. POST-PROCESS ──────────────────────────────────────────────────
-      - name: "⚙️ Post-Process"
+      - name: "Post-process"
         id: process
         if: steps.record.outputs.recording_success == 'true'
         run: bash scripts/post-process.sh
 
       # ─── 10. UPLOAD TO CLOUDS ───────────────────────────────────────────
-      - name: "☁️ Upload to Clouds"
+      - name: "Upload to clouds"
         id: upload
         if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
 
       # ─── 11. SEND COMPLETE NOTIFICATION ─────────────────────────────────
-      - name: "✅ Notify — Recording Complete"
+      - name: "✅ Notify, recording complete"
         if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         run: |
           source scripts/utils.sh
@@ -503,13 +503,13 @@ jobs:
           notify_recording_complete
 
       # ─── 12. UPDATE STATISTICS ──────────────────────────────────────────
-      - name: "📊 Update Statistics"
+      - name: "Update statistics"
         if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/update-stats.sh
 
       # ─── 13. ARCHIVE LINKS ──────────────────────────────────────────────
-      - name: "🔗 Archive Links"
+      - name: "Archive links"
         if: steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: |
@@ -522,12 +522,12 @@ jobs:
 
       # ─── 14. SEND FAILED NOTIFICATION (with diagnostics) ─────────────────
       # v4: include WHY each method failed. Was: "All recording methods failed"
-      # (useless — no info about WHY). Now: includes WARP, PoToken, cookie,
+      # (useless, no info about WHY). Now: includes WARP, PoToken, cookie,
       # IP state, plus last 50 lines of per-method failure log.
-      - name: "❌ Notify — Recording Failed"
+      - name: "❌ Notify, recording failed"
         # Only fire when recording was actually ATTEMPTED and failed. When the
         # recheck aborts (still_live=false), the dedicated "Stream Ended
-        # Mid-Race" step already notifies — firing a second "Recording failed"
+        # Mid-Race" step already notifies, firing a second "Recording failed"
         # here would double-notify and mislabel a skip as a recording failure.
         if: steps.detect.outputs.is_live == 'true' && steps.recheck.outputs.still_live != 'false' && steps.record.outputs.recording_success != 'true'
         run: |
@@ -549,38 +549,38 @@ jobs:
           # Fixes: (1) prior 4-spec/5-arg mismatch made printf re-use the format,
           # duplicating the dump; (2) pot_state was under "Cookies" and cookie_state
           # under "Last method failures"; (3) \\:\\n escapes rendered as literal
-          # \: and \n text — now bare colons + single-backslash \n.
+          # \: and \n text, now bare colons + single-backslash \n.
           detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP: %s\nIP: %s\nCookies: %s\nPoToken: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." "$warp_state" "$ip_state" "$cookie_state" "$pot_state" "${failures:-no log captured}")
           notify_recording_failed "Recording failed" "$detail"
 
       # ─── 15. AUTO-RETRY ON FAILURE ────────────────────────────────────────
-      - name: "🔄 Auto-Retry on Failure"
+      - name: "Auto-retry on failure"
         if: steps.detect.outputs.is_live == 'true' && steps.record.outputs.recording_success != 'true'
         continue-on-error: true
         run: |
           source scripts/utils.sh
           
-          log_header "🔄 AUTO-RETRY"
-          log_info "Stream was live but recording failed — dispatching new workflow run..."
+          log_header "AUTO-RETRY"
+          log_info "Stream was live but recording failed, dispatching new workflow run..."
           log_info "(Current run will finish cleanup, then new run will start)"
           
-          # Fire-and-forget dispatch — new run queued by concurrency group after this one ends
+          # Fire-and-forget dispatch, new run queued by concurrency group after this one ends
           curl -s -X POST \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token ${GH_PAT}" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/dispatches" \
             -d '{"ref":"main"}' && \
-            log_ok "Retry dispatched — will start after this run finishes" || \
-            log_warn "Failed to dispatch retry — next scheduled run (in 5 min) will retry"
+            log_ok "Retry dispatched, will start after this run finishes" || \
+            log_warn "Failed to dispatch retry, next scheduled run (in 5 min) will retry"
 
       # ─── 16. CLEANUP (ALWAYS RUNS) ───────────────────────────────────────
-      - name: "🧹 Cleanup"
+      - name: "Cleanup"
         if: always()
         run: |
           source scripts/utils.sh
           
-          log_header "🧹 CLEANUP"
+          log_header "CLEANUP"
           
           # Remove all media files
           rm -f *.mp4 *.webm *.mkv *.ts *.m4a *.flv *.part 2>/dev/null
@@ -592,7 +592,7 @@ jobs:
           log_info "Final disk space: $(get_disk_space_gb) GB free"
           log_ok "Cleanup complete"
 
-      - name: "🔓 Release recording lock"
+      - name: "Release recording lock"
         if: always() && steps.lock.outputs.proceed == 'true'
         continue-on-error: true
         run: |
@@ -601,12 +601,12 @@ jobs:
           lock_release "${{ steps.detect.outputs.video_id }}" || true
 
       # ─── 17. RUN SUMMARY ─────────────────────────────────────────────────
-      - name: "📋 Run Summary"
+      - name: "Run summary"
         if: always()
         run: |
           source scripts/utils.sh
           
-          log_header "📋 RUN SUMMARY"
+          log_header "RUN SUMMARY"
           log_info "Completed at  : $(now_pkt)"
           log_info "Stream live   : ${STREAM_IS_LIVE:-false}"
           log_info "Recorded      : ${RECORDING_SUCCESS:-false}"
@@ -618,14 +618,14 @@ jobs:
           log_info "Disk space    : $(get_disk_space_gb 2>/dev/null || echo 'N/A') GB"
           
           # Write to Job Summary
-          echo "## ☪️ The Muslim Lantern — Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## ☪️ The Muslim Lantern, Run Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| ⏰ Time | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
-          echo "| 📺 Stream Live | ${STREAM_IS_LIVE:-false} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🎬 Recorded | ${RECORDING_SUCCESS:-false} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ⏱️ Duration | ${RECORD_DURATION_FMT:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 💾 Size | ${RECORD_SIZE_HUMAN:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ☁️ Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3} |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🌐 WARP | ${WARP_CONNECTED:-false} |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Time | $(now_pkt) |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Stream Live | ${STREAM_IS_LIVE:-false} |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Recorded | ${RECORDING_SUCCESS:-false} |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Duration | ${RECORD_DURATION_FMT:-N/A} |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Size | ${RECORD_SIZE_HUMAN:-N/A} |" >> $GITHUB_STEP_SUMMARY
+          echo "|  Uploads | ${UPLOAD_SUCCESS_COUNT:-0}/${UPLOAD_TOTAL_SERVICES:-3} |" >> $GITHUB_STEP_SUMMARY
+          echo "|  WARP | ${WARP_CONNECTED:-false} |" >> $GITHUB_STEP_SUMMARY

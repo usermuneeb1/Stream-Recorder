@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  📊 System Status — regenerate status JSON + README badges                   ║
+# ║   System Status, regenerate status JSON + README badges                   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "📊 System Status"
+name: "System status"
 
 on:
   push:
@@ -30,25 +30,25 @@ jobs:
   status:
     runs-on: ubuntu-24.04
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "🐍 Set up Python"
+      - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: "📊 Generate status + badges"
+      - name: "Generate status + badges"
         run: python3 scripts/gen-status.py
 
-      - name: "🧹 Purge jsDelivr CDN cache (keep gallery data fresh)"
+      - name: "Purge jsdelivr CDN cache (keep gallery data fresh)"
         run: |
           for p in data/recordings.json data/youtube-stats.json data/system-status.json; do
             curl -s -o /dev/null "https://purge.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main/$p" || true
           done
           echo "Requested jsDelivr purge for data files."
 
-      - name: "⬆️ Commit"
+      - name: "Commit"
         run: |
           # RACE-SAFE commit+push. Previously this was a bare `git push`, which
           # failed intermittently with "! [rejected] main -> main (fetch first)"
@@ -63,14 +63,14 @@ jobs:
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder.local"
           git add data/system-status.json data/badges
-          git commit -m "📊 Update system status + badges"
+          git commit -m "Update system status + badges"
           for attempt in 1 2 3 4 5; do
             if git pull --rebase origin main && git push; then
               echo "✅ Status updated (attempt $attempt)."
               exit 0
             fi
-            echo "⚠️ push attempt $attempt failed (remote moved) — rebasing + retrying in ${attempt}s"
+            echo "⚠️ push attempt $attempt failed (remote moved), rebasing + retrying in ${attempt}s"
             sleep "$attempt"
           done
-          echo "❌ Could not push status after 5 attempts — will retry on next schedule."
+          echo "❌ Could not push status after 5 attempts, will retry on next schedule."
           exit 1

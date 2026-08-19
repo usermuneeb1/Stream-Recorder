@@ -1,8 +1,8 @@
-name: 📱 Telegram Mirror
+name: Telegram mirror
 
 on:
   workflow_run:
-    workflows: ["📡 Stream Recorder"]
+    workflows: ["Stream Recorder"]
     types: [completed]
   workflow_dispatch:
 
@@ -28,7 +28,7 @@ jobs:
           python-version: "3.11"
       - run: pip install pyrogram tgcrypto
 
-      - name: 📱 Upload ALL recordings to Telegram
+      - name: Upload ALL recordings to Telegram
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -47,7 +47,7 @@ jobs:
               print("✅ All recordings already have Telegram links")
               sys.exit(0)
 
-          print(f"📱 Found {len(todo)} recordings to upload\n")
+          print(f"Found {len(todo)} recordings to upload\n")
 
           for i, rec in enumerate(todo):
               title = rec.get("title", "Recording")
@@ -57,19 +57,19 @@ jobs:
                   url = rec["archive_link"].replace("/details/", "/download/") + "/"
 
               print(f"\n{'='*60}")
-              print(f"📱 [{i+1}/{len(todo)}] {title}")
+              print(f"[{i+1}/{len(todo)}] {title}")
 
               safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title[:60]) + ".mp4"
               path = f"/tmp/{safe}"
 
-              print(f"   📥 Downloading...")
+              print(f"    Downloading...")
               dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url], capture_output=True)
               if dl.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) < 10000:
                   print(f"   ❌ Download failed")
                   continue
 
               size = os.path.getsize(path)
-              print(f"   📦 Downloaded: {size/1024/1024:.0f} MB")
+              print(f"    Downloaded: {size/1024/1024:.0f} MB")
 
               # Upload
               env = os.environ.copy()
@@ -80,7 +80,7 @@ jobs:
                   ["python3", "scripts/telegram/upload_to_telegram.py", path, title],
                   env=env)
 
-              # Read output — capture BOTH the t.me link AND the Telegram file_id.
+              # Read output, capture BOTH the t.me link AND the Telegram file_id.
               # upload_to_telegram.py writes telegram_file_id= specifically so the
               # Cloudflare Worker proxy can stream the file (see its "Save file_id
               # for Cloudflare Worker proxy" comment).
@@ -102,7 +102,7 @@ jobs:
                           if tg_file_id:
                               r["telegram_file_id"] = tg_file_id
                           # CF Worker stream URL. The worker (worker.js) was hardened
-                          # to ONLY accept ?file_id= — ?url= and ?bot= were removed
+                          # to ONLY accept ?file_id=, ?url= and ?bot= were removed
                           # (open-proxy / token-leak risk) and now return HTTP 400.
                           # The dashboard's sanitizeCfStream() also strips ?url=/?bot=.
                           # So the URL MUST be built from the Telegram file_id, NOT the
@@ -121,12 +121,12 @@ jobs:
           print(f"\n{'='*60}\n✅ Done")
           PYSCRIPT
 
-      - name: 📤 Push
+      - name: Push
         run: |
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
           git add data/recordings.json
           git diff --cached --quiet || {
-            git commit -m "📱 Telegram: uploaded all recordings"
+            git commit -m "Telegram: uploaded all recordings"
             git push
           }

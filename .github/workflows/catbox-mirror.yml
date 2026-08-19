@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║ 🐱 CATBOX MIRROR — Upload thumbnails/transcripts to Catbox.moe            ║
+# ║  CATBOX MIRROR, Upload thumbnails/transcripts to Catbox.moe            ║
 # ║                                                                            ║
 # ║ Catbox = permanent, no account, direct hotlinks.                           ║
 # ║ Perfect for thumbnails, subtitles, chat logs (all < 200MB).               ║
@@ -8,11 +8,11 @@
 # ║ SAFE: Standalone workflow. Does NOT modify existing workflows.             ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: 🐱 Catbox Mirror
+name: Catbox mirror
 
 on:
   workflow_run:
-    workflows: ["📡 Stream Recorder"]
+    workflows: ["Stream Recorder"]
     types: [completed]
   workflow_dispatch:
 
@@ -32,10 +32,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: 📥 Checkout
+      - name: Checkout
         uses: actions/checkout@v7
 
-      - name: 🐱 Upload thumbnails to Catbox
+      - name: Upload thumbnails to Catbox
         run: |
           source scripts/catbox/upload_to_catbox.sh
 
@@ -79,17 +79,17 @@ jobs:
           if updated:
               with open('data/recordings.json', 'w') as f:
                   json.dump(recs, f, indent=2)
-              print('📋 Updated recordings.json')
+              print(' Updated recordings.json')
           else:
-              print('📋 No updates needed')
+              print(' No updates needed')
           "
 
-      - name: 📤 Commit changes
+      - name: Commit changes
         run: |
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
           git add data/recordings.json
           git diff --cached --quiet || {
-            git commit -m "🐱 Add Catbox thumbnail mirrors"
+            git commit -m "Add Catbox thumbnail mirrors"
             git push
           }

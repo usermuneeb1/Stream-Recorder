@@ -1,9 +1,9 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🏛️ IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                    ║
+# ║   IMPORT ARCHIVE.ORG PERSONAL BACKUPS                                    ║
 # ║  Adds missing Personal Media Backup Archive.org videos to the gallery.      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🏛️ Import Archive Backups"
+name: "Import archive backups"
 
 on:
   workflow_dispatch:
@@ -50,19 +50,19 @@ env:
 
 jobs:
   import:
-    name: "🏛️ Import backup videos"
+    name: "Import backup videos"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "📦 Install tools"
+      - name: "Install tools"
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq bc python3
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh
 
-      - name: "🏛️ Import missing backups"
+      - name: "Import missing backups"
         run: bash scripts/import-archive-backups.sh

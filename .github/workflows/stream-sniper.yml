@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🎯 GO-LIVE SNIPER — independent, redundant capture path                    ║
+# ║   GO-LIVE SNIPER, independent, redundant capture path                    ║
 # ║                                                                            ║
 # ║  Purpose: GUARANTEE a stream is captured the moment it goes live, because   ║
 # ║  the uploader privates the VOD afterward (no second chance).               ║
@@ -22,7 +22,7 @@
 # ║    ping-sniper    → Go-Live Sniper    (this redundant watcher)              ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🎯 Go-Live Sniper"
+name: "Go-live sniper"
 
 on:
   repository_dispatch:
@@ -60,7 +60,7 @@ env:
 
 jobs:
   sniper:
-    name: "🎯 Watch & Capture"
+    name: "Watch & capture"
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
@@ -69,7 +69,7 @@ jobs:
 
     steps:
       # ─── 0. CLEANUP OLD RUNS ──────────────────────────────────────────────
-      - name: "🧹 Cleanup Old Workflow Runs"
+      - name: "Cleanup old workflow runs"
         continue-on-error: true
         run: |
           if [[ -z "${GH_PAT:-}" ]] || ! command -v jq >/dev/null 2>&1; then exit 0; fi
@@ -80,11 +80,11 @@ jobs:
           for id in $RUNS; do curl -fsS -X DELETE -H "Authorization: token ${GH_PAT}" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${id}" >/dev/null 2>&1 || true; done
 
-      - name: "📥 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v7
 
-      # ─── 1. MINIMAL INSTALL (fast — needed only to check go-live) ─────────
-      - name: "📦 Minimal Install (yt-dlp, jq, curl)"
+      # ─── 1. MINIMAL INSTALL (fast, needed only to check go-live) ─────────
+      - name: "Minimal install (yt-dlp, jq, curl)"
         shell: bash {0}
         run: |
           set -u; set +o pipefail
@@ -97,7 +97,7 @@ jobs:
           chmod +x scripts/*.sh
           echo "yt-dlp: $(yt-dlp --version 2>&1 | head -1)"
 
-      - name: "🍪 Prepare Cookies"
+      - name: "Prepare cookies"
         run: |
           source scripts/utils.sh
           if [[ -n "${YOUTUBE_COOKIES:-}" ]]; then
@@ -109,24 +109,24 @@ jobs:
             chmod 600 cookies.txt
           fi
 
-      - name: "🌐 Setup Cloudflare WARP"
+      - name: "Setup Cloudflare WARP"
         run: bash scripts/setup-warp.sh
 
       # ─── 2. GO-LIVE DETECT (single pass, authoritative) ───────────────────
-      - name: "🎯 Detect Go-Live"
+      - name: "Detect Go-live"
         id: detect
         run: bash scripts/detect-stream.sh
 
-      - name: "⏭️ Not live — exit sniper"
+      - name: "⏭️ Not live, exit sniper"
         if: steps.detect.outputs.is_live != 'true'
         run: |
           source scripts/utils.sh
-          log_info "Channel not live right now — sniper standing down (will retry on next ping)."
+          log_info "Channel not live right now, sniper standing down (will retry on next ping)."
 
-      # ─── 3. LOCK — defer if the main recorder is already capturing this ───
-      # The "🔴 LIVE" notification is sent ONLY by the path that wins the lock,
+      # ─── 3. LOCK, defer if the main recorder is already capturing this ───
+      # The "LIVE" notification is sent ONLY by the path that wins the lock,
       # so the recorder and sniper never double-notify Discord.
-      - name: "🔒 Acquire recording lock"
+      - name: "Acquire recording lock"
         id: lock
         if: steps.detect.outputs.is_live == 'true'
         continue-on-error: true
@@ -137,10 +137,10 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
-            log_warn "Main recorder appears to be capturing this stream already — sniper deferring (no duplicate notification)."
+            log_warn "Main recorder appears to be capturing this stream already, sniper deferring (no duplicate notification)."
           fi
 
-      - name: "🔴 Notify — Go-Live!"
+      - name: "Notify, Go-live!"
         if: steps.lock.outputs.proceed == 'true'
         run: |
           source scripts/utils.sh
@@ -148,7 +148,7 @@ jobs:
           notify_live_detected || true
 
       # ─── 4. FULL INSTALL (only when we're actually going to record) ───────
-      - name: "📦 Full Install (ffmpeg, ytarchive, streamlink, megatools)"
+      - name: "Full install (ffmpeg, ytarchive, streamlink, megatools)"
         if: steps.lock.outputs.proceed == 'true'
         shell: bash {0}
         run: |
@@ -162,53 +162,53 @@ jobs:
           echo "ytarchive: $(ytarchive --version 2>&1 | head -1 || echo n/a)"
           echo "streamlink: $(streamlink --version 2>/dev/null || echo n/a)"
 
-      - name: "🍪 Check Cookie Health"
+      - name: "Check cookie health"
         if: steps.lock.outputs.proceed == 'true'
         continue-on-error: true
         run: bash scripts/check-cookies.sh
 
       # ─── 5. RECORD ─────────────────────────────────────────────────────────
-      - name: "🎬 Record Stream"
+      - name: "Record stream"
         id: record
         if: steps.lock.outputs.proceed == 'true'
         timeout-minutes: 300
         continue-on-error: true
         run: bash scripts/record-stream.sh
 
-      - name: "⚙️ Post-Process"
+      - name: "Post-process"
         id: process
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success == 'true'
         run: bash scripts/post-process.sh
 
-      - name: "☁️ Upload to Clouds"
+      - name: "Upload to clouds"
         id: upload
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/upload-clouds.sh
 
-      - name: "✅ Notify — Recording Complete"
+      - name: "✅ Notify, recording complete"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         run: |
           source scripts/utils.sh; source scripts/discord-notify.sh
           notify_recording_complete || true
 
-      - name: "📊 Update Statistics"
+      - name: "Update statistics"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/update-stats.sh
 
-      - name: "🔗 Archive Links"
+      - name: "Archive links"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success == 'true' && steps.process.outcome == 'success'
         continue-on-error: true
         run: bash scripts/update-links.sh
 
-      - name: "❌ Notify — Recording Failed"
+      - name: "❌ Notify, recording failed"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success != 'true'
         run: |
           source scripts/utils.sh; source scripts/discord-notify.sh
           notify_recording_failed "Sniper: recording failed after exhausting all methods" "Auto-retry dispatched." || true
 
-      - name: "🔄 Auto-Retry"
+      - name: "Auto-retry"
         if: steps.lock.outputs.proceed == 'true' && steps.record.outputs.recording_success != 'true'
         continue-on-error: true
         run: |
@@ -216,26 +216,26 @@ jobs:
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/dispatches" \
             -d '{"ref":"main"}' >/dev/null 2>&1 || true
 
-      # ─── 6. CLEANUP (always — release lock + remove media) ─────────────────
-      - name: "🔓 Release recording lock"
+      # ─── 6. CLEANUP (always, release lock + remove media) ─────────────────
+      - name: "Release recording lock"
         if: always() && steps.lock.outputs.proceed == 'true'
         continue-on-error: true
         run: |
           source scripts/utils.sh; source scripts/recording-lock.sh
           lock_release "${{ steps.detect.outputs.video_id }}" || true
 
-      - name: "🧹 Cleanup"
+      - name: "Cleanup"
         if: always()
         run: |
           rm -f *.mp4 *.webm *.mkv *.ts *.m4a *.flv *.part cookies.txt 2>/dev/null
           rm -rf /tmp/stream-sniper /tmp/yt-dlp-* 2>/dev/null || true
 
-      - name: "📋 Summary"
+      - name: "Summary"
         if: always()
         run: |
           source scripts/utils.sh
           {
-            echo "## 🎯 Go-Live Sniper"
+            echo "##  Go-Live Sniper"
             echo "| Metric | Value |"
             echo "|--------|-------|"
             echo "| Live detected | ${STREAM_IS_LIVE:-false} |"

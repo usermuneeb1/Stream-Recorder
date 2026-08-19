@@ -1,5 +1,5 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  🔴 MEGA Account Manager — Generate & Maintain MEGA.nz Accounts           ║
+# ║   MEGA Account Manager, Generate & Maintain MEGA.nz Accounts           ║
 # ║  Uses github.com/f-o/MEGA-Account-Generator approach:                     ║
 # ║    • Generates accounts with temporary Mail.tm emails                     ║
 # ║    • Auto-verifies via email link                                         ║
@@ -7,10 +7,10 @@
 # ║  Accounts are stored in accounts.csv (committed to repo).                 ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-name: "🔴 MEGA Account Manager"
+name: "MEGA account manager"
 
 on:
-  # Manual trigger — for generating new accounts or force sign-in
+  # Manual trigger, for generating new accounts or force sign-in
   workflow_dispatch:
     inputs:
       action:
@@ -47,7 +47,7 @@ env:
 
 jobs:
   mega-manager:
-    name: "🔴 MEGA Account Manager"
+    name: "MEGA account manager"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -56,18 +56,18 @@ jobs:
 
     steps:
       # ─── 1. CHECKOUT ─────────────────────────────────────────────────────
-      - name: "📥 Checkout Repository"
+      - name: "Checkout repository"
         uses: actions/checkout@v7
 
       # ─── 2. INSTALL DEPENDENCIES ─────────────────────────────────────────
-      - name: "📦 Install Dependencies"
+      - name: "Install dependencies"
         run: |
-          echo "📦 Installing megatools & Python dependencies..."
+          echo "Installing megatools & Python dependencies..."
           sudo apt-get update -qq
           
           # Install megatools (try apt first, then manual download)
           if ! sudo apt-get install -y -qq megatools 2>/dev/null; then
-            echo "⚠️ apt install failed — trying manual megatools install..."
+            echo "⚠️ apt install failed, trying manual megatools install..."
             # Download megatools binary directly
             wget -q "https://megatools.megous.com/builds/builds/megatools-1.11.1.20230212-linux-x86_64.tar.gz" -O /tmp/megatools.tar.gz 2>/dev/null || \
             wget -q "https://xff.cz/megatools/builds/builds/megatools-1.11.1.20230212-linux-x86_64.tar.gz" -O /tmp/megatools.tar.gz 2>/dev/null
@@ -92,14 +92,14 @@ jobs:
           echo "──────────────────────────────────────"
 
       # ─── 3. GENERATE ACCOUNTS (if requested) ─────────────────────────────
-      - name: "🔴 Generate MEGA Accounts"
+      - name: "Generate MEGA accounts"
         id: generate
         if: >-
           github.event_name == 'workflow_dispatch' && 
           (github.event.inputs.action == 'generate' || github.event.inputs.action == 'both')
         run: |
           echo "═══════════════════════════════════════"
-          echo "🔴 Generating MEGA Accounts"
+          echo "Generating MEGA Accounts"
           echo "═══════════════════════════════════════"
           
           NUM="${{ github.event.inputs.num_accounts }}"
@@ -121,9 +121,9 @@ jobs:
             echo "status=success" >> $GITHUB_OUTPUT
             TOTAL=$(tail -n +2 scripts/mega/accounts.csv 2>/dev/null | wc -l)
             echo "total=$TOTAL" >> $GITHUB_OUTPUT
-            echo "✅ Generation complete — $TOTAL total accounts"
+            echo "✅ Generation complete, $TOTAL total accounts"
             echo ""
-            echo "📋 accounts.csv contents (emails only):"
+            echo "accounts.csv contents (emails only):"
             tail -n +2 scripts/mega/accounts.csv 2>/dev/null | cut -d',' -f1 || true
           else
             echo "status=failed" >> $GITHUB_OUTPUT
@@ -136,7 +136,7 @@ jobs:
           fi
 
       # ─── 4. SIGN IN TO ALL ACCOUNTS (keep-alive) ─────────────────────────
-      - name: "🔄 Sign In to All Accounts"
+      - name: "Sign in to all accounts"
         id: signin
         if: >-
           github.event_name == 'schedule' || 
@@ -144,12 +144,12 @@ jobs:
           github.event.inputs.action == 'both'
         run: |
           echo "═══════════════════════════════════════"
-          echo "🔄 MEGA Account Keep-Alive Sign-In"
+          echo "MEGA Account Keep-Alive Sign-In"
           echo "═══════════════════════════════════════"
           
           # accounts.csv is intentionally tracked in this repository for this project.
           if [[ ! -f scripts/mega/accounts.csv ]]; then
-            echo "⚠️ No accounts.csv found — skipping sign-in"
+            echo "⚠️ No accounts.csv found, skipping sign-in"
             echo "status=skipped" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -174,7 +174,7 @@ jobs:
           fi
 
       # ─── 5. COMMIT UPDATED ACCOUNTS ──────────────────────────────────────
-      - name: "💾 Commit Account Changes"
+      - name: "Commit account changes"
         if: always()
         run: |
           cd $GITHUB_WORKSPACE
@@ -184,7 +184,7 @@ jobs:
           
           # Check if accounts.csv exists and has changes
           if [[ ! -f scripts/mega/accounts.csv ]]; then
-            echo "📝 No accounts.csv found — nothing to commit"
+            echo "No accounts.csv found, nothing to commit"
             exit 0
           fi
           
@@ -192,7 +192,7 @@ jobs:
           git add scripts/mega/accounts.csv 2>/dev/null || true
           
           if git diff --cached --quiet; then
-            echo "📝 No staged changes"
+            echo "No staged changes"
             exit 0
           fi
           
@@ -200,7 +200,7 @@ jobs:
           git config user.email "bot@stream-recorder.local"
           
           TIMESTAMP=$(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M PKT')
-          git commit -m "🔴 MEGA accounts updated — ${TIMESTAMP}"
+          git commit -m "MEGA accounts updated, ${TIMESTAMP}"
           
           # Push with PAT if available, otherwise try default token
           if [[ -n "${GH_PAT:-}" ]]; then
@@ -211,7 +211,7 @@ jobs:
           echo "✅ Account changes committed and pushed"
 
       # ─── 6. DISCORD NOTIFICATION ──────────────────────────────────────────
-      - name: "📡 Send Discord Report"
+      - name: "Send Discord report"
         if: always()
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_REPORTS:-$DISCORD_WEBHOOK_URL}"
@@ -256,17 +256,17 @@ jobs:
           # Action field
           FIELDS=$(echo "$FIELDS" | jq \
             --arg action "$ACTION" \
-            '. + [{"name": "🎯 Action Performed", "value": ("```\n" + ($action | ascii_upcase) + "\n```"), "inline": true}]')
+            '. + [{"name": "Action Performed", "value": ("```\n" + ($action | ascii_upcase) + "\n```"), "inline": true}]')
 
           # Date field
           FIELDS=$(echo "$FIELDS" | jq \
             --arg date "$DATE_STR" \
-            '. + [{"name": "📅 Date", "value": $date, "inline": true}]')
+            '. + [{"name": "Date", "value": $date, "inline": true}]')
 
           # Time field
           FIELDS=$(echo "$FIELDS" | jq \
             --arg time "$TIME_STR" \
-            '. + [{"name": "🕐 Time", "value": $time, "inline": true}]')
+            '. + [{"name": "Time", "value": $time, "inline": true}]')
 
           # Spacer
           FIELDS=$(echo "$FIELDS" | jq '. + [{"name": "\u200b", "value": "\u200b", "inline": false}]')
@@ -277,9 +277,9 @@ jobs:
               STORAGE_GB=$((GEN_TOTAL * 20))
               GEN_VALUE="✅ **Successfully Generated**\n\n"
               GEN_VALUE+="╔══════════════════════════╗\n"
-              GEN_VALUE+="║  📊 **Total Accounts:** \`${GEN_TOTAL}\`\n"
-              GEN_VALUE+="║  💾 **Total Storage:** \`${STORAGE_GB} GB\`\n"
-              GEN_VALUE+="║  🔄 **Rotation:** Round-Robin\n"
+              GEN_VALUE+="║   **Total Accounts:** \`${GEN_TOTAL}\`\n"
+              GEN_VALUE+="║   **Total Storage:** \`${STORAGE_GB} GB\`\n"
+              GEN_VALUE+="║   **Rotation:** Round-Robin\n"
               GEN_VALUE+="╚══════════════════════════╝"
             else
               GEN_VALUE="❌ **Generation Failed**\n\n"
@@ -291,7 +291,7 @@ jobs:
             fi
             FIELDS=$(echo "$FIELDS" | jq \
               --arg val "$GEN_VALUE" \
-              '. + [{"name": "🔴 Account Generation", "value": $val, "inline": false}]')
+              '. + [{"name": "Account Generation", "value": $val, "inline": false}]')
           fi
 
           # Sign-in results (if applicable)
@@ -306,8 +306,8 @@ jobs:
               SIGNIN_VALUE+="╔══════════════════════════╗\n"
               SIGNIN_VALUE+="║  ✅ **Active:**  \`${SIGNIN_SUCCESS}\` accounts\n"
               SIGNIN_VALUE+="║  ❌ **Failed:**  \`0\` accounts\n"
-              SIGNIN_VALUE+="║  💾 **Storage:** \`~${STORAGE_GB} GB\` available\n"
-              SIGNIN_VALUE+="║  🛡️ **Status:**  All Protected\n"
+              SIGNIN_VALUE+="║   **Storage:** \`~${STORAGE_GB} GB\` available\n"
+              SIGNIN_VALUE+="║   **Status:**  All Protected\n"
               SIGNIN_VALUE+="╚══════════════════════════╝\n\n"
               SIGNIN_VALUE+="*Next keep-alive: ~15 days*"
             elif [[ "$SIGNIN_STATUS" == "partial" ]]; then
@@ -333,17 +333,17 @@ jobs:
             fi
             FIELDS=$(echo "$FIELDS" | jq \
               --arg val "$SIGNIN_VALUE" \
-              '. + [{"name": "🔄 Keep-Alive Health Check", "value": $val, "inline": false}]')
+              '. + [{"name": "Keep-Alive Health Check", "value": $val, "inline": false}]')
           fi
 
           # System info footer field
-          SYS_VALUE="☁️ Provider: **MEGA.nz** (20GB/account)\n"
-          SYS_VALUE+="📧 Email: **Mail.tm** → Mail.gw → 1secmail\n"
-          SYS_VALUE+="🔄 Upload: **Round-Robin** rotation\n"
-          SYS_VALUE+="⏰ Keep-Alive: **1st & 15th** monthly"
+          SYS_VALUE="Provider: **MEGA.nz** (20GB/account)\n"
+          SYS_VALUE+="Email: **Mail.tm** → Mail.gw → 1secmail\n"
+          SYS_VALUE+="Upload: **Round-Robin** rotation\n"
+          SYS_VALUE+="Keep-Alive: **1st & 15th** monthly"
           FIELDS=$(echo "$FIELDS" | jq \
             --arg val "$SYS_VALUE" \
-            '. + [{"name": "⚙️ System Configuration", "value": $val, "inline": false}]')
+            '. + [{"name": "System Configuration", "value": $val, "inline": false}]')
 
           # ─── Build final payload ───
           PAYLOAD=$(jq -n \
@@ -374,7 +374,7 @@ jobs:
                 color: $color,
                 fields: $fields,
                 footer: {
-                  text: "☪️ MEGA Account Manager · Made with ❤️ by Muneeb Ahmad"
+                  text: "☪️ MEGA Account Manager"
                 },
                 timestamp: $timestamp
               }]
