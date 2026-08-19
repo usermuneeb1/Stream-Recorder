@@ -1,0 +1,4 @@
+{
+  "_comment": "Topics (tags) per recording, keyed by YouTube video id. Free-form strings — a topic can be a series (e.g. 'Debates 2026'), a subject (e.g. 'Trinity'), or a format (e.g. 'Q&A'). The dashboard shows them as chips and lets viewers filter by topic. Add entries with scripts/topics/add-topic.sh.",
+  "eIn7iwVa8fg": []
+}

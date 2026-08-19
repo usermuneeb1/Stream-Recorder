@@ -19,7 +19,8 @@ import {
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
 
-import type { Ep } from '../types';
+import type { Ep, Guest } from '../types';
+import { fetchGuests } from '../lib/fetcher';
 import { nextUp as pickNext } from '../lib/enrich';
 import { copyText, fmtDate, fmtTime, isHD, resShort, shareLinks } from '../lib/format';
 import {
@@ -102,6 +103,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumeAsk, setResumeAsk] = useState<number | null>(null);
   const [tick, setTick] = useState(0);                  // rerun side effects on rec change
+  const [guests, setGuests] = useState<Guest[]>([]);
 
   const player = useRef<MediaPlayerInstance | null>(null);
   const next = pickNext(recs, rec.videoId);
@@ -136,6 +138,18 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     for (let i = 0; i < rec.chapters.length; i++) if (time >= rec.chapters[i].time) cur = i;
     return cur;
   }, [rec.chapters, time]);
+
+  /* ── Guests (join/leave) ──────────────────────────────────────────── */
+  useEffect(() => {
+    let live = true;
+    setGuests([]);
+    fetchGuests(rec.videoId).then(g => { if (live) setGuests(g); });
+    return () => { live = false; };
+  }, [rec.videoId]);
+
+  const activeGuest = useMemo(() => {
+    return guests.find(g => time >= g.join && time <= g.leave) ?? null;
+  }, [guests, time]);
 
   /* ── Reset per recording ─────────────────────────────────────────── */
   useEffect(() => {
@@ -309,12 +323,16 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const shareUrl = (withTime: boolean) =>
     `${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}${withTime && time > 5 ? `?t=${Math.floor(time)}` : ''}`;
 
+  // Permanent mirrors first, so a viewer always lands on a link that can't
+  // expire (Archive.org, GitHub, MEGA). Temp hosts (Pixeldrain ~60d, Gofile
+  // ~10d) are listed last and labeled "temporary" so a dead link is expected
+  // there, never the default.
   const vault = [
-    { label: 'MEGA', href: rec.megaLink, color: '#d92753' },
-    { label: 'Pixeldrain', href: rec.pixeldrainLink, color: '#4f9ee8' },
-    { label: 'Gofile', href: rec.gofileLink, color: '#3ba97c' },
-    { label: 'GitHub', href: rec.githubDirect || rec.githubRelease, color: '#9aa0a6' },
-    { label: 'Archive.org', href: rec.archiveLink, color: '#e50914' },
+    { label: 'Archive.org', href: rec.archiveLink, color: '#e50914', perm: true },
+    { label: 'GitHub', href: rec.githubDirect || rec.githubRelease, color: '#9aa0a6', perm: true },
+    { label: 'MEGA', href: rec.megaLink, color: '#d92753', perm: true },
+    { label: 'Pixeldrain', href: rec.pixeldrainLink, color: '#4f9ee8', perm: false },
+    { label: 'Gofile', href: rec.gofileLink, color: '#3ba97c', perm: false },
   ].filter(v => v.href);
 
   const R = 26, CIRC = 2 * Math.PI * R;
@@ -392,7 +410,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
               {/* Player + ambient */}
               <div className={`relative ${theatre ? '' : 'md:px-0 px-0'}`}>
                 <div className={`ambient-bleed ${playing ? 'lit' : ''}`} style={{ backgroundImage: `url(${rec.thumbnail})` }} />
-                <div className="player-frame relative">
+                <div className={`player-frame relative ${active?.kind === 'youtube' ? 'src-youtube' : ''}`}>
                   <MediaPlayer
                     key={active?.url}
                     ref={player}
@@ -451,6 +469,15 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></svg>
                       Tap for sound
                     </button>
+                  )}
+
+                  {/* Guest name — shows on-screen while a guest is on air */}
+                  {activeGuest && playing && (
+                    <div className="guest-chip" aria-live="polite">
+                      <span className="guest-dot" />
+                      <span className="guest-label">Guest</span>
+                      <span className="guest-name">{activeGuest.name}</span>
+                    </div>
                   )}
 
                   {/* One loader only: the player's own rotating buffer circle.
@@ -544,6 +571,12 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                 </div>
                 <h1 className="display text-[clamp(24px,3.4vw,40px)] leading-[1.02] text-balance mb-5">{rec.title}</h1>
 
+                {rec.topics && rec.topics.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-6 -mt-3">
+                    {rec.topics.map(t => <span key={t} className="topic-chip topic-chip-lg">{t}</span>)}
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap mb-8">
                   <button
@@ -608,7 +641,37 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                   </div>
                 )}
 
-                <ChatReplay videoId={rec.videoId} time={time} playing={playing} />
+                {/* Guests — join/leave timeline */}
+                {guests.length > 0 && (
+                  <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="shelf-tick" />
+                      <span className="eyebrow">Guests</span>
+                      <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{guests.length} appearance{guests.length === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                      {guests.map((g, i) => {
+                        const onAir = !!activeGuest && activeGuest.name === g.name;
+                        return (
+                          <button
+                            key={`${g.name}-${i}`}
+                            className={`chapter-card ${onAir ? 'active' : ''}`}
+                            onClick={() => seekTo(Math.max(0, g.join))}
+                          >
+                            <div className="mono idx text-[10px] mb-1.5" style={{ color: 'var(--shade)' }}>
+                              {fmtTime(g.join)} → {fmtTime(g.leave)}
+                            </div>
+                            <div className="text-[12.5px] font-semibold line-clamp-1 leading-snug" style={{ color: onAir ? 'var(--ivory)' : 'var(--mist)' }}>
+                              🎙️ {g.name}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <ChatReplay videoId={rec.videoId} time={time} playing={playing} onSeek={seekTo} />
 
                 <div className="mono text-[10px] text-center py-8" style={{ color: 'var(--shade)' }}>
                   Lantern Archive · recorded autonomously · crafted with <span className="text-flame">♥</span> by Muneeb Ahmad
@@ -669,12 +732,15 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                       style={{ background: 'var(--ink-2)', color: 'var(--ivory)' }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: v.color, boxShadow: `0 0 8px ${v.color}` }} />
                       {v.label}
+                      <span className="mono text-[9px] uppercase tracking-wide" style={{ color: v.perm ? 'var(--flame-2)' : 'var(--shade)' }}>
+                        {v.perm ? 'permanent' : 'temporary'}
+                      </span>
                       <svg className="ml-auto" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--shade)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
                     </a>
                   ))}
                 </div>
                 <div className="mono text-[9.5px] mt-3 leading-relaxed" style={{ color: 'var(--shade)' }}>
-                  Each mirror holds the same 1080p file. If one dims, another lights.
+                  Permanent mirrors never expire. Temporary ones auto-refresh before they lapse.
                 </div>
               </div>
 

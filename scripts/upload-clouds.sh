@@ -357,8 +357,6 @@ upload_to_archive() {
     identifier=$(echo "$identifier" | sed 's/[^a-zA-Z0-9_-]/-/g' | cut -c1-100)
 
     # Metadata
-    local title="${STREAM_TITLE:-Live Stream Recording}"
-    local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local record_date
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
 
@@ -659,9 +657,7 @@ upload_to_clouds() {
 
         log_separator
         local part_name
-        local basename_f
-        basename_f=$(basename "$f")
-        
+
         # HD-only pipeline (compressed/480p variant removed)
         if (( total_files <= 2 )); then
             part_name="HD"

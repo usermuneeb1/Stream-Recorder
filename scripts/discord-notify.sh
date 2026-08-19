@@ -404,6 +404,9 @@ notify_recording_complete() {
         --arg date           "$record_date" \
         --arg parts          "$record_parts" \
         --arg uploads        "${upload_count}/${upload_total}" \
+        --arg upload_elapsed "$upload_elapsed" \
+        --arg process_time   "$process_time" \
+        --arg warp_ip        "$warp_ip" \
         --arg upstatus       "$upstatus" \
         --arg gofile_url       "$gofile_url" \
         --arg pixeldrain_url   "$pixeldrain_url" \
@@ -464,7 +467,10 @@ notify_recording_complete() {
                         else empty end),
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: "** Additional Info**", inline: false },
                         { name: " Live Chat",    value: $chat_status,   inline: true },
-                        { name: " Original",     value: ("[Watch on YT](" + $video_url + ")"), inline: true }
+                        { name: " Original",     value: ("[Watch on YT](" + $video_url + ")"), inline: true },
+                        { name: " Upload Time",  value: $upload_elapsed, inline: true },
+                        { name: " Process Time", value: $process_time,   inline: true },
+                        { name: " WARP IP",      value: $warp_ip,       inline: true }
                     ]
                 ),
                 footer: {

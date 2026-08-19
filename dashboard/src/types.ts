@@ -16,6 +16,13 @@ export interface Chapter {
   label: string;
 }
 
+/** A guest appearance: name + join/leave timestamps (seconds). */
+export interface Guest {
+  name: string;
+  join: number;
+  leave: number;
+}
+
 export interface Recording {
   videoId: string;
   title: string;
@@ -65,6 +72,7 @@ export interface Ep extends Recording {
   fromYouTube?: boolean;  // came from the channel feed, not the recording pipeline
   isShort?: boolean;      // vertical short from the channel's shorts playlist
   viewCount?: number;     // YouTube views (feed videos)
+  topics?: string[];      // free-form tags (series / subject / format)
 }
 
 export interface SystemStatus {

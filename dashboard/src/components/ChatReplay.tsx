@@ -5,18 +5,21 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchChat, type ChatMessage } from '../lib/fetcher';
+import { fmtTime } from '../lib/format';
 
 interface Props {
   videoId: string;
   time: number;        // player clock, seconds
   playing: boolean;
+  onSeek?: (t: number) => void;
 }
 
-export default function ChatReplay({ videoId, time, playing }: Props) {
+export default function ChatReplay({ videoId, time, playing, onSeek }: Props) {
   const [chat, setChat] = useState<{ demo?: boolean; messages: ChatMessage[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(true);
   const [follow, setFollow] = useState(true);
+  const [q, setQ] = useState('');
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,6 +37,15 @@ export default function ChatReplay({ videoId, time, playing }: Props) {
     [chat, time],
   );
   const supers = useMemo(() => chat?.messages.filter(m => m.k === 'super') ?? [], [chat]);
+
+  /* Search results — match author or message, across the whole chat. */
+  const needle = q.trim().toLowerCase();
+  const results = useMemo(() => {
+    if (!chat || !needle) return [];
+    return chat.messages
+      .filter(m => m.a?.toLowerCase().includes(needle) || m.m?.toLowerCase().includes(needle))
+      .slice(0, 200);
+  }, [chat, needle]);
 
   /* Follow the newest message unless the reader scrolled up. */
   useEffect(() => {
@@ -84,6 +96,44 @@ export default function ChatReplay({ videoId, time, playing }: Props) {
 
       {open && (
         <div className="relative rounded-xl overflow-hidden" style={{ border: '1px solid var(--line)', background: 'var(--ink-1)' }}>
+          {/* Search inside the chat */}
+          <div className="relative border-b" style={{ borderColor: 'var(--line)' }}>
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--shade)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search what was said…"
+              className="w-full h-10 pl-9 pr-9 text-[12.5px] outline-none"
+              style={{ background: 'transparent', color: 'var(--ivory)' }}
+            />
+            {q && (
+              <button className="absolute right-3 top-1/2 -translate-y-1/2 mono text-[10px]" style={{ color: 'var(--shade)' }} onClick={() => setQ('')} aria-label="Clear search">✕</button>
+            )}
+          </div>
+
+          {needle ? (
+            <div className="overflow-y-auto no-scrollbar h-[320px] px-3 py-3 flex flex-col gap-1">
+              {results.length === 0 && (
+                <span className="mono text-[10.5px] text-center py-8" style={{ color: 'var(--shade)' }}>
+                  no messages match “{q}”
+                </span>
+              )}
+              {results.map((m, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSeek?.(m.t)}
+                  className="text-left rounded-lg px-3 py-2 transition-colors hover:bg-[var(--flame-04)]"
+                  style={{ border: '1px solid transparent' }}
+                >
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="mono text-[9.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--flame-12)', color: 'var(--flame-1)' }}>{fmtTime(m.t)}</span>
+                    <span className="text-[11.5px] font-semibold" style={{ color: 'var(--mist)' }}>{m.a}</span>
+                  </div>
+                  <div className="text-[12px] leading-snug line-clamp-2" style={{ color: 'var(--ivory)' }}>{m.m}</div>
+                </button>
+              ))}
+            </div>
+          ) : (
           <div
             ref={boxRef}
             onScroll={onScroll}
@@ -120,6 +170,7 @@ export default function ChatReplay({ videoId, time, playing }: Props) {
               </div>
             ))}
           </div>
+          )}
 
           {!follow && (
             <button

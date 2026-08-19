@@ -24,12 +24,19 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [season, setSeason] = useState<string>('all');
+  const [topic, setTopic] = useState<string>('all');
   const [sort, setSort] = useState<SortKey>('newest');
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   const seasonList = useMemo(() => {
     const s = [...new Set(recs.map(r => r.season))];
     return s;
+  }, [recs]);
+
+  const topicList = useMemo(() => {
+    const t = new Set<string>();
+    recs.forEach(r => (r.topics || []).forEach(x => t.add(x)));
+    return [...t].sort();
   }, [recs]);
 
   const shown = useMemo(() => {
@@ -40,12 +47,14 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
       list = list.filter(r =>
         r.title.toLowerCase().includes(needle) ||
         r.date.includes(needle) ||
-        r.season.toLowerCase().includes(needle)
+        r.season.toLowerCase().includes(needle) ||
+        (r.topics || []).some(t => t.toLowerCase().includes(needle))
       );
     }
     if (filter === 'hd') list = list.filter(r => isHD(r.resolution));
     if (filter === 'new') list = list.filter(r => r.isNew);
     if (season !== 'all') list = list.filter(r => r.season === season);
+    if (topic !== 'all') list = list.filter(r => (r.topics || []).includes(topic));
 
     switch (sort) {
       case 'oldest':  list.sort((a, b) => a.date.localeCompare(b.date)); break;
@@ -55,7 +64,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
       default:        list.sort((a, b) => b.date.localeCompare(a.date));
     }
     return list;
-  }, [recs, q, filter, season, sort]);
+  }, [recs, q, filter, season, topic, sort]);
 
   const filters: { key: FilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -116,6 +125,19 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
           >
             <option value="all">All months</option>
             {seasonList.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+
+        {topicList.length > 0 && (
+          <select
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+            className="h-9 px-3 rounded-full text-[12px] font-semibold outline-none cursor-pointer"
+            style={{ background: 'var(--ink-1)', border: '1px solid var(--line)', color: 'var(--mist)' }}
+            aria-label="Filter by topic"
+          >
+            <option value="all">All topics</option>
+            {topicList.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         )}
 
@@ -213,6 +235,11 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
                     {ep.isNew && <span className="badge-new">NEW</span>}
                   </div>
                   <div className="text-[14px] font-bold line-clamp-1 mb-1.5" style={{ color: 'var(--ivory)' }}>{ep.title}</div>
+                  {ep.topics && ep.topics.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {ep.topics.slice(0, 3).map(t => <span key={t} className="topic-chip">{t}</span>)}
+                    </div>
+                  )}
                   <div className="mono text-[10.5px] flex flex-wrap gap-x-3" style={{ color: 'var(--shade)' }}>
                     <span>{fmtDate(ep.date)}</span>
                     <span>{ep.sizeHuman}</span>

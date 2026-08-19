@@ -1,8 +1,8 @@
 {
-  "total_streams": 13,
+  "total_streams": 12,
   "total_hours": 23.4918,
   "total_gb": 10.0865,
-  "avg_duration_hours": 1.80,
+  "avg_duration_hours": 1.8,
   "sources": {
     "archive": 8,
     "mega": 6,

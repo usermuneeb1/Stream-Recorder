@@ -91,6 +91,12 @@ export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList
           <div className="mono text-[10px] mt-1" style={{ color: 'var(--shade)' }}>
             {fmtDate(ep.date)}{ep.sizeHuman ? ` · ${ep.sizeHuman}` : ''}
           </div>
+          {ep.topics && ep.topics.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {ep.topics.slice(0, 2).map(t => <span key={t} className="topic-chip">{t}</span>)}
+              {ep.topics.length > 2 && <span className="topic-chip" style={{ color: 'var(--shade)' }}>+{ep.topics.length - 2}</span>}
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -98,6 +104,11 @@ export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList
       {!compact && (
         <div className="card-info" onClick={e => e.stopPropagation()}>
           <div className="text-[13.5px] font-bold line-clamp-2 mb-1.5" style={{ color: 'var(--ivory)' }}>{ep.title}</div>
+          {ep.topics && ep.topics.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              {ep.topics.slice(0, 3).map(t => <span key={t} className="topic-chip">{t}</span>)}
+            </div>
+          )}
           <div className="mono text-[10px] mb-3 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: 'var(--shade)' }}>
             <span style={{ color: 'var(--jade)' }}>{ep.matchPct}% match</span>
             <span>{fmtDate(ep.date)}</span>

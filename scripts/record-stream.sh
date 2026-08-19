@@ -525,8 +525,16 @@ record_method_h() {
     # ytarchive sometimes writes to <base>.mp4 directly, sometimes to
     # <base>.f<itag>.mp4, try to find what it actually produced.
     if [[ ! -f "$output_file" ]]; then
-        local produced
-        produced=$(ls -1t "${base}".* 2>/dev/null | grep -E '\.(mp4|mkv|ts|webm)$' | head -1 || true)
+        # ytarchive writes to <base>.<ext>; pick the newest valid media file.
+        local produced="" produced_time=0 f f_time
+        for f in "${base}".*.mp4 "${base}".*.mkv "${base}".*.ts "${base}".*.webm; do
+            [[ -f "$f" ]] || continue
+            f_time=$(stat -c %Y "$f" 2>/dev/null || echo 0)
+            if (( f_time >= produced_time )); then
+                produced_time=$f_time
+                produced="$f"
+            fi
+        done
         [[ -n "$produced" && -f "$produced" ]] && mv "$produced" "$output_file"
     fi
 
@@ -611,9 +619,10 @@ record_method_j() {
     -f "best" \
     -g \
     "${video_url}" 2>"${err_log}" | head -1) || {
+    local resolve_status=$?
     local err
     err=$(tail -3 "${err_log}" 2>/dev/null)
-    _log_method_failure "Method J" "$?" "$video_url" "$output_file" "${err}"
+    _log_method_failure "Method J" "$resolve_status" "$video_url" "$output_file" "${err}"
     log_warn " Method J: could not resolve manifest URL"
     return 1
   }
@@ -830,8 +839,7 @@ record_stream() {
     local safe_title
     safe_title=$(generate_output_filename "$stream_title")
     local raw_output="${RECORD_DIR}/${safe_title}_raw.mp4"
-    local final_output="${RECORD_DIR}/${safe_title}.mp4"
-    
+
     set_env "RECORD_OUTPUT_TITLE" "$safe_title"
     set_env "RECORD_RAW_FILE" "$raw_output"
     
@@ -979,11 +987,13 @@ record_stream() {
             "web_creator|Web Creator (alt client)"
         )
 
+        local vod_idx=0
         for row in "${vod_methods[@]}"; do
             local client="${row%%|*}"
             local mname="${row#*|}"
-            
-            log_info "  VOD Rescue attempt $((i+1))/${#vod_methods[@]}: ${mname}..."
+            vod_idx=$((vod_idx + 1))
+
+            log_info "  VOD Rescue attempt ${vod_idx}/${#vod_methods[@]}: ${mname}..."
             
             # Try downloading the full VOD (not live, just the replay)
             if timeout 1800 yt-dlp \

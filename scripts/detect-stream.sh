@@ -718,7 +718,9 @@ is_stream_still_live() {
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null)
     web_live=$(echo "$web_blob" | jq -r '.is_live // false' 2>/dev/null)
     web_status=$(echo "$web_blob" | jq -r '.live_status // "not_live"' 2>/dev/null)
-    if [[ "$web_live" == "true" ]] || [[ "$web_status" == "is_live" ]] || [[ "$web_status" == "is_upcoming" ]]; then
+    # Consistent with the rest of this file: is_upcoming is NOT live yet, so a
+    # scheduled-but-not-started premiere must not make the recheck return "live".
+    if [[ "$web_live" == "true" ]] || [[ "$web_status" == "is_live" ]]; then
         return 0
     fi
 

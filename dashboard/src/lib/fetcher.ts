@@ -2,7 +2,7 @@
 // mirror failover, normalizes snake_case records, merges duplicates, and
 // keeps the best resolution / longest duration per stream.
 
-import type { Chapter, Recording, StreamPrediction, Storyboard, SystemStatus, YTVideo } from '../types';
+import type { Chapter, Guest, Recording, StreamPrediction, Storyboard, SystemStatus, YTVideo } from '../types';
 
 // Data sources, tried in order:
 //   ''                      → relative /data/* — served by `vite dev` middleware
@@ -36,6 +36,46 @@ export async function fetchChat(videoId: string): Promise<{ demo?: boolean; mess
     } catch { /* next mirror */ }
   }
   return null;
+}
+
+/** Guest appearances for a recording, from data/guests.json (keyed by video id). */
+export async function fetchGuests(videoId: string): Promise<Guest[]> {
+  for (const base of SOURCES) {
+    try {
+      const r = await fetch(`${base}/data/guests.json`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const list = j?.[videoId];
+      if (Array.isArray(list)) {
+        return list
+          .filter((g: any) => g && typeof g.name === 'string' && typeof g.join === 'number')
+          .map((g: any) => ({ name: String(g.name).trim(), join: g.join, leave: g.leave ?? g.join }))
+          .filter((g: Guest) => g.name)
+          .sort((a: Guest, b: Guest) => a.join - b.join);
+      }
+    } catch { /* next mirror */ }
+  }
+  return [];
+}
+
+/** Topics per recording, from data/topics.json (keyed by video id). */
+export async function fetchTopics(): Promise<Record<string, string[]>> {
+  for (const base of SOURCES) {
+    try {
+      const r = await fetch(`${base}/data/topics.json`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && typeof j === 'object' && !Array.isArray(j)) {
+        const out: Record<string, string[]> = {};
+        for (const [vid, v] of Object.entries(j)) {
+          if (vid === '_comment') continue;
+          if (Array.isArray(v)) out[vid] = v.filter((t: any) => typeof t === 'string').map((t: string) => t.trim()).filter(Boolean);
+        }
+        return out;
+      }
+    } catch { /* next mirror */ }
+  }
+  return {};
 }
 
 async function fetchFirstJson<T = unknown>(path: string): Promise<T | null> {
