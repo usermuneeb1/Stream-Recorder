@@ -669,12 +669,14 @@ is_stream_still_live() {
         return 0
     fi
 
-    # PREMIERE-AWARE: a scheduled premiere shows isUpcoming=true in the
-    # embedded ytInitialPlayerResponse. We treat that as 'go-record-now'
-    # because ytarchive --wait will sit on the URL until premiere starts.
+    # v5 FIX (complete): a scheduled premiere shows isUpcoming=true but has
+    # NOT started. Detection treats is_upcoming as not-live (see Method 2),
+    # and the recheck must agree, or FORCE_RECORD / the recording loop would
+    # commit to a doomed recording and burn the 300-min timeout waiting for a
+    # stream that has not gone live (EGbDB405YSw infinite-loop incident).
     if grep -qE '"isUpcoming"\s*:\s*true' <<< "$video_page"; then
-        log_info "Scheduled premiere detected on $video_id, entering wait mode"
-        return 0
+        log_info "Scheduled premiere detected on $video_id, not live yet"
+        return 1
     fi
     
     # Method B: yt-dlp json check (with cookies for WARP IP authentication)
@@ -691,8 +693,13 @@ is_stream_still_live() {
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null)
     is_live=$(echo "$json_blob" | jq -r '.is_live // false' 2>/dev/null)
     live_status=$(echo "$json_blob" | jq -r '.live_status // "not_live"' 2>/dev/null)
-    if [[ "$is_live" == "true" ]] || [[ "$live_status" == "is_live" ]] || [[ "$live_status" == "is_upcoming" ]]; then
+    if [[ "$is_live" == "true" ]] || [[ "$live_status" == "is_live" ]]; then
         return 0
+    fi
+    # v5 FIX (complete): is_upcoming is not live yet, same policy as detection.
+    if [[ "$live_status" == "is_upcoming" ]]; then
+        log_info "Method B: event upcoming, not live yet"
+        return 1
     fi
 
     # v5 FIX: the mweb client systematically false-negatives live streams on
