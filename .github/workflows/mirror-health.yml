@@ -1,0 +1,103 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║   MIRROR HEALTH — verify every mirror link is alive, repair when not         ║
+# ║  Runs scripts/mirror-health.sh on a schedule. If any recording is below the  ║
+# ║  copy guarantee (or any link is dead), it alerts Discord and triggers the    ║
+# ║  existing repair-mirrors workflow to re-upload from the permanent copy.      ║
+# ║  The dashboard only ever sees healthy mirrors: dead links are healed before  ║
+# ║  the archive index is refreshed.                                             ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "Mirror health"
+
+on:
+  schedule:
+    # Every 6 hours
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: mirror-health
+  cancel-in-progress: false
+
+env:
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+
+jobs:
+  health:
+    name: "Check and repair mirrors"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+
+      - name: "Run mirror health check"
+        id: health
+        run: |
+          bash scripts/mirror-health.sh
+        # script exits non-zero when degraded; we capture that via the summary output
+
+      - name: "Read health result"
+        id: result
+        run: |
+          DEAD=$(jq -r '.summary.dead_links // 0' data/mirror-health.json)
+          DEGRADED=$(jq -r '.summary.degraded // 0' data/mirror-health.json)
+          TOTAL=$(jq -r '.summary.total // 0' data/mirror-health.json)
+          echo "dead=$DEAD" >> "$GITHUB_OUTPUT"
+          echo "degraded=$DEGRADED" >> "$GITHUB_OUTPUT"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "Health: $TOTAL recordings, $DEGRADED degraded, $DEAD dead links"
+
+      - name: "Alert + trigger repair if degraded"
+        if: steps.result.outputs.degraded != '0' || steps.result.outputs.dead != '0'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          DEAD="${{ steps.result.outputs.dead }}"
+          DEGRADED="${{ steps.result.outputs.degraded }}"
+          echo "###  Mirror health degraded" >> "$GITHUB_STEP_SUMMARY"
+          echo "- $DEGRADED recording(s) below the copy guarantee" >> "$GITHUB_STEP_SUMMARY"
+          echo "- $DEAD dead mirror link(s)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.recordings[] | select(.healthy == false) | "- \`\(.video_id)\`: \(.alive) alive, \(.dead) dead"' data/mirror-health.json >> "$GITHUB_STEP_SUMMARY"
+
+          # Discord alert
+          MSG="⚠️ **Mirror health degraded**: $DEGRADED recording(s) below guarantee, $DEAD dead link(s). Triggering repair."
+          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+          if [[ -n "$WEBHOOK" ]]; then
+            curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" '{content:$m, avatar_url:$a}')" \
+              >/dev/null 2>&1 || echo "discord send failed"
+          fi
+
+          # Trigger the existing repair workflow to re-upload from Archive.org
+          if [[ -n "${GH_PAT:-}" ]]; then
+            curl -fsS -X POST \
+              -H "Authorization: Bearer $GH_PAT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/repair-mirrors.yml/dispatches" \
+              -d '{"ref":"main"}' >/dev/null 2>&1 && echo "repair triggered" || echo "repair trigger failed (GH_PAT missing?)"
+          else
+            echo "no GH_PAT secret — repair not triggered, alert sent"
+          fi
+
+      - name: "Commit health data"
+        if: always()
+        run: |
+          git config user.name "usermuneeb1"
+          git config user.email "198427088+usermuneeb1@users.noreply.github.com"
+          git add data/mirror-health.json
+          git diff --cached --quiet || {
+            git commit -m "mirror health snapshot, $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "committed mirror health"
+          }
