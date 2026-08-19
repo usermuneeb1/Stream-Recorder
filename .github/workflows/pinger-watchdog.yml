@@ -1,0 +1,101 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║   PINGER WATCHDOG                                                           ║
+# ║  Alerts Discord if the external pinger goes silent. The recorder's real     ║
+# ║  coverage comes from cron-job.org firing repository_dispatch every few      ║
+# ║  minutes; if that pinger dies, the recorder goes deaf silently and a live   ║
+# ║  stream is missed. This workflow checks that dispatch-triggered runs are    ║
+# ║  still arriving, and alerts before a stream can be lost.                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "Pinger watchdog"
+
+on:
+  schedule:
+    # Every 30 minutes, offset so it never collides with the pinger cadence
+    - cron: "23 */1 * * *"
+  workflow_dispatch:
+    inputs:
+      quiet_minutes:
+        description: "Alert if no dispatch-triggered run in this many minutes"
+        required: false
+        default: "20"
+        type: string
+
+permissions:
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: pinger-watchdog
+  cancel-in-progress: true
+
+env:
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+
+jobs:
+  watchdog:
+    name: "Check pinger heartbeat"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+
+      - name: "Find the latest dispatch-triggered run"
+        id: check
+        env:
+          QUIET_MINUTES: ${{ inputs.quiet_minutes || '20' }}
+        run: |
+          # The last run of the main recorder that was triggered by a
+          # repository_dispatch event (i.e. by the external pinger).
+          latest=$(curl -fsS \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/runs?event=repository_dispatch&per_page=1" \
+            | jq -r '.workflow_runs[0].created_at // empty' 2>/dev/null || true)
+
+          if [[ -z "$latest" ]]; then
+            echo "no dispatch-triggered run ever found"
+            echo "alert=no-run" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          now_epoch=$(date +%s)
+          latest_epoch=$(date -d "$latest" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$latest" +%s 2>/dev/null || echo 0)
+          age_min=$(( (now_epoch - latest_epoch) / 60 ))
+          echo "latest dispatch run: $latest (${age_min} min ago)"
+          echo "age_min=${age_min}" >> "$GITHUB_OUTPUT"
+          echo "quiet_min=${QUIET_MINUTES}" >> "$GITHUB_OUTPUT"
+          if (( age_min > QUIET_MINUTES )); then
+            echo "alert=silent" >> "$GITHUB_OUTPUT"
+          else
+            echo "alert=ok" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Alert if the pinger is silent"
+        if: steps.check.outputs.alert != 'ok'
+        run: |
+          if [[ "${{ steps.check.outputs.alert }}" == "no-run" ]]; then
+            MSG="🚨 **Pinger watchdog**: the main recorder has NEVER been triggered by repository_dispatch. If cron-job.org was never set up, the recorder only runs on GitHub's throttled cron. Check the pinger config."
+          else
+            MSG="🚨 **Pinger watchdog**: no repository_dispatch run in ${{ steps.check.outputs.age_min }} minutes (quiet threshold ${{ steps.check.outputs.quiet_min }}m). The external pinger may be down. If a stream goes live now, it could be missed. Check cron-job.org."
+          fi
+
+          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+          if [[ -n "$WEBHOOK" ]]; then
+            curl -fsS -X POST "$WEBHOOK" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" \
+                '{content: $m, username: "Pinger Watchdog", avatar_url: $a}')" >/dev/null 2>&1 || echo "discord send failed"
+          else
+            echo "no discord webhook configured, alert would be: $MSG"
+          fi
+
+      - name: "Recovered"
+        if: steps.check.outputs.alert == 'ok'
+        run: echo "Pinger heartbeat OK (last dispatch run ${{ steps.check.outputs.age_min }}m ago)"
