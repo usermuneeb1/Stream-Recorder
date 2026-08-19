@@ -658,51 +658,43 @@ attempt_recording() {
     # The cookie-based methods (A/B) run only AFTER, as a bonus for the rare
     # members-only / age-restricted stream where cookies are actually required.
 
+    # Methods are DATA: one row per method, "function-name|display-label".
+    # The function name and its label travel together, so the label can never
+    # drift from the function it describes. (A previous version kept two
+    # parallel arrays that had to stay aligned 1:1; they drifted once and put
+    # the wrong tool name in failure logs and the Discord diagnostic dump.)
+    # Order of this array IS the cascade order.
     local methods=(
-        "record_method_d"      # android_vr, NO PoToken (guide), yt-dlp first
-        "record_method_c"      # mediaconnect
-        "record_method_g"      # plain yt-dlp
-        "record_method_e"      # mweb
-        "record_method_j"      # ffmpeg HLS direct
-        "record_method_h"      # ytarchive
-        "record_method_i"      # streamlink hardened
-        "record_method_f"      # streamlink default
-        "record_method_a"      # cookies web_creator
-        "record_method_b"      # cookies tv_embedded
+        "record_method_d|D: Android VR (cookieless 1080p)"
+        "record_method_c|C: mediaconnect (cookieless 1080p)"
+        "record_method_g|G: Plain yt-dlp (default)"
+        "record_method_e|E: Mobile Web"
+        "record_method_j|J: ffmpeg HLS direct (independent path)"
+        "record_method_h|H: ytarchive (cookieless, purpose-built for live)"
+        "record_method_i|I: streamlink hardened (cookieless, independent codebase)"
+        "record_method_f|F: Streamlink (HLS, default flags)"
+        "record_method_a|A: Cookies+web_creator (bonus)"
+        "record_method_b|B: Cookies+tv_embedded (bonus)"
     )
-    # NOTE: this array MUST stay aligned 1:1 with `methods[]` above.
-    # (A previous version drifted out of order, 9/10 labels pointed at the
-    # wrong method, so failure logs + the Discord diagnostic dump reported
-    # the wrong tool. Reordering `methods[]` without updating this array
-    # was the root cause.)
-    local method_names=(
-        "D: Android VR (cookieless 1080p)"
-        "C: mediaconnect (cookieless 1080p)"
-        "G: Plain yt-dlp (default)"
-        "E: Mobile Web"
-        "J: ffmpeg HLS direct (independent path)"
-        "H: ytarchive (cookieless, purpose-built for live)"
-        "I: streamlink hardened (cookieless, independent codebase)"
-        "F: Streamlink (HLS, default flags)"
-        "A: Cookies+web_creator (bonus)"
-        "B: Cookies+tv_embedded (bonus)"
-    )
-    for i in "${!methods[@]}"; do
+    local row fn label
+    for row in "${methods[@]}"; do
+        fn="${row%%|*}"
+        label="${row#*|}"
         log_separator
-        log_info "  Trying method ${method_names[$i]}..."
+        log_info "  Trying method ${label}..."
         
         # Try the recording method
-        ${methods[$i]} "$video_url" "$output_base" || true
+        ${fn} "$video_url" "$output_base" || true
         
         # Check if a valid file was produced
         local valid_file
         valid_file=$(validate_recorded_file "$output_base") && {
-            log_ok "  ✅ Method ${method_names[$i]} succeeded!"
+            log_ok "  ✅ Method ${label} succeeded!"
             RECORDED_FILES+=("$valid_file")
             return 0
         }
         
-        log_warn "  Method ${method_names[$i]}, no valid file produced"
+        log_warn "  Method ${label}, no valid file produced"
         
         # Small delay between methods
         sleep "${METHOD_RETRY_DELAY:-5}"
@@ -975,26 +967,21 @@ record_stream() {
             (( vod_wait_iters++ ))
         done
 
+        # VOD clients are DATA: "client-id|display-label" travel together so
+        # the label can never drift from the client it names (same class of
+        # bug as the main cascade's old parallel arrays).
         local vod_methods=(
-            "android_vr"
-            "ios"
-            "mweb"
-            "web"
-            "tv_embedded"
-            "web_creator"
-        )
-        local vod_method_names=(
-            "Android VR (anonymous)"
-            "iOS (anonymous)"
-            "Mobile Web (anonymous)"
-            "Web (default client)"
-            "TV Embedded (cookie-friendly)"
-            "Web Creator (alt client)"
+            "android_vr|Android VR (anonymous)"
+            "ios|iOS (anonymous)"
+            "mweb|Mobile Web (anonymous)"
+            "web|Web (default client)"
+            "tv_embedded|TV Embedded (cookie-friendly)"
+            "web_creator|Web Creator (alt client)"
         )
 
-        for i in "${!vod_methods[@]}"; do
-            local client="${vod_methods[$i]}"
-            local mname="${vod_method_names[$i]}"
+        for row in "${vod_methods[@]}"; do
+            local client="${row%%|*}"
+            local mname="${row#*|}"
             
             log_info "  VOD Rescue attempt $((i+1))/${#vod_methods[@]}: ${mname}..."
             

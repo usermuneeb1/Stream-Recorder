@@ -44,8 +44,8 @@ jobs:
 
       - name: "Bash syntax"
         run: |
-          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
-          for f in scripts/*.sh; do
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env tests/*.sh 2>/dev/null || true
+          for f in scripts/*.sh tests/*.sh; do
             echo "Checking syntax: $f"
             bash -n "$f"
           done
@@ -53,7 +53,7 @@ jobs:
       - name: "Shellcheck"
         run: |
           # Treat correctness findings as failures; allow style/warning noise for now.
-          shellcheck -x -S error scripts/*.sh
+          shellcheck -x -S error scripts/*.sh tests/*.sh
 
       - name: "Python syntax"
         run: |
@@ -69,6 +69,9 @@ jobs:
 
       - name: "Database audit"
         run: bash scripts/database-audit.sh
+
+      - name: "Recording cascade test"
+        run: bash tests/record-cascade-test.sh
 
       - name: "Secret reference summary"
         run: |
