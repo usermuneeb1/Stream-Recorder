@@ -357,8 +357,6 @@ upload_to_archive() {
     identifier=$(echo "$identifier" | sed 's/[^a-zA-Z0-9_-]/-/g' | cut -c1-100)
 
     # Metadata
-    local title="${STREAM_TITLE:-Live Stream Recording}"
-    local channel="${STREAM_CHANNEL:-Unknown Channel}"
     local record_date
     record_date=$(TZ='Asia/Karachi' date '+%Y-%m-%d')
 
@@ -388,10 +386,10 @@ upload_to_archive() {
             -w '%{http_code}|%{exitcode}|%{time_total}' \
             -H "authorization: LOW ${access_key}:${secret_key}" \
             -H "x-archive-auto-make-bucket: 1" \
-            -H "x-archive-meta-title: ${title}" \
-            -H "x-archive-meta-creator: ${channel}" \
+            -H "x-archive-meta-title: Personal Media Backup" \
+            -H "x-archive-meta-creator: Media Archive Bot" \
             -H "x-archive-meta-date: ${record_date}" \
-            -H "x-archive-meta-description: Live stream recording from ${channel}." \
+            -H "x-archive-meta-description: Personal media backup file." \
             -H "x-archive-meta-mediatype: movies" \
             -H "x-archive-meta-collection: opensource_movies" \
             -H "x-archive-meta-subject: backup;media;personal;archive" \
