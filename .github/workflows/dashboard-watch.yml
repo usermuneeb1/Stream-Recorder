@@ -1,0 +1,100 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║   DASHBOARD WATCH — is the public dashboard reachable AND current?          ║
+# ║  "Dashboard down" should be an event, not a surprise. This workflow pings   ║
+# ║  the deployed dashboard and checks that the public data is fresh, alerting  ║
+# ║  Discord if the site is unreachable or the archive index is stale.          ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "Dashboard watch"
+
+on:
+  schedule:
+    # Every 6 hours
+    - cron: "41 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: dashboard-watch
+  cancel-in-progress: true
+
+env:
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  DASHBOARD_URL: ${{ vars.DASHBOARD_URL || 'https://usermuneeb1.github.io/Stream-Recorder/' }}
+
+jobs:
+  watch:
+    name: "Check dashboard + data freshness"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+
+      - name: "Ping dashboard + check data freshness"
+        id: check
+        run: |
+          ALERT=""
+
+          # 1. Is the dashboard reachable?
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 30 \
+            -A "Mozilla/5.0 (dashboard-watch)" "$DASHBOARD_URL" 2>/dev/null || echo 000)
+          echo "dashboard_http=$CODE"
+          if [[ "$CODE" == "200" || "$CODE" == "301" || "$CODE" == "302" ]]; then
+            echo "dashboard_ok=true"
+          else
+            echo "dashboard_ok=false"
+            ALERT="${ALERT}Dashboard unreachable (HTTP ${CODE}).\n"
+          fi
+
+          # 2. Is the public data fresh? (system-status updated_at + mirror-health)
+          if [[ -f data/system-status.json ]]; then
+            STAMP=$(jq -r '.updated_at // ""' data/system-status.json)
+            if [[ -n "$STAMP" ]]; then
+              AGE_H=$(( ( $(date +%s) - $(date -d "$STAMP" +%s 2>/dev/null || echo 0) ) / 3600 ))
+              echo "data_age_h=$AGE_H"
+              if (( AGE_H > 48 )); then
+                ALERT="${ALERT}Archive data is stale (${AGE_H}h old).\n"
+              fi
+            fi
+          fi
+          if [[ -f data/mirror-health.json ]]; then
+            MAGE=$(jq -r '.updated_at // ""' data/mirror-health.json)
+            if [[ -n "$MAGE" ]]; then
+              MAGE_H=$(( ( $(date +%s) - $(date -d "$MAGE" +%s 2>/dev/null || echo 0) ) / 3600 ))
+              echo "mirror_health_age_h=$MAGE_H"
+              if (( MAGE_H > 48 )); then
+                ALERT="${ALERT}Mirror-health data stale (${MAGE_H}h old).\n"
+              fi
+            fi
+          fi
+
+          echo "alert=$([ -z "$ALERT" ] && echo none || echo problem)"
+          printf '%s' "$ALERT" > /tmp/alert.txt
+
+      - name: "Alert if down or stale"
+        if: steps.check.outputs.alert != 'none'
+        run: |
+          ALERT="$(cat /tmp/alert.txt)"
+          MSG="🚨 **Dashboard watch**:\n$ALERT"
+          echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+          if [[ -n "$WEBHOOK" ]]; then
+            curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" '{content:$m, avatar_url:$a}')" \
+              >/dev/null 2>&1 || echo "discord send failed"
+          else
+            echo "no webhook; would alert: $MSG"
+          fi
+
+      - name: "Healthy"
+        if: steps.check.outputs.alert == 'none'
+        run: echo "Dashboard OK (HTTP ${{ steps.check.outputs.dashboard_http }}), data fresh"

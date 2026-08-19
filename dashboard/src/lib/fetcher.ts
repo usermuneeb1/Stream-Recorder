@@ -191,6 +191,10 @@ export async function fetchStatus(): Promise<SystemStatus | null> {
   const j = await fetchFirstJson<any>('data/system-status.json');
   if (!j) return null;
   const ageH = (Date.now() - new Date(j.updated_at || 0).getTime()) / 3.6e6;
+  // mirror health rides alongside: system-status.json now carries a
+  // mirror_health summary (written by the mirror-health workflow), so the
+  // dashboard shows whether every recording still has its copies.
+  const mh = j.mirror_health;
   return {
     updatedAt:        j.updated_at || '',
     recordingsTotal:  j.recordings_total || 0,
@@ -200,6 +204,9 @@ export async function fetchStatus(): Promise<SystemStatus | null> {
     ytViews:          j.youtube?.views || '',
     ytVideos:         j.youtube?.videos || 0,
     ok:               ageH < 48,
+    mirrorHealthy:    mh ? mh.healthy : undefined,
+    mirrorTotal:      mh ? mh.total : undefined,
+    mirrorDegraded:   mh ? mh.degraded : undefined,
   };
 }
 

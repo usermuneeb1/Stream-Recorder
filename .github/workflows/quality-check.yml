@@ -70,6 +70,9 @@ jobs:
       - name: "Database audit"
         run: bash scripts/database-audit.sh
 
+      - name: "Data gate"
+        run: bash scripts/data-gate.sh
+
       - name: "Recording cascade test"
         run: bash tests/record-cascade-test.sh
 

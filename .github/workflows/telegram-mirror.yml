@@ -49,79 +49,100 @@ jobs:
 
           print(f"Found {len(todo)} recordings to upload\n")
 
-          for i, rec in enumerate(todo):
-              title = rec.get("title", "Recording")
-              vid = rec.get("video_id", "")
-              url = rec.get("archive_direct") or rec.get("archive_node") or ""
-              if not url and rec.get("archive_link"):
-                  url = rec["archive_link"].replace("/details/", "/download/") + "/"
+          failures = []  # (video_id, title, reason)
 
-              print(f"\n{'='*60}")
-              print(f"[{i+1}/{len(todo)}] {title}")
+          for attempt in range(1, 4):  # up to 3 passes so transient failures retry
+              still_missing = [r for r in todo if not r.get("telegram_link")]
+              if not still_missing:
+                  break
+              if attempt > 1:
+                  print(f"\n=== RETRY PASS {attempt}: {len(still_missing)} still missing ===")
+              for i, rec in enumerate(still_missing):
+                  title = rec.get("title", "Recording")
+                  vid = rec.get("video_id", "")
+                  url = rec.get("archive_direct") or rec.get("archive_node") or ""
+                  if not url and rec.get("archive_link"):
+                      url = rec["archive_link"].replace("/details/", "/download/") + "/"
 
-              safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title[:60]) + ".mp4"
-              path = f"/tmp/{safe}"
+                  print(f"\n{'='*60}")
+                  print(f"[{i+1}/{len(still_missing)}] {title}")
 
-              print(f"    Downloading...")
-              dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url], capture_output=True)
-              if dl.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) < 10000:
-                  print(f"   ❌ Download failed")
-                  continue
+                  safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title[:60]) + ".mp4"
+                  path = f"/tmp/{safe}"
 
-              size = os.path.getsize(path)
-              print(f"    Downloaded: {size/1024/1024:.0f} MB")
+                  print(f"    Downloading...")
+                  dl = subprocess.run(["curl", "-L", "--retry", "3", "--max-time", "3600", "-o", path, url], capture_output=True)
+                  if dl.returncode != 0 or not os.path.exists(path) or os.path.getsize(path) < 10000:
+                      print(f"   ❌ Download failed")
+                      failures.append((vid, title, "download failed"))
+                      continue
 
-              # Upload
-              env = os.environ.copy()
-              env["GITHUB_OUTPUT"] = f"/tmp/tg_out_{i}.txt"
-              open(env["GITHUB_OUTPUT"], "w").close()
+                  size = os.path.getsize(path)
+                  print(f"    Downloaded: {size/1024/1024:.0f} MB")
 
-              up = subprocess.run(
-                  ["python3", "scripts/telegram/upload_to_telegram.py", path, title],
-                  env=env)
+                  # Upload
+                  env = os.environ.copy()
+                  env["GITHUB_OUTPUT"] = f"/tmp/tg_out_{i}.txt"
+                  open(env["GITHUB_OUTPUT"], "w").close()
 
-              # Read output, capture BOTH the t.me link AND the Telegram file_id.
-              # upload_to_telegram.py writes telegram_file_id= specifically so the
-              # Cloudflare Worker proxy can stream the file (see its "Save file_id
-              # for Cloudflare Worker proxy" comment).
-              tg_link = ""
-              tg_file_id = ""
-              try:
-                  for line in open(env["GITHUB_OUTPUT"]):
-                      if line.startswith("telegram_link="):
-                          tg_link = line.strip().split("=", 1)[1]
-                      elif line.startswith("telegram_file_id="):
-                          tg_file_id = line.strip().split("=", 1)[1]
-              except: pass
+                  up = subprocess.run(
+                      ["python3", "scripts/telegram/upload_to_telegram.py", path, title],
+                      env=env)
 
-              if tg_link:
-                  import urllib.parse
-                  for r in recs:
-                      if r.get("video_id") == vid:
-                          r["telegram_link"] = tg_link
-                          if tg_file_id:
-                              r["telegram_file_id"] = tg_file_id
-                          # CF Worker stream URL. The worker (worker.js) was hardened
-                          # to ONLY accept ?file_id=, ?url= and ?bot= were removed
-                          # (open-proxy / token-leak risk) and now return HTTP 400.
-                          # The dashboard's sanitizeCfStream() also strips ?url=/?bot=.
-                          # So the URL MUST be built from the Telegram file_id, NOT the
-                          # archive source. (Previously this used ?url=<src>, which
-                          # produced a dead STORM player source on every recording.)
-                          if tg_file_id:
-                              r["cf_stream"] = f"https://tg-stream.isthatdxture.workers.dev/?file_id={urllib.parse.quote(tg_file_id, safe='')}"
-                          break
-                  with open("data/recordings.json", "w") as f:
-                      json.dump(recs, f, indent=2)
-                  print(f"   ✅ Link: {tg_link}")
+                  # Read output, capture BOTH the t.me link AND the Telegram file_id.
+                  # upload_to_telegram.py writes telegram_file_id= specifically so the
+                  # Cloudflare Worker proxy can stream the file (see its "Save file_id
+                  # for Cloudflare Worker proxy" comment).
+                  tg_link = ""
+                  tg_file_id = ""
+                  try:
+                      for line in open(env["GITHUB_OUTPUT"]):
+                          if line.startswith("telegram_link="):
+                              tg_link = line.strip().split("=", 1)[1]
+                          elif line.startswith("telegram_file_id="):
+                              tg_file_id = line.strip().split("=", 1)[1]
+                  except: pass
 
-              try: os.remove(path)
-              except: pass
+                  if tg_link:
+                      import urllib.parse
+                      for r in recs:
+                          if r.get("video_id") == vid:
+                              r["telegram_link"] = tg_link
+                              if tg_file_id:
+                                  r["telegram_file_id"] = tg_file_id
+                              # CF Worker stream URL. The worker (worker.js) was hardened
+                              # to ONLY accept ?file_id=, ?url= and ?bot= were removed
+                              # (open-proxy / token-leak risk) and now return HTTP 400.
+                              # The dashboard's sanitizeCfStream() also strips ?url=/?bot=.
+                              # So the URL MUST be built from the Telegram file_id, NOT the
+                              # archive source. (Previously this used ?url=<src>, which
+                              # produced a dead STORM player source on every recording.)
+                              if tg_file_id:
+                                  r["cf_stream"] = f"https://tg-stream.isthatdxture.workers.dev/?file_id={urllib.parse.quote(tg_file_id, safe='')}"
+                              break
+                      with open("data/recordings.json", "w") as f:
+                          json.dump(recs, f, indent=2)
+                      print(f"   ✅ Link: {tg_link}")
+                  else:
+                      failures.append((vid, title, f"upload returned {up.returncode}"))
+                      print(f"   ❌ Upload failed (rc={up.returncode})")
+
+                  try: os.remove(path)
+                  except: pass
 
           print(f"\n{'='*60}\n✅ Done")
+
+          # Persist failure list for the alert step
+          if failures:
+              with open("/tmp/tg_failures.txt", "w") as f:
+                  for vid, title, reason in failures:
+                      f.write(f"{vid} | {title} | {reason}\n")
+              print(f"⚠️  {len(failures)} Telegram upload(s) failed after retries")
+              sys.exit(1)  # fail the step so the workflow can alert
           PYSCRIPT
 
       - name: Push
+        if: always()
         run: |
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder"
@@ -130,3 +151,30 @@ jobs:
             git commit -m "Telegram: uploaded all recordings"
             git push
           }
+
+      - name: Alert if any Telegram upload failed
+        if: always()
+        env:
+          DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          AVATAR_URL: ${{ secrets.AVATAR_URL }}
+        run: |
+          if [[ -f /tmp/tg_failures.txt ]]; then
+            FAILURES="$(cat /tmp/tg_failures.txt)"
+            echo "##  Telegram upload failures" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$FAILURES" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            MSG="⚠️ **Telegram mirror**: some recordings failed to upload to Telegram after 3 retry passes. These have no Telegram link and may be missing from the bot channel:\n\`\`\`\n$FAILURES\n\`\`\`"
+            WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+            if [[ -n "$WEBHOOK" ]]; then
+              curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
+                -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" '{content:$m, avatar_url:$a}')" \
+                >/dev/null 2>&1 || echo "discord send failed"
+            else
+              echo "no webhook; would alert: $MSG"
+            fi
+            exit 1
+          else
+            echo "All recordings uploaded to Telegram successfully"
+          fi

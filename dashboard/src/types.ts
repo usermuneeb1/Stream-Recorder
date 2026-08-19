@@ -76,6 +76,10 @@ export interface SystemStatus {
   ytViews: string;
   ytVideos: number;
   ok: boolean;
+  // mirror health (from data/mirror-health.json)
+  mirrorHealthy?: boolean;
+  mirrorTotal?: number;
+  mirrorDegraded?: number;
 }
 
 export interface StreamPrediction {

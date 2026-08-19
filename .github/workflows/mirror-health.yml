@@ -90,12 +90,31 @@ jobs:
             echo "no GH_PAT secret — repair not triggered, alert sent"
           fi
 
+      - name: "Merge mirror health into system-status.json"
+        run: |
+          if [[ -f data/system-status.json ]] && [[ -f data/mirror-health.json ]]; then
+            jq -s '
+              .[1].summary as $mh |
+              .[1].updated_at as $mh_ts |
+              .[0] + { mirror_health: {
+                healthy: ($mh.degraded == 0),
+                total:   ($mh.total // 0),
+                degraded: ($mh.degraded // 0),
+                dead_links: ($mh.dead_links // 0),
+                updated_at: ($mh_ts // "")
+              }}
+            ' data/system-status.json data/mirror-health.json > /tmp/ss.json && mv /tmp/ss.json data/system-status.json
+            echo "merged mirror_health into system-status.json"
+          else
+            echo "system-status.json or mirror-health.json missing, skipping merge"
+          fi
+
       - name: "Commit health data"
         if: always()
         run: |
           git config user.name "usermuneeb1"
           git config user.email "198427088+usermuneeb1@users.noreply.github.com"
-          git add data/mirror-health.json
+          git add data/mirror-health.json data/system-status.json
           git diff --cached --quiet || {
             git commit -m "mirror health snapshot, $(date -u '+%Y-%m-%d %H:%M UTC')"
             git push

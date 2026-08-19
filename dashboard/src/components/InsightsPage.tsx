@@ -179,9 +179,10 @@ export default function InsightsPage({ recs, status, prediction }: Props) {
           { n: `${totalHours >= 100 ? Math.round(totalHours) : Math.round(totalHours * 10) / 10}h`, l: 'total runtime' },
           { n: totalSize >= 1000 ? `${(totalSize / 1024).toFixed(1)}TB` : `${Math.round(totalSize * 10) / 10}GB`, l: 'in the vault' },
           { n: avgDur ? `${Math.round(avgDur * 10) / 10}h` : '—', l: 'average stream' },
+          { n: status?.mirrorHealthy ? '✓ healthy' : (status?.mirrorDegraded ? 'repairing' : '—'), l: 'mirror health', hl: !status?.mirrorHealthy },
         ].map(s => (
-          <div key={s.l} className="rounded-xl p-5" style={{ background: 'var(--ink-1)', border: '1px solid var(--line)' }}>
-            <div className="stat-num tabular-nums">{s.n}</div>
+          <div key={s.l} className={`rounded-xl p-5 ${s.hl ? '' : ''}`} style={{ background: 'var(--ink-1)', border: `1px solid ${s.hl ? 'var(--accent-warm, #FF6B35)' : 'var(--line)'}` }}>
+            <div className="stat-num tabular-nums" style={s.hl ? { color: 'var(--accent-warm, #FF6B35)' } : undefined}>{s.n}</div>
             <div className="stat-label">{s.l}</div>
           </div>
         ))}
