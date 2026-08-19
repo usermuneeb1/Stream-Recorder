@@ -392,7 +392,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
               {/* Player + ambient */}
               <div className={`relative ${theatre ? '' : 'md:px-0 px-0'}`}>
                 <div className={`ambient-bleed ${playing ? 'lit' : ''}`} style={{ backgroundImage: `url(${rec.thumbnail})` }} />
-                <div className="player-frame relative">
+                <div className={`player-frame relative ${active?.kind === 'youtube' ? 'src-youtube' : ''}`}>
                   <MediaPlayer
                     key={active?.url}
                     ref={player}

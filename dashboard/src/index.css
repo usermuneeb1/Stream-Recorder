@@ -905,6 +905,13 @@ media-player .vds-buffering-indicator { display: none !important; }
   animation: ring-spin 0.9s linear infinite;
 }
 
+/* YouTube embeds render their own native buffering/seek spinner, so for
+   YouTube sources we hide Vidstack's spinner and our custom seek veil —
+   leaving YouTube's single native spinner as the only loader (no two
+   overlapping circles when seeking). MP4 mirrors keep both. */
+.src-youtube .vds-buffering-indicator { display: none; }
+.src-youtube .seek-veil { display: none; }
+
 /* Seek beat — the blur smears the embed's native seek spinner invisible. */
 .seek-veil {
   position: absolute;
