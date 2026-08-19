@@ -266,15 +266,10 @@ export default function SystemPage({ recs, status, prediction, ytCount }: Props)
       <div className="rounded-xl p-6 flex flex-wrap items-center gap-4" style={{ background: 'var(--flame-04)', border: '1px solid var(--line-flame)' }}>
         <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: 'var(--flame-1)', boxShadow: '0 0 14px 3px var(--flame-glow)' }} />
         <p className="text-[12.5px] leading-relaxed flex-1 min-w-[240px]" style={{ color: 'var(--mist)' }}>
-          <span style={{ color: 'var(--ivory)' }}>Autonomous by design.</span> Forty-one GitHub workflows
-          run the detection, capture, mirroring and publishing without anyone watching. This website is
-          the glass wall in front of the machine — every number above is read live from its output.
+          <span style={{ color: 'var(--ivory)' }}>Autonomous by design.</span> The archive records, mirrors
+          and publishes every broadcast without anyone watching. This page is the live status
+          read straight from the archive's own records.
         </p>
-        <a href="https://github.com/usermuneeb1/Stream-Recorder" target="_blank" rel="noopener noreferrer"
-          className="btn btn-ghost !py-2.5 !px-5 !text-[12px]">
-          View the machinery
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
-        </a>
         <a href="#/stats" className="btn btn-ghost !py-2.5 !px-5 !text-[12px]">
           See the numbers
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>

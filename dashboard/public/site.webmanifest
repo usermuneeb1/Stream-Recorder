@@ -10,8 +10,8 @@
   "theme_color": "#e50914",
   "categories": ["education", "lifestyle"],
   "icons": [
-    { "src": "/logo-vertical.pn.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any" },
-    { "src": "/logo.png",             "sizes": "512x512", "type": "image/png",  "purpose": "any maskable" }
+    { "src": "/logo-vertical.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any" },
+    { "src": "/logo.png",           "sizes": "512x512", "type": "image/png",  "purpose": "any" }
   ],
   "shortcuts": [
     { "name": "Newest stream", "short_name": "Latest", "url": "/?sort=newest" }

@@ -18,7 +18,6 @@ export default function Footer({ recs, status }: Props) {
     { label: 'RSS feed', href: '/feed.xml', ext: false },
     { label: 'Podcast', href: '/podcast.xml', ext: false },
     { label: 'Archive insights', href: '#/stats', ext: false },
-    { label: 'Recording engine', href: 'https://github.com/usermuneeb1/Stream-Recorder', ext: true },
   ];
 
   return (
@@ -63,19 +62,19 @@ export default function Footer({ recs, status }: Props) {
             </ul>
           </nav>
 
-          {/* The machine */}
+          {/* The archive */}
           <div>
-            <div className="eyebrow mb-4">The machine</div>
+            <div className="eyebrow mb-4">The archive</div>
             <p className="text-[13px] leading-relaxed" style={{ color: 'var(--mist)' }}>
-              An autonomous recorder watches the channel around the clock. When a stream
-              goes live it captures 1080p through a ten-method cascade and fans the file
-              out to five clouds — no server, no bill.
+              Every live broadcast is captured the moment it airs and preserved
+              in full 1080p across multiple independent archives — so no single
+              host can ever take it down.
             </p>
             <div className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 rounded-full"
               style={{ background: 'var(--jade-dim)', border: '1px solid rgba(59,169,124,.3)' }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--jade)', boxShadow: '0 0 8px rgba(59,169,124,.8)' }} />
               <span className="mono text-[10px] tracking-[0.14em] uppercase" style={{ color: 'var(--jade)' }}>
-                Autonomous · Zero-cost infra
+                Preserved · Permanent
               </span>
             </div>
           </div>

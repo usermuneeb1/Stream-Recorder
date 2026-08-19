@@ -5,7 +5,7 @@
   "feed_url": "https://muslim-lantern-archive.vercel.app/feed.json",
   "description": "Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.",
   "icon": "https://muslim-lantern-archive.vercel.app/logo.png",
-  "favicon": "https://muslim-lantern-archive.vercel.app/logo-vertical.pn.jpg",
+  "favicon": "https://muslim-lantern-archive.vercel.app/logo-vertical.jpg",
   "authors": [
     {
       "name": "Muneeb Ahmad"
