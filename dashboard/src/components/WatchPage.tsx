@@ -671,7 +671,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                   </div>
                 )}
 
-                <ChatReplay videoId={rec.videoId} time={time} playing={playing} />
+                <ChatReplay videoId={rec.videoId} time={time} playing={playing} onSeek={seekTo} />
 
                 <div className="mono text-[10px] text-center py-8" style={{ color: 'var(--shade)' }}>
                   Lantern Archive · recorded autonomously · crafted with <span className="text-flame">♥</span> by Muneeb Ahmad
