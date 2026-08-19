@@ -1,6 +1,4 @@
 {
-  "_comment": "Guest segments per recording, keyed by YouTube video id. Each guest has a name and a join/leave time in seconds from stream start. The watch page shows the guest's name on-screen while they are speaking (join..leave) and adds a chapter mark. Only GUESTS are listed — never the host.",
-  "eIn7iwVa8fg": [
-    { "name": "Example Guest", "join": 60, "leave": 540 }
-  ]
+  "_comment": "Guest segments per recording, keyed by YouTube video id. Each guest has a name and a join/leave time in seconds from stream start. The watch page shows the guest's name on-screen while they are speaking (join..leave) and adds a chapter mark. Only GUESTS are listed — never the host. Add entries with scripts/guests/add-guest.sh.",
+  "eIn7iwVa8fg": []
 }
