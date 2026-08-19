@@ -11,8 +11,8 @@ name: "Pinger watchdog"
 
 on:
   schedule:
-    # Every 30 minutes, offset so it never collides with the pinger cadence
-    - cron: "23 */1 * * *"
+    # Every 30 minutes (two slots per hour, offset to clear the pinger cadence)
+    - cron: "23,53 * * * *"
   workflow_dispatch:
     inputs:
       quiet_minutes:
@@ -51,41 +51,50 @@ jobs:
         env:
           QUIET_MINUTES: ${{ inputs.quiet_minutes || '20' }}
         run: |
-          # The last run of the main recorder that was triggered by a
-          # repository_dispatch event (i.e. by the external pinger).
-          latest=$(curl -fsS \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/runs?event=repository_dispatch&per_page=1" \
-            | jq -r '.workflow_runs[0].created_at // empty' 2>/dev/null || true)
+          # The last run of EACH watcher workflow that was triggered by a
+          # repository_dispatch event (i.e. by the external pinger). The sniper
+          # is watched separately because it is the path that is known to be
+          # under-covered (0 dispatch runs historically).
+          check_workflow() {
+            local wf="$1"
+            local latest
+            latest=$(curl -fsS \
+              -H "Authorization: Bearer ${{ github.token }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${wf}/runs?event=repository_dispatch&per_page=1" \
+              | jq -r '.workflow_runs[0].created_at // empty' 2>/dev/null || true)
+            if [[ -z "$latest" ]]; then
+              echo "${wf}:no-run"
+              return
+            fi
+            local now_epoch latest_epoch age_min
+            now_epoch=$(date +%s)
+            latest_epoch=$(date -d "$latest" +%s 2>/dev/null || echo 0)
+            age_min=$(( (now_epoch - latest_epoch) / 60 ))
+            echo "${wf}:${age_min}"
+          }
 
-          if [[ -z "$latest" ]]; then
-            echo "no dispatch-triggered run ever found"
-            echo "alert=no-run" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          now_epoch=$(date +%s)
-          latest_epoch=$(date -d "$latest" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$latest" +%s 2>/dev/null || echo 0)
-          age_min=$(( (now_epoch - latest_epoch) / 60 ))
-          echo "latest dispatch run: $latest (${age_min} min ago)"
-          echo "age_min=${age_min}" >> "$GITHUB_OUTPUT"
-          echo "quiet_min=${QUIET_MINUTES}" >> "$GITHUB_OUTPUT"
-          if (( age_min > QUIET_MINUTES )); then
-            echo "alert=silent" >> "$GITHUB_OUTPUT"
-          else
-            echo "alert=ok" >> "$GITHUB_OUTPUT"
-          fi
+          ALERT=""
+          for wf in stream-recorder.yml stream-sniper.yml; do
+            RESULT=$(check_workflow "$wf")
+            AGE="${RESULT#*:}"
+            echo "latest_${wf%.yml}=${AGE}" >> "$GITHUB_OUTPUT"
+            if [[ "$AGE" == "no-run" ]]; then
+              ALERT="${ALERT}${wf} has NEVER been triggered by repository_dispatch.\n"
+            elif (( AGE > QUIET_MINUTES )); then
+              ALERT="${ALERT}${wf} has no dispatch run in ${AGE} min.\n"
+            fi
+          done
+          echo "alert=$([ -z "$ALERT" ] && echo ok || echo silent)" >> "$GITHUB_OUTPUT"
+          printf '%s' "$ALERT" > /tmp/watchdog-alert.txt
 
       - name: "Alert if the pinger is silent"
         if: steps.check.outputs.alert != 'ok'
         run: |
-          if [[ "${{ steps.check.outputs.alert }}" == "no-run" ]]; then
-            MSG="🚨 **Pinger watchdog**: the main recorder has NEVER been triggered by repository_dispatch. If cron-job.org was never set up, the recorder only runs on GitHub's throttled cron. Check the pinger config."
-          else
-            MSG="🚨 **Pinger watchdog**: no repository_dispatch run in ${{ steps.check.outputs.age_min }} minutes (quiet threshold ${{ steps.check.outputs.quiet_min }}m). The external pinger may be down. If a stream goes live now, it could be missed. Check cron-job.org."
-          fi
-
+          ALERT="$(cat /tmp/watchdog-alert.txt)"
+          MSG="🚨 **Pinger watchdog**:\n$ALERT"
+          MSG="${MSG}If a stream goes live now, it could be missed. Check cron-job.org / the pinger config."
+          echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
           WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
           if [[ -n "$WEBHOOK" ]]; then
             curl -fsS -X POST "$WEBHOOK" \
@@ -98,4 +107,5 @@ jobs:
 
       - name: "Recovered"
         if: steps.check.outputs.alert == 'ok'
-        run: echo "Pinger heartbeat OK (last dispatch run ${{ steps.check.outputs.age_min }}m ago)"
+        run: |
+          echo "Pinger heartbeat OK — recorder last dispatch run ${{ steps.check.outputs.latest_stream-recorder }}m ago, sniper ${{ steps.check.outputs.latest_stream-sniper }}m ago"

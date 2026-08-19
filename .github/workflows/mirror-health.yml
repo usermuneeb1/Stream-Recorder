@@ -42,6 +42,15 @@ jobs:
 
       - name: "Run mirror health check"
         id: health
+        # The script exits non-zero when degraded; that must NOT kill the job,
+        # or the alert/repair/merge steps below would be skipped exactly when
+        # they are needed. continue-on-error keeps the job alive; the result
+        # step reads the JSON the script wrote before exiting.
+        continue-on-error: true
+        env:
+          # lets the script verify Gofile folders via the folder API (same key
+          # the uploader uses); absent, Gofile is reported unverifiable
+          GOFILE_API_KEY: ${{ secrets.GOFILE_API_KEY }}
         run: |
           bash scripts/mirror-health.sh
         # script exits non-zero when degraded; we capture that via the summary output
@@ -91,6 +100,7 @@ jobs:
           fi
 
       - name: "Merge mirror health into system-status.json"
+        if: always()   # keep system-status fresh even on degraded runs
         run: |
           if [[ -f data/system-status.json ]] && [[ -f data/mirror-health.json ]]; then
             jq -s '

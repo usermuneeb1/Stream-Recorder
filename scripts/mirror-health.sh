@@ -32,12 +32,50 @@ check_url() {
 }
 
 # ── classify a mirror URL ───────────────────────────────────────────────────
+# Archive.org and Pixeldrain can be verified over HTTP: 200 = alive.
 classify() {
     local url="$1"
     local rc
     check_url "$url"; rc=$?
     case "$rc" in
         0) printf 'alive' ;;
+        1) printf 'dead' ;;
+        2) printf 'unverifiable' ;;
+    esac
+}
+
+# Gofile: the /d/<code> page returns 200 even for a deleted/expired folder, so
+# the page can't prove existence. The folder API needs the account key the
+# uploader uses (GOFILE_API_KEY); without it the folder cannot be verified and
+# we say "unverifiable" rather than claiming "alive". Returns alive/dead/unverifiable.
+classify_gofile() {
+    local url="$1" code status
+    code=$(echo "$url" | sed -n 's#.*/d/\([^/?#]*\).*#\1#p')
+    if [[ -z "$code" ]]; then
+        printf 'unverifiable'; return
+    fi
+    if [[ -z "${GOFILE_API_KEY:-}" ]]; then
+        printf 'unverifiable'; return
+    fi
+    status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
+        -H "Authorization: Bearer ${GOFILE_API_KEY}" \
+        "https://api.gofile.io/contents/${code}" 2>/dev/null \
+        | jq -r '.status // "error"' 2>/dev/null || echo error)
+    case "$status" in
+        ok) printf 'alive' ;;
+        *) printf 'dead' ;;
+    esac
+}
+
+# MEGA: links are mega.nz/#!<key> — the fragment never reaches the server, so
+# the landing page returns 200 whether or not the file exists. Existence cannot
+# be confirmed over plain HTTP, so a reachable page is "unverifiable", never
+# "alive". (A truly missing page still counts as dead.)
+classify_mega() {
+    local url="$1" rc
+    check_url "$url"; rc=$?
+    case "$rc" in
+        0) printf 'unverifiable' ;;
         1) printf 'dead' ;;
         2) printf 'unverifiable' ;;
     esac
@@ -59,12 +97,15 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     a="null"; g="null"; p="null"; m="null"
     alive=0; dead=0; unverifiable=0
     if [[ -n "$archive" ]]; then a=$(classify "$archive"); case "$a" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
-    if [[ -n "$gofile" ]]; then g=$(classify "$gofile"); case "$g" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
+    if [[ -n "$gofile" ]]; then g=$(classify_gofile "$gofile"); case "$g" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
     if [[ -n "$pixel" ]]; then p=$(classify "$pixel"); case "$p" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
-    if [[ -n "$mega" ]]; then m=$(classify "$mega"); case "$m" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
+    if [[ -n "$mega" ]]; then m=$(classify_mega "$mega"); case "$m" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
 
     healthy="true"
     (( alive >= MIN_COPIES )) || healthy="false"
+
+    # serialise each mirror as a real JSON string, or null when no link exists
+    jv() { [[ -n "$1" ]] && printf '"%s"' "$2" || printf 'null'; }
 
     jq -cn \
         --arg id "$vid" \
@@ -73,10 +114,10 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
         --argjson dead "$dead" \
         --argjson unverifiable "$unverifiable" \
         --argjson healthy "$healthy" \
-        --arg archive "$a" \
-        --arg gofile "$g" \
-        --arg pixeldrain "$p" \
-        --arg mega "$m" \
+        --argjson archive "$(jv "$archive" "$a")" \
+        --argjson gofile "$(jv "$gofile" "$g")" \
+        --argjson pixeldrain "$(jv "$pixel" "$p")" \
+        --argjson mega "$(jv "$mega" "$m")" \
         '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega}}'
 done > "$TMP_JSON"
 

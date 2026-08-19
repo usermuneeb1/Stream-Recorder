@@ -28,7 +28,7 @@ env:
   DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
-  DASHBOARD_URL: ${{ vars.DASHBOARD_URL || 'https://usermuneeb1.github.io/Stream-Recorder/' }}
+  DASHBOARD_URL: ${{ vars.DASHBOARD_URL || 'https://muslim-lantern-archive.vercel.app/' }}
 
 jobs:
   watch:

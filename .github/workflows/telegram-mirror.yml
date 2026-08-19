@@ -82,7 +82,9 @@ jobs:
 
                   # Upload
                   env = os.environ.copy()
-                  env["GITHUB_OUTPUT"] = f"/tmp/tg_out_{i}.txt"
+                  # unique per video so retry passes never clobber each other's
+                  # output file between the upload writing it and us reading it
+                  env["GITHUB_OUTPUT"] = f"/tmp/tg_out_{vid}.txt"
                   open(env["GITHUB_OUTPUT"], "w").close()
 
                   up = subprocess.run(
@@ -132,12 +134,19 @@ jobs:
 
           print(f"\n{'='*60}\n✅ Done")
 
-          # Persist failure list for the alert step
+          # Persist failure list for the alert step (deduped by video_id — the
+          # same video can fail on multiple retry passes)
           if failures:
+              seen = set()
+              uniq = []
+              for vid, title, reason in failures:
+                  if vid not in seen:
+                      seen.add(vid)
+                      uniq.append((vid, title, reason))
               with open("/tmp/tg_failures.txt", "w") as f:
-                  for vid, title, reason in failures:
+                  for vid, title, reason in uniq:
                       f.write(f"{vid} | {title} | {reason}\n")
-              print(f"⚠️  {len(failures)} Telegram upload(s) failed after retries")
+              print(f"⚠️  {len(uniq)} Telegram upload(s) failed after retries")
               sys.exit(1)  # fail the step so the workflow can alert
           PYSCRIPT
 

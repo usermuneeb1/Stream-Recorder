@@ -52,13 +52,16 @@ else
 fi
 
 # ── 2. stats.json ↔ recordings.json consistency ───────────────────────────────
+# recordings.json is the list of RECORDED streams. If the channel feed ever
+# adds non-recorded entries (fromYouTube/isShort), they are not "streams" and
+# must not count against stats.json's total_streams — filter them here.
 if [[ -f stats.json ]] && [[ -f data/recordings.json ]]; then
     STATS_N=$(jq -r '.total_streams // -1' stats.json 2>/dev/null)
-    RECS_N=$(jq 'length' data/recordings.json 2>/dev/null || echo 0)
+    RECS_N=$(jq '[.[] | select((.fromYouTube // false) != true and (.isShort // false) != true)] | length' data/recordings.json 2>/dev/null || echo 0)
     if [[ "$STATS_N" != "-1" && "$STATS_N" != "$RECS_N" ]]; then
-        fail "stats.json total_streams=$STATS_N != recordings.json count=$RECS_N"
+        fail "stats.json total_streams=$STATS_N != recordings.json recorded count=$RECS_N"
     else
-        ok "stats.json and recordings.json agree ($RECS_N)"
+        ok "stats.json and recordings.json agree ($RECS_N recorded streams)"
     fi
 else
     fail "stats.json or recordings.json missing for consistency check"
