@@ -52,6 +52,16 @@ export default defineConfig({
     // Sandboxed preview hosts vary per session — allow any host so the
     // live preview (and local LAN access) works out of the box.
     allowedHosts: true,
+    // In production, Vercel serverless functions power /api/* (storyboard
+    // VTT proxy, live YouTube endpoints, etc.). In dev there is no Vercel,
+    // so proxy those routes to the deployed instance — this makes the
+    // storyboard hover-preview thumbnails and live feeds work locally too.
+    proxy: {
+      '/api': {
+        target: 'https://muslim-lantern-archive.vercel.app',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',
