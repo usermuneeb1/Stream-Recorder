@@ -64,6 +64,11 @@ function buildMirrors(rec: Ep): Mirror[] {
   if (rec.archiveNode) out.push({ label: 'R3AL', note: 'Archive.org node', url: rec.archiveNode, kind: 'mp4' });
   const gh = rec.githubDirect || rec.githubRelease;
   if (gh) out.push({ label: 'B3ING', note: 'GitHub release', url: gh, kind: 'mp4' });
+  // Pixeldrain direct stream — derivable from the u/<id> page link; a real
+  // CDN playback source (present for every recording) that never depends on
+  // the guessed archive filename or the Telegram worker.
+  const pd = rec.pixeldrainLink?.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/);
+  if (pd) out.push({ label: 'N3ON', note: 'Pixeldrain CDN', url: `https://pixeldrain.com/api/file/${pd[1]}`, kind: 'mp4' });
   if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4' });
   if (rec.archiveDirect && rec.archiveDirect !== rec.archiveNode) {
     out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4' });
@@ -427,6 +432,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                     onPause={() => { setPlaying(false); setSeekVeil(false); }}
                     onSeeking={() => setSeekVeil(true)}
                     onSeeked={() => { setTimeout(() => setSeekVeil(false), 220); }}
+                    onWaiting={() => { setTimeout(() => setSeekVeil(false), 2500); }}
                     onError={onPlayerError}
                     onEnded={() => { setPlaying(false); clearPosition(rec.videoId); if (next) setCountdown(12); }}
                     onTimeUpdate={(d: any) => {
