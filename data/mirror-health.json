@@ -1,179 +1,215 @@
 {
-  "updated_at": "2026-08-21T13:11:55Z",
+  "updated_at": "2026-08-21T18:59:15Z",
   "summary": {
     "total": 12,
-    "healthy": 10,
-    "degraded": 2,
+    "healthy": 12,
+    "degraded": 0,
     "dead_links": 0,
-    "unverifiable_links": 26
+    "unverifiable_links": 16
   },
   "recordings": [
     {
       "video_id": "y84vFOO8onU",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-15",
-      "alive": 2,
+      "alive": 3,
       "dead": 0,
       "unverifiable": 2,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "ASWJmIsyd9s",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "lZwdaI5i9MA",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "6AlPqgkHC-Q",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-10",
-      "alive": 2,
+      "alive": 3,
       "dead": 0,
       "unverifiable": 2,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "iWMtQ-tA6EA",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-07-30",
-      "alive": 1,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 3,
-      "healthy": false,
+      "unverifiable": 1,
+      "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
-        "archive": "unverifiable",
+        "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "X05zRHM4kVs",
       "title": "Forced Recording 2026-07-27",
-      "alive": 1,
+      "alive": 3,
       "dead": 0,
-      "unverifiable": 3,
-      "healthy": false,
+      "unverifiable": 2,
+      "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "PYkqrEBc_zY",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "vSKAJZkhuq4",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "lQySsXx00Io",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 2,
+      "alive": 3,
       "dead": 0,
       "unverifiable": 2,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "LT7jTHW_e8Y",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "84lG-ZjxCGI",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     },
     {
       "video_id": "1-Rb7AkebH4",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 2,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 1,
       "healthy": true,
+      "permanent_ok": true,
+      "fast_ok": true,
       "mirrors": {
         "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
-        "mega": "unverifiable"
+        "mega": "alive",
+        "github": "alive"
       }
     }
   ]
