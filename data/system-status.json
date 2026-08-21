@@ -11,5 +11,12 @@
     "subscribers": "633K",
     "views": "183M",
     "videos": 651
+  },
+  "mirror_health": {
+    "healthy": false,
+    "total": 12,
+    "degraded": 2,
+    "dead_links": 0,
+    "updated_at": "2026-08-21T13:11:55Z"
   }
 }
