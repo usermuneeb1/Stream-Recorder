@@ -107,10 +107,21 @@ jobs:
           
           echo "✅ Stats updated!"
 
+      - name: Refresh full channel video list (public/yt-all.json)
+        # Keeps the Channel page's bundled snapshot fresh for GitHub Pages
+        # (which has no serverless functions). Vercel users get the live
+        # /api/ytall scrape; this is the self-updating fallback for everyone else.
+        # Script resolves public/ relative to its CWD — must run in dashboard/.
+        working-directory: dashboard
+        run: |
+          node scripts/scrape-yt-full.mjs \
+            && echo "videos: $(jq '.total' public/yt-all.json)" \
+            || echo "⚠️ scrape failed, keeping previous snapshot"
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/youtube-stats.json
-          git diff --staged --quiet || git commit -m "Auto-update YouTube stats [skip ci]"
+          git add data/youtube-stats.json public/yt-all.json
+          git diff --staged --quiet || git commit -m "Auto-update YouTube stats + channel list [skip ci]"
           git push

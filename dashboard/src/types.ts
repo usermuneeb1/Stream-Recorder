@@ -103,10 +103,11 @@ export interface StreamPrediction {
 export type Route =
   | { kind: 'home' }
   | { kind: 'browse' }
+  | { kind: 'channel' }
   | { kind: 'shorts' }
-  | { kind: 'system' }
   | { kind: 'stats' }
   | { kind: 'mylist' }
+  | { kind: 'system' }
   | { kind: 'watch'; rec: Ep }
   | { kind: 'watch-pending'; id: string }
   | { kind: 'notfound' };

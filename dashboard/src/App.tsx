@@ -16,6 +16,7 @@ import Hero from './components/Hero';
 import Shelf from './components/Shelf';
 import ContinueShelf from './components/ContinueShelf';
 import BrowsePage from './components/BrowsePage';
+import ChannelPage from './components/ChannelPage';
 import WatchPage from './components/WatchPage';
 import ShortsPage from './components/ShortsPage';
 import SystemPage from './components/SystemPage';
@@ -37,6 +38,7 @@ function parseHash(all: Ep[]): Route {
     return rec ? { kind: 'watch', rec } : all.length ? { kind: 'notfound' } : { kind: 'watch-pending', id };
   }
   if (h.startsWith('#/browse')) return { kind: 'browse' };
+  if (h.startsWith('#/channel')) return { kind: 'channel' };
   if (h.startsWith('#/shorts')) return { kind: 'shorts' };
   if (h.startsWith('#/system')) return { kind: 'system' };
   if (h.startsWith('#/stats')) return { kind: 'stats' };
@@ -276,6 +278,17 @@ export default function App() {
               title="The Archive"
               subtitle="Every preserved recording — filter by month and quality, or search by title and date."
               recs={recs}
+              listedIds={listedIds}
+              onOpen={open}
+              onDetails={setDetails}
+              onToggleList={toggleList}
+            />
+            <Footer recs={recs} status={status} />
+          </div>
+        ) : route.kind === 'channel' ? (
+          <div className="page-enter" key="channel">
+            <ChannelPage
+              videos={ytLong}
               listedIds={listedIds}
               onOpen={open}
               onDetails={setDetails}

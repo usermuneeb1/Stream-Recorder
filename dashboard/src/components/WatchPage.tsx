@@ -23,6 +23,7 @@ import type { Ep, Guest } from '../types';
 import { fetchGuests } from '../lib/fetcher';
 import Comments from './Comments';
 import { nextUp as pickNext } from '../lib/enrich';
+import { track } from '../lib/analytics';
 import { copyText, fmtDate, fmtTime, isHD, resShort, shareLinks } from '../lib/format';
 import {
   clearPosition, getRate, getTheatre, loadPosition,
@@ -122,6 +123,16 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const player = useRef<MediaPlayerInstance | null>(null);
   const next = pickNext(recs, rec.videoId);
 
+  /* ── QoE instrumentation (streaming-engineer metrics) ──────────────
+     TTFF = mount→first frame (the churn-at-the-door number), rebuffer =
+     accumulated stall time while lit, failures = every source errored.
+     Shipped as privacy-friendly Plausible custom events. */
+  const qoeT0 = useRef(0);
+  const qoeTtffSent = useRef(false);
+  const qoeStallMs = useRef(0);
+  const qoeWaitStart = useRef(0);
+
+
   const sorted = useMemo(() => [...recs].sort((a, b) => b.date.localeCompare(a.date)), [recs]);
   const idxInSorted = sorted.findIndex(r => r.videoId === rec.videoId);
   const newer = idxInSorted > 0 ? sorted[idxInSorted - 1] : undefined;
@@ -134,6 +145,21 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     return firstGood === -1 ? 0 : firstGood;
   }, [srcIdx, failed, mirrors]);
   const active = mirrors[activeIdx];
+
+  /* -- QoE instrumentation (streaming-engineer metrics) --------------
+     TTFF = source-set?first frame (the churn-at-the-door number),
+     rebuffer = accumulated stall time while lit. Plausible events. */
+  useEffect(() => {
+    qoeT0.current = performance.now();
+    qoeTtffSent.current = false;
+  }, [active?.url]);
+
+  useEffect(() => () => {
+    if (qoeStallMs.current > 0) {
+      track('qoe_rebuffer', { stall_ms: Math.round(qoeStallMs.current) });
+      qoeStallMs.current = 0;
+    }
+  }, [rec.videoId]);
 
   const chapterVtt = useMemo(() => {
     if (!rec.chapters || rec.chapters.length < 2) return '';
@@ -274,6 +300,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
         setLitOnce(false); setElapsed(0);
       } else {
         toast('All mirrors failed — try a download instead');
+        track('qoe_fail', { video: rec.videoId });
       }
       return n;
     });
@@ -317,6 +344,11 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
 
   const onPlaying = useCallback(async () => {
     setPlaying(true); setLitOnce(true); setSeekVeil(false);
+    if (!qoeTtffSent.current && qoeT0.current) {
+      qoeTtffSent.current = true;
+      track('qoe_ttff', { ms: Math.round(performance.now() - qoeT0.current), mirror: active?.label ?? '' });
+    }
+    if (qoeWaitStart.current) { qoeStallMs.current += performance.now() - qoeWaitStart.current; qoeWaitStart.current = 0; }
     // If the listener unmuted through the player's own controls, follow suit.
     const p = player.current;
     if (p && !p.muted) setSoundOff(false);
@@ -454,7 +486,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                     onPause={() => { setPlaying(false); setSeekVeil(false); }}
                     onSeeking={() => setSeekVeil(true)}
                     onSeeked={() => { setTimeout(() => setSeekVeil(false), 220); }}
-                    onWaiting={() => { setTimeout(() => setSeekVeil(false), 2500); }}
+                    onWaiting={() => { if (litOnce) qoeWaitStart.current = performance.now(); setTimeout(() => setSeekVeil(false), 2500); }}
                     onError={onPlayerError}
                     onEnded={() => { setPlaying(false); clearPosition(rec.videoId); if (next) setCountdown(12); }}
                     onTimeUpdate={(d: any) => {
