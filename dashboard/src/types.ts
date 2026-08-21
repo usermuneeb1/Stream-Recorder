@@ -73,6 +73,10 @@ export interface Ep extends Recording {
   isShort?: boolean;      // vertical short from the channel's shorts playlist
   viewCount?: number;     // YouTube views (feed videos)
   topics?: string[];      // free-form tags (series / subject / format)
+  deadMirrors?: string[]; // mirror types flagged dead by the latest health sweep
+                          // ('archive'|'gofile'|'pixeldrain'|'mega'|'github') — the
+                          // repair workflow replaces them automatically; the UI
+                          // demotes/labels them until fresh links land.
 }
 
 export interface SystemStatus {

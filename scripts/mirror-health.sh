@@ -12,7 +12,6 @@ source "$SCRIPT_DIR/utils.sh"
 
 RECORDINGS_JSON="${RECORDINGS_JSON:-data/recordings.json}"
 OUT_JSON="${MIRROR_HEALTH_JSON:-data/mirror-health.json}"
-MIN_COPIES="${MIN_MIRROR_COPIES:-2}"          # minimum alive mirrors per recording
 CHECK_TIMEOUT="${MIRROR_CHECK_TIMEOUT:-12}"    # seconds per URL
 
 # ── URL liveness check ──────────────────────────────────────────────────────
@@ -45,46 +44,82 @@ classify() {
 }
 
 # Gofile: the /d/<code> page returns 200 even for a deleted/expired folder, so
-# the page can't prove existence. The folder API needs the account key the
-# uploader uses (GOFILE_API_KEY); without it the folder cannot be verified and
-# we say "unverifiable" rather than claiming "alive". Returns alive/dead/unverifiable.
+# the page can't prove existence. Preferred: Contents API with the account key
+# (GOFILE_API_KEY). Fallback: the SAME API with the public website token (wt)
+# from gofile.io/js/wt.obf.js — but that file is obfuscated and the token
+# rotates, so a hardcoded wt usually returns "error-token" → unverifiable.
+# That is ACCEPTABLE by policy: gofile is disposable; it can satisfy the fast
+# side of the bar only when actually verifiable. Pixeldrain + GitHub releases
+# carry the fast side otherwise.
 classify_gofile() {
     local url="$1" code status
     code=$(echo "$url" | sed -n 's#.*/d/\([^/?#]*\).*#\1#p')
     if [[ -z "$code" ]]; then
         printf 'unverifiable'; return
     fi
-    if [[ -z "${GOFILE_API_KEY:-}" ]]; then
-        printf 'unverifiable'; return
+    if [[ -n "${GOFILE_API_KEY:-}" ]]; then
+        status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
+            -H "Authorization: Bearer ${GOFILE_API_KEY}" \
+            "https://api.gofile.io/contents/${code}" 2>/dev/null \
+            | jq -r '.status // "error"' 2>/dev/null || echo error)
+    else
+        # Public website token — same one the uploader uses for folder reads.
+        status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
+            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null \
+            | jq -r '.status // "error"' 2>/dev/null || echo error)
     fi
-    status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
-        -H "Authorization: Bearer ${GOFILE_API_KEY}" \
-        "https://api.gofile.io/contents/${code}" 2>/dev/null \
-        | jq -r '.status // "error"' 2>/dev/null || echo error)
     case "$status" in
         ok) printf 'alive' ;;
-        *) printf 'dead' ;;
+        notFound|notfound) printf 'dead' ;;
+        *) printf 'unverifiable' ;;
     esac
 }
 
-# MEGA: links are mega.nz/#!<key> — the fragment never reaches the server, so
-# the landing page returns 200 whether or not the file exists. Existence cannot
-# be confirmed over plain HTTP, so a reachable page is "unverifiable", never
-# "alive". (A truly missing page still counts as dead.)
+# MEGA: the HTML page returns 200 whether or not the file exists (key is in
+# the fragment, never sent to the server). But MEGA's public API CAN prove
+# existence without any login: a={"a":"g","p":<handle>} returns size info for
+# a live file and a negative error code for a dead one. No decryption, no
+# account. This replaces the old always-"unverifiable" classifier.
 classify_mega() {
-    local url="$1" rc
-    check_url "$url"; rc=$?
-    case "$rc" in
-        0) printf 'unverifiable' ;;
-        1) printf 'dead' ;;
-        2) printf 'unverifiable' ;;
+    local url="$1" handle resp
+    # NOTE: '|' delimiter — '#' appears literally in mega URLs (#! and /file/x#)
+    handle=$(echo "$url" | sed -n 's|.*mega\.nz/#!\([^!]*\)!.*|\1|p')
+    [[ -z "$handle" ]] && handle=$(echo "$url" | sed -n 's|.*/file/\([^#/]*\)[#/].*|\1|p')
+    [[ -z "$handle" ]] && handle=$(echo "$url" | sed -n 's|.*/file/\([^/?#]*\).*|\1|p')
+    if [[ -z "$handle" ]]; then
+        printf 'unverifiable'; return
+    fi
+    resp=$(curl -sS --max-time "$CHECK_TIMEOUT" \
+        "https://g.api.mega.co.nz/cs?id=0" \
+        -d "[{\"a\":\"g\",\"p\":\"${handle}\"}]" 2>/dev/null || true)
+    # Fallback endpoint (some networks/DNS only resolve one of the two)
+    if [[ -z "$resp" ]]; then
+        resp=$(curl -sS --max-time "$CHECK_TIMEOUT" \
+            "https://api.mega.co.nz/cs?id=0" \
+            -d "[{\"a\":\"g\",\"p\":\"${handle}\"}]" 2>/dev/null || echo "")
+    fi
+    case "$resp" in
+        *'"s"'*) printf 'alive' ;;
+        *'-'[0-9]*) printf 'dead' ;;     # negative error code = ENOENT etc.
+        *) printf 'unverifiable' ;;
     esac
+}
+
+# GitHub release asset: plain HTTP works — 302→200 via the Azure CDN when the
+# asset exists, 404 when deleted. Counts toward the FAST side of the bar.
+classify_gh() {
+    local url="$1"
+    classify "$url"
 }
 
 log_header "MIRROR HEALTH CHECK"
 log_info "Checking $(jq length "$RECORDINGS_JSON" 2>/dev/null || echo '?') recordings from $RECORDINGS_JSON"
 
 # ── build health JSON ───────────────────────────────────────────────────────
+# COPY GUARANTEE (the settled bar):
+#   every recording needs ≥1 PERMANENT mirror alive (Archive.org or MEGA)
+#   AND ≥1 FAST mirror alive (Pixeldrain, Gofile, GitHub release).
+# Gofile is disposable by policy — it can satisfy "fast" but nothing else.
 TMP_JSON="$(mktemp)"
 jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     vid=$(echo "$rec" | jq -r '.video_id')
@@ -93,16 +128,33 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     gofile=$(echo "$rec" | jq -r '.gofile_link // empty')
     pixel=$(echo "$rec" | jq -r '.pixeldrain_link // empty')
     mega=$(echo "$rec" | jq -r '.mega_link // empty')
+    ghrel=$(echo "$rec" | jq -r '.github_release // .github_direct // empty')
 
-    a="null"; g="null"; p="null"; m="null"
+    a="null"; g="null"; p="null"; m="null"; gh="null"
+    if [[ -n "$archive" ]]; then a=$(classify "$archive"); fi
+    if [[ -n "$gofile" ]]; then g=$(classify_gofile "$gofile"); fi
+    if [[ -n "$pixel" ]]; then p=$(classify "$pixel"); fi
+    if [[ -n "$mega" ]]; then m=$(classify_mega "$mega"); fi
+    if [[ -n "$ghrel" ]]; then gh=$(classify_gh "$ghrel"); fi
+
+    is_alive() { [[ "$1" == "alive" ]] && return 0 || return 1; }
+
+    permanent_ok=false; fast_ok=false
+    if is_alive "$a" || is_alive "$m"; then permanent_ok=true; fi
+    if is_alive "$p" || is_alive "$g" || is_alive "$gh"; then fast_ok=true; fi
+
     alive=0; dead=0; unverifiable=0
-    if [[ -n "$archive" ]]; then a=$(classify "$archive"); case "$a" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
-    if [[ -n "$gofile" ]]; then g=$(classify_gofile "$gofile"); case "$g" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
-    if [[ -n "$pixel" ]]; then p=$(classify "$pixel"); case "$p" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
-    if [[ -n "$mega" ]]; then m=$(classify_mega "$mega"); case "$m" in alive) alive=$((alive+1));; dead) dead=$((dead+1));; *) unverifiable=$((unverifiable+1));; esac; fi
+    for st in "$a" "$g" "$p" "$m" "$gh"; do
+        [[ "$st" == "null" ]] && continue
+        case "$st" in
+            alive) ((alive++)) ;;
+            dead) ((dead++)) ;;
+            *) ((unverifiable++)) ;;
+        esac
+    done
 
     healthy="true"
-    (( alive >= MIN_COPIES )) || healthy="false"
+    { $permanent_ok && $fast_ok; } || healthy="false"
 
     # serialise each mirror as a real JSON string, or null when no link exists
     jv() { [[ -n "$1" ]] && printf '"%s"' "$2" || printf 'null'; }
@@ -114,11 +166,14 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
         --argjson dead "$dead" \
         --argjson unverifiable "$unverifiable" \
         --argjson healthy "$healthy" \
+        --argjson permanent_ok "$permanent_ok" \
+        --argjson fast_ok "$fast_ok" \
         --argjson archive "$(jv "$archive" "$a")" \
         --argjson gofile "$(jv "$gofile" "$g")" \
         --argjson pixeldrain "$(jv "$pixel" "$p")" \
         --argjson mega "$(jv "$mega" "$m")" \
-        '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega}}'
+        --argjson github "$(jv "$ghrel" "$gh")" \
+        '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, permanent_ok:$permanent_ok, fast_ok:$fast_ok, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega, github:$github}}'
 done > "$TMP_JSON"
 
 # ── aggregate ───────────────────────────────────────────────────────────────
@@ -136,7 +191,7 @@ jq -s \
     --argjson degraded "$DEAD_RECS" \
     --argjson dead_links "$DEAD_LINKS" \
     --argjson unverifiable "$UNVER" \
-    '{updated_at:$updated, summary:{total:$total, healthy:$healthy, degraded:$degraded, dead_links:$dead_links, unverifiable_links:$unverifiable}, recordings:map({video_id,title,alive,dead,unverifiable,healthy,mirrors})}' \
+    '{updated_at:$updated, summary:{total:$total, healthy:$healthy, degraded:$degraded, dead_links:$dead_links, unverifiable_links:$unverifiable}, recordings:map({video_id,title,alive,dead,unverifiable,healthy,permanent_ok,fast_ok,mirrors})}' \
     "$TMP_JSON" > "$OUT_JSON"
 rm -f "$TMP_JSON"
 
@@ -144,10 +199,10 @@ log_info "Total: $TOTAL | Healthy: $HEALTHY | Degraded: $DEAD_RECS | Dead links:
 
 # ── exit status: non-zero if any recording is below the copy guarantee ──────
 if (( DEAD_RECS > 0 )); then
-    log_warn "DEGRADED: $DEAD_RECS recording(s) below ${MIN_COPIES} live mirrors"
-    echo "degraded=true" 
+    log_warn "DEGRADED: $DEAD_RECS recording(s) below the copy guarantee (≥1 permanent + ≥1 fast mirror)"
+    echo "degraded=true"
     exit 1
 fi
-log_ok "All recordings have at least ${MIN_COPIES} live mirrors"
+log_ok "All recordings meet the copy guarantee (≥1 permanent + ≥1 fast mirror)"
 echo "degraded=false"
 exit 0

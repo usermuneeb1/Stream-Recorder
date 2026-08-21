@@ -88,14 +88,11 @@ record_method_a() {
         return 1
     fi
 
-    # Skip if cookies are expired or missing
-    if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
-        log_warn "  Method A: Cookies expired, skipping"
-        return 1
-    fi
-    
-    if [[ ! -f "$COOKIES_FILE" ]] || [[ ! -s "$COOKIES_FILE" ]]; then
-        log_warn "  Method A: No cookies file, skipping"
+    # Cookie methods are BONUS paths — they may only run when cookies are
+    # verified usable. Stale/unverified cookies must never add failed-method
+    # noise to a recording that cookieless methods should handle.
+    if [[ "${COOKIE_STATUS:-}" != "valid" && "${COOKIE_STATUS:-}" != "valid_unverified" ]]; then
+        log_warn "  Cookies not verified (${COOKIE_STATUS:-missing}), skipping"
         return 1
     fi
     
@@ -141,13 +138,9 @@ record_method_b() {
         return 1
     fi
 
-    if [[ "${COOKIE_STATUS:-}" == "expired" ]]; then
-        log_warn "  Method B: Cookies expired, skipping"
-        return 1
-    fi
-    
-    if [[ ! -f "$COOKIES_FILE" ]] || [[ ! -s "$COOKIES_FILE" ]]; then
-        log_warn "  Method B: No cookies file, skipping"
+    # Cookie methods are BONUS paths — verified-valid cookies only (see A).
+    if [[ "${COOKIE_STATUS:-}" != "valid" && "${COOKIE_STATUS:-}" != "valid_unverified" ]]; then
+        log_warn "  Cookies not verified (${COOKIE_STATUS:-missing}), skipping"
         return 1
     fi
     
@@ -844,16 +837,37 @@ record_stream() {
     set_env "RECORD_RAW_FILE" "$raw_output"
     
     # ── Live Chat Extractor ──────────────────────────────────────────────────
+    # FIX: the old check `command -v chat_downloader` matched only one of the
+    # possible CLI names (pip installs `chat-downloader`; some environments
+    # expose `chat_downloader` or only the module). When none matched, chat
+    # capture silently never ran — 1 chat file across 12 recordings. Now we
+    # resolve ANY working invocation, keep stderr for diagnosis, and retry
+    # against the VOD replay if the live capture came back empty.
     local chat_output="${RECORD_DIR}/chat.json"
+    local chat_err="${RECORD_DIR}/method_logs/chat.err"
     local chat_pid=""
-    
-    log_info "Spawning chat-downloader in background..."
-    if command -v chat_downloader &>/dev/null; then
-        chat_downloader "$video_url" --output "$chat_output" >/dev/null 2>&1 &
+    local chat_bin=""
+
+    _resolve_chat_downloader() {
+        command -v chat_downloader &>/dev/null && { echo "chat_downloader"; return 0; }
+        command -v chat-downloader  &>/dev/null && { echo "chat-downloader"; return 0; }
+        python3 -c "import chat_downloader" &>/dev/null && { echo "__module__"; return 0; }
+        return 1
+    }
+
+    log_info "Spawning chat downloader in background..."
+    chat_bin=$(_resolve_chat_downloader) || true
+    if [[ -n "$chat_bin" ]]; then
+        : > "$chat_err"
+        if [[ "$chat_bin" == "__module__" ]]; then
+            python3 -m chat_downloader "$video_url" --output "$chat_output" >/dev/null 2>"$chat_err" &
+        else
+            "$chat_bin" "$video_url" --output "$chat_output" >/dev/null 2>"$chat_err" &
+        fi
         chat_pid=$!
-        log_info "Chat downloader started (PID: $chat_pid)"
+        log_info "Chat downloader started (${chat_bin}, PID: $chat_pid)"
     else
-        log_warn "chat_downloader not found, skipping chat extraction"
+        log_warn "chat_downloader unavailable (pip install chat-downloader), skipping live chat extraction"
     fi
     
     # ── Recording Loop ───────────────────────────────────────────────────────
@@ -933,7 +947,33 @@ record_stream() {
         log_info "Stopping chat downloader..."
         kill -2 "$chat_pid" 2>/dev/null || kill -9 "$chat_pid" 2>/dev/null
         wait "$chat_pid" 2>/dev/null || true
+    fi
+
+    # ── Chat validation + VOD-replay retry ───────────────────────────────────
+    # A live capture can come back empty (tool died mid-stream, WARP hiccup).
+    # Once the stream has ended, the live-chat REPLAY is fetchable from the
+    # VOD page — retry synchronously before giving up. Only a file with real
+    # content (>50 bytes) counts as success.
+    _chat_valid() { [[ -f "$chat_output" ]] && [[ $(wc -c < "$chat_output" 2>/dev/null || echo 0) -gt 50 ]]; }
+
+    if ! _chat_valid; then
+        log_warn "Live chat capture empty or missing, trying VOD replay..."
+        chat_bin=$(_resolve_chat_downloader) || chat_bin=""
+        if [[ -n "$chat_bin" ]]; then
+            if [[ "$chat_bin" == "__module__" ]]; then
+                python3 -m chat_downloader "$video_url" --output "$chat_output" >>"$chat_err" 2>&1 || true
+            else
+                "$chat_bin" "$video_url" --output "$chat_output" >>"$chat_err" 2>&1 || true
+            fi
+            _chat_valid && log_ok "Chat recovered from VOD replay ($(wc -c < "$chat_output") bytes)"
+        fi
+    fi
+
+    if _chat_valid; then
+        log_ok "Chat log captured: $(wc -c < "$chat_output") bytes"
         set_env "RECORD_CHAT_FILE" "$chat_output"
+    else
+        log_warn "No chat log captured ($(tail -2 "$chat_err" 2>/dev/null | tr '\n' ' ' | cut -c1-160))"
     fi
     
     if [[ ${#RECORDED_FILES[@]} -eq 0 ]]; then

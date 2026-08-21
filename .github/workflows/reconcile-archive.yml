@@ -1,0 +1,93 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║   ARCHIVE RECONCILER — missed-stream self-healing                            ║
+# ║                                                                              ║
+# ║  A real miss already happened (RATmDJ9Roh4, 2026-07-11). The recorder's     ║
+# ║  5-minute polling is necessary but not sufficient; this daily pass is the   ║
+# ║  safety net that turns "missed" into "captured within 24h" automatically:   ║
+# ║    • compares the channel /streams tab against data/recordings.json         ║
+# ║    • rescues anything missing by reusing the REAL pipeline                  ║
+# ║      (post-process.sh → upload-clouds.sh → update-stats.sh)                 ║
+# ║    • honors data/reconcile-skip.json (owner-declined rescues)               ║
+# ║    • pages Discord ONLY when an automatic rescue fails                      ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: "Archive reconciler"
+
+on:
+  schedule:
+    # Daily at 07:47 UTC (after cloud-refresh, before peak evening streams)
+    - cron: "47 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: archive-reconciler
+  cancel-in-progress: false
+
+env:
+  GH_PAT: ${{ secrets.GH_PAT }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+  DISCORD_WEBHOOK_RECORDINGS: ${{ secrets.DISCORD_WEBHOOK_RECORDINGS }}
+  ARCHIVE_ACCESS_KEY: ${{ secrets.ARCHIVE_ACCESS_KEY }}
+  ARCHIVE_SECRET_KEY: ${{ secrets.ARCHIVE_SECRET_KEY }}
+  MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+  MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+  PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  GOFILE_API_KEY: ${{ secrets.GOFILE_API_KEY }}
+  AVATAR_URL: ${{ secrets.AVATAR_URL }}
+  RECORD_DIR: /tmp/stream-recorder
+  TZ: Asia/Karachi
+
+jobs:
+  reconcile:
+    name: "Find & rescue missed streams"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v7
+
+      - name: "Install dependencies"
+        run: |
+          set -u
+          sudo apt-get update -qq || true
+          sudo apt-get install -y -qq ffmpeg jq curl python3 megatools
+          sudo curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
+            -o /usr/local/bin/yt-dlp 2>/dev/null || \
+          sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+            -o /usr/local/bin/yt-dlp
+          sudo chmod a+rx /usr/local/bin/yt-dlp
+          pip3 install --quiet streamlink chat-downloader || true
+          sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
+          chmod +x scripts/*.sh
+          yt-dlp --version
+
+      - name: "Reconcile archive (detect + rescue)"
+        id: reconcile
+        continue-on-error: true
+        run: bash scripts/reconcile-archive.sh
+
+      - name: "Notify only on failed auto-rescue"
+        if: steps.reconcile.outcome == 'failure'
+        run: |
+          source scripts/utils.sh
+          source scripts/discord-notify.sh
+          local_msg="Automatic rescue failed for ${{ env.RECONCILE_FAILURES || '1' }} missed stream(s)."
+          payload=$(jq -n \
+            --arg title "Reconciler could not auto-rescue a missed stream" \
+            --arg desc "${local_msg} Check the run logs — the stream may still be public and recoverable manually." \
+            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{embeds:[{title:$title, description:$desc, color:15158332, url:$url}]}')
+          send_discord_webhook "$payload" "alerts"
+
+      - name: "Cleanup"
+        if: always()
+        run: rm -rf /tmp/stream-recorder

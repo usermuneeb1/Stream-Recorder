@@ -649,6 +649,125 @@ recover_broken_video() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  QUARANTINE GATE
+#  Decides whether a fresh capture may enter the public gallery
+#  (data/recordings.json). Fragments and false-positive captures still get
+#  uploaded to the clouds (archives don't destroy), they just never pollute
+#  the index. Decision rules (agreed design):
+#    R1: duration < QUARANTINE_MIN_DURATION_SEC (default 300) → fragment,
+#        UNLESS the source VOD itself is shorter than the threshold (a real
+#        short stream) or FORCE_RECORD testing is active.
+#    R2: same normalized title on the same date already exists in the gallery
+#        with a full-length duration → duplicate fragment of that capture.
+#  Exports: QUARANTINE_DECISION=allow|quarantine, QUARANTINE_REASON
+# ═══════════════════════════════════════════════════════════════════════════════
+
+QUARANTINE_MIN_DURATION_SEC="${QUARANTINE_MIN_DURATION_SEC:-300}"
+QUARANTINE_LEDGER="data/quarantined.json"
+
+_normalize_title() {
+    echo "$1" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed -e 's/[[:space:]]*[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}.*$//' \
+              -e 's/[^a-z0-9 ]//g' \
+              -e 's/  */ /g' \
+              -e 's/^ //; s/ $//'
+}
+
+_vod_duration() {
+    local video_url="$1"
+    command -v yt-dlp >/dev/null 2>&1 || { echo "-1"; return; }
+    timeout 45 yt-dlp --print "%(duration)s" --no-download --no-playlist \
+        --no-warnings --socket-timeout 15 \
+        --extractor-args "youtube:player_client=android_vr" \
+        "$video_url" 2>/dev/null | head -1 | cut -d. -f1 || echo "-1"
+}
+
+quarantine_check() {
+    local video_id="$1"
+    local title="$2"
+    local date_str="$3"
+    local duration_sec="${4:-0}"
+    local existing_json="${5:-[]}"
+
+    duration_sec="${duration_sec%.*}"
+    [[ ! "$duration_sec" =~ ^[0-9]+$ ]] && duration_sec=0
+    QUARANTINE_DECISION="allow"
+    QUARANTINE_REASON=""
+
+    # ── R1: too-short capture ────────────────────────────────────────────────
+    if (( duration_sec > 0 && duration_sec < QUARANTINE_MIN_DURATION_SEC )); then
+        local allow_short=false
+        [[ "${FORCE_RECORD:-false}" == "true" ]] && allow_short=true
+
+        if [[ "$allow_short" != "true" ]]; then
+            local vod_dur
+            vod_dur=$(_vod_duration "${STREAM_URL:-https://www.youtube.com/watch?v=${video_id}}")
+            # vod_dur >= 0 means YouTube told us the real length. A real short
+            # stream has a short VOD; a fragment of a long stream does not.
+            if [[ "$vod_dur" =~ ^[0-9]+$ ]] && (( vod_dur > 0 )); then
+                (( vod_dur < QUARANTINE_MIN_DURATION_SEC )) && allow_short=true
+            fi
+        fi
+
+        if [[ "$allow_short" != "true" ]]; then
+            QUARANTINE_DECISION="quarantine"
+            QUARANTINE_REASON="fragment (${duration_sec}s < ${QUARANTINE_MIN_DURATION_SEC}s minimum)"
+        fi
+    fi
+
+    # ── R2: same-title-same-day duplicate of an existing full capture ────────
+    if [[ "$QUARANTINE_DECISION" == "allow" ]] && [[ -n "$title" ]]; then
+        local norm_title dup="no"
+        norm_title=$(_normalize_title "$title")
+        if [[ -n "$norm_title" ]]; then
+            # Title normalization is bash-side (jq can't call shell functions),
+            # so stream candidate rows out with jq and compare here.
+            # Strip CR defensively — jq on Windows emits CRLF.
+            while IFS=$'\t' read -r r_title r_dur; do
+                r_title="${r_title%$'\r'}"
+                r_dur="${r_dur%$'\r'}"
+                [[ -z "$r_title" ]] && continue
+                [[ "$(_normalize_title "$r_title")" == "$norm_title" ]] || continue
+                local rd="${r_dur%.*}"
+                [[ ! "$rd" =~ ^[0-9]+$ ]] && rd=0
+                if (( rd >= QUARANTINE_MIN_DURATION_SEC )); then
+                    dup="yes"
+                    break
+                fi
+            done < <(echo "$existing_json" | jq -r '.[] | select((.date // "") == "'"$date_str"'") | [(.title // ""), (.duration_sec // 0)] | @tsv' 2>/dev/null)
+
+            if [[ "$dup" == "yes" ]]; then
+                QUARANTINE_DECISION="quarantine"
+                QUARANTINE_REASON="duplicate-fragment (full-length capture with same title already in gallery for ${date_str})"
+            fi
+        fi
+    fi
+
+    if [[ "$QUARANTINE_DECISION" == "quarantine" ]]; then
+        log_warn "QUARANTINE: ${video_id} blocked from gallery — ${QUARANTINE_REASON}"
+        _quarantine_ledger_write "$video_id" "$title" "$date_str" "$duration_sec" "$QUARANTINE_REASON"
+        return 1
+    fi
+
+    return 0
+}
+
+_quarantine_ledger_write() {
+    local video_id="$1" title="$2" date_str="$3" duration_sec="$4" reason="$5"
+    local existing ledger
+    existing=$(github_api_read_content "$QUARANTINE_LEDGER" 2>/dev/null) || existing="[]"
+    echo "$existing" | jq -e 'type=="array"' >/dev/null 2>&1 || existing="[]"
+    ledger=$(echo "$existing" | jq \
+        --arg vid "$video_id" --arg t "$title" --arg d "$date_str" \
+        --argjson dur "${duration_sec:-0}" --arg r "$reason" \
+        --arg at "$(now_utc_iso)" '
+        ([{video_id:$vid, title:$t, date:$d, duration_sec:$dur, reason:$r, decided_at:$at}] + .)[:100]')
+    github_api_write "$QUARANTINE_LEDGER" "$ledger" \
+        "Quarantine: ${video_id} — ${reason}" >/dev/null 2>&1 || true
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  JSON UTILITIES
 #  Helpers for building JSON payloads (used by Discord notifications)
 # ═══════════════════════════════════════════════════════════════════════════════

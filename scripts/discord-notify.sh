@@ -52,6 +52,17 @@ send_discord_webhook() {
         return 0
     fi
 
+    # ── Repeat-alert suppression (fail-open) ─────────────────────────────────
+    local _digest_note=""
+    if ! _alert_should_send "$channel_type" "$payload" _digest_note; then
+        return 0
+    fi
+    if [[ -n "$_digest_note" ]]; then
+        payload=$(echo "$payload" | jq --arg n "$_digest_note" '
+            (.content // "") as $c
+            | . + {content: (if ($c | length) > 0 then $c + "\n" + $n else $n end)}' 2>/dev/null) || true
+    fi
+
     local req_url="$webhook_url"
     [[ -n "$wait_id_file" ]] && req_url="${webhook_url}?wait=true"
 
@@ -119,6 +130,81 @@ _discord_rate_limit() {
         sleep "$sleep_time"
     fi
     echo "$(date '+%s')" > "$throttle_file" 2>/dev/null || true
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  REPEAT-ALERT SUPPRESSION
+#  A looping failure (detect→fail→retry) used to fire the same embed every
+#  5 minutes and flood Discord (EGbDB405YSw incident class). Policy:
+#    • Same alert identity (channel + embed title) may send at most
+#      ALERT_MAX_SENDS_PER_DAY (3) times per rolling 24h window.
+#    • Further repeats are suppressed; the suppression count rides along on
+#      the NEXT allowed alert as a one-line digest note.
+#    • State lives in data/alert-state.json (runners are ephemeral — only the
+#      repo persists across runs). Unique alerts (per-stream titles) are
+#      never affected.
+#    • FAILS OPEN: any error reading/parsing state → send the alert. The
+#      limiter must never be the reason a real alert is lost.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ALERT_STATE_FILE="data/alert-state.json"
+ALERT_MAX_SENDS_PER_DAY="${ALERT_MAX_SENDS_PER_DAY:-3}"
+ALERT_WINDOW_SEC=86400
+
+_alert_should_send() {
+    local channel_type="$1"
+    local payload="$2"
+    local -n _digest_note=$3
+    _digest_note=""
+
+    # Fail-open guards
+    command -v jq >/dev/null 2>&1 || return 0
+    [[ -n "${GH_PAT:-}" && -n "${GITHUB_REPOSITORY:-}" ]] || return 0
+
+    local title key state now
+    title=$(echo "$payload" | jq -r '.embeds[0].title // "notification"' 2>/dev/null) || return 0
+    key=$(printf '%s|%s' "$channel_type" "${title:0:120}" | sha1sum 2>/dev/null | cut -c1-12)
+    [[ -z "$key" ]] && return 0
+    now=$(date '+%s')
+
+    state=$(github_api_read_content "$ALERT_STATE_FILE" 2>/dev/null) || state="{}"
+    echo "$state" | jq -e 'type=="object"' >/dev/null 2>&1 || state="{}"
+
+    local entry win_start count suppressed last_write new_state decision
+    entry=$(echo "$state" | jq -r --arg k "$key" '.[$k] // {}' 2>/dev/null)
+    win_start=$(echo "$entry"  | jq -r '.window_start // 0' 2>/dev/null)
+    count=$(echo "$entry"      | jq -r '.count // 0'       2>/dev/null)
+    suppressed=$(echo "$entry" | jq -r '.suppressed // 0'  2>/dev/null)
+
+    # Expired window → fresh start
+    if (( now - win_start >= ALERT_WINDOW_SEC )); then
+        win_start=$now; count=0; suppressed=0
+    fi
+
+    if (( count < ALERT_MAX_SENDS_PER_DAY )); then
+        decision="send"
+        (( count++ ))
+    else
+        decision="suppress"
+        (( suppressed++ ))
+        _digest_note="🔇 ${suppressed} repeat alert(s) suppressed in the last 24h (same title)"
+    fi
+
+    new_state=$(echo "$state" | jq -c \
+        --arg k "$key" --argjson ws "$win_start" --argjson c "$count" \
+        --argjson s "$suppressed" --argjson now "$now" '
+        . + { ($k): {window_start: $ws, count: $c, suppressed: $s, updated_at: $now} }
+        | with_entries(select(.value.updated_at > ($now - 172800)))' 2>/dev/null) || return 0
+
+    # Best-effort persist; a failed write must not block the current decision
+    github_api_write "$ALERT_STATE_FILE" "$new_state" \
+        "Alert state: ${decision} (${key})" >/dev/null 2>&1 || true
+
+    if [[ "$decision" == "suppress" ]]; then
+        log_warn "Repeat alert suppressed (${count}/${ALERT_MAX_SENDS_PER_DAY} sent in window): ${title:0:80}"
+        return 1
+    fi
+    return 0
 }
 
 patch_discord_webhook() {

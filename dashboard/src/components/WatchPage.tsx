@@ -21,6 +21,7 @@ import '@vidstack/react/player/styles/default/layouts/video.css';
 
 import type { Ep, Guest } from '../types';
 import { fetchGuests } from '../lib/fetcher';
+import Comments from './Comments';
 import { nextUp as pickNext } from '../lib/enrich';
 import { copyText, fmtDate, fmtTime, isHD, resShort, shareLinks } from '../lib/format';
 import {
@@ -41,6 +42,7 @@ interface Mirror {
   note: string;
   url: string;
   kind: 'youtube' | 'mp4';
+  type?: 'archive' | 'pixeldrain' | 'github' | 'telegram' | 'youtube';
 }
 
 declare global { interface Window { __mlaContinueResume?: string } }
@@ -59,21 +61,28 @@ function buildMirrors(rec: Ep): Mirror[] {
       label: 'GHOST', note: 'YouTube original',
       url: `youtube/${ytId}`,
       kind: 'youtube',
+      type: 'youtube',
     });
   }
-  if (rec.archiveNode) out.push({ label: 'R3AL', note: 'Archive.org node', url: rec.archiveNode, kind: 'mp4' });
+  if (rec.archiveNode) out.push({ label: 'R3AL', note: 'Archive.org node', url: rec.archiveNode, kind: 'mp4', type: 'archive' });
   const gh = rec.githubDirect || rec.githubRelease;
-  if (gh) out.push({ label: 'B3ING', note: 'GitHub release', url: gh, kind: 'mp4' });
+  if (gh) out.push({ label: 'B3ING', note: 'GitHub release', url: gh, kind: 'mp4', type: 'github' });
   // Pixeldrain direct stream — derivable from the u/<id> page link; a real
   // CDN playback source (present for every recording) that never depends on
   // the guessed archive filename or the Telegram worker.
   const pd = rec.pixeldrainLink?.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/);
-  if (pd) out.push({ label: 'N3ON', note: 'Pixeldrain CDN', url: `https://pixeldrain.com/api/file/${pd[1]}`, kind: 'mp4' });
-  if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4' });
+  if (pd) out.push({ label: 'N3ON', note: 'Pixeldrain CDN', url: `https://pixeldrain.com/api/file/${pd[1]}`, kind: 'mp4', type: 'pixeldrain' });
+  if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4', type: 'telegram' });
   if (rec.archiveDirect && rec.archiveDirect !== rec.archiveNode) {
-    out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4' });
+    out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4', type: 'archive' });
   }
-  return out;
+  // NEVER-DEAD guarantee: mirrors flagged dead by the latest health sweep
+  // sink to the bottom of Auto's order, so playback always starts on a
+  // source that verified alive. They stay manually selectable — the repair
+  // workflow re-uploads them from Archive.org within hours and the fresh
+  // link lands here automatically.
+  const isDead = (m: Mirror) => !!m.type && !!rec.deadMirrors?.includes(m.type);
+  return [...out.filter(m => !isDead(m)), ...out.filter(isDead)];
 }
 
 function chaptersToVtt(chapters: { time: number; label: string }[], duration: number): string {
@@ -325,20 +334,33 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     if (p) { p.currentTime = t; if (!p.state.playing) void p.play(); }
   };
 
+  // Plain shares use the server-rendered /v/<id> page so Discord/Twitter
+  // unfurl a real card (crawlers don't run JS). Timestamp copies stay on the
+  // hash route — they're in-app deep links where playback position matters.
   const shareUrl = (withTime: boolean) =>
-    `${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}${withTime && time > 5 ? `?t=${Math.floor(time)}` : ''}`;
+    withTime && time > 5
+      ? `${window.location.origin}/#/watch/${encodeURIComponent(rec.videoId)}?t=${Math.floor(time)}`
+      : `${window.location.origin}/v/${encodeURIComponent(rec.videoId)}`;
 
   // Permanent mirrors first, so a viewer always lands on a link that can't
   // expire (Archive.org, GitHub, MEGA). Temp hosts (Pixeldrain ~60d, Gofile
   // ~10d) are listed last and labeled "temporary" so a dead link is expected
-  // there, never the default.
+  // there, never the default. Links the health sweep flagged dead are shown
+  // as "auto-refreshing…" — repair-mirrors replaces them from Archive.org
+  // automatically and recordings.json picks up the fresh URL.
+  const vaultType: Record<string, string> = {
+    'Archive.org': 'archive', GitHub: 'github', MEGA: 'mega',
+    Pixeldrain: 'pixeldrain', Gofile: 'gofile',
+  };
   const vault = [
     { label: 'Archive.org', href: rec.archiveLink, color: '#e50914', perm: true },
     { label: 'GitHub', href: rec.githubDirect || rec.githubRelease, color: '#9aa0a6', perm: true },
     { label: 'MEGA', href: rec.megaLink, color: '#d92753', perm: true },
     { label: 'Pixeldrain', href: rec.pixeldrainLink, color: '#4f9ee8', perm: false },
     { label: 'Gofile', href: rec.gofileLink, color: '#3ba97c', perm: false },
-  ].filter(v => v.href);
+  ]
+    .filter(v => v.href)
+    .map(v => ({ ...v, dead: !!vaultType[v.label] && !!rec.deadMirrors?.includes(vaultType[v.label]) }));
 
   const R = 26, CIRC = 2 * Math.PI * R;
 
@@ -679,6 +701,8 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
 
                 <ChatReplay videoId={rec.videoId} time={time} playing={playing} onSeek={seekTo} />
 
+                <Comments videoId={rec.videoId} />
+
                 <div className="mono text-[10px] text-center py-8" style={{ color: 'var(--shade)' }}>
                   Lantern Archive · recorded autonomously · crafted with <span className="text-flame">♥</span> by Muneeb Ahmad
                 </div>
@@ -735,11 +759,11 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                   {vault.map(v => (
                     <a key={v.label} href={v.href} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-2.5 px-3 h-10 rounded-lg text-[12.5px] font-semibold transition-all hover:translate-x-1"
-                      style={{ background: 'var(--ink-2)', color: 'var(--ivory)' }}>
+                      style={{ background: 'var(--ink-2)', color: 'var(--ivory)', opacity: v.dead ? 0.55 : 1 }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: v.color, boxShadow: `0 0 8px ${v.color}` }} />
                       {v.label}
-                      <span className="mono text-[9px] uppercase tracking-wide" style={{ color: v.perm ? 'var(--flame-2)' : 'var(--shade)' }}>
-                        {v.perm ? 'permanent' : 'temporary'}
+                      <span className="mono text-[9px] uppercase tracking-wide" style={{ color: v.dead ? '#e8a13c' : v.perm ? 'var(--flame-2)' : 'var(--shade)' }}>
+                        {v.dead ? 'auto-refreshing…' : v.perm ? 'permanent' : 'temporary'}
                       </span>
                       <svg className="ml-auto" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--shade)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
                     </a>

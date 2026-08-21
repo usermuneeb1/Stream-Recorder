@@ -35,48 +35,57 @@ update_stats() {
     log_info "  Size     : $(format_size "$size_bytes") (${size_gb} GB)"
     log_info "  Title    : ${stream_title}"
     
-    # ── Read existing stats ──────────────────────────────────────────────────
-    log_step "Reading existing stats.json..."
-    
-    local existing_stats
-    existing_stats=$(github_api_read_content "stats.json" 2>/dev/null) || existing_stats=""
-    
-    local total_streams=0 total_hours=0 total_gb=0 avg_duration=0
-    local src_archive=0 src_mega=0 src_pixel=0 src_gofile=0
-    
-    if [[ -n "$existing_stats" ]]; then
-        total_streams=$(echo "$existing_stats" | jq -r '.total_streams // 0' 2>/dev/null)
-        total_hours=$(echo "$existing_stats" | jq -r '.total_hours // 0' 2>/dev/null)
-        total_gb=$(echo "$existing_stats" | jq -r '.total_gb // 0' 2>/dev/null)
-        src_archive=$(echo "$existing_stats" | jq -r '.sources.archive // 0' 2>/dev/null)
-        src_mega=$(echo "$existing_stats" | jq -r '.sources.mega // 0' 2>/dev/null)
-        src_pixel=$(echo "$existing_stats" | jq -r '.sources.pixel // .sources.pixeldrain // 0' 2>/dev/null)
-        src_gofile=$(echo "$existing_stats" | jq -r '.sources.gofile // 0' 2>/dev/null)
-        log_info "Existing: ${total_streams} streams, ${total_hours}h, ${total_gb} GB"
-    else
-        log_info "No existing stats, creating from scratch"
+    # ── RECOMPUTE FROM TRUTH (see block below) ───────────────────────────────
+    log_step "Recomputing totals from data/recordings.json..."
+    # The old incremental += drifted permanently (observed: stats claimed
+    # 10.09 GB while recordings.json summed to 5.6 GB). Totals are now always
+    # derived from data/recordings.json — the canonical index — so every
+    # writer path (recorder, importer, reconciler, repairs) stays consistent
+    # and past drift self-heals on the next recording.
+    local rec_json total_streams=0 total_hours=0 total_gb=0 avg_duration=0
+    rec_json=$(github_api_read_content "data/recordings.json" 2>/dev/null) || rec_json="[]"
+    echo "$rec_json" | jq -e 'type=="array"' >/dev/null 2>&1 || rec_json="[]"
+
+    # Include the CURRENT capture even if its gallery entry isn't written yet
+    local current_entry='null'
+    if [[ "${QUARANTINE_DECISION:-allow}" != "quarantine" && -n "${STREAM_VIDEO_ID:-}" ]]; then
+        current_entry=$(jq -n --arg id "${STREAM_VIDEO_ID}" \
+            --argjson dur "${duration_sec:-0}" --argjson size "${size_bytes:-0}" \
+            '{video_id:$id, duration_sec:$dur, size_bytes:$size}')
     fi
-    
-    # ── Calculate new totals ─────────────────────────────────────────────────
-    log_step "Calculating new totals..."
-    
-    total_streams=$(( total_streams + 1 ))
-    total_hours=$(echo "scale=2; $total_hours + $duration_hours" | bc)
-    total_gb=$(echo "scale=2; $total_gb + $size_gb" | bc)
-    avg_duration=$(echo "scale=2; $total_hours / $total_streams" | bc)
-    # Normalize bc output, bc omits leading zero (.13 → 0.13) which breaks jq tonumber
-    [[ "$total_hours"   == .* ]] && total_hours="0${total_hours}"
-    [[ "$total_gb"      == .* ]] && total_gb="0${total_gb}"
-    [[ "$avg_duration"  == .* ]] && avg_duration="0${avg_duration}"
-    [[ "$size_gb"       == .* ]] && size_gb="0${size_gb}"
-    
-    # Count one provider hit per recording if at least one link was produced.
-    [[ -n "${ARCHIVE_LINKS:-}" ]] && src_archive=$(( src_archive + 1 ))
-    [[ -n "${MEGA_LINKS:-}" ]] && src_mega=$(( src_mega + 1 ))
-    [[ -n "${PIXELDRAIN_LINKS:-}" ]] && src_pixel=$(( src_pixel + 1 ))
-    [[ -n "${GOFILE_LINKS:-}" ]] && src_gofile=$(( src_gofile + 1 ))
-    
-    log_info "Updated: ${total_streams} streams, ${total_hours}h, ${total_gb} GB, avg ${avg_duration}h"
+
+    read -r total_streams total_seconds total_bytes < <(
+        echo "$rec_json" | jq -r --argjson cur "$current_entry" '
+        ( . + [$cur] | map(select(. != null))
+          | map(select((.fromYouTube // false) != true and (.isShort // false) != true))
+          | unique_by(.video_id)
+          | {
+              n: length,
+              secs: ([.[].duration_sec // 0 | tonumber? // 0] | add // 0),
+              bytes: ([.[].size_bytes // 0 | tonumber? // 0] | add // 0)
+            } )
+        | "\(.n) \(.secs) \(.bytes)"' 2>/dev/null || echo "0 0 0"
+    )
+    total_streams=${total_streams:-0}
+    total_seconds=${total_seconds:-0}
+    total_bytes=${total_bytes:-0}
+
+    total_hours=$(echo "scale=2; $total_seconds / 3600" | bc)
+    total_gb=$(echo "scale=2; $total_bytes / 1073741824" | bc)
+    (( total_streams > 0 )) && avg_duration=$(echo "scale=2; $total_hours / $total_streams" | bc) || avg_duration=0
+    [[ "$total_hours"  == .* ]] && total_hours="0${total_hours}"
+    [[ "$total_gb"     == .* ]] && total_gb="0${total_gb}"
+    [[ "$avg_duration" == .* ]] && avg_duration="0${avg_duration}"
+
+    # Per-provider counts also recomputed from the index (non-empty link = hit)
+    local src_archive=0 src_mega=0 src_pixel=0 src_gofile=0
+    read -r src_archive src_mega src_pixel src_gofile < <(
+        echo "$rec_json" | jq -r '
+        def nonempty($k): ([.[] | select((.[$k] // "") != "")] | length);
+        "\(nonempty("archive_link")) \(nonempty("mega_link")) \(nonempty("pixeldrain_link")) \(nonempty("gofile_link"))"' 2>/dev/null || echo "0 0 0 0"
+    )
+
+    log_info "Recomputed from recordings.json: ${total_streams} streams, ${total_hours}h, ${total_gb} GB, avg ${avg_duration}h"
     log_info "Sources: archive=${src_archive}, mega=${src_mega}, pixel=${src_pixel}, gofile=${src_gofile}"
     
     # ── Build new stats JSON ─────────────────────────────────────────────────
@@ -179,6 +188,15 @@ update_recordings_json() {
     local existing
     existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing='[]'
     [[ -z "$existing" || "$existing" != "["* ]] && existing='[]'
+
+    # ── Quarantine gate: fragments & false captures never enter the gallery ──
+    # (file is already uploaded to the clouds; only the index is protected)
+    if ! quarantine_check "$vid" "${STREAM_TITLE:-Unknown}" "$(TZ='Asia/Karachi' date '+%Y-%m-%d')" "${RECORD_DURATION_SEC:-0}" "$existing"; then
+        set_env "QUARANTINE_DECISION" "quarantine"
+        set_env "QUARANTINE_REASON" "${QUARANTINE_REASON:-unknown}"
+        return 0
+    fi
+    set_env "QUARANTINE_DECISION" "allow"
 
     local month
     month=$(TZ='Asia/Karachi' date '+%Y-%m')

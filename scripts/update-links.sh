@@ -226,10 +226,21 @@ update_recordings_json() {
     current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="[]"
     echo "$current" | jq -e 'type=="array"' >/dev/null 2>&1 || current="[]"
 
-    # ── Build/merge the entry with jq (newest first, dedup by video_id) ───────
+    # ── Quarantine gate: fragments & false captures never enter the gallery ──
+    if ! quarantine_check "$video_id" "$title" "$date_str" "${dur_sec:-0}" "$current"; then
+        log_warn "Gallery index protected — capture quarantined (${QUARANTINE_REASON:-unknown})"
+        return 0
+    fi
+
+    # ── Build/merge the entry with jq (newest first, keyed by YouTube id) ─────
+    # SCHEMA FIX: video_id MUST be the original YouTube id (canonical schema,
+    # owned by update-stats.sh). This writer previously stored the Archive
+    # identifier here, which is what normalize-recordings.py kept having to
+    # repair. Merge is preserve-first: existing enriched fields (thumbnail,
+    # github_release, telegram_link, storyboard, ...) survive; new non-empty
+    # values overwrite.
     local updated
     updated=$(echo "$current" | jq \
-        --arg id "$rec_id" \
         --arg vid "$video_id" \
         --arg vurl "$video_url" \
         --arg title "$title" \
@@ -248,10 +259,9 @@ update_recordings_json() {
         --arg mega "$mega_link" \
         --arg chat "${RECORD_CHAT_URL:-}" \
         --arg rec "$recorded_at" '
-        # thumbnail intentionally empty → site uses public/thumbnail.jpg
-        ( [ .[] | select(.video_id != $id) ] ) as $rest
-        | [ {
-            video_id: $id,
+        ([ .[] | select(.video_id == $vid) ][0] // {}) as $old
+        | ({
+            video_id: $vid,
             title: $title,
             channel: "The Muslim Lantern",
             video_url: $vurl,
@@ -272,7 +282,8 @@ update_recordings_json() {
             mega_link: $mega,
             chat_url: $chat,
             recorded_at: $rec
-          } ] + $rest
+          } | with_entries(select(.value != "" and .value != null and .value != 0))) as $new
+        | [ ($old * $new) ] + [ .[] | select(.video_id != $vid) ]
         | sort_by(.date) | reverse
     ') || { log_warn "jq failed to build recordings.json"; return 0; }
 

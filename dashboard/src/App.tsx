@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Ep, Route, StreamPrediction, SystemStatus } from './types';
 import { enrichRecordings, enrichYouTube } from './lib/enrich';
-import { fetchAllYouTube, fetchPrediction, fetchRecordings, fetchStatus, fetchTopics, fetchYouTubeFeed } from './lib/fetcher';
+import { fetchAllYouTube, fetchMirrorHealth, fetchPrediction, fetchRecordings, fetchStatus, fetchTopics, fetchYouTubeFeed } from './lib/fetcher';
 import { getList, toggleList as toggleStore } from './lib/storage';
 import { initAnalytics, track } from './lib/analytics';
 import { nav } from './components/Nav';
@@ -65,16 +65,19 @@ export default function App() {
     initAnalytics();
     let alive = true;
     (async () => {
-      const [raw, st, pr, all, fed, topics] = await Promise.all([
+      const [raw, st, pr, all, fed, topics, mh] = await Promise.all([
         fetchRecordings(),
         fetchStatus().catch(() => null),
         fetchPrediction().catch(() => null),
         fetchAllYouTube().catch(() => []),
         fetchYouTubeFeed().catch(() => ({ videos: [], shorts: [] })),
         fetchTopics().catch(() => ({})),
+        fetchMirrorHealth().catch(() => ({} as Record<string, string[]>)),
       ]);
       if (!alive) return;
-      setRecs(enrichRecordings(raw, topics).filter(r => !r.isForced));
+      setRecs(enrichRecordings(raw, topics)
+        .filter(r => !r.isForced)
+        .map(r => ({ ...r, deadMirrors: mh[r.videoId] })));
       setStatus(st);
       setPrediction(pr);
       setYtLong(all.map(v => enrichYouTube(v, false, topics)));

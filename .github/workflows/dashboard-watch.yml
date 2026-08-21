@@ -9,12 +9,13 @@ name: "Dashboard watch"
 
 on:
   schedule:
-    # Every 6 hours
-    - cron: "41 */6 * * *"
+    # Hourly — wake-up list says "dashboard down >6h must page", so detect
+    # within the hour instead of the old 6-12h window.
+    - cron: "41 * * * *"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 defaults:
   run:
@@ -80,21 +81,55 @@ jobs:
           echo "alert=$([ -z "$ALERT" ] && echo none || echo problem)"
           printf '%s' "$ALERT" > /tmp/alert.txt
 
-      - name: "Alert if down or stale"
-        if: steps.check.outputs.alert != 'none'
+      - name: "Alert on state TRANSITION (no repeat spam)"
+        if: always()
         run: |
-          ALERT="$(cat /tmp/alert.txt)"
-          MSG="🚨 **Dashboard watch**:\n$ALERT"
-          echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
-          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
-          if [[ -n "$WEBHOOK" ]]; then
-            curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
-              -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" '{content:$m, avatar_url:$a}')" \
-              >/dev/null 2>&1 || echo "discord send failed"
-          else
-            echo "no webhook; would alert: $MSG"
+          # Transition-gated alerting: alert once when entering a problem
+          # state, once on recovery, silence in between. A persistent outage
+          # must page exactly once — hourly repeats are just noise.
+          STATE_FILE="data/dashboard-watch-state.json"
+          ALERT="$(cat /tmp/alert.txt 2>/dev/null || true)"
+          NOW_PROBLEM=$([[ -n "$ALERT" ]] && echo true || echo false)
+          WAS_PROBLEM=false
+
+          if [[ -f "$STATE_FILE" ]]; then
+            WAS_PROBLEM=$(jq -r '.problem // false' "$STATE_FILE" 2>/dev/null) || WAS_PROBLEM=false
           fi
 
-      - name: "Healthy"
-        if: steps.check.outputs.alert == 'none'
-        run: echo "Dashboard OK (HTTP ${{ steps.check.outputs.dashboard_http }}), data fresh"
+          jq -n --argjson p "$NOW_PROBLEM" --arg at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            '{problem: $p, updated_at: $at}' > "$STATE_FILE"
+
+          if [[ "$NOW_PROBLEM" == "true" && "$WAS_PROBLEM" != "true" ]]; then
+            MSG="🚨 **Dashboard watch**:\n$ALERT"
+            echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+            WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+            if [[ -n "$WEBHOOK" ]]; then
+              curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
+                -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" '{content:$m, avatar_url:$a}')" \
+                >/dev/null 2>&1 || echo "discord send failed"
+            else
+              echo "no webhook; would alert: $MSG"
+            fi
+          elif [[ "$NOW_PROBLEM" == "true" ]]; then
+            echo "Still degraded (already alerted), staying quiet"
+          elif [[ "$WAS_PROBLEM" == "true" ]]; then
+            MSG="✅ **Dashboard watch**: recovered"
+            echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+            WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
+            [[ -n "$WEBHOOK" ]] && curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
+              -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" '{content:$m, avatar_url:$a}')" \
+              >/dev/null 2>&1 || true
+          else
+            echo "Dashboard OK (HTTP ${{ steps.check.outputs.dashboard_http }}), data fresh"
+          fi
+
+      - name: "Commit watch state"
+        if: always()
+        run: |
+          git config user.name "usermuneeb1"
+          git config user.email "198427088+usermuneeb1@users.noreply.github.com"
+          git add data/dashboard-watch-state.json 2>/dev/null || exit 0
+          git diff --cached --quiet || {
+            git commit -m "dashboard watch state, $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          }

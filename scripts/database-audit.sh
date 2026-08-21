@@ -44,6 +44,47 @@ _audit_recordings() {
     [[ -n "$duplicates" ]] && _report error "Duplicate recording video_id(s): $(echo "$duplicates" | paste -sd ', ' -)"
     (( missing_title > 0 )) && _report warn "recordings.json entries missing title: $missing_title"
     (( bad_url > 0 )) && _report warn "recordings.json entries with non-http URL: $bad_url"
+
+    # ── Archive-link ownership check ─────────────────────────────────────────
+    # Identifiers follow tml-YYYY-MM-<videoid>-<ts>, so an entry whose
+    # archive_link lacks its OWN video_id is cross-wired (observed:
+    # 84lG-ZjxCGI pointing at another video's item). Auto-swap only when the
+    # true owner is unambiguous; otherwise flag for human review.
+    local crosswired swapped
+    swapped=0
+    crosswired=$(jq -r '.[]
+        | select((.archive_link // "") != "")
+        | select((.archive_link | contains(.video_id // "###none###")) | not)
+        | "\(.video_id)\t\(.archive_link)"' "$file" 2>/dev/null || true)
+    if [[ -n "$crosswired" ]]; then
+        while IFS=$'\t' read -r vid link; do
+            [[ -z "$vid" ]] && continue
+            # find entries whose identifier contains THIS video's id
+            local owners
+            owners=$(jq -r --arg v "$vid" '.[] | select((.archive_link // "") != "" and ((.archive_link | contains($v)))) | .video_id' "$file" 2>/dev/null | tr '\n' ' ')
+            if [[ $(echo "$owners" | wc -w) -eq 1 ]] && [[ "${owners// /}" != "$vid" ]]; then
+                local owner="${owners// /}"
+                local stolen
+                stolen=$(jq -r --arg o "$owner" --arg l "$link" '.[] | select(.video_id == $o and .archive_link == $l) | .video_id' "$file" 2>/dev/null)
+                if [[ -n "$stolen" ]]; then
+                    # swap: give each entry the link that names it
+                    local tmp
+                    tmp=$(jq --arg v "$vid" --arg o "$owner" '
+                        (map(select(.video_id == $v)) | .[0].archive_link // "") as $a
+                        | map(if .video_id == $v then .archive_link = ""
+                              elif .video_id == $o then .archive_link = $a
+                              else . end)' "$file" 2>/dev/null)
+                    if echo "$tmp" | jq -e 'type=="array"' >/dev/null 2>&1; then
+                        printf '%s' "$tmp" > "$file"
+                        (( swapped++ ))
+                        _report ok "Swapped cross-wired archive_link: ${vid} ↔ ${owner}"
+                    fi
+                fi
+            else
+                _report warn "Cross-wired archive_link on ${vid} (ambiguous owner: ${owners:-none}) — manual review"
+            fi
+        done <<< "$crosswired"
+    fi
 }
 
 _audit_links() {

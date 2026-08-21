@@ -260,6 +260,28 @@ export async function fetchPrediction(): Promise<StreamPrediction | null> {
   };
 }
 
+/** Mirror liveness from the latest automated health sweep
+ *  (data/mirror-health.json, refreshed every few hours by CI).
+ *  Returns videoId → array of dead mirror types
+ *  ('archive'|'gofile'|'pixeldrain'|'mega'|'github'). The repair workflow
+ *  re-uploads dead mirrors from Archive.org and rewrites recordings.json,
+ *  so a dead entry here means "link currently being replaced" — the UI
+ *  demotes it so visitors only ever click working links. */
+export async function fetchMirrorHealth(): Promise<Record<string, string[]>> {
+  const j = await fetchFirstJson<any>('data/mirror-health.json');
+  if (!j || !Array.isArray(j?.recordings)) return {};
+  const out: Record<string, string[]> = {};
+  for (const r of j.recordings) {
+    const m = r?.mirrors;
+    if (!m || !r.videoId) continue;
+    const dead = Object.entries(m)
+      .filter(([, v]) => v === 'dead')
+      .map(([k]) => k);
+    if (dead.length) out[String(r.videoId)] = dead;
+  }
+  return out;
+}
+
 /** Latest channel videos and shorts — live endpoint first, bundled snapshot fallback. */
 export async function fetchYouTubeFeed(): Promise<{ videos: YTVideo[]; shorts: YTVideo[] }> {
   const parse = (j: any): YTVideo[] =>

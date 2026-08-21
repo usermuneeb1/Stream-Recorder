@@ -4,6 +4,7 @@
   "installCommand": "npm install",
   "framework": "vite",
   "rewrites": [
+    { "source": "/v/:id", "destination": "/api/v/:id" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

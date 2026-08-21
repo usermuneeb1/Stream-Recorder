@@ -12,29 +12,13 @@ _cookie_alert() {
     local status="$1"
     local detail="$2"
 
-    # Suppressed under PUBLIC_STREAM_ONLY mode, the recorder runs cookieless
-    # so a stale/missing cookie is irrelevant to recording success. Posting
-    # 'cookie warning' Discord alerts in this mode just confuses the user.
-    if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]] || [[ "${FORCE_RECORD:-false}" == "true" ]]; then
-        log_info "Cookie alert suppressed (PUBLIC_STREAM_ONLY=${PUBLIC_STREAM_ONLY:-false}, FORCE_RECORD=${FORCE_RECORD:-false})"
-        return 0
-    fi
-
-    local throttle_file="cookie_${status}_warning_sent.txt"
-    local throttle_seconds="${COOKIE_WARNING_THROTTLE_SECONDS:-43200}" # 12 hours
-    local now_ts last_sent
-    now_ts=$(now_epoch)
-    last_sent=$(github_api_read_content "$throttle_file" 2>/dev/null) || last_sent=0
-    [[ ! "$last_sent" =~ ^[0-9]+$ ]] && last_sent=0
-
-    if (( now_ts - last_sent < throttle_seconds )); then
-        log_warn "Cookie ${status} alert throttled (last sent $(( (now_ts - last_sent) / 3600 ))h ago)"
-        return 0
-    fi
-
-    source "$SCRIPT_DIR/discord-notify.sh"
-    notify_cookie_warning "$status" "$detail" || true
-    github_api_write "$throttle_file" "$now_ts" "Cookie ${status} alert sent" >/dev/null 2>&1 || true
+    # SETTLED DESIGN (zero-touch): cookie state is a logged NON-EVENT.
+    # The cascade is cookieless-first; stale cookies can only ever disable
+    # the two bonus cookie methods, never lose a public-stream recording.
+    # Cookie problems are therefore logged for the run summary and NEVER
+    # sent to Discord — no more manual cookie chores as wake-up calls.
+    log_info "Cookie status: ${status} (non-event under cookieless-first design) ${detail:+— ${detail}}"
+    return 0
 }
 
 _cookie_fingerprint() {
