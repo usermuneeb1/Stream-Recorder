@@ -1,9 +1,9 @@
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║   QUALITY CHECK, Backend scripts + Dashboard build                           ║
-# ║  Fast validation gate for professional maintenance.                          ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
+﻿# â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+# â•‘   QUALITY CHECK, Backend scripts + Dashboard build                           â•‘
+# â•‘  Fast validation gate for professional maintenance.                          â•‘
+# â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-name: "✅ Quality check"
+name: "âœ… Quality check"
 
 on:
   workflow_dispatch:
@@ -104,7 +104,7 @@ jobs:
       - name: "Setup Node.js"
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
@@ -112,7 +112,10 @@ jobs:
         run: npm ci
 
       - name: "Lint"
-        run: echo "eslint not yet configured — see automation grill Q1"
+        run: npm run lint
+
+      - name: "Unit tests"
+        run: npm test
 
       - name: "Dependency audit"
         # Critical-only so known-transitive noise can't permanently redden

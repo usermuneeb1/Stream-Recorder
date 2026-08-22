@@ -1121,3 +1121,26 @@ p { text-wrap: pretty; }
   content-visibility: auto;
   contain-intrinsic-size: auto 240px;
 }
+
+
+/* ============================================================
+   Boot & splash — logo only. The brand speaks for itself.
+   Rare/first-time tier: one gentle scale-fade + flame glow pulse,
+   ease-out-quart, then a clean exit fade. No wordmark, no bars.
+   ============================================================ */
+
+.boot-logo {
+  width: clamp(88px, 12vw, 132px);
+  height: auto;
+  border-radius: 18%;
+  animation: boot-glow 2.4s var(--ease-out-quart) infinite;
+}
+@keyframes boot-glow {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(230, 9, 20, 0.35)); transform: scale(0.985); }
+  50%      { filter: drop-shadow(0 0 30px rgba(230, 9, 20, 0.6));  transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-logo { animation: none; }
+}
+
+.splash-closing { opacity: 0; transition: opacity 0.5s var(--ease-out-quart); }
