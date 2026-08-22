@@ -91,6 +91,9 @@ export default function Comments({ videoId }: { videoId: string }) {
             onChange={e => setName(e.target.value)}
             placeholder="Your name"
             maxLength={32}
+            aria-label="Your display name"
+            name="comment-name"
+            autoComplete="off"
             className="rounded-lg px-3 h-9 text-[12.5px] outline-none flex-1 min-w-[140px]"
             style={{ background: 'var(--ink-2)', border: '1px solid var(--line)', color: 'var(--ivory)' }}
           />
@@ -99,6 +102,9 @@ export default function Comments({ videoId }: { videoId: string }) {
             onChange={e => setPassphrase(e.target.value)}
             placeholder="Passphrase"
             type="password"
+            aria-label="Shared passphrase"
+            name="comment-passphrase"
+            autoComplete="off"
             maxLength={64}
             className="rounded-lg px-3 h-9 text-[12.5px] outline-none w-[150px]"
             style={{ background: 'var(--ink-2)', border: '1px solid var(--line)', color: 'var(--ivory)' }}
@@ -110,6 +116,8 @@ export default function Comments({ videoId }: { videoId: string }) {
           placeholder="Say something about this stream…"
           maxLength={600}
           rows={2}
+          aria-label="Your comment"
+          name="comment-text"
           className="w-full rounded-lg px-3 py-2 text-[12.5px] outline-none resize-none"
           style={{ background: 'var(--ink-2)', border: '1px solid var(--line)', color: 'var(--ivory)' }}
         />

@@ -87,9 +87,9 @@ export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onC
 
   return (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Command palette">
-      <div data-overlay-scrim className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
+      <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
       <div
-        data-overlay-panel className="palette-card absolute left-0 right-0 mx-auto top-[14vh] w-[min(580px,92vw)] overflow-hidden"
+        className="palette-card absolute left-0 right-0 mx-auto top-[14vh] w-[min(580px,92vw)] overflow-hidden"
         style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(28px) saturate(160%)', WebkitBackdropFilter: 'blur(28px) saturate(160%)' }}
       >
         <div className="flex items-center gap-3 px-5 h-14" style={{ borderBottom: '1px solid var(--line)' }}>

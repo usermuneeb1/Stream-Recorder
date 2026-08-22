@@ -505,7 +505,10 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                       native one until real frames roll, then fades. */}
                   {veil && (
                     <div className="load-veil" style={{ opacity: framesFlowing ? 0 : 1 }} aria-hidden="true">
+                      {/* Shared-element landing target: the clicked card's art
+                          morphs into this image via the View Transitions API. */}
                       <img src={rec.thumbnail} alt="" draggable={false}
+                        style={{ viewTransitionName: `art-${rec.videoId}` }}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       <span className="tint" />
                       {elapsed < 8 && (

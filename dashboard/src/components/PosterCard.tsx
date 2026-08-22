@@ -83,6 +83,7 @@ export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList
     >
       <div className="card-art">
         <img
+          style={{ viewTransitionName: `art-` }}
           src={broken ? '/thumbnail.jpg' : ep.thumbnail}
           alt=""
           loading="lazy"

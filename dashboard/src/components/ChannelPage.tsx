@@ -65,6 +65,10 @@ export default function ChannelPage({ videos, listedIds, onOpen, onDetails, onTo
               value={q}
               onChange={e => setQ(e.target.value)}
               placeholder="Filter titles…"
+              type="search"
+              aria-label="Filter videos by title"
+              name="channel-filter"
+              autoComplete="off"
               className="rounded-lg pl-8 pr-3 h-9 text-[12.5px] outline-none w-[190px]"
               style={{ background: 'var(--ink-1)', border: '1px solid var(--line)', color: 'var(--ivory)' }}
             />
