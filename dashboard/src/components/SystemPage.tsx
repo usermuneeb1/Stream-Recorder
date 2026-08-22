@@ -193,7 +193,7 @@ export default function SystemPage({ recs, status, prediction, ytCount }: Props)
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ink-3)' }}>
-                      <div className="h-full rounded-full transition-all duration-700"
+                      <div className="h-full rounded-full transition duration-700"
                         style={{ width: `${pct}%`, background: m.color, boxShadow: `0 0 8px ${m.color}66` }} />
                     </div>
                   </div>
@@ -220,7 +220,7 @@ export default function SystemPage({ recs, status, prediction, ytCount }: Props)
             <div className="flex flex-col gap-2">
               {chatSample.map(r => (
                 <a key={r.videoId} href={r.chatUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 px-3 h-10 rounded-lg text-[12px] font-semibold transition-all hover:translate-x-1"
+                  className="flex items-center gap-2.5 px-3 h-10 rounded-lg text-[12px] font-semibold transition hover:translate-x-1"
                   style={{ background: 'var(--ink-2)', color: 'var(--ivory)' }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--flame-2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                   <span className="line-clamp-1">{fmtDate(r.date)} — {r.title}</span>

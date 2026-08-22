@@ -4,6 +4,7 @@
 // Shorts live in their own snap-scroll cinema (#/shorts).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { Ep, Route, StreamPrediction, SystemStatus } from './types';
 import { enrichRecordings, enrichYouTube } from './lib/enrich';
 import { fetchAllYouTube, fetchMirrorHealth, fetchPrediction, fetchRecordings, fetchStatus, fetchTopics, fetchYouTubeFeed } from './lib/fetcher';
@@ -100,8 +101,16 @@ export default function App() {
 
   /* ── Routing ──────────────────────────────────────────────────────── */
   useEffect(() => {
+    const apply = () => setRoute(parseHash(all));
     const sync = () => {
-      setRoute(parseHash(all));
+      // Crossfade route changes through the View Transitions API where
+      // supported (progressive enhancement — instant switch elsewhere).
+      const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+      if (typeof doc.startViewTransition === 'function') {
+        doc.startViewTransition(() => flushSync(apply));
+      } else {
+        apply();
+      }
       if (!window.location.hash.startsWith('#/watch')) window.scrollTo({ top: 0 });
     };
     sync();

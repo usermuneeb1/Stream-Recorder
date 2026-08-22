@@ -44,9 +44,9 @@ export default function SearchOverlay({ recs, listedIds, onOpen, onDetails, onTo
 
   return (
     <div className="fixed inset-0 z-[85] flex flex-col" role="dialog" aria-modal="true" aria-label="Search the archive">
-      <div className="absolute inset-0" style={{ background: 'var(--overlay)', backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' }} onClick={onClose} />
+      <div data-overlay-scrim className="absolute inset-0" style={{ background: 'var(--overlay)', backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' }} onClick={onClose} />
 
-      <div className="relative z-[1] px-[4vw] md:px-8 pt-24 md:pt-28 pb-6">
+      <div data-overlay-panel className="relative z-[1] px-[4vw] md:px-8 pt-24 md:pt-28 pb-6">
         <input
           ref={inputRef}
           value={q}

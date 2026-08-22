@@ -319,7 +319,7 @@ export default function InsightsPage({ recs, status, prediction }: Props) {
               const on = peakSet.has(h);
               return (
                 <div key={h} className="flex-1 flex flex-col items-center gap-1 group" title={`${h}:00 PKT`}>
-                  <div className="w-full rounded-sm transition-all duration-300"
+                  <div className="w-full rounded-sm transition duration-300"
                     style={{
                       height: on ? 40 : 14,
                       background: on ? 'var(--flame-1)' : 'var(--ink-3)',
@@ -363,7 +363,7 @@ export default function InsightsPage({ recs, status, prediction }: Props) {
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ink-3)' }}>
-                      <div className="h-full rounded-full transition-all duration-700"
+                      <div className="h-full rounded-full transition duration-700"
                         style={{ width: `${pct}%`, background: m.color, boxShadow: `0 0 8px ${m.color}66` }} />
                     </div>
                   </div>
@@ -401,7 +401,7 @@ export default function InsightsPage({ recs, status, prediction }: Props) {
           <div className="flex flex-col gap-1.5">
             {longest.map((r, i) => (
               <button key={r.videoId} onClick={() => nav(`#/watch/${encodeURIComponent(r.videoId)}`)}
-                className="flex items-center gap-3 px-3 h-11 rounded-lg text-left transition-all hover:translate-x-1"
+                className="flex items-center gap-3 px-3 h-11 rounded-lg text-left transition hover:translate-x-1"
                 style={{ background: 'var(--ink-2)' }}
                 aria-label={`Watch ${r.title}`}>
                 <span className="mono text-[10px] w-5 flex-none" style={{ color: 'var(--flame-2)' }}>{String(i + 1).padStart(2, '0')}</span>
@@ -430,7 +430,7 @@ export default function InsightsPage({ recs, status, prediction }: Props) {
                 <span className="mono text-[10.5px] w-16 flex-none" style={{ color: 'var(--ivory)' }}>{m.label}</span>
                 <div className="flex-1 h-6 rounded-md overflow-hidden flex"
                   style={{ background: 'var(--ink-2)' }}>
-                  <div className="h-full flex items-center pl-2 transition-all duration-700"
+                  <div className="h-full flex items-center pl-2 transition duration-700"
                     style={{ width: `${Math.max(pct, 2)}%`, background: 'var(--flame-12)', borderRight: '1px solid var(--flame-45)' }}>
                     {pct >= 14 && (
                       <span className="mono text-[8.5px] tabular-nums" style={{ color: 'var(--flame-1)' }}>{m.count} rec</span>

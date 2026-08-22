@@ -40,7 +40,7 @@ export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, o
     <div className="fixed inset-0 z-[95] overflow-y-auto" role="dialog" aria-modal="true" aria-label={ep.title}>
       <div className="overlay-backdrop" onClick={onClose} />
       <div className="relative min-h-full flex items-start justify-center p-4 md:p-8">
-        <div className="modal-card w-[min(940px,96vw)] my-8 overflow-hidden">
+        <div data-overlay-panel className="modal-card w-[min(940px,96vw)] my-8 overflow-hidden">
           {/* Art */}
           <div className="relative aspect-[16/7.5]">
             <img
@@ -137,7 +137,7 @@ export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, o
                     href={v.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3.5 h-11 rounded-lg text-[12.5px] font-semibold transition-all hover:translate-x-1"
+                    className="flex items-center gap-3 px-3.5 h-11 rounded-lg text-[12.5px] font-semibold transition hover:translate-x-1"
                     style={{ background: 'var(--ink-2)', border: '1px solid var(--line)', color: 'var(--ivory)' }}
                   >
                     <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: v.color, boxShadow: `0 0 8px ${v.color}` }} />

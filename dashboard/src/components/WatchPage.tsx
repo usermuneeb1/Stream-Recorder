@@ -411,7 +411,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   return (
     <div className={`min-h-dvh ${theatre ? 'theatre' : ''}`}>
       {/* Sticky chrome */}
-      <div className="sticky top-0 z-40 safe-bottom-0" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(22px) saturate(150%)', WebkitBackdropFilter: 'blur(22px) saturate(150%)', borderBottom: '1px solid var(--line)' }}>
+      <div className="sticky top-0 z-40 safe-bottom-0" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(22px) saturate(150%)', WebkitBackdropFilter: 'blur(22px) saturate(150%)', borderBottom: '1px solid var(--line)', boxShadow: '0 16px 32px -22px rgba(0,0,0,0.55)' }}>
         <div className="flex items-center gap-2 px-4 md:px-6 h-14">
           <button className="btn-icon" title="Back to archive (Esc)" aria-label="Back to archive" onClick={onClose}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 5-7 7 7 7" /></svg>
@@ -790,7 +790,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                 <div className="flex flex-col gap-1.5">
                   {vault.map(v => (
                     <a key={v.label} href={v.href} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 px-3 h-10 rounded-lg text-[12.5px] font-semibold transition-all hover:translate-x-1"
+                      className="flex items-center gap-2.5 px-3 h-10 rounded-lg text-[12.5px] font-semibold transition hover:translate-x-1"
                       style={{ background: 'var(--ink-2)', color: 'var(--ivory)', opacity: v.dead ? 0.55 : 1 }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: v.color, boxShadow: `0 0 8px ${v.color}` }} />
                       {v.label}

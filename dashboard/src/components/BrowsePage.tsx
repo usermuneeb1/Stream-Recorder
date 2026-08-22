@@ -214,7 +214,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
                 aria-label={`Play ${ep.title}`}
                 onClick={() => onOpen(ep)}
                 onKeyDown={e => { if (e.key === 'Enter') onOpen(ep); }}
-                className="group flex gap-4 p-3 rounded-xl cursor-pointer transition-all duration-300 hover:translate-x-1"
+                className="group flex gap-4 p-3 rounded-xl cursor-pointer transition duration-300 hover:translate-x-1"
                 style={{ background: 'var(--ink-1)', border: '1px solid var(--line)' }}
               >
                 <div className="relative w-40 sm:w-52 aspect-video rounded-lg overflow-hidden flex-none">

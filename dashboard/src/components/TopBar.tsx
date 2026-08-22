@@ -35,12 +35,13 @@ export default function TopBar({ route, listCount, onSearch, onCommand, onLive }
 
   return (
     <header
-      className="fixed top-0 inset-x-0 z-40 transition-all duration-500"
+      className="fixed top-0 inset-x-0 z-40 transition duration-500"
       style={{
         background: solid ? 'var(--glass-strong)' : 'linear-gradient(to bottom, var(--topbar-fade), transparent)',
         backdropFilter: solid ? 'blur(22px) saturate(150%)' : 'none',
         WebkitBackdropFilter: solid ? 'blur(22px) saturate(150%)' : 'none',
         borderBottom: solid ? '1px solid var(--line)' : '1px solid transparent',
+    boxShadow: solid ? '0 16px 32px -22px rgba(0,0,0,0.55)' : 'none',
       }}
     >
       <div className="flex items-center gap-6 px-[4vw] md:px-8 h-16 md:h-[72px]">
