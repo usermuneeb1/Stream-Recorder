@@ -44,13 +44,42 @@ make_safe_filename() {
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SERVICE 1: GOFILE UPLOAD
-#  No account needed, fast, multiple regional servers
+#  2026 API: anonymous one-shot uploads are DEAD (error-createFolderResponse).
+#  Working flow (verified live): POST /accounts mints a token, then upload
+#  with Authorization: Bearer. GOFILE_API_KEY (a real account token) wins if
+#  set; otherwise ONE guest account is minted per run and reused for every
+#  file — the docs explicitly say never mint an account per upload.
 # ═══════════════════════════════════════════════════════════════════════════════
+
+GOFILE_GUEST_TOKEN=""
+
+_gofile_token() {
+    # Echoes a usable bearer token; empty string on failure.
+    if [[ -n "${GOFILE_API_KEY:-}" ]]; then
+        echo "${GOFILE_API_KEY}"
+        return 0
+    fi
+    if [[ -n "$GOFILE_GUEST_TOKEN" ]]; then
+        echo "$GOFILE_GUEST_TOKEN"
+        return 0
+    fi
+    local resp
+    resp=$(curl -s --max-time 30 -X POST "https://api.gofile.io/accounts" \
+        -H "Content-Type: application/json" -d '{}' 2>/dev/null) || true
+    local tok
+    tok=$(echo "$resp" | jq -r '.data.token // empty' 2>/dev/null)
+    if [[ -n "$tok" ]]; then
+        GOFILE_GUEST_TOKEN="$tok"
+        echo "$tok"
+        return 0
+    fi
+    log_warn "  Gofile: could not mint guest account (${resp:0:120})"
+    return 1
+}
 
 upload_to_gofile() {
     local file="$1"
     local part_name="$2"
-    local api_key="${GOFILE_API_KEY:-}"
 
     log_info "  Gofile: Uploading $(basename "$file") ($(format_size "$(get_file_size "$file")"))..."
 
@@ -65,32 +94,30 @@ upload_to_gofile() {
     )
     local endpoint_idx=0
 
+    # Token once per call site; _gofile_token caches across files in the run.
+    local token
+    token=$(_gofile_token) || { log_error "  Gofile: no account token available"; return 1; }
+
     while (( attempt <= max_retries )); do
         local endpoint="${endpoints[$endpoint_idx]:-${endpoints[0]}}"
         local upload_start upload_response
         upload_start=$(now_epoch)
 
-        log_debug "  Gofile attempt ${attempt}/${max_retries}"
+        log_debug "  Gofile attempt ${attempt}/${max_retries} on ${endpoint}"
 
-        if [[ -n "$api_key" ]]; then
-            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
-                -H "Authorization: Bearer ${api_key}" \
-                -F "file=@${file}" \
-                "$endpoint" 2>/dev/null) || true
-        else
-            upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
-                -F "file=@${file}" \
-                "$endpoint" 2>/dev/null) || true
-        fi
+        upload_response=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+            -H "Authorization: Bearer ${token}" \
+            -F "file=@${file}" \
+            "$endpoint" 2>/dev/null) || true
 
         local upload_elapsed=$(( $(now_epoch) - upload_start ))
 
-        local status download_page file_code
-        status=$(echo "$upload_response"       | jq -r '.status // empty' 2>/dev/null)
+        # New API: success carries .data.downloadPage directly (no .status wrapper).
+        local download_page file_code
         download_page=$(echo "$upload_response" | jq -r '.data.downloadPage // empty' 2>/dev/null)
         file_code=$(echo "$upload_response"    | jq -r '.data.code // .data.fileId // empty' 2>/dev/null)
 
-        if [[ "$status" == "ok" ]] && { [[ -n "$download_page" ]] || [[ -n "$file_code" ]]; }; then
+        if [[ -n "$download_page" || -n "$file_code" ]]; then
             local link="${download_page:-https://gofile.io/d/${file_code}}"
             local speed fsize
             fsize=$(get_file_size "$file")
@@ -99,6 +126,13 @@ upload_to_gofile() {
             log_info "  Gofile: Link → ${link}"
             GOFILE_LINKS+=("${part_name}|${link}")
             return 0
+        fi
+
+        # Expired/invalid token mid-run → re-mint once and keep going.
+        if echo "$upload_response" | grep -q 'error-token'; then
+            log_warn "  Gofile: token rejected, minting a fresh guest account..."
+            GOFILE_GUEST_TOKEN=""
+            token=$(_gofile_token) || break
         fi
 
         log_warn "  Gofile: Upload failed on ${endpoint} (attempt ${attempt}), ${upload_response:0:200}"
@@ -559,16 +593,17 @@ upload_thumbnail_to_cloud() {
     upload_thumbnail_to_archive "$thumb_file" || log_warn "Archive thumbnail upload failed, trying Gofile..."
 
     if [[ -z "${THUMBNAIL_CLOUD_URL:-}" ]]; then
-        local gf_response gf_status gf_code gf_link
-        gf_response=$(curl -s --max-time 120 -F "file=@${thumb_file}" \
-            "https://upload.gofile.io/uploadfile" 2>/dev/null) || true
-        gf_status=$(echo "$gf_response" | jq -r '.status // empty' 2>/dev/null)
-        gf_code=$(echo "$gf_response" | jq -r '.data.code // .data.fileId // empty' 2>/dev/null)
-        if [[ "$gf_status" == "ok" && -n "$gf_code" ]]; then
-            contents=$(curl -s --max-time 60 "https://api.gofile.io/contents/${gf_code}?wt=4fd6sg89d7s6" 2>/dev/null) || true
-            gf_link=$(echo "$contents" | jq -r '(.data.children // {}) | to_entries[0].value.link // empty' 2>/dev/null)
-            if [[ -n "$gf_link" && "$gf_link" == http* ]]; then
-                THUMBNAIL_CLOUD_URL="$gf_link"
+        # Gofile thumbnail via the same 2026 account+token flow as videos.
+        local gf_token gf_response gf_page
+        gf_token=$(_gofile_token) || gf_token=""
+        if [[ -n "$gf_token" ]]; then
+            gf_response=$(curl -s --max-time 120 \
+                -H "Authorization: Bearer ${gf_token}" \
+                -F "file=@${thumb_file}" \
+                "https://upload.gofile.io/uploadfile" 2>/dev/null) || true
+            gf_page=$(echo "$gf_response" | jq -r '.data.downloadPage // empty' 2>/dev/null)
+            if [[ -n "$gf_page" ]]; then
+                THUMBNAIL_CLOUD_URL="$gf_page"
                 set_env "THUMBNAIL_CLOUD_URL" "$THUMBNAIL_CLOUD_URL"
                 set_env "STREAM_THUMBNAIL" "$THUMBNAIL_CLOUD_URL"
                 log_ok "Thumbnail display URL (Gofile) → ${THUMBNAIL_CLOUD_URL}"
