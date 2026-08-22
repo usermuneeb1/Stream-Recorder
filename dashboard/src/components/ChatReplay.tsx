@@ -103,6 +103,7 @@ export default function ChatReplay({ videoId, time, playing, onSeek }: Props) {
               value={q}
               onChange={e => setQ(e.target.value)}
               placeholder="Search what was said…"
+              aria-label="Search chat messages"
               className="w-full h-10 pl-9 pr-9 text-[12.5px] outline-none"
               style={{ background: 'transparent', color: 'var(--ivory)' }}
             />

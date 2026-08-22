@@ -23,17 +23,23 @@ const HOLD_MS = 9000;
 export default function Hero({ recs, live, prediction, listedIds, onOpen, onDetails, onToggleList }: Props) {
   const slides = recs.slice(0, 4);
   const [idx, setIdx] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [broken, setBroken] = useState<Record<string, boolean>>({});
-  const [scrollY, setScrollY] = useState(0);
   const [trailerOn, setTrailerOn] = useState(false);   // iframe loaded → fade in
   const hoverRef = useRef(false);
   const rafRef = useRef(0);
   const startRef = useRef(performance.now());
 
-  // Ambient trailers only for users who allow motion.
-  const reduceMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Per-frame values live in the DOM, not in state: the slide-progress fill
+  // and the scroll-parallax are written by rAF directly to nodes, so the
+  // whole Hero never re-renders at 60fps.
+  const fillRef = useRef<HTMLDivElement | null>(null);
+  const artImgRef = useRef<HTMLImageElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const progressRef = useRef(0);   // slide progress lives here, not in state
+
+  // New slide → new trailer: drop the fade-in state so it lights up fresh.
+  const currentId = slides[Math.min(idx, slides.length - 1)]?.videoId;
+  useEffect(() => { setTrailerOn(false); }, [currentId]);
 
   /* Slide rotation — rAF-driven progress, pauses on hover. */
   useEffect(() => {
@@ -43,11 +49,13 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
     const loop = (now: number) => {
       if (!hoverRef.current) {
         const p = Math.min(1, (now - startRef.current) / HOLD_MS);
-        setProgress(p);
+        progressRef.current = p;
+        if (fillRef.current) fillRef.current.style.width = `${p * 100}%`;
         if (p >= 1) {
           startRef.current = now;
+          progressRef.current = 0;
+          if (fillRef.current) fillRef.current.style.width = '0%';
           setIdx(i => (i + 1) % slides.length);
-          setProgress(0);
         }
       } else {
         startRef.current = now - progressRef.current * HOLD_MS;
@@ -56,22 +64,36 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides.length]);
 
-  const progressRef = useRef(0);
-  progressRef.current = progress;
-
-  // New slide → new trailer: drop the fade-in state so it lights up fresh.
-  const currentId = slides[Math.min(idx, slides.length - 1)]?.videoId;
-  useEffect(() => { setTrailerOn(false); }, [currentId]);
-
-  /* Parallax on scroll. */
+  /* Parallax on scroll — direct style writes, coalesced per frame.
+     Re-runs per slide because the art/content nodes are keyed and remount. */
   useEffect(() => {
-    const onScroll = () => setScrollY(window.scrollY);
+    const img = artImgRef.current;
+    const content = contentRef.current;
+    if (!img || !content) return;
+    let raf = 0;
+    const apply = () => {
+      const y = window.scrollY;
+      img.style.transform = `translateY(${y * 0.12}px) scale(1.05)`;
+      content.style.opacity = String(Math.max(0, 1 - y / 420));
+      content.style.transform = `translateY(${y * 0.18}px)`;
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(apply);
+    };
+    apply();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, [currentId]);
+
+  // Ambient trailers only for users who allow motion.
+  const reduceMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (!slides.length) return null;
   const ep = slides[Math.min(idx, slides.length - 1)];
@@ -81,7 +103,8 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
 
   const jump = (i: number) => {
     setIdx(i);
-    setProgress(0);
+    progressRef.current = 0;
+    if (fillRef.current) fillRef.current.style.width = '0%';
     startRef.current = performance.now();
   };
 
@@ -97,17 +120,13 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
       aria-label="Featured recordings"
     >
       {/* Art with parallax + Ken Burns (also the trailer's poster) */}
-      <div
-        className="hero-art"
-        key={ep.videoId}
-        style={{ transform: `translateY(${scrollY * 0.32}px)` }}
-      >
+      <div className="hero-art" key={ep.videoId}>
         <img
+          ref={artImgRef}
           src={broken[ep.videoId] ? '/thumbnail.jpg' : ep.thumbnail}
           alt=""
           draggable={false}
           onError={() => setBroken(b => ({ ...b, [ep.videoId]: true }))}
-          style={{ transform: `translateY(${scrollY * 0.12}px) scale(1.05)` }}
         />
       </div>
 
@@ -121,7 +140,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
         >
           <iframe
             src={`https://www.youtube-nocookie.com/embed/${ep.videoId}?autoplay=1&mute=1&loop=1&playlist=${ep.videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&start=6`}
-            title=""
+            title="Ambient trailer"
             allow="autoplay; encrypted-media"
             tabIndex={-1}
             style={{
@@ -143,8 +162,8 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
 
       {/* Content lockup */}
       <div
+        ref={contentRef}
         className="hero-content left-[4vw] right-[4vw] bottom-[13vh] max-w-3xl"
-        style={{ opacity: Math.max(0, 1 - scrollY / 420), transform: `translateY(${scrollY * 0.18}px)` }}
         key={ep.videoId + '-c'}
       >
         <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -211,7 +230,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
               onClick={() => jump(i)}
               aria-label={`Show recording ${i + 1}`}
             >
-              {i === idx && <div className="fill" style={{ width: `${progress * 100}%` }} />}
+              {i === idx && <div ref={fillRef} className="fill" />}
             </button>
           ))}
         </div>

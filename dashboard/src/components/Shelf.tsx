@@ -18,15 +18,19 @@ interface Props {
 
 export default function Shelf({ label, hint, recs, numbered, listedIds, onOpen, onDetails, onToggleList }: Props) {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const [scrolled, setScrolled] = useState(0);
-  const [maxScroll, setMaxScroll] = useState(0);
+  // Threshold booleans, not raw pixels: setState with an unchanged value
+  // bails out, so scrolling only re-renders the shelf when an arrow or fade
+  // actually flips — not on every scroll tick.
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(true);
 
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
     const measure = () => {
-      setScrolled(el.scrollLeft);
-      setMaxScroll(el.scrollWidth - el.clientWidth);
+      const max = el.scrollWidth - el.clientWidth;
+      setCanLeft(el.scrollLeft > 8);
+      setCanRight(el.scrollLeft < max - 8);
     };
     measure();
     el.addEventListener('scroll', measure, { passive: true });
@@ -43,9 +47,6 @@ export default function Shelf({ label, hint, recs, numbered, listedIds, onOpen, 
     const el = trackRef.current;
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' });
   };
-
-  const canLeft = scrolled > 8;
-  const canRight = scrolled < maxScroll - 8;
 
   return (
     <section className="shelf reveal-on-scroll">

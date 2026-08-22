@@ -36,6 +36,7 @@ export default function TopBar({ route, listCount, onSearch, onCommand, onLive }
     <header
       className="fixed top-0 inset-x-0 z-40 transition duration-500"
       style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
         background: solid ? 'var(--glass-strong)' : 'linear-gradient(to bottom, var(--topbar-fade), transparent)',
         backdropFilter: solid ? 'blur(22px) saturate(150%)' : 'none',
         WebkitBackdropFilter: solid ? 'blur(22px) saturate(150%)' : 'none',
@@ -93,6 +94,7 @@ export default function TopBar({ route, listCount, onSearch, onCommand, onLive }
             href="https://youtube.com/@TheMuslimLantern"
             target="_blank" rel="noopener noreferrer"
             title="The Muslim Lantern on YouTube"
+            aria-label="The Muslim Lantern on YouTube"
             style={{ border: '1px solid var(--line-flame)', color: 'var(--flame-1)', background: 'var(--flame-04)' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4L15.8 12z" /></svg>

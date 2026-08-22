@@ -1,9 +1,10 @@
 // Details modal — the program notes for one recording: art, metadata,
 // chapters, the mirror vault, and neighbours in the archive.
 
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Ep } from '../types';
 import { fmtDate, fmtTime, isHD, resShort } from '../lib/format';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface Props {
   ep: Ep;
@@ -16,13 +17,11 @@ interface Props {
 
 export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, onClose }: Props) {
   const [broken, setBroken] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); };
-  }, [onClose]);
+  // Scroll lock · Escape · focus trap · initial focus on Close · restore.
+  useDialogA11y(containerRef, onClose, closeRef);
 
   const sorted = [...recs].sort((a, b) => b.date.localeCompare(a.date));
   const idx = sorted.findIndex(r => r.videoId === ep.videoId);
@@ -37,7 +36,7 @@ export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, o
   ].filter(v => v.href);
 
   return (
-    <div className="fixed inset-0 z-[95] overflow-y-auto" role="dialog" aria-modal="true" aria-label={ep.title}>
+    <div ref={containerRef} className="fixed inset-0 z-[95] overflow-y-auto" role="dialog" aria-modal="true" aria-label={ep.title}>
       <div className="overlay-backdrop" onClick={onClose} />
       <div className="relative min-h-full flex items-start justify-center p-4 md:p-8">
         <div data-overlay-panel className="modal-card w-[min(940px,96vw)] my-8 overflow-hidden">
@@ -51,6 +50,7 @@ export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, o
             />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--ink-1) 2%, transparent 60%)' }} />
             <button
+              ref={closeRef}
               className="orb-sm absolute top-4 right-4 z-[2]"
               style={{ background: 'var(--glass-strong)' }}
               onClick={onClose}

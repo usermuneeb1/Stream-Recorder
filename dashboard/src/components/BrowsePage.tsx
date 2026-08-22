@@ -94,6 +94,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Search title or date…"
+            aria-label="Search recordings"
             className="w-full h-10 pl-10 pr-4 rounded-full text-[13px] outline-none transition-colors"
             style={{ background: 'var(--ink-1)', border: '1px solid var(--line)', color: 'var(--ivory)' }}
           />
@@ -104,6 +105,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
+              aria-pressed={filter === f.key}
               className="px-4 h-9 text-[12px] font-semibold transition-colors"
               style={{
                 background: filter === f.key ? 'var(--flame-12)' : 'transparent',
@@ -160,6 +162,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
             onClick={() => setView('grid')}
             title="Grid view"
             aria-label="Grid view"
+            aria-pressed={view === 'grid'}
             className="w-9 h-9 flex items-center justify-center transition-colors"
             style={{ color: view === 'grid' ? 'var(--flame-1)' : 'var(--mist)', background: view === 'grid' ? 'var(--flame-08)' : 'transparent' }}
           >
@@ -169,6 +172,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
             onClick={() => setView('list')}
             title="List view"
             aria-label="List view"
+            aria-pressed={view === 'list'}
             className="w-9 h-9 flex items-center justify-center transition-colors"
             style={{ color: view === 'list' ? 'var(--flame-1)' : 'var(--mist)', background: view === 'list' ? 'var(--flame-08)' : 'transparent' }}
           >
@@ -182,9 +186,18 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
         <div className="py-24 text-center">
           <div className="w-2 h-2 rounded-full mx-auto mb-5" style={{ background: 'var(--flame-3)' }} />
           <p className="display text-xl mb-2">Nothing lit here</p>
-          <p className="text-[13px]" style={{ color: 'var(--mist)' }}>
+          <p className="text-[13px] mb-5" style={{ color: 'var(--mist)' }}>
             Try a different search, or clear the filters.
           </p>
+          {/* Empty states get one clear next action. */}
+          {(q || filter !== 'all' || season !== 'all' || topic !== 'all') && (
+            <button
+              className="btn btn-ghost !py-2 !px-4 !text-[12px]"
+              onClick={() => { setQ(''); setFilter('all'); setSeason('all'); setTopic('all'); }}
+            >
+              Clear all filters
+            </button>
+          )}
         </div>
       ) : view === 'grid' ? (
         <div className="cv-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-7">
@@ -213,7 +226,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
                 tabIndex={0}
                 aria-label={`Play ${ep.title}`}
                 onClick={() => onOpen(ep)}
-                onKeyDown={e => { if (e.key === 'Enter') onOpen(ep); }}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(ep); } }}
                 className="group flex gap-4 p-3 rounded-xl cursor-pointer transition duration-300 hover:translate-x-1"
                 style={{ background: 'var(--ink-1)', border: '1px solid var(--line)' }}
               >
@@ -257,7 +270,9 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
                       ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5 9.5 18 20 6.5" /></svg>
                       : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>}
                   </button>
-                  <span className="orb-sm solid" title="Play" aria-label={`Play ${ep.title}`}>
+                  {/* Decorative echo of the row's action — the row itself is
+                      the control, so this stays invisible to screen readers. */}
+                  <span className="orb-sm solid" aria-hidden="true">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
                   </span>
                 </div>

@@ -29,6 +29,7 @@ import {
   clearPosition, getRate, getTheatre, loadPosition,
   pushHistory, savePosition, setRate as persistRate, setTheatre as persistTheatre,
 } from '../lib/storage';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface Props {
   rec: Ep;
@@ -411,7 +412,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   return (
     <div className={`min-h-dvh ${theatre ? 'theatre' : ''}`}>
       {/* Sticky chrome */}
-      <div className="sticky top-0 z-40 safe-bottom-0" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(22px) saturate(150%)', WebkitBackdropFilter: 'blur(22px) saturate(150%)', borderBottom: '1px solid var(--line)', boxShadow: '0 16px 32px -22px rgba(0,0,0,0.55)' }}>
+      <div className="sticky top-0 z-40" style={{ background: 'var(--glass-strong)', backdropFilter: 'blur(22px) saturate(150%)', WebkitBackdropFilter: 'blur(22px) saturate(150%)', borderBottom: '1px solid var(--line)', boxShadow: '0 16px 32px -22px rgba(0,0,0,0.55)' }}>
         <div className="flex items-center gap-2 px-4 md:px-6 h-14">
           <button className="btn-icon" title="Back to archive (Esc)" aria-label="Back to archive" onClick={onClose}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 5-7 7 7 7" /></svg>
@@ -655,7 +656,12 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                     Copy link
                   </button>
                   <div className="relative">
-                    <button className="btn btn-ghost !py-2 !px-4 !text-[12px]" onClick={e => { e.stopPropagation(); setShareOpen(v => !v); }}>
+                    <button
+                      className="btn btn-ghost !py-2 !px-4 !text-[12px]"
+                      onClick={e => { e.stopPropagation(); setShareOpen(v => !v); }}
+                      aria-expanded={shareOpen}
+                      aria-haspopup="true"
+                    >
                       Share ▾
                     </button>
                     {shareOpen && (
@@ -756,6 +762,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                   className="w-full flex items-center gap-2.5 px-3 h-10 rounded-lg mb-1.5 text-[12.5px] font-bold transition-colors"
                   style={{ background: srcIdx === 0 ? 'var(--flame-08)' : 'transparent', border: `1px solid ${srcIdx === 0 ? 'var(--line-flame)' : 'transparent'}`, color: 'var(--ivory)' }}
                   onClick={() => selectMirror(0)}
+                  aria-pressed={srcIdx === 0}
                 >
                   ⚡ Auto
                   <span className="mono ml-auto text-[10px]" style={{ color: 'var(--shade)' }}>{active?.label}</span>
@@ -775,6 +782,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                         color: 'var(--mist)',
                       }}
                       onClick={() => selectMirror(i + 1)}
+                      aria-pressed={srcIdx === i + 1}
                     >
                       <span className={`dot-health ${state}`} />
                       <span style={{ color: 'var(--ivory)' }}>{m.label}</span>
@@ -849,33 +857,43 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       {shareOpen && <div className="fixed inset-0 z-20" onClick={() => setShareOpen(false)} />}
 
       {/* Help modal */}
-      {showHelp && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-          <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={() => setShowHelp(false)} />
-          <div className="modal-card relative w-[min(420px,94vw)] p-6">
-            <div className="eyebrow mb-4">Shortcuts</div>
-            <div className="flex flex-col gap-2.5 text-[12.5px]" style={{ color: 'var(--mist)' }}>
-              {[
-                ['Space / K', 'Play · pause'],
-                ['← / →', 'Seek ±10s'],
-                ['↑ / ↓', 'Volume'],
-                ['M', 'Mute'],
-                ['F', 'Fullscreen'],
-                ['I', 'Picture-in-picture'],
-                ['0–5', 'Switch mirror (0 = auto)'],
-                ['T', 'Theatre mode'],
-                ['?', 'This panel'],
-                ['Esc', 'Close panel / exit'],
-              ].map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between">
-                  <span>{v}</span>
-                  <span className="kbd">{k}</span>
-                </div>
-              ))}
+      {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
+    </div>
+  );
+}
+
+/* ── Shortcuts help — a real dialog: trapped focus, Esc, restore ────────── */
+
+function ShortcutsHelp({ onClose }: { onClose: () => void }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useDialogA11y(containerRef, onClose, cardRef);
+
+  return (
+    <div ref={containerRef} className="fixed inset-0 z-[90] flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
+      <div ref={cardRef} tabIndex={-1} className="modal-card relative w-[min(420px,94vw)] p-6 outline-none">
+        <div className="eyebrow mb-4">Shortcuts</div>
+        <div className="flex flex-col gap-2.5 text-[12.5px]" style={{ color: 'var(--mist)' }}>
+          {[
+            ['Space / K', 'Play · pause'],
+            ['← / →', 'Seek ±10s'],
+            ['↑ / ↓', 'Volume'],
+            ['M', 'Mute'],
+            ['F', 'Fullscreen'],
+            ['I', 'Picture-in-picture'],
+            ['0–5', 'Switch mirror (0 = auto)'],
+            ['T', 'Theatre mode'],
+            ['?', 'This panel'],
+            ['Esc', 'Close panel / exit'],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between">
+              <span>{v}</span>
+              <span className="kbd">{k}</span>
             </div>
-          </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -208,7 +208,7 @@ function ShortCard({ short, index, playing, muted, liked, onActive, onToggleLike
         </button>
 
         {/* Hairline progress */}
-        <div className="short-progress" aria-hidden="true"><div style={{ width: `${progress * 100}%` }} /></div>
+        <div className="short-progress" aria-hidden="true"><div style={{ transform: `scaleX(${progress})` }} /></div>
 
         {/* Info + rail */}
         <div className="short-info">

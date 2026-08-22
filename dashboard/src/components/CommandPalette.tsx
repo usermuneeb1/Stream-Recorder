@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Ep } from '../types';
 import { fmtDate } from '../lib/format';
 import { nav } from './Nav';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface Props {
   recs: Ep[];
@@ -23,17 +24,12 @@ interface Action {
 export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onClose }: Props) {
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 40);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => { clearTimeout(t); window.removeEventListener('keydown', onKey); };
-  }, [onClose]);
+  // Scroll lock · Escape · focus trap · restore focus to the trigger.
+  useDialogA11y(containerRef, onClose, inputRef);
 
   const actions: Action[] = useMemo(() => [
     { id: 'search', label: 'Search everything', hint: 'open full search', run: () => { onClose(); setTimeout(onSearch, 80); } },
@@ -86,7 +82,7 @@ export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onC
   };
 
   return (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div ref={containerRef} className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Command palette">
       <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
       <div
         className="palette-card absolute left-0 right-0 mx-auto top-[14vh] w-[min(580px,92vw)] overflow-hidden"
@@ -100,13 +96,14 @@ export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onC
             onChange={e => setQ(e.target.value)}
             onKeyDown={onKey}
             placeholder="Jump to an episode or command…"
+            aria-label="Search episodes and commands"
             className="flex-1 bg-transparent outline-none text-[14px]"
             style={{ color: 'var(--ivory)' }}
           />
           <span className="kbd">esc</span>
         </div>
 
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-2">
+        <div ref={listRef} role="listbox" aria-label="Episodes and actions" className="max-h-[52vh] overflow-y-auto py-2">
           {items.length === 0 && (
             <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--mist)' }}>Nothing matches “{q}”.</div>
           )}
@@ -114,6 +111,8 @@ export default function CommandPalette({ recs, onOpen, onSearch, onSurprise, onC
             <button
               key={it.kind === 'ep' ? it.ep.videoId : it.action.id}
               data-row
+              role="option"
+              aria-selected={sel === i}
               onMouseEnter={() => setSel(i)}
               onClick={() => run(i)}
               className="w-full flex items-center gap-3.5 px-5 py-2.5 text-left transition-colors"

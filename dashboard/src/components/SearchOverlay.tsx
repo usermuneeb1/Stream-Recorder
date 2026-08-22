@@ -1,8 +1,9 @@
 // Full-screen search — the archive at your fingertips. `/` opens it.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Ep } from '../types';
 import PosterCard from './PosterCard';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface Props {
   recs: Ep[];
@@ -15,19 +16,11 @@ interface Props {
 
 export default function SearchOverlay({ recs, listedIds, onOpen, onDetails, onToggleList, onClose }: Props) {
   const [q, setQ] = useState('');
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 40);
-    document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      clearTimeout(t);
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
+  // Scroll lock · Escape · focus trap · restore focus to the trigger.
+  useDialogA11y(containerRef, onClose, inputRef);
 
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -43,7 +36,7 @@ export default function SearchOverlay({ recs, listedIds, onOpen, onDetails, onTo
   const pick = (ep: Ep) => { onClose(); setTimeout(() => onOpen(ep), 60); };
 
   return (
-    <div className="fixed inset-0 z-[85] flex flex-col" role="dialog" aria-modal="true" aria-label="Search the archive">
+    <div ref={containerRef} className="fixed inset-0 z-[85] flex flex-col" role="dialog" aria-modal="true" aria-label="Search the archive">
       <div className="absolute inset-0" style={{ background: 'var(--overlay)', backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)' }} onClick={onClose} />
 
       <div className="relative z-[1] px-[4vw] md:px-8 pt-24 md:pt-28 pb-6">
@@ -52,6 +45,7 @@ export default function SearchOverlay({ recs, listedIds, onOpen, onDetails, onTo
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder="Search the archive…"
+          aria-label="Search the archive"
           className="display w-full bg-transparent outline-none text-[clamp(26px,4.5vw,44px)] font-medium pb-4"
           style={{ color: 'var(--ivory)', borderBottom: '1px solid var(--line-flame)' }}
         />
