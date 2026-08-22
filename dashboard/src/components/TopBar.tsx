@@ -26,10 +26,9 @@ export default function TopBar({ route, listCount, onSearch, onCommand, onLive }
   const links: { label: string; href: string; active: boolean }[] = [
     { label: 'Home', href: '#/', active: route === 'home' },
     { label: 'Archive', href: '#/browse', active: route === 'browse' },
-        { label: 'Channel', href: '#/channel', active: route === 'channel' },
+    { label: 'Channel', href: '#/channel', active: route === 'channel' },
     { label: 'Shorts', href: '#/shorts', active: route === 'shorts' },
     { label: 'Insights', href: '#/stats', active: route === 'stats' },
-    { label: 'System', href: '#/system', active: route === 'system' },
     { label: 'My List', href: '#/my-list', active: route === 'mylist' },
   ];
 

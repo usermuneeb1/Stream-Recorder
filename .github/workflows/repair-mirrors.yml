@@ -79,6 +79,11 @@ jobs:
           sed -i 's/\r$//' scripts/*.sh scripts/*.env 2>/dev/null || true
           chmod +x scripts/*.sh
 
+      - name: "Backfill archive playback nodes"
+        # R3AL self-healing: any recording missing archive_direct/archive_node
+        # gets them re-derived + re-resolved before repairs run.
+        run: bash scripts/backfill-archive-nodes.sh || true
+
       - name: "Repair from Archive.org"
         env:
           TARGET_VIDEO_ID: ${{ github.event.inputs.video_id }}
