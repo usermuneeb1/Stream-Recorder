@@ -187,7 +187,7 @@ export default function BrowsePage({ title, subtitle, recs, listedIds, onOpen, o
           </p>
         </div>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-7">
+        <div className="cv-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-7">
           {shown.map((ep, i) => (
             <PosterCard
               key={ep.videoId}

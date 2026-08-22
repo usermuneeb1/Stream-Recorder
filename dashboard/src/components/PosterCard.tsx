@@ -1,10 +1,11 @@
 // Poster card — the atom of the archive. Shelf variant expands on hover with
 // an info drawer; compact variant serves grids (browse / search / details).
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Ep } from '../types';
 import { fmtDate, fmtRemaining, isHD, resShort } from '../lib/format';
 import { positionOf } from '../lib/storage';
+import { previewSourceFor, previewStartFor } from '../lib/preview';
 import { nav } from './Nav';
 
 interface Props {
@@ -17,15 +18,52 @@ interface Props {
   index?: number;          // stagger delay
 }
 
+// Hover preview gate — evaluated once (js-cache-property-access).
+// Desktop fine pointers only, and never for reduced-motion users.
+const CAN_PREVIEW =
+  typeof window !== 'undefined' &&
+  !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+const REDUCES_MOTION =
+  typeof window !== 'undefined' &&
+  !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
 function PlayIcon() {
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>;
 }
 
 export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList, compact, index }: Props) {
   const [broken, setBroken] = useState(false);
+  // Mini-preview state: mounted → <video> exists; live → frames actually
+  // flowing (fade the video in only then, so the poster never flashes black).
+  const [previewOn, setPreviewOn] = useState(false);
+  const [previewLive, setPreviewLive] = useState(false);
+  const hoverTimer = useRef<number | undefined>(undefined);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   const pos = positionOf(ep.videoId);
   const pct = pos && pos.d ? Math.min(100, (pos.t / pos.d) * 100) : 0;
   const left = pos ? pos.d - pos.t : 0;
+
+  const src = previewSourceFor(ep);
+
+  const killPreview = () => {
+    window.clearTimeout(hoverTimer.current);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.removeAttribute('src');
+      videoRef.current.load();   // release the media element's decoder + bytes
+    }
+    setPreviewOn(false);
+    setPreviewLive(false);
+  };
+
+  const enter = () => {
+    if (!CAN_PREVIEW || REDUCES_MOTION || !src || previewOn) return; // early-exit
+    hoverTimer.current = window.setTimeout(() => setPreviewOn(true), 650);
+  };
+
+  // Unmount hygiene: no orphan timers, no streaming decoders left behind.
+  useEffect(() => killPreview, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = () => onOpen(ep);
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
@@ -39,6 +77,9 @@ export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList
       aria-label={`Play ${ep.title}`}
       onClick={open}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+      onMouseEnter={enter}
+      onMouseLeave={killPreview}
+      onBlur={killPreview}
     >
       <div className="card-art">
         <img
@@ -48,6 +89,24 @@ export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList
           draggable={false}
           onError={() => setBroken(true)}
         />
+
+        {/* Mini preview — mounts only after the dwell delay, fades in only
+            once frames actually flow. Muted, inline, metadata-preload.
+            #t= starts mid-content where it's interesting. */}
+        {previewOn && src && (
+          <video
+            ref={videoRef}
+            className={`card-preview ${previewLive ? 'live' : ''}`}
+            src={`${src}#t=${previewStartFor(ep)}`}
+            muted
+            playsInline
+            autoPlay
+            preload="metadata"
+            onPlaying={() => setPreviewLive(true)}
+            onError={killPreview}
+          />
+        )}
+
         <div className="card-shade" />
 
         {/* top-left flags */}

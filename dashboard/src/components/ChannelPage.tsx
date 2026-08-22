@@ -90,7 +90,7 @@ export default function ChannelPage({ videos, listedIds, onOpen, onDetails, onTo
           <p className="text-[12.5px]" style={{ color: 'var(--shade)' }}>Try a shorter fragment of the title.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-7">
+        <div className="cv-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-7">
           {shown.map((v, i) => (
             <PosterCard
               key={v.videoId}
