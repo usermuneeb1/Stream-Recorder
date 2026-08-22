@@ -33,7 +33,7 @@ export default function ChannelPage({ videos, listedIds, onOpen, onDetails, onTo
   }, [videos, q, sort]);
 
   return (
-    <div className="page-enter max-w-[1500px] mx-auto px-4 md:px-6 py-8">
+    <div className="page-enter max-w-[1500px] mx-auto px-4 md:px-6 pt-28 md:pt-36 pb-12">
       {/* Header */}
       <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
         <div>

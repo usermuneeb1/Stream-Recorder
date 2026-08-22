@@ -87,6 +87,7 @@ export default function PosterCard({ ep, listed, onOpen, onDetails, onToggleList
           src={broken ? '/thumbnail.jpg' : ep.thumbnail}
           alt=""
           loading="lazy"
+          decoding="async"
           draggable={false}
           onError={() => setBroken(true)}
         />

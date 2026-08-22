@@ -18,24 +18,29 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 // SCROLL-REVEAL — any .reveal-on-scroll element fades+slides in when it
 // enters the viewport. One observer for the whole document; a light
 // periodic re-scan catches React-rendered cards added later.
-if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
-  const obs = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (e.isIntersecting) {
-        e.target.classList.add('is-visible');
-        obs.unobserve(e.target);
+if (typeof window !== 'undefined') {
+  if ('IntersectionObserver' in window) {
+    const obs = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('is-visible');
+          obs.unobserve(e.target);
+        }
       }
-    }
-  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 
-  const scan = () => {
-    document.querySelectorAll<HTMLElement>('.reveal-on-scroll:not(.is-visible):not([data-observed])').forEach(el => {
-      el.dataset.observed = '1';
-      obs.observe(el);
-    });
-  };
-  requestAnimationFrame(scan);
-  setInterval(scan, 800);
+    const scan = () => {
+      document.querySelectorAll<HTMLElement>('.reveal-on-scroll:not(.is-visible):not([data-observed])').forEach(el => {
+        el.dataset.observed = '1';
+        obs.observe(el);
+      });
+    };
+    requestAnimationFrame(scan);
+    setInterval(scan, 800);
+  } else {
+    // Safety net: without IO, never leave content invisible — show it all.
+    document.querySelectorAll<HTMLElement>('.reveal-on-scroll').forEach(el => el.classList.add('is-visible'));
+  }
 }
 
 // Service worker — production only.

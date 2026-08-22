@@ -24,7 +24,8 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
   const slides = recs.slice(0, 4);
   const [idx, setIdx] = useState(0);
   const [broken, setBroken] = useState<Record<string, boolean>>({});
-  const [trailerOn, setTrailerOn] = useState(false);   // iframe loaded → fade in
+  const [trailerOn, setTrailerOn] = useState(false);   // frames actually flowing → fade in
+  const [trailerDead, setTrailerDead] = useState(false); // mirror errored → art only
   const hoverRef = useRef(false);
   const rafRef = useRef(0);
   const startRef = useRef(performance.now());
@@ -39,7 +40,10 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
 
   // New slide → new trailer: drop the fade-in state so it lights up fresh.
   const currentId = slides[Math.min(idx, slides.length - 1)]?.videoId;
-  useEffect(() => { setTrailerOn(false); }, [currentId]);
+  useEffect(() => {
+    setTrailerOn(false);
+    setTrailerDead(false);
+  }, [currentId]);
 
   /* Slide rotation — rAF-driven progress, pauses on hover. */
   useEffect(() => {
@@ -97,6 +101,13 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
 
   if (!slides.length) return null;
   const ep = slides[Math.min(idx, slides.length - 1)];
+  // Ambient trailer source — PERMANENT mirrors only, in failover order.
+  // The old YouTube iframe showed "This video is unavailable" on the front
+  // door the day a VOD got privated. Archive.org nodes and GitHub releases
+  // never expire, so the billboard always has something to play.
+  const trailerSrc = !trailerDead
+    ? (ep.archiveNode || ep.archiveDirect || ep.githubDirect || ep.githubRelease || '')
+    : '';
   const pos = positionOf(ep.videoId);
   const resumePct = pos && pos.d ? Math.min(100, (pos.t / pos.d) * 100) : 0;
   const listed = listedIds.has(ep.videoId);
@@ -126,31 +137,34 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
           src={broken[ep.videoId] ? '/thumbnail.jpg' : ep.thumbnail}
           alt=""
           draggable={false}
+          fetchPriority="high"
+          decoding="async"
           onError={() => setBroken(b => ({ ...b, [ep.videoId]: true }))}
         />
       </div>
 
-      {/* Ambient trailer — the video itself, muted, chromeless, on loop */}
-      {!reduceMotion && /^[\w-]{11}$/.test(ep.videoId) && (
+      {/* Ambient trailer — the video itself, muted, chromeless, on loop,
+          streamed from a PERMANENT mirror. `poster` guarantees this layer is
+          never black and never an error panel: worst case it's just the art. */}
+      {!reduceMotion && trailerSrc && (
         <div
           key={ep.videoId + '-trailer'}
           className="hero-art"
           aria-hidden="true"
           style={{ opacity: trailerOn ? 1 : 0, transition: 'opacity 1.4s var(--ease)', pointerEvents: 'none', animation: 'none' }}
         >
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${ep.videoId}?autoplay=1&mute=1&loop=1&playlist=${ep.videoId}&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&start=6`}
-            title="Ambient trailer"
-            allow="autoplay; encrypted-media"
-            tabIndex={-1}
-            style={{
-              position: 'absolute', inset: 0,
-              width: '100%', height: '100%',
-              border: 0,
-              transform: 'scale(1.42)',       // crop the player chrome
-              transformOrigin: 'center',
-            }}
-            onLoad={() => setTrailerOn(true)}
+          <video
+            src={trailerSrc}
+            poster={broken[ep.videoId] ? undefined : ep.thumbnail}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            disablePictureInPicture
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+            onPlaying={() => setTrailerOn(true)}
+            onError={() => { setTrailerOn(false); setTrailerDead(true); }}
           />
         </div>
       )}
