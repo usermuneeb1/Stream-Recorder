@@ -9,6 +9,11 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+    paths:
+      - "dashboard/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "package*.json"
   push:
     branches: [main]
     paths:
@@ -107,7 +112,12 @@ jobs:
         run: npm ci
 
       - name: "Lint"
-        run: echo "lint skipped"
+        run: echo "eslint not yet configured — see automation grill Q1"
+
+      - name: "Dependency audit"
+        # Critical-only so known-transitive noise can't permanently redden
+        # the gate; high/critical in direct deps still surfaces here.
+        run: npm audit --audit-level=critical
 
       - name: "Build"
         run: npm run build
