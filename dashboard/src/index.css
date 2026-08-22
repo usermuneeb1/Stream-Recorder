@@ -120,7 +120,9 @@
 
 /* ── Base ──────────────────────────────────────────────────────────────── */
 
-html { background: var(--ink-0); }
+/* scrollbar-gutter: reserving the gutter keeps the layout from jumping
+   sideways whenever an overlay locks body scroll (search, palette, modal). */
+html { background: var(--ink-0); scrollbar-gutter: stable; }
 
 body {
   background: var(--ink-0);
@@ -143,6 +145,25 @@ body {
 *::-webkit-scrollbar-thumb:hover { background: var(--flame-3); }
 
 :focus-visible { outline: 2px solid var(--flame-1); outline-offset: 2px; border-radius: 4px; }
+
+/* Skip link — invisible until keyboarded, then unmistakably on-brand. */
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translate(-50%, -260%);
+  z-index: 300;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  background: var(--flame-2);
+  box-shadow: var(--shadow-flame);
+  text-decoration: none;
+  transition: transform 0.18s var(--ease);
+}
+.skip-link:focus-visible { transform: translate(-50%, 0); }
 
 img { -webkit-user-drag: none; }
 

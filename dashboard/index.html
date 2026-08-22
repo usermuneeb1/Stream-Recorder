@@ -37,12 +37,16 @@
   <meta property="og:title" content="The Lantern Archive — The Muslim Lantern, preserved forever" />
   <meta property="og:description" content="Every live broadcast of The Muslim Lantern, recorded in 1080p and mirrored across five archives. Free to watch." />
   <meta property="og:image" content="/thumbnail.jpg" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="720" />
+  <meta property="og:image:alt" content="The Lantern Archive — The Muslim Lantern, preserved forever" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="The Lantern Archive" />
   <meta name="twitter:description" content="Every live broadcast of The Muslim Lantern, preserved forever. Free to watch." />
   <meta name="twitter:image" content="/thumbnail.jpg" />
+  <meta name="twitter:image:alt" content="The Lantern Archive — The Muslim Lantern, preserved forever" />
 
   <title>The Lantern Archive — The Muslim Lantern, preserved forever</title>
 
@@ -67,6 +71,12 @@
   <!-- Fonts: Bebas Neue (cinematic display), Manrope (UI), Spline Sans Mono (data) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Startup rung: nearly every image and the hero trailer stream from
+       Archive.org — warm DNS + TLS before the first request so posters and
+       the billboard's first frame arrive sooner on cold loads. -->
+  <link rel="preconnect" href="https://archive.org" crossorigin />
+  <link rel="dns-prefetch" href="//archive.org" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- Critical boot: the lantern lights in the room you chose — no flash of the wrong theme -->

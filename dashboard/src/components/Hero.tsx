@@ -26,6 +26,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
   const [broken, setBroken] = useState<Record<string, boolean>>({});
   const [trailerOn, setTrailerOn] = useState(false);   // frames actually flowing → fade in
   const [trailerDead, setTrailerDead] = useState(false); // mirror errored → art only
+  const [trailerDwell, setTrailerDwell] = useState(false); // startup beat elapsed → mount video
   const hoverRef = useRef(false);
   const rafRef = useRef(0);
   const startRef = useRef(performance.now());
@@ -95,9 +96,26 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
     };
   }, [currentId]);
 
-  // Ambient trailers only for users who allow motion.
+  // Ambient trailers only for users who allow motion — and never for
+  // Data-Saver / 2G visitors. The page's own time-to-first-frame comes
+  // first; ambient megabytes are a luxury, not the product.
   const reduceMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const conn = typeof navigator !== 'undefined'
+    ? (navigator as { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+    : undefined;
+  const dataSaver = !!conn?.saveData || /(^|\b)2g\b/.test(conn?.effectiveType || '');
+  const trailerAllowed = !reduceMotion && !dataSaver;
+
+  /* Startup dwell — art + UI paint immediately; the trailer mounts only
+     after a quiet beat so video bytes never compete with the front door's
+     first render. Resets per slide alongside its fresh mirror. */
+  useEffect(() => {
+    setTrailerDwell(false);
+    if (!trailerAllowed) return;
+    const t = setTimeout(() => setTrailerDwell(true), 2500);
+    return () => clearTimeout(t);
+  }, [currentId, trailerAllowed]);
 
   if (!slides.length) return null;
   const ep = slides[Math.min(idx, slides.length - 1)];
@@ -144,9 +162,10 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
       </div>
 
       {/* Ambient trailer — the video itself, muted, chromeless, on loop,
-          streamed from a PERMANENT mirror. `poster` guarantees this layer is
-          never black and never an error panel: worst case it's just the art. */}
-      {!reduceMotion && trailerSrc && (
+          streamed from a PERMANENT mirror after the startup dwell. `poster`
+          guarantees this layer is never black and never an error panel:
+          worst case it's just the art. */}
+      {!trailerAllowed ? null : !trailerDwell ? null : !trailerSrc ? null : (
         <div
           key={ep.videoId + '-trailer'}
           className="hero-art"

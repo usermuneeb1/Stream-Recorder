@@ -61,6 +61,7 @@ export default function TopBar({ route, listCount, onSearch, onCommand, onLive }
             <a
               key={l.href}
               href={l.href}
+              aria-current={l.active ? 'page' : undefined}
               className="relative text-[13.5px] font-semibold tracking-wide transition-colors duration-300 py-1"
               style={{ color: l.active ? 'var(--flame-1)' : 'var(--mist)' }}
             >

@@ -166,6 +166,7 @@ export default function App() {
 
   return (
     <div className="relative min-h-dvh" style={{ background: 'var(--ink-0)' }}>
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <Splash />
       <div className="ambient-light" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
@@ -180,7 +181,7 @@ export default function App() {
         />
       )}
 
-      <main className="relative z-[1]">
+      <main id="main-content" className="relative z-[1]">
         {loading ? (
           <HomeSkeleton />
         ) : route.kind === 'home' ? (
