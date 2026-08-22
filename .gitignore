@@ -56,3 +56,7 @@ scripts/pixeldrain/accounts.csv
 scripts/mega/signin_results.json
 scripts/mega/.last_account_index
 scripts/mega/accounts.old.csv
+
+# Agent skills — local toolkit only, never part of the repo
+.agents/
+skills-lock.json
