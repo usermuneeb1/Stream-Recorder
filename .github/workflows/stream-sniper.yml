@@ -14,7 +14,7 @@
 # ║                                                                              ║
 # ║  Triggers:                                                                   ║
 # ║    • repository_dispatch "ping-sniper"  ← external pinger (PRIMARY coverage) ║
-# ║    • schedule "*/2 * * * *"            ← best-effort (GitHub throttles cron) ║
+# ║    • schedule "*/5 * * * *"            ← best-effort (GitHub minimum cadence) ║
 # ║    • workflow_dispatch                                                       ║
 # ║                                                                              ║
 # ║  Set up the external pinger to fire BOTH:                                    ║
@@ -28,7 +28,7 @@ on:
   repository_dispatch:
     types: [ping-sniper]
   schedule:
-    - cron: "*/2 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 concurrency:
