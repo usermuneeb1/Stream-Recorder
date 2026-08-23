@@ -1,15 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║   PINGER WATCHDOG                                                           ║
-# ║  Two severities, so Discord gets fires — not noise:                         ║
+# ║  Watches ONE thing: the stream-recorder's dispatch heartbeat from the       ║
+# ║  external pinger (cron-job.org). Alerts Discord ONLY when coverage is       ║
+# ║  genuinely degrading — i.e. dispatches used to arrive and stopped.          ║
 # ║                                                                              ║
-# ║  🔴 CRITICAL — dispatch heartbeat LOST (dispatches used to arrive, now      ║
-# ║     stale) or a watched workflow has no runs of any kind. Re-alerts every   ║
-# ║     cycle until fixed, because coverage is genuinely degrading.             ║
-# ║                                                                              ║
-# ║  🟡 SETUP NOTE — a workflow that has NEVER seen its dispatch type but IS    ║
-# ║     alive through its schedule fallback (e.g. the sniper's */2 cron).       ║
-# ║     Coverage exists but is latency-degraded; sent at most once per          ║
-# ║     NOTE_COOLDOWN_DAYS via a stamped state file, then goes quiet.           ║
+# ║  The go-live sniper is intentionally NOT watched here: its own */2          ║
+# ║  schedule fallback provides independent capture coverage, so its            ║
+# ║  dispatch count is not an outage signal.                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: "Pinger watchdog"
@@ -28,7 +25,6 @@ on:
 
 permissions:
   actions: read
-  contents: write        # commit the setup-note throttle stamp
 
 defaults:
   run:
@@ -42,66 +38,67 @@ env:
   DISCORD_WEBHOOK_ALERTS: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
-  # A scheduled run older than this means GitHub throttling disabled the
-  # fallback too — that escalates a setup note to a critical alarm.
-  ALIVE_WINDOW_MIN: "90"
-  # Setup notes repeat at most this often (seconds). 7 days.
-  NOTE_COOLDOWN_SEC: "604800"
 
 jobs:
   watchdog:
-    name: "Check pinger heartbeat"
+    name: "Check recorder heartbeat"
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: "Checkout"
         uses: actions/checkout@v7
 
-      - name: "Classify each watcher workflow"
+      - name: "Check stream-recorder dispatch heartbeat"
         id: check
         env:
           QUIET_MINUTES: ${{ inputs.quiet_minutes || '20' }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          BASE="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows"
+          BASE="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/runs"
           auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json")
 
-          latest_age() {  # $1=event filter ('' = any)  $2=workflow file
-            local url="${BASE}/$2/runs?per_page=1${1:+&event=$1}"
-            local ts
-            ts=$(curl -fsS "${auth[@]}" "$url" | jq -r '.workflow_runs[0].created_at // empty' 2>/dev/null || true)
-            [[ -z "$ts" ]] && { echo "NEVER"; return; }
-            echo $(( ($(date +%s) - $(date -d "$ts" +%s 2>/dev/null || echo 0)) / 60 ))
-          }
+          DISP=$(curl -fsS "${auth[@]}" "${BASE}?event=repository_dispatch&per_page=1" \
+            | jq -r '.workflow_runs[0].created_at // empty' 2>/dev/null || true)
 
-          CRITICAL=""
-          NOTES=""
-          for wf in stream-recorder.yml stream-sniper.yml; do
-            DISP=$(latest_age repository_dispatch "$wf")
-            ANY=$(latest_age "" "$wf")
-            echo "${wf}: dispatch=${DISP}m any=${ANY}m" >> "$GITHUB_STEP_SUMMARY"
-
-            if [[ "$DISP" != "NEVER" ]] && (( DISP > QUIET_MINUTES )); then
-              CRITICAL+="🔴 \`${wf}\` dispatch heartbeat LOST — last ping ${DISP} min ago (quiet window: ${QUIET_MINUTES})."$'\n'
-            elif [[ "$DISP" == "NEVER" ]]; then
-              if [[ "$ANY" == "NEVER" ]] || (( ANY > ALIVE_WINDOW_MIN )); then
-                CRITICAL+="🔴 \`${wf}\` has NEVER been dispatched AND has no recent runs (${ANY}m) — the workflow itself looks dead."$'\n'
-              else
-                NOTES+="🟡 \`${wf}\` has never been triggered by repository_dispatch — covered right now by its schedule fallback (last run ${ANY} min ago), but latency is degraded vs the ~2-min pinger cadence."$'\n'
-              fi
+          if [[ -z "$DISP" ]]; then
+            # Never dispatched at all — check whether ANY run happened recently.
+            ANY=$(curl -fsS "${auth[@]}" "${BASE}?per_page=1" \
+              | jq -r '.workflow_runs[0].created_at // empty' 2>/dev/null || true)
+            if [[ -z "$ANY" ]]; then
+              AGE="NEVER"
+            else
+              AGE_MIN=$(( ($(date +%s) - $(date -d "$ANY" +%s 2>/dev/null || echo 0)) / 60 ))
+              if (( AGE_MIN > 90 )); then AGE="STALE(${AGE_MIN}m)"; else AGE="schedule-ok"; fi
             fi
-            echo "latest_${wf%.yml}_dispatch=${DISP}" >> "$GITHUB_OUTPUT"
-          done
+          else
+            AGE=$(( ($(date +%s) - $(date -d "$DISP" +%s 2>/dev/null || echo 0)) / 60 ))
+          fi
+          echo "age=${AGE}" >> "$GITHUB_OUTPUT"
 
-          echo "critical=$([ -z "$CRITICAL" ] && echo ok || echo yes)" >> "$GITHUB_OUTPUT"
-          printf '%s' "$CRITICAL" > /tmp/watchdog-critical.txt
-          printf '%s' "$NOTES"    > /tmp/watchdog-notes.txt
-          [[ -n "$NOTES" ]] && echo "has_note=yes" >> "$GITHUB_OUTPUT" || echo "has_note=no" >> "$GITHUB_OUTPUT"
+          ALERT="no"
+          REASON=""
+          case "$AGE" in
+            NEVER|STALE*)
+              ALERT="yes"
+              REASON="stream-recorder has never been triggered by repository_dispatch (${AGE}) — the scheduled fallback may be throttled too."
+              ;;
+            schedule-ok)
+              ;;
+            *)
+              if (( AGE > QUIET_MINUTES )); then
+                ALERT="yes"
+                REASON="stream-recorder dispatch heartbeat LOST — last ping ${AGE} min ago (quiet window: ${QUIET_MINUTES})."
+              fi
+              ;;
+          esac
+          echo "alert=$ALERT" >> "$GITHUB_OUTPUT"
+          printf '%s' "$REASON" > /tmp/watchdog-reason.txt
+          if [[ -n "$REASON" ]]; then echo "reason: $REASON" >> "$GITHUB_STEP_SUMMARY"; else echo "heartbeat ok (last dispatch ${AGE} min ago)" >> "$GITHUB_STEP_SUMMARY"; fi
 
-      - name: "🔴 Send critical alarm (heartbeat lost / dead workflow)"
-        if: steps.check.outputs.critical == 'yes'
+      - name: "🚨 Alert — recorder coverage degrading"
+        if: steps.check.outputs.alert == 'yes'
         run: |
-          MSG="🚨 **Pinger watchdog — CRITICAL**"$'\n'"$(cat /tmp/watchdog-critical.txt)"$'\n'"A live stream could be missed RIGHT NOW. Check cron-job.org and the workflow state."
+          MSG="🚨 **Pinger watchdog**:"$'\n'"$(cat /tmp/watchdog-reason.txt)"$'\n'"If a stream goes live now it could be missed. Check cron-job.org / the pinger config."
           echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
           WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
           if [[ -n "$WEBHOOK" ]]; then
@@ -110,53 +107,6 @@ jobs:
                 '{content: $m, username: "Pinger Watchdog", avatar_url: $a}')" >/dev/null 2>&1 || echo "discord send failed"
           fi
 
-      - name: "🟡 Send setup note (throttled to once per cooldown)"
-        if: steps.check.outputs.has_note == 'yes'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          NOTE_FILE="pinger_sniper_note_sent.txt"
-          now=$(date +%s)
-          last=0
-          [[ -f "$NOTE_FILE" ]] && last=$(cat "$NOTE_FILE" 2>/dev/null || echo 0)
-          if (( now - last < NOTE_COOLDOWN_SEC )); then
-            echo "setup note already sent $(( (now - last) / 86400 ))d ago — staying quiet"
-            exit 0
-          fi
-
-          MSG="🟠 **Pinger watchdog — setup needed (not an outage)**"$'\n'"$(cat /tmp/watchdog-notes.txt)"$'\n\n'"**Fix — add the second pinger job (2 min):** duplicate your working \`ping-recorder\` job on cron-job.org and change the request body to:"$'\n'"\`\`\`json"$'\n'"{ \"event_type\": \"ping-sniper\" }"$'\n'"\`\`\`"$'\n'"Same URL (\`POST https://api.github.com/repos/${GITHUB_REPOSITORY}/dispatches\`), same PAT header. Until then the sniper still catches streams via its own \`*/2\` schedule — just a few minutes slower."
-          WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
-          SENT=0
-          if [[ -n "$WEBHOOK" ]]; then
-            curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \
-              -d "$(jq -n --arg m "$MSG" --arg a "${AVATAR_URL:-}" \
-                '{content: $m, username: "Pinger Watchdog", avatar_url: $a}')" >/dev/null 2>&1 && SENT=1 || echo "discord send failed"
-          fi
-          echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
-
-          if (( SENT )); then
-            echo "$now" > "$NOTE_FILE"
-            git config user.name  "pinger-watchdog-bot"
-            git config user.email "actions@users.noreply.github.com"
-            git add "$NOTE_FILE"
-            git commit -m "pinger watchdog: setup note sent (7-day throttle stamp)" || exit 0
-            git pull --rebase origin "${GITHUB_REF_NAME:-main}" >/dev/null 2>&1 || true
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-              "HEAD:${GITHUB_REF_NAME:-main}" >/dev/null 2>&1 \
-              && echo "throttle stamp committed" \
-              || { echo "stamp push failed — note may repeat next cycle"; }
-          fi
-
-      - name: "Recovered"
-        if: steps.check.outputs.critical == 'ok' && steps.check.outputs.has_note == 'no'
-        env:
-          RECORDER: ${{ steps.check.outputs['latest_stream-recorder_dispatch'] }}
-          SNIPER: ${{ steps.check.outputs['latest_stream-sniper_dispatch'] }}
-        run: |
-          {
-            echo "✅ Pinger heartbeat OK"
-            echo "| Workflow | Last dispatch |"
-            echo "|---|---|"
-            echo "| stream-recorder | ${RECORDER} min ago |"
-            echo "| stream-sniper | ${SNIPER} min ago |"
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: "✅ Heartbeat OK"
+        if: steps.check.outputs.alert == 'no'
+        run: echo "Recorder dispatch heartbeat healthy — status: ${{ steps.check.outputs.age }}."
