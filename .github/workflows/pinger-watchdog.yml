@@ -4,7 +4,7 @@
 # ║  external pinger (cron-job.org). Alerts Discord ONLY when coverage is       ║
 # ║  genuinely degrading — i.e. dispatches used to arrive and stopped.          ║
 # ║                                                                              ║
-# ║  The go-live sniper is intentionally NOT watched here: its own */2          ║
+# ║  The go-live sniper is intentionally NOT watched here: its own */5          ║
 # ║  schedule fallback provides independent capture coverage, so its            ║
 # ║  dispatch count is not an outage signal.                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝

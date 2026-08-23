@@ -25,7 +25,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
   const [idx, setIdx] = useState(0);
   const [broken, setBroken] = useState<Record<string, boolean>>({});
   const [trailerOn, setTrailerOn] = useState(false);   // frames actually flowing → fade in
-  const [trailerDead, setTrailerDead] = useState(false); // mirror errored → art only
+  const [mirrorIdx, setMirrorIdx] = useState(0);       // index into this slide's permanent-mirror chain
   const [trailerDwell, setTrailerDwell] = useState(false); // startup beat elapsed → mount video
   const hoverRef = useRef(false);
   const rafRef = useRef(0);
@@ -39,12 +39,18 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
   const contentRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef(0);   // slide progress lives here, not in state
 
-  // New slide → new trailer: drop the fade-in state so it lights up fresh.
+  // New slide → new trailer: fresh fade-in state, restart at the first mirror.
   const currentId = slides[Math.min(idx, slides.length - 1)]?.videoId;
   useEffect(() => {
     setTrailerOn(false);
-    setTrailerDead(false);
+    setMirrorIdx(0);
   }, [currentId]);
+
+  // One reset site for the slide-progress bar (rAF loop, jump, rotation).
+  const resetProgress = () => {
+    progressRef.current = 0;
+    if (fillRef.current) fillRef.current.style.width = '0%';
+  };
 
   /* Slide rotation — rAF-driven progress, pauses on hover. */
   useEffect(() => {
@@ -58,8 +64,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
         if (fillRef.current) fillRef.current.style.width = `${p * 100}%`;
         if (p >= 1) {
           startRef.current = now;
-          progressRef.current = 0;
-          if (fillRef.current) fillRef.current.style.width = '0%';
+          resetProgress();
           setIdx(i => (i + 1) % slides.length);
         }
       } else {
@@ -119,21 +124,20 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
 
   if (!slides.length) return null;
   const ep = slides[Math.min(idx, slides.length - 1)];
-  // Ambient trailer source — PERMANENT mirrors only, in failover order.
+  // Ambient trailer source — the PERMANENT mirror CHAIN, walked in order.
   // The old YouTube iframe showed "This video is unavailable" on the front
   // door the day a VOD got privated. Archive.org nodes and GitHub releases
-  // never expire, so the billboard always has something to play.
-  const trailerSrc = !trailerDead
-    ? (ep.archiveNode || ep.archiveDirect || ep.githubDirect || ep.githubRelease || '')
-    : '';
+  // never expire; if one mirror errors, onError advances to the next, and
+  // only a fully-spent chain falls back to art alone.
+  const mirrors = [ep.archiveNode, ep.archiveDirect, ep.githubDirect, ep.githubRelease].filter(Boolean) as string[];
+  const trailerSrc = mirrors[mirrorIdx] ?? '';
   const pos = positionOf(ep.videoId);
   const resumePct = pos && pos.d ? Math.min(100, (pos.t / pos.d) * 100) : 0;
   const listed = listedIds.has(ep.videoId);
 
   const jump = (i: number) => {
     setIdx(i);
-    progressRef.current = 0;
-    if (fillRef.current) fillRef.current.style.width = '0%';
+    resetProgress();
     startRef.current = performance.now();
   };
 
@@ -162,10 +166,10 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
       </div>
 
       {/* Ambient trailer — the video itself, muted, chromeless, on loop,
-          streamed from a PERMANENT mirror after the startup dwell. `poster`
-          guarantees this layer is never black and never an error panel:
-          worst case it's just the art. */}
-      {!trailerAllowed ? null : !trailerDwell ? null : !trailerSrc ? null : (
+          streamed from the permanent-mirror chain after the startup dwell.
+          The poster ALWAYS resolves (local fallback asset included), so this
+          layer is never black and never an error panel: worst case it's art. */}
+      {trailerAllowed && trailerDwell && trailerSrc ? (
         <div
           key={ep.videoId + '-trailer'}
           className="hero-art"
@@ -174,7 +178,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
         >
           <video
             src={trailerSrc}
-            poster={broken[ep.videoId] ? undefined : ep.thumbnail}
+            poster={broken[ep.videoId] ? '/thumbnail.jpg' : ep.thumbnail}
             autoPlay
             muted
             loop
@@ -183,10 +187,14 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
             disablePictureInPicture
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
             onPlaying={() => setTrailerOn(true)}
-            onError={() => { setTrailerOn(false); setTrailerDead(true); }}
+            onError={() => {
+              // Mirror down → walk to the next permanent mirror in the chain.
+              setTrailerOn(false);
+              setMirrorIdx(ix => ix + 1);
+            }}
           />
         </div>
-      )}
+      ) : null}
       <div className="hero-shade" />
 
       {/* Letterbox bars — the cinema frame */}
@@ -263,7 +271,7 @@ export default function Hero({ recs, live, prediction, listedIds, onOpen, onDeta
               onClick={() => jump(i)}
               aria-label={`Show recording ${i + 1}`}
             >
-              {i === idx && <div ref={fillRef} className="fill" />}
+              {i === idx && <div ref={fillRef} className="fill" style={{ width: '0%' }} />}
             </button>
           ))}
         </div>
