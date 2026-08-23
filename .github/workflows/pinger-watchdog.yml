@@ -109,4 +109,5 @@ jobs:
 
       - name: "✅ Heartbeat OK"
         if: steps.check.outputs.alert == 'no'
-        run: echo "Recorder dispatch heartbeat healthy — status: ${{ steps.check.outputs.age }}."
+        run: |
+          echo "Recorder dispatch heartbeat healthy — status: ${{ steps.check.outputs.age }}."
