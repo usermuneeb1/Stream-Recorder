@@ -21,7 +21,7 @@ Three decoupled layers. Each fails independently; none trusts the others.
 │                                                                  │
 │   · Recording    stream-recorder · stream-sniper · stream-guard  │
 │   · Mirrors      Archive.org · MEGA · Pixeldrain · Gofile        │
-│                  Telegram · GitHub Releases                      │
+│                  0807.st · VikingFile · Telegram · GitHub        │
 │   · Enrichment   AI thumbnails · storyboards · chapters · HLS    │
 │   · Scheduling   smart-schedule · stream prediction              │
 │   · Community    Discord bot · chat archiver · weekly summary    │

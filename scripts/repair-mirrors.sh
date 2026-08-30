@@ -51,6 +51,28 @@ _is_pixeldrain_alive() {
     [[ "$success" != "false" ]]
 }
 
+_is_st0807_alive() {
+    local url="$1"
+    [[ -z "$url" ]] && return 1
+    [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
+    local code
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --range 0-1023 -L "$url" 2>/dev/null) || return 1
+    [[ "$code" =~ ^(2|3)[0-9]{2}$ ]]
+}
+
+_is_vikingfile_alive() {
+    local url="$1"
+    [[ -z "$url" ]] && return 1
+    [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
+    local hash
+    hash=$(echo "$url" | sed -n 's#.*vikingfile.com/f/\([^/?#]*\).*#\1#p')
+    [[ -z "$hash" ]] && return 1
+    local info exist
+    info=$(curl -s --max-time 20 -X POST "https://vikingfile.com/api/check-file" -F "hash=${hash}" 2>/dev/null) || return 1
+    exist=$(jq -r '.exist // empty' <<< "$info" 2>/dev/null)
+    [[ "$exist" == "true" ]]
+}
+
 _archive_id_from_url() {
     sed -E 's#.*archive\.org/details/([^/?#]+).*#\1#' <<< "$1"
 }
@@ -111,7 +133,7 @@ PY
 }
 
 _update_recording_links() {
-    local video_id="$1" gofile="$2" pixel="$3" mega="$4"
+    local video_id="$1" gofile="$2" pixel="$3" mega="$4" st0807="$5" viking="$6"
     local current updated
     current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="$(cat data/recordings.json 2>/dev/null || echo '[]')"
     updated=$(jq \
@@ -119,12 +141,16 @@ _update_recording_links() {
       --arg gofile "$gofile" \
       --arg pixel "$pixel" \
       --arg mega "$mega" \
+      --arg st0807 "${st0807:-}" \
+      --arg viking "${viking:-}" \
       --arg checked "$(now_utc_iso)" \
       'map(if (.video_id == $id) then
           . + {
             gofile_link: (if $gofile != "" then $gofile else (.gofile_link // "") end),
             pixeldrain_link: (if $pixel != "" then $pixel else (.pixeldrain_link // "") end),
             mega_link: (if $mega != "" then $mega else (.mega_link // "") end),
+            st0807_link: (if $st0807 != "" then $st0807 else (.st0807_link // "") end),
+            vikingfile_link: (if $viking != "" then $viking else (.vikingfile_link // "") end),
             mirrors_repaired_at: $checked
           }
         else . end)' <<< "$current") || return 1
@@ -137,7 +163,7 @@ repair_mirrors() {
     local target_video="${TARGET_VIDEO_ID:-}"
     local max_items="${MAX_ITEMS:-3}"
     local dry_run="${DRY_RUN:-false}"
-    local destinations="${DESTINATIONS:-gofile,pixeldrain,mega}"
+    local destinations="${DESTINATIONS:-gofile,pixeldrain,mega,st0807,vikingfile}"
 
     local records
     records=$(github_api_read_content "data/recordings.json" 2>/dev/null) || records="$(cat data/recordings.json 2>/dev/null || echo '[]')"
@@ -158,7 +184,7 @@ repair_mirrors() {
     local repaired=0 checked=0
     local idx=0
     while (( idx < count && repaired < max_items )); do
-        local rec video_id title archive_link gofile_old pixel_old mega_old
+        local rec video_id title archive_link gofile_old pixel_old mega_old st0807_old viking_old
         rec=$(jq ".[$idx]" <<< "$candidates")
         video_id=$(jq -r '.video_id // empty' <<< "$rec")
         title=$(jq -r '.title // "recording"' <<< "$rec")
@@ -166,12 +192,14 @@ repair_mirrors() {
         gofile_old=$(jq -r '.gofile_link // empty' <<< "$rec")
         pixel_old=$(jq -r '.pixeldrain_link // empty' <<< "$rec")
         mega_old=$(jq -r '.mega_link // empty' <<< "$rec")
+        st0807_old=$(jq -r '.st0807_link // empty' <<< "$rec")
+        viking_old=$(jq -r '.vikingfile_link // empty' <<< "$rec")
         ((idx++)); ((checked++))
 
         log_separator
         log_info "Checking: ${video_id}, ${title}"
 
-        local need_gofile=false need_pixel=false need_mega=false
+        local need_gofile=false need_pixel=false need_mega=false need_st0807=false need_viking=false
         if [[ "$destinations" == *gofile* ]]; then
             _is_gofile_alive "$gofile_old" || need_gofile=true
         fi
@@ -181,13 +209,19 @@ repair_mirrors() {
         if [[ "$destinations" == *mega* ]]; then
             if [[ "${FORCE_REPAIR:-false}" == "true" ]] || [[ -z "$mega_old" ]] || [[ "$mega_old" != *mega.nz* ]]; then need_mega=true; fi
         fi
+        if [[ "$destinations" == *st0807* || "$destinations" == *0807* ]]; then
+            _is_st0807_alive "$st0807_old" || need_st0807=true
+        fi
+        if [[ "$destinations" == *vikingfile* || "$destinations" == *viking* ]]; then
+            _is_vikingfile_alive "$viking_old" || need_viking=true
+        fi
 
-        if [[ "$need_gofile" != true && "$need_pixel" != true && "$need_mega" != true ]]; then
+        if [[ "$need_gofile" != true && "$need_pixel" != true && "$need_mega" != true && "$need_st0807" != true && "$need_viking" != true ]]; then
             log_ok "  Mirrors already present/alive, skipping"
             continue
         fi
 
-        log_warn "  Needs repair: gofile=${need_gofile}, pixeldrain=${need_pixel}, mega=${need_mega}"
+        log_warn "  Needs repair: gofile=${need_gofile}, pixeldrain=${need_pixel}, mega=${need_mega}, 0807=${need_st0807}, vikingfile=${need_viking}"
         if [[ "$dry_run" == "true" ]]; then
             continue
         fi
@@ -200,7 +234,7 @@ repair_mirrors() {
         fi
         log_ok "  Download ready: $(basename "$file") ($(format_size "$(get_file_size "$file")"))"
 
-        local new_gofile="" new_pixel="" new_mega=""
+        local new_gofile="" new_pixel="" new_mega="" new_st0807="" new_viking=""
         if [[ "$need_gofile" == true ]]; then
             GOFILE_LINKS=()
             if upload_to_gofile "$file" "HD"; then

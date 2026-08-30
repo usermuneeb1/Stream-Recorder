@@ -103,6 +103,28 @@ update_links() {
             [[ -n "$a_link" ]] && entry+="[archive:${a_part}] ${a_link} (PERMANENT)\n"
         done
     fi
+
+    # Add 0807.st links
+    if [[ -n "${ST0807_LINKS:-}" ]]; then
+        IFS=';' read -ra s_entries <<< "$ST0807_LINKS"
+        for s_entry in "${s_entries[@]}"; do
+            local s_part s_link
+            s_part=$(echo "$s_entry" | cut -d'|' -f1)
+            s_link=$(echo "$s_entry" | cut -d'|' -f2)
+            [[ -n "$s_link" ]] && entry+="[0807:${s_part}] ${s_link}\n"
+        done
+    fi
+
+    # Add VikingFile links
+    if [[ -n "${VIKINGFILE_LINKS:-}" ]]; then
+        IFS=';' read -ra v_entries <<< "$VIKINGFILE_LINKS"
+        for v_entry in "${v_entries[@]}"; do
+            local v_part v_link
+            v_part=$(echo "$v_entry" | cut -d'|' -f1)
+            v_link=$(echo "$v_entry" | cut -d'|' -f2)
+            [[ -n "$v_link" ]] && entry+="[vikingfile:${v_part}] ${v_link}\n"
+        done
+    fi
     
     entry+="========================================\n"
     
@@ -171,11 +193,13 @@ update_recordings_json() {
     # ── Pull first link of each provider from the "part|url;part|url" strings ──
     first_link() { echo "$1" | cut -d';' -f1 | cut -d'|' -f2; }
 
-    local archive_link pixeldrain_link gofile_link mega_link
+    local archive_link pixeldrain_link gofile_link mega_link st0807_link vikingfile_link
     archive_link=$(first_link "${ARCHIVE_LINKS:-}")
     pixeldrain_link=$(first_link "${PIXELDRAIN_LINKS:-}")
     gofile_link=$(first_link "${GOFILE_LINKS:-}")
     mega_link=$(first_link "${MEGA_LINKS:-}")
+    st0807_link=$(first_link "${ST0807_LINKS:-}")
+    vikingfile_link=$(first_link "${VIKINGFILE_LINKS:-}")
 
     # Need at least an Archive link (permanent, drives the player + unique id).
     if [[ -z "$archive_link" ]]; then
@@ -257,6 +281,8 @@ update_recordings_json() {
         --arg pd "$pixeldrain_link" \
         --arg gof "$gofile_link" \
         --arg mega "$mega_link" \
+        --arg st0807 "$st0807_link" \
+        --arg viking "$vikingfile_link" \
         --arg chat "${RECORD_CHAT_URL:-}" \
         --arg rec "$recorded_at" '
         ([ .[] | select(.video_id == $vid) ][0] // {}) as $old
@@ -280,6 +306,8 @@ update_recordings_json() {
             pixeldrain_link: $pd,
             gofile_link: $gof,
             mega_link: $mega,
+            st0807_link: $st0807,
+            vikingfile_link: $viking,
             chat_url: $chat,
             recorded_at: $rec
           } | with_entries(select(.value != "" and .value != null and .value != 0))) as $new

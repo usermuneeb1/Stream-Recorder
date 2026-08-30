@@ -9,6 +9,7 @@ import type { Ep } from '../types';
 export function previewSourceFor(ep: Ep): string {
   const pd = ep.pixeldrainLink?.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/);
   if (pd) return `https://pixeldrain.com/api/file/${pd[1]}`;
+  if (ep.st0807Link) return ep.st0807Link;
   const gh = ep.githubDirect || ep.githubRelease;
   if (gh) return gh;
   if (ep.archiveNode) return ep.archiveNode;

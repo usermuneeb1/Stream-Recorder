@@ -121,11 +121,13 @@ export default function InsightsPage({ recs, status, prediction }: Props) {
       { name: 'MEGA', color: '#d92753', n: count(r => !!r.megaLink) },
       { name: 'Pixeldrain', color: '#4f9ee8', n: count(r => !!r.pixeldrainLink) },
       { name: 'Gofile', color: '#3ba97c', n: count(r => !!r.gofileLink) },
+      { name: '0807.st', color: '#c45c26', n: count(r => !!r.st0807Link) },
+      { name: 'VikingFile', color: '#6b8f3d', n: count(r => !!r.vikingfileLink) },
       { name: 'Telegram', color: '#4f9ee8', n: count(r => !!(r.telegramLink || r.cfStream)) },
     ];
     const perRec = recs.map(r =>
       [r.archiveLink || r.archiveNode || r.archiveDirect, r.githubRelease || r.githubDirect,
-        r.megaLink, r.pixeldrainLink, r.gofileLink, r.telegramLink || r.cfStream]
+        r.megaLink, r.pixeldrainLink, r.gofileLink, r.st0807Link, r.vikingfileLink, r.telegramLink || r.cfStream]
         .filter(Boolean).length,
     );
     const avgCopies = perRec.length ? perRec.reduce((a, b) => a + b, 0) / perRec.length : 0;

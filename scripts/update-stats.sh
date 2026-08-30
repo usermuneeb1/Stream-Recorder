@@ -78,15 +78,15 @@ update_stats() {
     [[ "$avg_duration" == .* ]] && avg_duration="0${avg_duration}"
 
     # Per-provider counts also recomputed from the index (non-empty link = hit)
-    local src_archive=0 src_mega=0 src_pixel=0 src_gofile=0
-    read -r src_archive src_mega src_pixel src_gofile < <(
+    local src_archive=0 src_mega=0 src_pixel=0 src_gofile=0 src_st0807=0 src_viking=0
+    read -r src_archive src_mega src_pixel src_gofile src_st0807 src_viking < <(
         echo "$rec_json" | jq -r '
         def nonempty($k): ([.[] | select((.[$k] // "") != "")] | length);
-        "\(nonempty("archive_link")) \(nonempty("mega_link")) \(nonempty("pixeldrain_link")) \(nonempty("gofile_link"))"' 2>/dev/null || echo "0 0 0 0"
+        "\(nonempty("archive_link")) \(nonempty("mega_link")) \(nonempty("pixeldrain_link")) \(nonempty("gofile_link")) \(nonempty("st0807_link")) \(nonempty("vikingfile_link"))"' 2>/dev/null || echo "0 0 0 0 0 0"
     )
 
     log_info "Recomputed from recordings.json: ${total_streams} streams, ${total_hours}h, ${total_gb} GB, avg ${avg_duration}h"
-    log_info "Sources: archive=${src_archive}, mega=${src_mega}, pixel=${src_pixel}, gofile=${src_gofile}"
+    log_info "Sources: archive=${src_archive}, mega=${src_mega}, pixel=${src_pixel}, gofile=${src_gofile}, 0807=${src_st0807}, viking=${src_viking}"
     
     # ── Build new stats JSON ─────────────────────────────────────────────────
     local new_stats
@@ -99,6 +99,8 @@ update_stats() {
         --arg src_mega           "$src_mega" \
         --arg src_pixel          "$src_pixel" \
         --arg src_gofile         "$src_gofile" \
+        --arg src_st0807         "$src_st0807" \
+        --arg src_viking         "$src_viking" \
         --arg last_title         "$stream_title" \
         --arg last_channel       "$stream_channel" \
         --arg last_date          "$current_date" \
@@ -114,7 +116,9 @@ update_stats() {
                 archive: ($src_archive | tonumber // 0),
                 mega: ($src_mega | tonumber // 0),
                 pixel: ($src_pixel | tonumber // 0),
-                gofile: ($src_gofile | tonumber // 0)
+                gofile: ($src_gofile | tonumber // 0),
+                st0807: ($src_st0807 | tonumber // 0),
+                vikingfile: ($src_viking | tonumber // 0)
             },
             last_stream: {
                 title: $last_title,
@@ -171,7 +175,7 @@ update_recordings_json() {
 
     log_step "Updating data/recordings.json for dashboard..."
 
-    local gofile_link="" pixeldrain_link="" archive_link="" mega_link=""
+    local gofile_link="" pixeldrain_link="" archive_link="" mega_link="" st0807_link="" vikingfile_link=""
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         gofile_link=$(echo "${GOFILE_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
     fi
@@ -183,6 +187,12 @@ update_recordings_json() {
     fi
     if [[ -n "${MEGA_LINKS:-}" ]]; then
         mega_link=$(echo "${MEGA_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${ST0807_LINKS:-}" ]]; then
+        st0807_link=$(echo "${ST0807_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
+    fi
+    if [[ -n "${VIKINGFILE_LINKS:-}" ]]; then
+        vikingfile_link=$(echo "${VIKINGFILE_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
     fi
 
     local existing
@@ -220,6 +230,8 @@ update_recordings_json() {
         --arg pixeldrain_link "$pixeldrain_link" \
         --arg archive_link "$archive_link" \
         --arg mega_link "$mega_link" \
+        --arg st0807_link "$st0807_link" \
+        --arg vikingfile_link "$vikingfile_link" \
         --arg chat_url "${RECORD_CHAT_URL:-}" \
         --arg recorded_at "$(now_utc_iso)" \
         '{
@@ -241,6 +253,8 @@ update_recordings_json() {
             pixeldrain_link: $pixeldrain_link,
             archive_link: $archive_link,
             mega_link: $mega_link,
+            st0807_link: $st0807_link,
+            vikingfile_link: $vikingfile_link,
             chat_url: $chat_url,
             recorded_at: $recorded_at
         }')

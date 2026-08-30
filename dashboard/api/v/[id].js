@@ -114,6 +114,7 @@ export default async function handler(request) {
     rec.github_direct || rec.github_release,
     (String(rec.pixeldrain_link || '').match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/) || [])[1]
       ? `https://pixeldrain.com/api/file/${String(rec.pixeldrain_link).match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/)[1]}` : '',
+    rec.st0807_link,
   ].filter(Boolean);
 
   const dlName = safeFilename(title);
