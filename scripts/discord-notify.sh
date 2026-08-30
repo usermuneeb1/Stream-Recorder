@@ -406,7 +406,7 @@ notify_recording_complete() {
 
     # Extract URLs from "PartName|url" semicolon-delimited env vars
     # HD links only (compressed/480p variant removed from pipeline)
-    local gofile_url="" pixeldrain_url="" archive_url="" archive_id="" mega_url=""
+    local gofile_url="" pixeldrain_url="" archive_url="" archive_id="" mega_url="" st0807_url="" vikingfile_url=""
     
     if [[ -n "${GOFILE_LINKS:-}" ]]; then
         IFS=';' read -ra _g <<< "${GOFILE_LINKS}"
@@ -458,8 +458,30 @@ notify_recording_complete() {
             fi
         done
     fi
-
-
+    if [[ -n "${ST0807_LINKS:-}" ]]; then
+        IFS=';' read -ra _s <<< "${ST0807_LINKS}"
+        for entry in "${_s[@]}"; do
+            local _part _link
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            [[ "$_part" == "Compressed" ]] && continue
+            if [[ -z "$st0807_url" ]]; then
+                st0807_url="$_link"
+            fi
+        done
+    fi
+    if [[ -n "${VIKINGFILE_LINKS:-}" ]]; then
+        IFS=';' read -ra _v <<< "${VIKINGFILE_LINKS}"
+        for entry in "${_v[@]}"; do
+            local _part _link
+            _part=$(echo "$entry" | cut -d'|' -f1)
+            _link=$(echo "$entry" | cut -d'|' -f2)
+            [[ "$_part" == "Compressed" ]] && continue
+            if [[ -z "$vikingfile_url" ]]; then
+                vikingfile_url="$_link"
+            fi
+        done
+    fi
 
     local chat_status="❌ Not archived"
     [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ [Chat Log Available](${RECORD_CHAT_URL})"
@@ -473,6 +495,10 @@ notify_recording_complete() {
     upstatus+=$(if [[ -n "$archive_url" ]]; then echo "Archive.org ✅"; else echo "Archive.org ❌"; fi)
     upstatus+=" · "
     upstatus+=$(if [[ -n "$mega_url" ]]; then echo "MEGA ✅"; else echo "MEGA ❌"; fi)
+    upstatus+=" · "
+    upstatus+=$(if [[ -n "$st0807_url" ]]; then echo "0807.st ✅"; else echo "0807.st ❌"; fi)
+    upstatus+=" · "
+    upstatus+=$(if [[ -n "$vikingfile_url" ]]; then echo "VikingFile ✅"; else echo "VikingFile ❌"; fi)
     
     # Compressed/480p variant removed from pipeline, HD-only
 
@@ -499,6 +525,8 @@ notify_recording_complete() {
         --arg archive_url      "$archive_url" \
         --arg archive_id       "$archive_id" \
         --arg mega_url         "$mega_url" \
+        --arg st0807_url       "$st0807_url" \
+        --arg vikingfile_url   "$vikingfile_url" \
         --arg chat_status    "$chat_status" \
         --arg dash_url       "$dashboard_url" \
         --arg timestamp      "$timestamp" \
@@ -539,16 +567,18 @@ notify_recording_complete() {
                     [
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: ("** Upload Status**\n" + $upstatus), inline: false },
                         
-                        (if ($gofile_url != "" or $pixeldrain_url != "" or $archive_url != "" or $mega_url != "") then
+                        (if ($gofile_url != "" or $pixeldrain_url != "" or $archive_url != "" or $mega_url != "" or $st0807_url != "" or $vikingfile_url != "") then
                             { name: "╔══  HD  ══════════════════════╗", value: ("**Original quality** • " + $size), inline: false }
                         else empty end),
                         (if $gofile_url      != "" then { name: " Gofile",         value: ("[▶️ Watch / Download](" + $gofile_url + ")"),         inline: true } else empty end),
                         (if $pixeldrain_url  != "" then { name: " Pixeldrain",     value: ("[Download](" + $pixeldrain_url + ")"),                inline: true } else empty end),
                         (if $archive_url     != "" then { name: " Archive.org",  value: ("[Permanent Link](" + $archive_url + ")\n`" + $archive_id + "`"), inline: false } else empty end),
                         (if $mega_url        != "" then { name: " MEGA.nz",      value: ("[Download (Permanent)](" + $mega_url + ")"),               inline: true } else empty end),
+                        (if $st0807_url      != "" then { name: " 0807.st",       value: ("[Watch / Download](" + $st0807_url + ")"),              inline: true } else empty end),
+                        (if $vikingfile_url  != "" then { name: " VikingFile",    value: ("[Download](" + $vikingfile_url + ")"),                   inline: true } else empty end),
                         
                         
-                        (if ($gofile_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "") then
+                        (if ($gofile_url == "" and $pixeldrain_url == "" and $archive_url == "" and $mega_url == "" and $st0807_url == "" and $vikingfile_url == "") then
                             { name: "❌  Downloads",  value: "All cloud uploads failed, files may be lost. Check workflow logs.", inline: false }
                         else empty end),
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: "** Additional Info**", inline: false },
@@ -591,6 +621,16 @@ notify_recording_complete() {
                     components: [
                         { type: 2, style: 5, label: "MEGA.nz (Permanent)", url: $mega_url }
                     ]
+                } else empty end),
+                (if ($st0807_url != "" or $vikingfile_url != "") then
+                {
+                    type: 1,
+                    components: (
+                        [
+                            (if $st0807_url != "" then { type: 2, style: 5, label: "0807.st", url: $st0807_url } else empty end),
+                            (if $vikingfile_url != "" then { type: 2, style: 5, label: "VikingFile", url: $vikingfile_url } else empty end)
+                        ]
+                    )
                 } else empty end)
             ]
         }')
@@ -830,6 +870,8 @@ notify_links_refreshed() {
                     "Periodic link refresh complete. All download links have been pinged to prevent expiry.\n\n" +
                     "> **Gofile**, Expires after 10 days of inactivity\n" +
                     "> **Pixeldrain**, Expires after 60 days of inactivity\n" +
+                    "> **0807.st**, expiry=0 (never auto-delete) + keep-alive ping\n" +
+                    "> **VikingFile**, check-file + keep-alive ping\n" +
                     "> **Archive.org**, Permanently safely archived"
                 ),
                 color: 5763757,

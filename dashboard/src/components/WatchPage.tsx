@@ -44,7 +44,7 @@ interface Mirror {
   note: string;
   url: string;
   kind: 'youtube' | 'mp4';
-  type?: 'archive' | 'pixeldrain' | 'github' | 'telegram' | 'youtube';
+  type?: 'archive' | 'pixeldrain' | 'github' | 'telegram' | 'youtube' | 'st0807';
 }
 
 declare global { interface Window { __mlaContinueResume?: string } }
@@ -74,6 +74,7 @@ function buildMirrors(rec: Ep): Mirror[] {
   // the guessed archive filename or the Telegram worker.
   const pd = rec.pixeldrainLink?.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/);
   if (pd) out.push({ label: 'N3ON', note: 'Pixeldrain CDN', url: `https://pixeldrain.com/api/file/${pd[1]}`, kind: 'mp4', type: 'pixeldrain' });
+  if (rec.st0807Link) out.push({ label: '0807', note: '0807.st direct', url: rec.st0807Link, kind: 'mp4', type: 'st0807' });
   if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4', type: 'telegram' });
   if (rec.archiveDirect && rec.archiveDirect !== rec.archiveNode) {
     out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4', type: 'archive' });
@@ -384,11 +385,14 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const vaultType: Record<string, string> = {
     'Archive.org': 'archive', GitHub: 'github', MEGA: 'mega',
     Pixeldrain: 'pixeldrain', Gofile: 'gofile',
+    '0807.st': 'st0807', VikingFile: 'vikingfile',
   };
   const vault = [
     { label: 'Archive.org', href: rec.archiveLink, color: '#e50914', perm: true },
     { label: 'GitHub', href: rec.githubDirect || rec.githubRelease, color: '#9aa0a6', perm: true },
     { label: 'MEGA', href: rec.megaLink, color: '#d92753', perm: true },
+    { label: '0807.st', href: rec.st0807Link, color: '#c45c26', perm: false },
+    { label: 'VikingFile', href: rec.vikingfileLink, color: '#6b8f3d', perm: false },
     { label: 'Pixeldrain', href: rec.pixeldrainLink, color: '#4f9ee8', perm: false },
     { label: 'Gofile', href: rec.gofileLink, color: '#3ba97c', perm: false },
   ]

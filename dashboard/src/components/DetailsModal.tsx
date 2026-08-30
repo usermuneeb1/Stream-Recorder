@@ -32,6 +32,8 @@ export default function DetailsModal({ ep, recs, listed, onOpen, onToggleList, o
     { label: 'MEGA', href: ep.megaLink, color: '#d92753' },
     { label: 'Pixeldrain', href: ep.pixeldrainLink, color: '#4f9ee8' },
     { label: 'Gofile', href: ep.gofileLink, color: '#3ba97c' },
+    { label: '0807.st', href: ep.st0807Link, color: '#c45c26' },
+    { label: 'VikingFile', href: ep.vikingfileLink, color: '#6b8f3d' },
     { label: 'Archive.org', href: ep.archiveLink, color: '#e50914' },
   ].filter(v => v.href);
 

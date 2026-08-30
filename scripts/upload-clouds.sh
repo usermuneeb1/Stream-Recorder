@@ -21,8 +21,10 @@ GOFILE_LINKS=()
 MEGA_LINKS=()
 ARCHIVE_LINKS=()
 PIXELDRAIN_LINKS=()
+ST0807_LINKS=()
+VIKINGFILE_LINKS=()
 UPLOAD_SUCCESS_COUNT=0
-UPLOAD_TOTAL_SERVICES=4
+UPLOAD_TOTAL_SERVICES=6
 UPLOAD_START_TIME=""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -40,6 +42,24 @@ make_safe_filename() {
         | cut -c1-200)
     [[ -z "$safe" ]] && safe="recording_$(date +%s).mp4"
     echo "$safe"
+}
+
+# Copy [offset, offset+length) from src into dest without dd bs=1 (too slow on GB files).
+_slice_file() {
+    local src="$1" dest="$2" offset="$3" length="$4"
+    python3 - "$src" "$dest" "$offset" "$length" <<'PY'
+import sys
+src, dest, offset, length = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+with open(src, "rb") as f, open(dest, "wb") as o:
+    f.seek(offset)
+    remaining = length
+    while remaining:
+        buf = f.read(min(8 * 1024 * 1024, remaining))
+        if not buf:
+            break
+        o.write(buf)
+        remaining -= len(buf)
+PY
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -493,6 +513,267 @@ upload_to_archive() {
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  SERVICE 5: 0807.ST UPLOAD
+#  Direct hotlink URLs. Anonymous uploads solve a tiny proof-of-work
+#  (scripts/st0807_pow.py). Partner token ST0807_TOKEN skips PoW and raises
+#  the size cap. Always uploaded with expiry=0 (never auto-delete).
+#  Simple POST for files under ~1.8 GB; chunked (16 MB) above that.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_st0807_auth_args() {
+    local token="${ST0807_TOKEN:-}"
+    if [[ -n "$token" ]]; then
+        printf -- '-H\nAuthorization: Bearer %s\n' "$token"
+    fi
+}
+
+_st0807_pow_json() {
+    python3 "$SCRIPT_DIR/st0807_pow.py" 2>/dev/null || true
+}
+
+_st0807_parse_url() {
+    local body="$1"
+    echo "$body" | jq -r '.url // empty' 2>/dev/null
+}
+
+upload_to_st0807() {
+    local file="$1"
+    local part_name="$2"
+    local token="${ST0807_TOKEN:-}"
+    local fsize
+    fsize=$(get_file_size "$file")
+
+    log_info "  0807.st: Uploading $(basename \"$file\") ($(format_size \"$fsize\"))..."
+
+    local max_retries="${ST0807_MAX_RETRIES:-3}"
+    local attempt=1
+    local simple_limit=$((1800 * 1024 * 1024))  # 1.8 GB, under anonymous 2 GB POST cap
+
+    while (( attempt <= max_retries )); do
+        local upload_start upload_response link
+        upload_start=$(now_epoch)
+        log_debug "  0807.st attempt ${attempt}/${max_retries} (token=$([[ -n \"$token\" ]] && echo yes || echo pow))"
+
+        if (( fsize <= simple_limit )); then
+            local -a curl_args=(-s --max-time "${UPLOAD_TIMEOUT:-3600}" -F "file=@${file}" -F "expiry=0" -F "maxdl=0")
+            if [[ -n "$token" ]]; then
+                curl_args+=(-H "Authorization: Bearer ${token}")
+            else
+                local pow
+                pow=$(_st0807_pow_json)
+                if [[ -z "$pow" ]] || ! echo "$pow" | jq -e '.pow_nonce' >/dev/null 2>&1; then
+                    log_warn "  0807.st: proof-of-work failed (attempt ${attempt})"
+                    (( attempt++ )); sleep 5; continue
+                fi
+                curl_args+=(-F "pow_id=$(echo "$pow" | jq -r '.pow_id')")
+                curl_args+=(-F "pow_ts=$(echo "$pow" | jq -r '.pow_ts')")
+                curl_args+=(-F "pow_bits=$(echo "$pow" | jq -r '.pow_bits')")
+                curl_args+=(-F "pow_sig=$(echo "$pow" | jq -r '.pow_sig')")
+                curl_args+=(-F "pow_nonce=$(echo "$pow" | jq -r '.pow_nonce')")
+            fi
+            upload_response=$(curl "${curl_args[@]}" "https://0807.st/upload" 2>/dev/null) || true
+        else
+            upload_response=$(_st0807_chunked_upload "$file" "$token") || true
+        fi
+
+        local upload_elapsed=$(( $(now_epoch) - upload_start ))
+        link=$(_st0807_parse_url "$upload_response")
+
+        if [[ -n "$link" ]]; then
+            local speed
+            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+            log_ok "  0807.st: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
+            log_info "  0807.st: Link → ${link}"
+            ST0807_LINKS+=("${part_name}|${link}")
+            return 0
+        fi
+
+        log_warn "  0807.st: attempt ${attempt} failed, ${upload_response:0:200}"
+        (( attempt++ ))
+        sleep 5
+    done
+
+    log_error "  0807.st: ❌ All ${max_retries} attempts failed"
+    return 1
+}
+
+_st0807_chunked_upload() {
+    local file="$1"
+    local token="$2"
+    local fsize name mime init_body upload_id
+    fsize=$(get_file_size "$file")
+    name=$(make_safe_filename "$(basename "$file")")
+    mime="video/mp4"
+
+    local -a hdr=()
+    [[ -n "$token" ]] && hdr+=(-H "Authorization: Bearer ${token}")
+
+    local init_json
+    init_json=$(jq -n --arg name "$name" --argjson size "$fsize" --arg mime "$mime" \
+        '{name:$name, size:$size, mime:$mime, maxdl:"0", vanity:""}')
+
+    if [[ -z "$token" ]]; then
+        local pow
+        pow=$(_st0807_pow_json)
+        if [[ -z "$pow" ]] || ! echo "$pow" | jq -e '.pow_nonce' >/dev/null 2>&1; then
+            echo '{"error":"pow_failed"}'
+            return 1
+        fi
+        init_json=$(echo "$init_json" "$pow" | jq -s '.[0] + {
+            pow_id: .[1].pow_id, pow_ts: .[1].pow_ts, pow_bits: .[1].pow_bits,
+            pow_sig: .[1].pow_sig, pow_nonce: .[1].pow_nonce
+        }')
+    fi
+
+    init_body=$(curl -s --max-time 60 "${hdr[@]}" -H "Content-Type: application/json" \
+        -d "$init_json" "https://0807.st/upload/init" 2>/dev/null) || true
+    upload_id=$(echo "$init_body" | jq -r '.uploadId // .id // empty' 2>/dev/null)
+    if [[ -z "$upload_id" ]]; then
+        echo "$init_body"
+        return 1
+    fi
+
+    local chunk_size=16777216  # 16 MB
+    local offset=0
+    while (( offset < fsize )); do
+        local this=$chunk_size
+        (( offset + this > fsize )) && this=$(( fsize - offset ))
+        local chunk
+        chunk=$(mktemp /tmp/st0807_chunk_XXXX)
+        dd if="$file" of="$chunk" bs=1 skip="$offset" count="$this" status=none 2>/dev/null || \
+            dd if="$file" of="$chunk" bs="$chunk_size" skip=$(( offset / chunk_size )) count=1 status=none 2>/dev/null
+        local chunk_resp
+        chunk_resp=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" "${hdr[@]}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$chunk" \
+            "https://0807.st/upload/chunk?id=${upload_id}&offset=${offset}" 2>/dev/null) || true
+        rm -f "$chunk"
+        offset=$(( offset + this ))
+    done
+
+    local finish_json finish_body
+    finish_json=$(jq -n --arg id "$upload_id" '{id:$id, expiry:"0", maxdl:"0", password:"", vanity:""}')
+    finish_body=$(curl -s --max-time 120 "${hdr[@]}" -H "Content-Type: application/json" \
+        -d "$finish_json" "https://0807.st/upload/finish" 2>/dev/null) || true
+    echo "$finish_body"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SERVICE 6: VIKINGFILE UPLOAD
+#  https://vikingfile.com/api — anonymous (empty user) or VIKINGFILE_USER hash.
+#  Multipart: get-upload-url → PUT parts → complete-upload.
+#  Legacy single-POST fallback for smaller files / if multipart fails.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+upload_to_vikingfile() {
+    local file="$1"
+    local part_name="$2"
+    local user="${VIKINGFILE_USER:-}"
+    local fsize
+    fsize=$(get_file_size "$file")
+    local safe_name
+    safe_name=$(make_safe_filename "$(basename "$file")")
+
+    log_info "  VikingFile: Uploading $(basename \"$file\") ($(format_size \"$fsize\"))..."
+
+    local max_retries="${VIKINGFILE_MAX_RETRIES:-3}"
+    local attempt=1
+
+    while (( attempt <= max_retries )); do
+        local upload_start link
+        upload_start=$(now_epoch)
+        log_debug "  VikingFile attempt ${attempt}/${max_retries}"
+
+        link=$(_vikingfile_multipart "$file" "$safe_name" "$user" "$fsize") || true
+        if [[ -z "$link" ]]; then
+            link=$(_vikingfile_legacy "$file" "$safe_name" "$user") || true
+        fi
+
+        local upload_elapsed=$(( $(now_epoch) - upload_start ))
+        if [[ -n "$link" ]]; then
+            local speed
+            (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
+            log_ok "  VikingFile: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
+            log_info "  VikingFile: Link → ${link}"
+            VIKINGFILE_LINKS+=("${part_name}|${link}")
+            return 0
+        fi
+
+        log_warn "  VikingFile: attempt ${attempt} failed"
+        (( attempt++ ))
+        sleep 5
+    done
+
+    log_error "  VikingFile: ❌ All ${max_retries} attempts failed"
+    return 1
+}
+
+_vikingfile_multipart() {
+    local file="$1" name="$2" user="$3" fsize="$4"
+    local meta
+    meta=$(curl -s --max-time 30 -X POST "https://vikingfile.com/api/get-upload-url" \
+        -F "size=${fsize}" 2>/dev/null) || return 1
+
+    local upload_id key part_size nparts
+    upload_id=$(echo "$meta" | jq -r '.uploadId // empty' 2>/dev/null)
+    key=$(echo "$meta" | jq -r '.key // empty' 2>/dev/null)
+    part_size=$(echo "$meta" | jq -r '.partSize // 1073741824' 2>/dev/null)
+    nparts=$(echo "$meta" | jq -r '.numberParts // 0' 2>/dev/null)
+    [[ -z "$upload_id" || -z "$key" || "$nparts" -lt 1 ]] && return 1
+
+    local -a etags=()
+    local i=0
+    while (( i < nparts )); do
+        local url
+        url=$(echo "$meta" | jq -r ".urls[$i] // empty" 2>/dev/null)
+        [[ -z "$url" ]] && return 1
+        local offset=$(( i * part_size ))
+        local this=$part_size
+        (( offset + this > fsize )) && this=$(( fsize - offset ))
+        local part
+        part=$(mktemp /tmp/viking_part_XXXX)
+        _slice_file "$file" "$part" "$offset" "$this"
+        local headers etag
+        headers=$(mktemp /tmp/viking_hdr_XXXX)
+        curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" -D "$headers" -o /dev/null \
+            -X PUT --data-binary @"$part" "$url" >/dev/null 2>&1 || true
+        etag=$(grep -i '^etag:' "$headers" | head -1 | sed 's/[Ee][Tt][Aa][Gg]:[[:space:]]*//' | tr -d '\r"' | awk '{print $1}')
+        rm -f "$part" "$headers"
+        [[ -z "$etag" ]] && return 1
+        etags+=("$etag")
+        (( i++ ))
+    done
+
+    local -a form=(-F "key=${key}" -F "uploadId=${upload_id}" -F "name=${name}" -F "user=${user}")
+    local idx=0
+    for etag in "${etags[@]}"; do
+        form+=(-F "parts[${idx}][PartNumber]=$(( idx + 1 ))")
+        form+=(-F "parts[${idx}][ETag]=${etag}")
+        (( idx++ ))
+    done
+
+    local complete url
+    complete=$(curl -s --max-time 120 -X POST "https://vikingfile.com/api/complete-upload" \
+        "${form[@]}" 2>/dev/null) || return 1
+    url=$(echo "$complete" | jq -r '.url // empty' 2>/dev/null)
+    [[ -n "$url" ]] && echo "$url"
+}
+
+_vikingfile_legacy() {
+    local file="$1" name="$2" user="$3"
+    local server
+    server=$(curl -s --max-time 20 "https://vikingfile.com/api/get-server" | jq -r '.server // empty' 2>/dev/null)
+    [[ -z "$server" ]] && server="https://upload.vikingfile.com"
+    local resp url
+    resp=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" \
+        -F "file=@${file};filename=${name}" \
+        -F "user=${user}" \
+        "$server" 2>/dev/null) || return 1
+    url=$(echo "$resp" | jq -r '.url // empty' 2>/dev/null)
+    [[ -n "$url" ]] && echo "$url"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  THUMBNAIL → CLOUD (not stored in git repo)
 #  1) MEGA, permanent copy in YOUR account (/Root/TheMuslimLantern/thumbnails/)
 #  2) Archive.org image, hotlink URL for dashboard (works when YouTube thumb dies)
@@ -669,6 +950,8 @@ upload_to_clouds() {
     [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]] && (( active_services++ ))
     [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]] && (( active_services++ ))
     [[ "${ARCHIVE_SKIP:-false}" != "true" ]] && [[ -n "${ARCHIVE_ACCESS_KEY:-}" ]] && (( active_services++ ))
+    [[ "${ST0807_SKIP:-false}" != "true" ]] && (( active_services++ ))
+    [[ "${VIKINGFILE_SKIP:-false}" != "true" ]] && (( active_services++ ))
     UPLOAD_TOTAL_SERVICES=$active_services
 
     log_info "Files to upload: ${total_files}"
@@ -771,6 +1054,38 @@ upload_to_clouds() {
             log_info "  MEGA.nz: Skipped (no credentials)" 
         fi
 
+        # ── 5. 0807.st (HD) ──
+        if [[ "${ST0807_SKIP:-false}" != "true" ]]; then
+            (( expected_total_uploads++ ))
+            if upload_to_st0807 "$f" "$part_name"; then
+                (( svc_success++ ))
+            else
+                log_warn "  0807.st: First attempt failed, retrying after 10s..."
+                sleep 10
+                if upload_to_st0807 "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
+            fi
+        else
+            log_info "  0807.st: Skipped (ST0807_SKIP=true)"
+        fi
+
+        # ── 6. VikingFile (HD) ──
+        if [[ "${VIKINGFILE_SKIP:-false}" != "true" ]]; then
+            (( expected_total_uploads++ ))
+            if upload_to_vikingfile "$f" "$part_name"; then
+                (( svc_success++ ))
+            else
+                log_warn "  VikingFile: First attempt failed, retrying after 10s..."
+                sleep 10
+                if upload_to_vikingfile "$f" "$part_name"; then
+                    (( svc_success++ ))
+                fi
+            fi
+        else
+            log_info "  VikingFile: Skipped (VIKINGFILE_SKIP=true)"
+        fi
+
         UPLOAD_SUCCESS_COUNT=$(( UPLOAD_SUCCESS_COUNT + svc_success ))
     done
 
@@ -815,6 +1130,8 @@ upload_to_clouds() {
     [[ -n "$pixeldrain_str"   ]] && log_ok  "  Pixeldrain   ✅ : ${PIXELDRAIN_LINKS[*]}"
     [[ -n "$archive_str"      ]] && log_ok  "  Archive.org  ✅ : ${ARCHIVE_LINKS[*]}"
     [[ -n "$mega_str"         ]] && log_ok  "  MEGA.nz      ✅ : ${MEGA_LINKS[*]}"
+    [[ -n "$st0807_str"       ]] && log_ok  "  0807.st      ✅ : ${ST0807_LINKS[*]}"
+    [[ -n "$vikingfile_str"   ]] && log_ok  "  VikingFile   ✅ : ${VIKINGFILE_LINKS[*]}"
     log_separator
 
     if (( UPLOAD_SUCCESS_COUNT == 0 )); then
@@ -828,6 +1145,21 @@ upload_to_clouds() {
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    upload_to_clouds
+fi
+�══════════════════════
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    upload_to_clouds
+fi
+═══════
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    upload_to_clouds
+fi
+�══════════════════════
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     upload_to_clouds

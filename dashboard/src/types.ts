@@ -42,6 +42,8 @@ export interface Recording {
   megaLink: string;
   pixeldrainLink: string;
   gofileLink: string;
+  st0807Link: string;
+  vikingfileLink: string;
   githubRelease: string;
   githubDirect: string;
   telegramLink: string;
@@ -74,7 +76,7 @@ export interface Ep extends Recording {
   viewCount?: number;     // YouTube views (feed videos)
   topics?: string[];      // free-form tags (series / subject / format)
   deadMirrors?: string[]; // mirror types flagged dead by the latest health sweep
-                          // ('archive'|'gofile'|'pixeldrain'|'mega'|'github') — the
+                          // ('archive'|'gofile'|'pixeldrain'|'mega'|'github'|'st0807'|'vikingfile') — the
                           // repair workflow replaces them automatically; the UI
                           // demotes/labels them until fresh links land.
 }

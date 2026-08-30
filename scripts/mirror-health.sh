@@ -2,7 +2,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  MIRROR HEALTH — verify every recording's mirror links are alive            ║
 # ║  Reads data/recordings.json, checks each mirror URL (Archive.org, Gofile,   ║
-# ║  Pixeldrain, MEGA), writes data/mirror-health.json with per-recording and   ║
+# ║  Pixeldrain, MEGA, 0807.st, VikingFile), writes data/mirror-health.json     ║
 # ║  aggregate status, and exits non-zero if any recording is below the copy    ║
 # ║  guarantee (so the workflow can alert + trigger repair).                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -112,13 +112,36 @@ classify_gh() {
     classify "$url"
 }
 
+# 0807.st: direct file URLs. 200/206 = alive, 404/410 = dead.
+classify_st0807() {
+    local url="$1"
+    classify "$url"
+}
+
+# VikingFile: check-file API with the /f/<hash> id.
+classify_vikingfile() {
+    local url="$1" hash exist
+    hash=$(echo "$url" | sed -n 's#.*vikingfile.com/f/\([^/?#]*\).*#\1#p')
+    if [[ -z "$hash" ]]; then
+        printf 'unverifiable'; return
+    fi
+    exist=$(curl -sS --max-time "$CHECK_TIMEOUT" -X POST \
+        "https://vikingfile.com/api/check-file" -F "hash=${hash}" 2>/dev/null \
+        | jq -r '.exist // empty' 2>/dev/null || echo "")
+    case "$exist" in
+        true) printf 'alive' ;;
+        false) printf 'dead' ;;
+        *) printf 'unverifiable' ;;
+    esac
+}
+
 log_header "MIRROR HEALTH CHECK"
 log_info "Checking $(jq length "$RECORDINGS_JSON" 2>/dev/null || echo '?') recordings from $RECORDINGS_JSON"
 
 # ── build health JSON ───────────────────────────────────────────────────────
 # COPY GUARANTEE (the settled bar):
 #   every recording needs ≥1 PERMANENT mirror alive (Archive.org or MEGA)
-#   AND ≥1 FAST mirror alive (Pixeldrain, Gofile, GitHub release).
+#   AND ≥1 FAST mirror alive (Pixeldrain, Gofile, GitHub release, 0807.st, VikingFile).
 # Gofile is disposable by policy — it can satisfy "fast" but nothing else.
 TMP_JSON="$(mktemp)"
 jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
@@ -173,7 +196,9 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
         --argjson pixeldrain "$(jv "$pixel" "$p")" \
         --argjson mega "$(jv "$mega" "$m")" \
         --argjson github "$(jv "$ghrel" "$gh")" \
-        '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, permanent_ok:$permanent_ok, fast_ok:$fast_ok, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega, github:$github}}'
+        --argjson st0807 "$(jv "$st0807" "$s")" \
+        --argjson vikingfile "$(jv "$viking" "$v")" \
+        '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, permanent_ok:$permanent_ok, fast_ok:$fast_ok, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega, github:$github, st0807:$st0807, vikingfile:$vikingfile}}'
 done > "$TMP_JSON"
 
 # ── aggregate ───────────────────────────────────────────────────────────────

@@ -169,7 +169,7 @@ function dedupAndMerge(records: Recording[]): Recording[] {
     const merged: Recording = { ...ex };
     const fields: (keyof Recording)[] = [
       'archiveDirect', 'archiveNode', 'archiveLink', 'megaLink', 'pixeldrainLink',
-      'gofileLink', 'githubRelease', 'githubDirect',
+      'gofileLink', 'st0807Link', 'vikingfileLink', 'githubRelease', 'githubDirect',
       'telegramLink', 'cfStream', 'chatUrl', 'youtubeUnlisted', 'youtubeId', 'transcriptUrl',
     ];
     for (const f of fields) if (!merged[f] && r[f]) merged[f] = r[f] as never;
@@ -212,6 +212,8 @@ export async function fetchRecordings(): Promise<Recording[]> {
       megaLink:        r.mega_link || '',
       pixeldrainLink:  r.pixeldrain_link || '',
       gofileLink:      r.gofile_link || '',
+      st0807Link:      r.st0807_link || '',
+      vikingfileLink:  r.vikingfile_link || '',
       githubRelease:   r.github_release || '',
       githubDirect:    r.github_direct || '',
       telegramLink:    r.telegram_link || '',
@@ -263,7 +265,7 @@ export async function fetchPrediction(): Promise<StreamPrediction | null> {
 /** Mirror liveness from the latest automated health sweep
  *  (data/mirror-health.json, refreshed every few hours by CI).
  *  Returns videoId → array of dead mirror types
- *  ('archive'|'gofile'|'pixeldrain'|'mega'|'github'). The repair workflow
+ *  ('archive'|'gofile'|'pixeldrain'|'mega'|'github'|'st0807'|'vikingfile'). The repair workflow
  *  re-uploads dead mirrors from Archive.org and rewrites recordings.json,
  *  so a dead entry here means "link currently being replaced" — the UI
  *  demotes it so visitors only ever click working links. */
@@ -273,11 +275,12 @@ export async function fetchMirrorHealth(): Promise<Record<string, string[]>> {
   const out: Record<string, string[]> = {};
   for (const r of j.recordings) {
     const m = r?.mirrors;
-    if (!m || !r.videoId) continue;
+    const vid = r.video_id || r.videoId;
+    if (!m || !vid) continue;
     const dead = Object.entries(m)
       .filter(([, v]) => v === 'dead')
       .map(([k]) => k);
-    if (dead.length) out[String(r.videoId)] = dead;
+    if (dead.length) out[String(vid)] = dead;
   }
   return out;
 }

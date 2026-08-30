@@ -52,6 +52,7 @@ export function enrichYouTube(v: YTVideo, isShort = false, topics: Record<string
     thumbnail: v.thumb || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
     archiveLink: '', archiveDirect: '', archiveNode: '',
     megaLink: '', pixeldrainLink: '', gofileLink: '',
+    st0807Link: '', vikingfileLink: '',
     githubRelease: '', githubDirect: '',
     telegramLink: '', cfStream: '',
     youtubeUnlisted: '',

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  STREAM RECORDER, AUTOMATED CLOUD LINK PRESERVATION v2.0                     ║
-# ║  Runs every 3 days to keep Gofile/Pixeldrain links alive.                    ║
+# ║  Runs every 3 days to keep Gofile/Pixeldrain/0807.st/VikingFile links alive. ║
 # ║  Dead links → edits the original Discord message with Archive.org fallback   ║
 # ║  Updates links.txt to mark expired links.                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -27,6 +27,15 @@ check_link_alive() {
         message=$(echo "$info" | jq -r '.message // .value // empty' 2>/dev/null)
         [[ "$success" == "false" ]] && { log_debug "    Pixeldrain API says dead: ${message:-unknown}"; return 1; }
         return 0
+    fi
+
+    if [[ "$url" =~ vikingfile\.com/f/([a-zA-Z0-9_-]+) ]]; then
+        local vf_hash="${BASH_REMATCH[1]}"
+        local vf_info vf_exist
+        vf_info=$(curl -s --max-time "$timeout" -X POST "https://vikingfile.com/api/check-file" -F "hash=${vf_hash}" 2>/dev/null) || return 1
+        vf_exist=$(echo "$vf_info" | jq -r '.exist // empty' 2>/dev/null)
+        [[ "$vf_exist" == "true" ]] && return 0
+        return 1
     fi
     
     local http_code
@@ -128,6 +137,27 @@ refresh_pixeldrain() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  0807.ST REFRESH, 1KB range ping (expiry=0 uploads never auto-delete, but
+#  a HEAD/range keeps the object warm on any CDN cache in front).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+refresh_st0807() {
+    local url="$1"
+    curl -s -o /dev/null --max-time 30 -r "0-1023" -L "$url" 2>/dev/null
+    return $?
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  VIKINGFILE REFRESH, check-file + 1KB range ping on the public URL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+refresh_vikingfile() {
+    local url="$1"
+    curl -s -o /dev/null --max-time 30 -r "0-1023" -L "$url" 2>/dev/null
+    return $?
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  PARSE LINKS.TXT INTO STREAM ENTRY BLOCKS
 #  Returns each entry block with its MsgID, gofile, pixeldrain, archive links
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -216,8 +246,10 @@ edit_discord_dead_links() {
     IFS=',' read -ra services <<< "$dead_services"
     for svc in "${services[@]}"; do
         case "$svc" in
-            gofile)     dead_list+="**Gofile**, ❌ Expired\n" ;;
-            pixeldrain) dead_list+="**Pixeldrain**, ❌ Expired\n" ;;
+            gofile)      dead_list+="**Gofile**, ❌ Expired\n" ;;
+            pixeldrain)  dead_list+="**Pixeldrain**, ❌ Expired\n" ;;
+            st0807)      dead_list+="**0807.st**, ❌ Expired\n" ;;
+            vikingfile)  dead_list+="**VikingFile**, ❌ Expired\n" ;;
         esac
     done
     
@@ -323,7 +355,9 @@ refresh_links() {
         gofile: (.gofile_link // ""),
         pixeldrain: (.pixeldrain_link // ""),
         archive: (.archive_link // ""),
-        mega: (.mega_link // "")
+        mega: (.mega_link // ""),
+        st0807: (.st0807_link // ""),
+        vikingfile: (.vikingfile_link // "")
     }]' 2>/dev/null || parse_entries_from_links "$links_content")
     
     local entry_count
@@ -372,7 +406,7 @@ refresh_links() {
     
     # ── Track results ─────────────────────────────────────────────────────────
     local total_checked=0 total_alive=0 total_refreshed=0 total_dead=0 total_edited=0
-    local dead_gofile_urls=() dead_pixeldrain_urls=()
+    local dead_gofile_urls=() dead_pixeldrain_urls=() dead_st0807_urls=() dead_vikingfile_urls=()
     local updated_links="$links_content"
     
     # ── Refresh Gofile links (1KB ping) ───────────────────────────────────────
@@ -444,6 +478,66 @@ refresh_links() {
             random_sleep 2 5
         done
     fi
+
+    # ── Refresh 0807.st links (1KB ping) ──────────────────────────────────────
+    if [[ "$do_st0807" == true ]] && (( total_st0807 > 0 )); then
+        log_step "Refreshing 0807.st links (1KB ping)..."
+        for url in "${st0807_urls[@]}"; do
+            if echo "$links_content" | grep -q "${url}.*\[EXPIRED\]"; then
+                log_info "  [skip] Already expired: $url"
+                continue
+            fi
+            (( total_checked++ ))
+            log_info "  [${total_checked}/${total_links}] Checking: $url"
+            if check_link_alive "$url"; then
+                (( total_alive++ ))
+                if [[ "$dry_run" == "true" ]]; then
+                    log_ok "    ✅ Alive, dry run, no refresh ping"
+                elif refresh_st0807 "$url"; then
+                    (( total_refreshed++ ))
+                    log_ok "    ✅ Alive, timer reset (1KB)"
+                else
+                    log_warn "    ⚠️ Alive but refresh ping failed"
+                fi
+            else
+                (( total_dead++ ))
+                dead_st0807_urls+=("$url")
+                updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
+                log_warn "    DEAD, link expired"
+            fi
+            random_sleep 1 3
+        done
+    fi
+
+    # ── Refresh VikingFile links (1KB ping + check-file) ──────────────────────
+    if [[ "$do_vikingfile" == true ]] && (( total_vikingfile > 0 )); then
+        log_step "Refreshing VikingFile links (1KB ping)..."
+        for url in "${vikingfile_urls[@]}"; do
+            if echo "$links_content" | grep -q "${url}.*\[EXPIRED\]"; then
+                log_info "  [skip] Already expired: $url"
+                continue
+            fi
+            (( total_checked++ ))
+            log_info "  [${total_checked}/${total_links}] Checking: $url"
+            if check_link_alive "$url"; then
+                (( total_alive++ ))
+                if [[ "$dry_run" == "true" ]]; then
+                    log_ok "    ✅ Alive, dry run, no refresh ping"
+                elif refresh_vikingfile "$url"; then
+                    (( total_refreshed++ ))
+                    log_ok "    ✅ Alive, timer reset (1KB)"
+                else
+                    log_warn "    ⚠️ Alive but refresh ping failed"
+                fi
+            else
+                (( total_dead++ ))
+                dead_vikingfile_urls+=("$url")
+                updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
+                log_warn "    DEAD, link expired"
+            fi
+            random_sleep 1 3
+        done
+    fi
     
     # ── Edit Discord messages for entries with dead links ─────────────────────
     if (( total_dead > 0 )) && [[ "$dry_run" != "true" ]]; then
@@ -454,12 +548,14 @@ refresh_links() {
         while (( i < entry_count )); do
             local entry
             entry=$(echo "$entries_json" | jq ".[$i]")
-            local e_title e_msgid e_gofile e_pixeldrain e_archive
+            local e_title e_msgid e_gofile e_pixeldrain e_archive e_st0807 e_vikingfile
             e_title=$(echo "$entry" | jq -r '.title')
             e_msgid=$(echo "$entry" | jq -r '.msg_id')
             e_gofile=$(echo "$entry" | jq -r '.gofile')
             e_pixeldrain=$(echo "$entry" | jq -r '.pixeldrain')
             e_archive=$(echo "$entry" | jq -r '.archive')
+            e_st0807=$(echo "$entry" | jq -r '.st0807 // empty')
+            e_vikingfile=$(echo "$entry" | jq -r '.vikingfile // empty')
             
             # Check if any of this entry's links are in the dead list
             local dead_services=""
@@ -534,6 +630,8 @@ refresh_links() {
         --arg edited "$total_edited" \
         --arg total_gofile "$total_gofile" \
         --arg total_pixeldrain "$total_pixeldrain" \
+        --arg total_st0807 "$total_st0807" \
+        --arg total_vikingfile "$total_vikingfile" \
         --arg dry_run "$dry_run" \
         --arg updated_at "$(now_utc_iso)" \
         '{
@@ -549,6 +647,8 @@ refresh_links() {
             providers: {
                 gofile: { total: ($total_gofile | tonumber) },
                 pixeldrain: { total: ($total_pixeldrain | tonumber) },
+                st0807: { total: ($total_st0807 | tonumber) },
+                vikingfile: { total: ($total_vikingfile | tonumber) },
                 archive: { permanent: true }
             }
         }')
@@ -586,6 +686,13 @@ refresh_links() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    refresh_links
+fi
+═════════════════════════════════════════════════════════════
 #  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
