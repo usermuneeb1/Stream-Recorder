@@ -164,6 +164,14 @@ repair_mirrors() {
     local max_items="${MAX_ITEMS:-3}"
     local dry_run="${DRY_RUN:-false}"
     local destinations="${DESTINATIONS:-gofile,pixeldrain,mega,st0807,vikingfile}"
+    # Older workflow YAML still passes DESTINATIONS=gofile,pixeldrain,mega.
+    # Keep the new hosts in the repair set unless the caller opted out.
+    if [[ "${ST0807_SKIP:-false}" != "true" && "$destinations" != *st0807* && "$destinations" != *0807* ]]; then
+        destinations="${destinations},st0807"
+    fi
+    if [[ "${VIKINGFILE_SKIP:-false}" != "true" && "$destinations" != *vikingfile* && "$destinations" != *viking* ]]; then
+        destinations="${destinations},vikingfile"
+    fi
 
     local records
     records=$(github_api_read_content "data/recordings.json" 2>/dev/null) || records="$(cat data/recordings.json 2>/dev/null || echo '[]')"
