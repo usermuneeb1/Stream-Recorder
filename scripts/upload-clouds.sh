@@ -1151,18 +1151,3 @@ upload_to_clouds() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     upload_to_clouds
 fi
-�══════════════════════
-
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    upload_to_clouds
-fi
-═══════
-
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    upload_to_clouds
-fi
-�══════════════════════
-
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    upload_to_clouds
-fi
