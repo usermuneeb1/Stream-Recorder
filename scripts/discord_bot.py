@@ -103,9 +103,15 @@ def cmd_status():
 
     fields = []
     if status:
-        fields.append({"name": "Total Recordings", "value": str(status.get("total_recordings", "?")), "inline": True})
-        fields.append({"name": "Total Hours", "value": f"{status.get('total_hours', 0):.1f}h", "inline": True})
-        fields.append({"name": "Total Size", "value": f"{status.get('total_gb', 0):.2f} GB", "inline": True})
+        # Field names must match the producer schema in scripts/gen-status.py:
+        #   recordings_total, total_hours, total_size_gb
+        # (2026-09-01 bug: bot read total_recordings/total_gb -> "?" / "0.00 GB".
+        #  Pinned by tests/test_status_contract.py.)
+        total_hours = status.get("total_hours") or 0
+        total_gb = status.get("total_size_gb") or 0
+        fields.append({"name": "Total Recordings", "value": str(status.get("recordings_total", "?")), "inline": True})
+        fields.append({"name": "Total Hours", "value": f"{float(total_hours):.1f}h", "inline": True})
+        fields.append({"name": "Total Size", "value": f"{float(total_gb):.2f} GB", "inline": True})
 
     if latest:
         fields.append({
