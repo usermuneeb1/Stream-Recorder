@@ -552,7 +552,9 @@ upload_to_st0807() {
     while (( attempt <= max_retries )); do
         local upload_start upload_response link
         upload_start=$(now_epoch)
-        log_debug "  0807.st attempt ${attempt}/${max_retries} (token=$([[ -n \"$token\" ]] && echo yes || echo pow))"
+        local tok_state="pow"
+        [[ -n "$token" ]] && tok_state="yes"
+        log_debug "  0807.st attempt ${attempt}/${max_retries} (token=$tok_state)"
 
         if (( fsize <= simple_limit )); then
             local -a curl_args=(-s --max-time "${UPLOAD_TIMEOUT:-3600}" -F "file=@${file}" -F "expiry=0" -F "maxdl=0")
