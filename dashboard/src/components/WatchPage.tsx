@@ -25,6 +25,7 @@ import Comments from './Comments';
 import { nextUp as pickNext } from '../lib/enrich';
 import { track } from '../lib/analytics';
 import { copyText, fmtDate, fmtTime, isHD, resShort, shareLinks } from '../lib/format';
+import { resolveActiveIdx, srcIdxForMirror } from '../lib/mirrors';
 import {
   clearPosition, getRate, getTheatre, loadPosition,
   pushHistory, savePosition, setRate as persistRate, setTheatre as persistTheatre,
@@ -140,12 +141,16 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const newer = idxInSorted > 0 ? sorted[idxInSorted - 1] : undefined;
   const older = idxInSorted >= 0 && idxInSorted < sorted.length - 1 ? sorted[idxInSorted + 1] : undefined;
 
-  /* Active mirror resolution */
-  const activeIdx = useMemo(() => {
-    if (srcIdx !== 0) return srcIdx;
-    const firstGood = mirrors.findIndex((_, i) => !failed.has(i));
-    return firstGood === -1 ? 0 : firstGood;
-  }, [srcIdx, failed, mirrors]);
+  /* Active mirror resolution.
+     srcIdx is 1-based (0 = Auto, 1 = first mirror) — the sidebar, keyboard
+     and highlight all speak that language. resolveActiveIdx subtracts 1 so
+     playback lands on the mirror the user actually picked. The previous
+     `if (srcIdx !== 0) return srcIdx` played mirrors[1] when the user
+     clicked mirrors[0] (GHOST → R3AL) and played undefined on the last slot. */
+  const activeIdx = useMemo(
+    () => resolveActiveIdx(srcIdx, failed, mirrors.length),
+    [srcIdx, failed, mirrors.length],
+  );
   const active = mirrors[activeIdx];
 
   /* -- QoE instrumentation (streaming-engineer metrics) --------------
@@ -286,9 +291,15 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   }, [countdown, next, onOpen]);
 
   /* ── Mirror selection + failover ─────────────────────────────────── */
-  const selectMirror = useCallback((i: number) => {
-    setSrcIdx(i);
-    setFailed(f => { const n = new Set(f); n.delete(i); return n; });
+  const selectMirror = useCallback((src: number) => {
+    setSrcIdx(src);
+    setFailed(f => {
+      // src is 1-based (0 = Auto). failed is 0-based mirror indices.
+      if (src === 0) return f;
+      const n = new Set(f);
+      n.delete(src - 1);
+      return n;
+    });
     setLitOnce(false); setElapsed(0); setPlaying(false);
   }, []);
 
@@ -298,7 +309,9 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       const nextIdx = mirrors.findIndex((_, i) => !n.has(i));
       if (nextIdx !== -1) {
         toast(`${mirrors[activeIdx]?.label ?? 'Mirror'} failed — switching to ${mirrors[nextIdx].label}`);
-        setSrcIdx(nextIdx);
+        // Stay in Auto if we were Auto — first-healthy handles the skip.
+        // Manual selection jumps to the next mirror in 1-based srcIdx.
+        if (srcIdx !== 0) setSrcIdx(srcIdxForMirror(nextIdx));
         setLitOnce(false); setElapsed(0);
       } else {
         toast('All mirrors failed — try a download instead');
@@ -306,7 +319,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       }
       return n;
     });
-  }, [activeIdx, mirrors, toast]);
+  }, [activeIdx, mirrors, toast, srcIdx, rec.videoId]);
 
   /* ── Global keyboard ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -780,13 +793,13 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                       key={m.label}
                       className="w-full flex items-center gap-2.5 px-3 h-10 rounded-lg text-[12.5px] font-semibold transition-colors"
                       style={{
-                        background: srcIdx === i + 1 ? 'var(--flame-08)' : 'transparent',
+                        background: srcIdx === srcIdxForMirror(i) ? 'var(--flame-08)' : 'transparent',
                         opacity: dead ? 0.5 : 1,
                         textDecoration: dead ? 'line-through' : 'none',
                         color: 'var(--mist)',
                       }}
-                      onClick={() => selectMirror(i + 1)}
-                      aria-pressed={srcIdx === i + 1}
+                      onClick={() => selectMirror(srcIdxForMirror(i))}
+                      aria-pressed={srcIdx === srcIdxForMirror(i)}
                     >
                       <span className={`dot-health ${state}`} />
                       <span style={{ color: 'var(--ivory)' }}>{m.label}</span>
