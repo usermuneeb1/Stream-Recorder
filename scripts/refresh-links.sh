@@ -316,6 +316,30 @@ mark_dead_in_links_txt() {
     echo "$links_content" | sed "s|${dead_url}|${dead_url} [EXPIRED]|g"
 }
 
+# Mark a dead URL inside recordings.json (the real source of truth).
+# Appends the URL to each affected entry's "expired_links" array instead of
+# string-splicing " [EXPIRED]" into a JSON value (which produced unusable URLs).
+mark_dead_in_recordings() {
+    local dead_url="$1"
+    local content="$2"
+
+    echo "$content" | jq --arg u "$dead_url" '
+        map(
+          if ([.gofile_link, .pixeldrain_link, .st0807_link, .vikingfile_link]
+               | map(select(. != null)) | index($u)) != null
+          then .expired_links = (((.expired_links // []) + [$u]) | unique)
+          else .
+          end
+        )' 2>/dev/null || echo "$content"
+}
+
+# Has this URL already been recorded as expired?
+url_already_expired() {
+    local url="$1" content="$2"
+    echo "$content" | jq -e --arg u "$url" \
+        'any(.[]; (.expired_links // []) | index($u) != null)' >/dev/null 2>&1
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  MAIN REFRESH ORCHESTRATOR
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -351,7 +375,7 @@ refresh_links() {
     entries_json=$(# Parse recordings.json directly with jq
     echo "$links_content" | jq -c '[.[] | {
         title: .title,
-        msg_id: "",
+        msg_id: (.discord_msg_id // .msg_id // ""),
         gofile: (.gofile_link // ""),
         pixeldrain: (.pixeldrain_link // ""),
         archive: (.archive_link // ""),
@@ -377,29 +401,41 @@ refresh_links() {
     readarray -t pixeldrain_urls < <(echo "$entries_json" | jq -r '[.[].pixeldrain // "" | split("|")[]] | map(select(length>0)) | unique | .[]')
     readarray -t archive_urls    < <(echo "$entries_json" | jq -r '[.[].archive // ""    | split("|")[]] | map(select(length>0)) | unique | .[]')
 
+    local st0807_urls=() vikingfile_urls=()
+    readarray -t st0807_urls     < <(echo "$entries_json" | jq -r '[.[].st0807 // ""     | split("|")[]] | map(select(length>0)) | unique | .[]')
+    readarray -t vikingfile_urls < <(echo "$entries_json" | jq -r '[.[].vikingfile // "" | split("|")[]] | map(select(length>0)) | unique | .[]')
+
     local total_gofile=${#gofile_urls[@]}
     local total_pixeldrain=${#pixeldrain_urls[@]}
     local total_archive=${#archive_urls[@]}
+    local total_st0807=${#st0807_urls[@]}
+    local total_vikingfile=${#vikingfile_urls[@]}
 
     # ── Provider filtering (independent Gofile/Pixeldrain cadences) ───────────
     # REFRESH_PROVIDERS = "both" (default) | "gofile" | "pixeldrain" | comma-list.
     # Lets the workflow refresh Gofile every 5 days and Pixeldrain every 30 days
     # on separate schedules without duplicating the whole job.
     local providers="${REFRESH_PROVIDERS:-both}"
-    local do_gofile=false do_pixeldrain=false
+    local do_gofile=false do_pixeldrain=false do_st0807=false do_vikingfile=false
     [[ "$providers" == "both" || "$providers" == *"gofile"* ]]     && do_gofile=true
     [[ "$providers" == "both" || "$providers" == *"pixeldrain"* ]] && do_pixeldrain=true
-    log_info "Provider filter: '${providers}' → gofile=${do_gofile} pixeldrain=${do_pixeldrain}"
+    [[ "$providers" == "both" || "$providers" == *"st0807"* ]]     && do_st0807=true
+    [[ "$providers" == "both" || "$providers" == *"vikingfile"* ]] && do_vikingfile=true
+    log_info "Provider filter: '${providers}' → gofile=${do_gofile} pixeldrain=${do_pixeldrain} st0807=${do_st0807} vikingfile=${do_vikingfile}"
 
     # Count only the providers we'll actually refresh so totals are honest.
-    local eff_gofile=0 eff_pixeldrain=0
+    local eff_gofile=0 eff_pixeldrain=0 eff_st0807=0 eff_vikingfile=0
     [[ "$do_gofile" == true ]]     && eff_gofile=$total_gofile
     [[ "$do_pixeldrain" == true ]] && eff_pixeldrain=$total_pixeldrain
-    local total_links=$(( eff_gofile + eff_pixeldrain ))
+    [[ "$do_st0807" == true ]]     && eff_st0807=$total_st0807
+    [[ "$do_vikingfile" == true ]] && eff_vikingfile=$total_vikingfile
+    local total_links=$(( eff_gofile + eff_pixeldrain + eff_st0807 + eff_vikingfile ))
     
     log_info "Found links:"
     log_info "  Gofile     : ${total_gofile}${do_gofile:+ (refreshing)}${do_gofile:+}"
     log_info "  Pixeldrain : ${total_pixeldrain}${do_pixeldrain:+ (refreshing)}${do_pixeldrain:+}"
+    log_info "  0807.st    : ${total_st0807}"
+    log_info "  VikingFile : ${total_vikingfile}"
     log_info "  Archive.org: ${total_archive} (permanent, no refresh needed)"
     log_info "  Total to check this run: ${total_links}"
     log_separator
@@ -415,7 +451,7 @@ refresh_links() {
         
         for url in "${gofile_urls[@]}"; do
             # Skip already-expired links
-            if echo "$links_content" | grep -q "${url}.*\[EXPIRED\]"; then
+            if url_already_expired "$url" "$links_content"; then
                 log_info "  [skip] Already expired: $url"
                 continue
             fi
@@ -436,7 +472,7 @@ refresh_links() {
             else
                 (( total_dead++ ))
                 dead_gofile_urls+=("$url")
-                updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
+                updated_links=$(mark_dead_in_recordings "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
             fi
             
@@ -450,7 +486,7 @@ refresh_links() {
         
         for url in "${pixeldrain_urls[@]}"; do
             # Skip already-expired links
-            if echo "$links_content" | grep -q "${url}.*\[EXPIRED\]"; then
+            if url_already_expired "$url" "$links_content"; then
                 log_info "  [skip] Already expired: $url"
                 continue
             fi
@@ -471,7 +507,7 @@ refresh_links() {
             else
                 (( total_dead++ ))
                 dead_pixeldrain_urls+=("$url")
-                updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
+                updated_links=$(mark_dead_in_recordings "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
             fi
             
@@ -483,7 +519,7 @@ refresh_links() {
     if [[ "$do_st0807" == true ]] && (( total_st0807 > 0 )); then
         log_step "Refreshing 0807.st links (1KB ping)..."
         for url in "${st0807_urls[@]}"; do
-            if echo "$links_content" | grep -q "${url}.*\[EXPIRED\]"; then
+            if url_already_expired "$url" "$links_content"; then
                 log_info "  [skip] Already expired: $url"
                 continue
             fi
@@ -502,7 +538,7 @@ refresh_links() {
             else
                 (( total_dead++ ))
                 dead_st0807_urls+=("$url")
-                updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
+                updated_links=$(mark_dead_in_recordings "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
             fi
             random_sleep 1 3
@@ -513,7 +549,7 @@ refresh_links() {
     if [[ "$do_vikingfile" == true ]] && (( total_vikingfile > 0 )); then
         log_step "Refreshing VikingFile links (1KB ping)..."
         for url in "${vikingfile_urls[@]}"; do
-            if echo "$links_content" | grep -q "${url}.*\[EXPIRED\]"; then
+            if url_already_expired "$url" "$links_content"; then
                 log_info "  [skip] Already expired: $url"
                 continue
             fi
@@ -532,7 +568,7 @@ refresh_links() {
             else
                 (( total_dead++ ))
                 dead_vikingfile_urls+=("$url")
-                updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
+                updated_links=$(mark_dead_in_recordings "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
             fi
             random_sleep 1 3
@@ -580,6 +616,26 @@ refresh_links() {
                 done
             fi
             
+            # Check 0807.st
+            if [[ -n "$e_st0807" ]]; then
+                IFS='|' read -ra s_urls <<< "$e_st0807"
+                for s_url in "${s_urls[@]}"; do
+                    for dead in "${dead_st0807_urls[@]:-}"; do
+                        [[ "$s_url" == "$dead" ]] && { dead_services+="st0807,"; break; }
+                    done
+                done
+            fi
+
+            # Check VikingFile
+            if [[ -n "$e_vikingfile" ]]; then
+                IFS='|' read -ra v_urls <<< "$e_vikingfile"
+                for v_url in "${v_urls[@]}"; do
+                    for dead in "${dead_vikingfile_urls[@]:-}"; do
+                        [[ "$v_url" == "$dead" ]] && { dead_services+="vikingfile,"; break; }
+                    done
+                done
+            fi
+
             # If this entry has dead links, edit its Discord message
             if [[ -n "$dead_services" ]]; then
                 dead_services="${dead_services%,}"  # remove trailing comma
@@ -611,12 +667,12 @@ refresh_links() {
     
     # ── Save updated links.txt if any links died ─────────────────────────────
     if [[ "$updated_links" != "$links_content" ]] && [[ "$dry_run" != "true" ]]; then
-        log_step "Saving updated links.txt (marking expired links)..."
-        
-        if github_api_write "links.txt" "$updated_links" "Link refresh: ${total_dead} expired links marked [$(now_pkt)]"; then
-            log_ok "links.txt updated with [EXPIRED] markers"
+        log_step "Saving updated recordings.json (marking expired links)..."
+
+        if github_api_write "data/recordings.json" "$updated_links" "Link refresh: ${total_dead} expired links marked [$(now_pkt)]"; then
+            log_ok "recordings.json updated with expired_links"
         else
-            log_warn "Failed to update links.txt"
+            log_warn "Failed to update recordings.json"
         fi
     fi
     
