@@ -10,8 +10,10 @@ grn() { printf '  \033[32mGREEN\033[0m %s\n' "$1"; }
 FAIL=0
 
 echo "CHECK 1: mirror-health covers every recording"
-TOTAL_REC=$(python3 -c "import json;print(len(json.load(open('data/recordings.json'))))")
-COVERED=$(python3 -c "import json;print(json.load(open('data/mirror-health.json'))['summary']['total'])")
+gh api 'repos/usermuneeb1/Stream-Recorder/contents/data/recordings.json?ref=main' -q '.content' | base64 -d > /tmp/dbg-recs.json 2>/dev/null
+gh api 'repos/usermuneeb1/Stream-Recorder/contents/data/mirror-health.json?ref=main' -q '.content' | base64 -d > /tmp/dbg-mh.json 2>/dev/null
+TOTAL_REC=$(python3 -c "import json;print(len(json.load(open('/tmp/dbg-recs.json'))))")
+COVERED=$(python3 -c "import json;print(json.load(open('/tmp/dbg-mh.json'))['summary']['total'])")
 if [ "$COVERED" -eq "$TOTAL_REC" ] && [ "$TOTAL_REC" -gt 0 ]; then
   grn "mirror-health covers $COVERED/$TOTAL_REC recordings"
 else
@@ -24,7 +26,7 @@ STALE=$(python3 - <<'EOF'
 import json, datetime
 now = datetime.datetime.now(datetime.timezone.utc)
 stale = 0
-for r in json.load(open('data/recordings.json')):
+for r in json.load(open('/tmp/dbg-recs.json')):
     ts = r.get('mirrors_repaired_at')
     if not ts or not r.get('gofile_link'):
         stale += 1; continue
