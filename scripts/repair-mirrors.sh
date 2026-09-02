@@ -323,6 +323,10 @@ repair_mirrors() {
         else
             log_warn "  No new mirrors produced"
         fi
+
+        # Free the downloaded source before the next candidate — multi-GB
+        # files accumulate in /tmp and can exhaust the runner disk (2026-09-02).
+        rm -f "${file:-}"
     done
 
     log_separator

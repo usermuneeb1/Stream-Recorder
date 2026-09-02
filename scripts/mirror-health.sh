@@ -57,17 +57,12 @@ classify_gofile() {
     if [[ -z "$code" ]]; then
         printf 'unverifiable'; return
     fi
-    if [[ -n "${GOFILE_API_KEY:-}" ]]; then
-        status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
-            -H "Authorization: Bearer ${GOFILE_API_KEY}" \
-            "https://api.gofile.io/contents/${code}" 2>/dev/null \
-            | jq -r '.status // "error"' 2>/dev/null || echo error)
-    else
-        # Public website token — same one the uploader uses for folder reads.
-        status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
-            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null \
-            | jq -r '.status // "error"' 2>/dev/null || echo error)
-    fi
+    # Public website token only — no account API key anywhere (owner policy
+    # 2026-09-02). A stale wt yields error-token → unverifiable, and the
+    # pixeldrain/github/archive classifiers still carry the verdict.
+    status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
+        "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null \
+        | jq -r '.status // "error"' 2>/dev/null || echo error)
     case "$status" in
         ok) printf 'alive' ;;
         # API returns "error-notFound" — glob the substring, never exact-match
