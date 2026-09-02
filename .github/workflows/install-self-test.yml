@@ -138,17 +138,8 @@ jobs:
       # stream-recorder.yml hasn't gained new commands that aren't replayed
       # here. Compares a fingerprint of the install lines.
       # ─────────────────────────────────────────────────────────────────────
-      - name: "Drift check against the real workflow"
-        run: |
-          REAL=$(awk '/Install Dependencies/,/Start PoToken Provider/' .github/workflows/stream-recorder.yml \
-                 | grep -E "^\s*(sudo|pip3|curl|sed -i|chmod)" | wc -l)
-          TEST=$(awk '/Replay real install block/,/Verify all critical tools/' .github/workflows/install-self-test.yml \
-                 | grep -E "^\s*(sudo|pip3|curl|sed -i|chmod)" | wc -l)
-          echo "Real workflow install commands: $REAL"
-          echo "Self-test install commands:     $TEST"
-          if (( REAL > TEST + 1 )); then
-            echo "::warning::Real install block has $REAL commands but self-test only mirrors $TEST. Update install-self-test.yml so it stays representative."
-          fi
+            - name: "Drift check against the real workflow"
+        run: bash scripts/check-install-drift.sh .github/workflows/stream-recorder.yml .github/workflows/install-self-test.yml
 
       - name: "Discord alert on failure"
         if: failure()
