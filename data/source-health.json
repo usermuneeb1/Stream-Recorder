@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-08-26T06:33:52.000Z",
+  "updated_at": "2026-09-02T11:05:16.000Z",
   "dry_run": false,
   "totals": {
     "checked": 12,
@@ -13,6 +13,12 @@
       "total": 12
     },
     "pixeldrain": {
+      "total": 12
+    },
+    "st0807": {
+      "total": 2
+    },
+    "vikingfile": {
       "total": 12
     },
     "archive": {
