@@ -79,12 +79,19 @@ RC=0; OUT=$(run_refresh gofile) || RC=$?
 [[ "$RC" -eq 0 ]] && ok "exit 0" || bad "exit $RC (crash — unbound st0807/vikingfile gate?)"
 grep -q "LINK REFRESH COMPLETE" <<<"$OUT" && ok "reached completion banner" || bad "never reached LINK REFRESH COMPLETE"
 grep -q 'unbound variable' "$WORKDIR/stderr.gofile.log" && bad "unbound variable in stderr" || ok "no unbound-variable errors"
+grep -q 'st0807=true vikingfile=true' <<<"$OUT" && ok "gofile run carries 0807/viking keep-alive (30-day TTL, 6x buffer)" || bad "keep-alive carriers NOT enabled on the 5-day run"
 
 echo "── 2: REFRESH_PROVIDERS=both also clean (pixeldrain + both gates) ──"
 RC=0; OUT=$(run_refresh both) || RC=$?
 [[ "$RC" -eq 0 ]] && ok "exit 0" || bad "exit $RC"
 grep -q "LINK REFRESH COMPLETE" <<<"$OUT" && ok "reached completion banner" || bad "never completed"
 grep -q 'unbound variable' "$WORKDIR/stderr.both.log" && bad "unbound variable in stderr" || ok "no unbound-variable errors"
+
+echo "── 3: monthly pixeldrain run stays single-provider (cadence separation) ──"
+RC=0; OUT=$(run_refresh pixeldrain) || RC=$?
+[[ "$RC" -eq 0 ]] && ok "exit 0" || bad "exit $RC"
+grep -q 'gofile=false pixeldrain=true st0807=false vikingfile=false' <<<"$OUT" && ok "pixeldrain run does not double-fire the fast hosts" || bad "cadence separation broken"
+grep -q "LINK REFRESH COMPLETE" <<<"$OUT" && ok "reached completion banner" || bad "never completed"
 
 echo ""
 if (( FAILURES > 0 )); then echo "RESULT: RED — $FAILURES case(s) failed"; exit 1; fi

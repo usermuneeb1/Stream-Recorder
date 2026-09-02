@@ -58,10 +58,11 @@ function buildMirrors(rec: Ep): Mirror[] {
     (rec.youtubeUnlisted?.match(/(?:v=|\/)([\w-]{11})/)?.[1] ?? '') ||
     (/^[\w-]{11}$/.test(rec.videoId) ? rec.videoId : '');
   const out: Mirror[] = [];
-  // CDN-first Auto order (2026-09-02): 0807.st uploads carry expiry=0 (never
-  // auto-delete) and serve direct MP4s, so it fronts playback as the archive's
-  // CDN; VikingFile direct follows; then Pixeldrain. Permanent mirrors
-  // (Archive/GitHub) trail as expiry-proof fallbacks, YouTube ghost last.
+  // CDN-first Auto order (2026-09-02): 0807.st serves direct MP4s and fronts
+  // playback as the archive's CDN (its ~30-day idle deletion is covered by the
+  // 5-day keep-alive ping); VikingFile direct follows; then Pixeldrain.
+  // Permanent mirrors (Archive/GitHub) trail as expiry-proof fallbacks,
+  // YouTube ghost last.
   if (rec.st0807Link) out.push({ label: '0807', note: '0807.st CDN', url: rec.st0807Link, kind: 'mp4', type: 'st0807' });
   if (rec.vikingfileLink) out.push({ label: 'VKNG', note: 'VikingFile direct', url: rec.vikingfileLink, kind: 'mp4', type: 'vikingfile' });
   // Pixeldrain direct stream — derivable from the u/<id> page link; a real

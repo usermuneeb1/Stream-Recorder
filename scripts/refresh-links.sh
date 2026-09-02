@@ -165,8 +165,9 @@ refresh_pixeldrain() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  0807.ST REFRESH, 1KB range ping (expiry=0 uploads never auto-delete, but
-#  a HEAD/range keeps the object warm on any CDN cache in front).
+#  0807.ST REFRESH, 1KB range ping. Files auto-delete after ~300 days of NO
+#  ACTIVITY (owner correction 2026-09-02) — this ping IS the keep-alive: it
+#  registers a download and resets the idle timer. Also keeps CDN caches warm.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 refresh_st0807() {
@@ -423,6 +424,16 @@ refresh_links() {
     [[ "$providers" == "both" || "$providers" == *"pixeldrain"* ]] && do_pixeldrain=true
     [[ "$providers" == "both" || "$providers" == *"st0807"* || "$providers" == *"0807"* ]]       && do_st0807=true
     [[ "$providers" == "both" || "$providers" == *"vikingfile"* || "$providers" == *"viking"* ]] && do_vikingfile=true
+
+    # 0807.st deletes files after ~30 days of NO ACTIVITY, VikingFile has a
+    # similar idle TTL (owner correction 2026-09-02: it is NOT expiry-forever).
+    # The workflow has no cron slot for them; the 5-day gofile run is the
+    # keep-alive carrier: a 1KB ping every 5 days = 6x buffer against the
+    # 30-day TTL (the monthly pixeldrain run would have NO buffer at all).
+    if [[ "$do_gofile" == true ]]; then
+        do_st0807=true; do_vikingfile=true
+        log_info "5-day run → 0807.st + VikingFile keep-alive included (30-day idle TTL, 6x buffer)"
+    fi
     log_info "Provider filter: '${providers}' → gofile=${do_gofile} pixeldrain=${do_pixeldrain} st0807=${do_st0807} vikingfile=${do_vikingfile}"
 
     # Count only the providers we'll actually refresh so totals are honest.
