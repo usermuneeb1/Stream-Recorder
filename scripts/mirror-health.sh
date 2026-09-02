@@ -70,7 +70,8 @@ classify_gofile() {
     fi
     case "$status" in
         ok) printf 'alive' ;;
-        notFound|notfound) printf 'dead' ;;
+        # API returns "error-notFound" — glob the substring, never exact-match
+        *notFound*|*notfound*) printf 'dead' ;;
         *) printf 'unverifiable' ;;
     esac
 }
@@ -152,13 +153,17 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     pixel=$(echo "$rec" | jq -r '.pixeldrain_link // empty')
     mega=$(echo "$rec" | jq -r '.mega_link // empty')
     ghrel=$(echo "$rec" | jq -r '.github_release // .github_direct // empty')
+    st0807=$(echo "$rec" | jq -r '.st0807_link // empty')
+    viking=$(echo "$rec" | jq -r '.vikingfile_link // empty')
 
-    a="null"; g="null"; p="null"; m="null"; gh="null"
+    a="null"; g="null"; p="null"; m="null"; gh="null"; s="null"; v="null"
     if [[ -n "$archive" ]]; then a=$(classify "$archive"); fi
     if [[ -n "$gofile" ]]; then g=$(classify_gofile "$gofile"); fi
     if [[ -n "$pixel" ]]; then p=$(classify "$pixel"); fi
     if [[ -n "$mega" ]]; then m=$(classify_mega "$mega"); fi
     if [[ -n "$ghrel" ]]; then gh=$(classify_gh "$ghrel"); fi
+    if [[ -n "$st0807" ]]; then s=$(classify_st0807 "$st0807"); fi
+    if [[ -n "$viking" ]]; then v=$(classify_vikingfile "$viking"); fi
 
     is_alive() { [[ "$1" == "alive" ]] && return 0 || return 1; }
 
@@ -167,7 +172,7 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     if is_alive "$p" || is_alive "$g" || is_alive "$gh"; then fast_ok=true; fi
 
     alive=0; dead=0; unverifiable=0
-    for st in "$a" "$g" "$p" "$m" "$gh"; do
+    for st in "$a" "$g" "$p" "$m" "$gh" "$s" "$v"; do
         [[ "$st" == "null" ]] && continue
         case "$st" in
             alive) ((alive++)) ;;
@@ -179,7 +184,9 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     healthy="true"
     { $permanent_ok && $fast_ok; } || healthy="false"
 
-    # serialise each mirror as a real JSON string, or null when no link exists
+    # serialise each mirror status as a JSON string ("alive"/"dead"/...), or
+    # JSON null when no link exists. --argjson requires VALID JSON, so the
+    # quotes must not be backslash-escaped (2026-09-02 vacuous-output bug).
     jv() { [[ -n "$1" ]] && printf '"%s"' "$2" || printf 'null'; }
 
     jq -cn \
@@ -201,8 +208,16 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
         '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, permanent_ok:$permanent_ok, fast_ok:$fast_ok, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega, github:$github, st0807:$st0807, vikingfile:$vikingfile}}'
 done > "$TMP_JSON"
 
-# ── aggregate ───────────────────────────────────────────────────────────────
+# ── vacuous-output guard (2026-09-02: emitter broke silently, wrote total:0, ──
+# ── exit 0 — dead links became invisible and repair was never triggered) ────
 TOTAL=$(wc -l < "$TMP_JSON" | tr -d ' ')
+EXPECTED_TOTAL=$(jq 'length' "$RECORDINGS_JSON" 2>/dev/null || echo '?')
+if [[ "$EXPECTED_TOTAL" == "?" ]] || (( TOTAL != EXPECTED_TOTAL )); then
+    log_error "Serialisation failed: emitted $TOTAL of $EXPECTED_TOTAL recordings. Refusing to publish vacuous health data."
+    exit 2
+fi
+
+# ── aggregate ───────────────────────────────────────────────────────────────
 HEALTHY=$(jq -s '[.[] | select(.healthy==true)] | length' "$TMP_JSON")
 DEAD_RECS=$(jq -s '[.[] | select(.healthy==false)] | length' "$TMP_JSON")
 DEAD_LINKS=$(jq -s '[.[] | .mirrors | to_entries[] | select(.value=="dead")] | length' "$TMP_JSON")

@@ -21,6 +21,20 @@ _is_gofile_alive() {
     [[ -z "$url" ]] && return 1
     # FORCE mode = always consider dead (force re-upload)
     [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
+    # The Contents API is authoritative; /d/ pages return 200 even when expired
+    # (SPA shell). 2026-09-02: page-grep said "alive" for every dead folder.
+    local code status
+    code=$(sed -n 's#.*gofile\.io/d/\([^/?# ]*\).*#\1#p' <<< "$url" | head -1)
+    if [[ -n "$code" && -n "${GOFILE_API_KEY:-}" ]]; then
+        status=$(curl -s --max-time 20 \
+            -H "Authorization: Bearer ${GOFILE_API_KEY}" \
+            "https://api.gofile.io/contents/${code}" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
+        case "$status" in
+            ok) return 0 ;;
+            *notFound*|*notfound*) return 1 ;;
+            *) : ;;  # token/network error → unverifiable, fall through to heuristic
+        esac
+    fi
     # Gofile pages return HTTP 200 even when expired. Check actual content.
     local page
     page=$(curl -sL --max-time 20 "$url" 2>/dev/null) || return 1
@@ -275,8 +289,25 @@ repair_mirrors() {
             fi
         fi
 
-        if [[ -n "$new_gofile$new_pixel$new_mega" ]]; then
-            _update_recording_links "$video_id" "$new_gofile" "$new_pixel" "$new_mega" || log_warn "  Failed to update recordings.json"
+        if [[ "$need_st0807" == true ]]; then
+            ST0807_LINKS=()
+            if upload_to_st0807 "$file" "HD"; then
+                new_st0807=$(printf '%s' "${ST0807_LINKS[0]:-}" | cut -d'|' -f2 || true)
+            else
+                log_warn "  0807.st upload failed for ${video_id}"
+            fi
+        fi
+        if [[ "$need_viking" == true ]]; then
+            VIKINGFILE_LINKS=()
+            if upload_to_vikingfile "$file" "HD"; then
+                new_viking=$(printf '%s' "${VIKINGFILE_LINKS[0]:-}" | cut -d'|' -f2 || true)
+            else
+                log_warn "  VikingFile upload failed for ${video_id}"
+            fi
+        fi
+
+        if [[ -n "$new_gofile$new_pixel$new_mega$new_st0807$new_viking" ]]; then
+            _update_recording_links "$video_id" "$new_gofile" "$new_pixel" "$new_mega" "$new_st0807" "$new_viking" || log_warn "  Failed to update recordings.json"
             repaired=$((repaired + 1))
             log_ok "  Repaired mirrors for ${video_id}"
         else
