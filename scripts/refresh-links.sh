@@ -39,20 +39,15 @@ check_link_alive() {
     fi
 
     # Gofile: /d/<code> returns HTTP 200 with the SPA shell even for deleted
-    # folders — the page proves NOTHING. Only the Contents API is authoritative
-    # (2026-09-02: all gofile links silently expired while the HTTP check
-    # reported 12/12 alive). Unverifiable → fall through to HTTP, don't lie "dead".
+    # folders — the page proves NOTHING. The Contents API with the PUBLIC
+    # website token (no account key, by policy 2026-09-02) is the only reliable
+    # signal. error-notFound → dead; error-token/network → unverifiable,
+    # fall through to HTTP rather than lying "dead".
     if [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]]; then
         local gf_code="${BASH_REMATCH[1]}"
         local gf_status
-        if [[ -n "${GOFILE_API_KEY:-}" ]]; then
-            gf_status=$(curl -s --max-time "$timeout" \
-                -H "Authorization: Bearer ${GOFILE_API_KEY}" \
-                "https://api.gofile.io/contents/${gf_code}" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
-        else
-            gf_status=$(curl -s --max-time "$timeout" \
-                "https://api.gofile.io/contents/${gf_code}?wt=4fd6sg89d7s6" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
-        fi
+        gf_status=$(curl -s --max-time "$timeout" \
+            "https://api.gofile.io/contents/${gf_code}?wt=4fd6sg89d7s6" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
         case "$gf_status" in
             ok) return 0 ;;
             *notFound*|*notfound*) log_debug "    Gofile API says dead: $gf_status"; return 1 ;;
@@ -83,15 +78,13 @@ refresh_gofile() {
     local code=""
     [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]] && code="${BASH_REMATCH[1]}"
 
-    # An authenticated Contents API call is REAL folder access → resets the
-    # 10-day inactivity timer. Fetching the bare /d/ page only downloads the
-    # SPA shell and does NOT register content access (2026-09-02: "refreshed:12"
-    # was phantom and every link expired anyway).
-    if [[ -n "${GOFILE_API_KEY:-}" && -n "$code" ]]; then
+    # Best-effort keep-alive WITHOUT an account API key (policy 2026-09-02):
+    # hit the public Contents endpoint — real content access, unlike the bare
+    # /d/ page which only downloads the SPA shell (the old "refresh" was
+    # phantom and let every link expire). Falls back to the page ping.
+    if [[ -n "$code" ]]; then
         curl -s -o /dev/null --max-time 30 \
-            -H "Authorization: Bearer ${GOFILE_API_KEY}" \
-            "https://api.gofile.io/contents/${code}" 2>/dev/null || return 1
-        return 0
+            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null && return 0
     fi
 
     curl -s -o /dev/null --max-time 30 \

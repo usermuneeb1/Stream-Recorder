@@ -21,14 +21,14 @@ _is_gofile_alive() {
     [[ -z "$url" ]] && return 1
     # FORCE mode = always consider dead (force re-upload)
     [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
-    # The Contents API is authoritative; /d/ pages return 200 even when expired
+    # The Contents API (public website token — no account key, by policy
+    # 2026-09-02) is authoritative; /d/ pages return 200 even when expired
     # (SPA shell). 2026-09-02: page-grep said "alive" for every dead folder.
     local code status
     code=$(sed -n 's#.*gofile\.io/d/\([^/?# ]*\).*#\1#p' <<< "$url" | head -1)
-    if [[ -n "$code" && -n "${GOFILE_API_KEY:-}" ]]; then
+    if [[ -n "$code" ]]; then
         status=$(curl -s --max-time 20 \
-            -H "Authorization: Bearer ${GOFILE_API_KEY}" \
-            "https://api.gofile.io/contents/${code}" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
+            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
         case "$status" in
             ok) return 0 ;;
             *notFound*|*notfound*) return 1 ;;
@@ -150,6 +150,12 @@ _update_recording_links() {
     local video_id="$1" gofile="$2" pixel="$3" mega="$4" st0807="$5" viking="$6"
     local current updated
     current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="$(cat data/recordings.json 2>/dev/null || echo '[]')"
+    # NEVER let a failed read become a wipe of the canonical index:
+    # refuse to write when the current data isn't a non-empty array.
+    if ! jq -e 'type == "array" and length > 0' <<< "$current" >/dev/null 2>&1; then
+        log_error "  recordings.json unreadable/empty — refusing to write (would wipe the index)"
+        return 1
+    fi
     updated=$(jq \
       --arg id "$video_id" \
       --arg gofile "$gofile" \
@@ -168,6 +174,10 @@ _update_recording_links() {
             mirrors_repaired_at: $checked
           }
         else . end)' <<< "$current") || return 1
+    if ! jq -e 'type == "array" and length > 0' <<< "$updated" >/dev/null 2>&1; then
+        log_error "  computed recordings.json update is empty — refusing to write"
+        return 1
+    fi
     github_api_write "data/recordings.json" "$updated" "Mirror repair: ${video_id}" >/dev/null
 }
 

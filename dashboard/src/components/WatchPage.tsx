@@ -44,7 +44,7 @@ interface Mirror {
   note: string;
   url: string;
   kind: 'youtube' | 'mp4';
-  type?: 'archive' | 'pixeldrain' | 'github' | 'telegram' | 'youtube' | 'st0807';
+  type?: 'archive' | 'pixeldrain' | 'github' | 'telegram' | 'youtube' | 'st0807' | 'vikingfile';
 }
 
 declare global { interface Window { __mlaContinueResume?: string } }
@@ -58,6 +58,24 @@ function buildMirrors(rec: Ep): Mirror[] {
     (rec.youtubeUnlisted?.match(/(?:v=|\/)([\w-]{11})/)?.[1] ?? '') ||
     (/^[\w-]{11}$/.test(rec.videoId) ? rec.videoId : '');
   const out: Mirror[] = [];
+  // CDN-first Auto order (2026-09-02): 0807.st uploads carry expiry=0 (never
+  // auto-delete) and serve direct MP4s, so it fronts playback as the archive's
+  // CDN; VikingFile direct follows; then Pixeldrain. Permanent mirrors
+  // (Archive/GitHub) trail as expiry-proof fallbacks, YouTube ghost last.
+  if (rec.st0807Link) out.push({ label: '0807', note: '0807.st CDN', url: rec.st0807Link, kind: 'mp4', type: 'st0807' });
+  if (rec.vikingfileLink) out.push({ label: 'VKNG', note: 'VikingFile direct', url: rec.vikingfileLink, kind: 'mp4', type: 'vikingfile' });
+  // Pixeldrain direct stream — derivable from the u/<id> page link; a real
+  // CDN playback source (present for every recording) that never depends on
+  // the guessed archive filename or the Telegram worker.
+  const pd = rec.pixeldrainLink?.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/);
+  if (pd) out.push({ label: 'N3ON', note: 'Pixeldrain CDN', url: `https://pixeldrain.com/api/file/${pd[1]}`, kind: 'mp4', type: 'pixeldrain' });
+  if (rec.archiveNode) out.push({ label: 'R3AL', note: 'Archive.org node', url: rec.archiveNode, kind: 'mp4', type: 'archive' });
+  const gh = rec.githubDirect || rec.githubRelease;
+  if (gh) out.push({ label: 'B3ING', note: 'GitHub release', url: gh, kind: 'mp4', type: 'github' });
+  if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4', type: 'telegram' });
+  if (rec.archiveDirect && rec.archiveDirect !== rec.archiveNode) {
+    out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4', type: 'archive' });
+  }
   if (ytId) {
     out.push({
       label: 'GHOST', note: 'YouTube original',
@@ -65,19 +83,6 @@ function buildMirrors(rec: Ep): Mirror[] {
       kind: 'youtube',
       type: 'youtube',
     });
-  }
-  if (rec.archiveNode) out.push({ label: 'R3AL', note: 'Archive.org node', url: rec.archiveNode, kind: 'mp4', type: 'archive' });
-  const gh = rec.githubDirect || rec.githubRelease;
-  if (gh) out.push({ label: 'B3ING', note: 'GitHub release', url: gh, kind: 'mp4', type: 'github' });
-  // Pixeldrain direct stream — derivable from the u/<id> page link; a real
-  // CDN playback source (present for every recording) that never depends on
-  // the guessed archive filename or the Telegram worker.
-  const pd = rec.pixeldrainLink?.match(/pixeldrain\.com\/(?:u|api\/file)\/([\w-]+)/);
-  if (pd) out.push({ label: 'N3ON', note: 'Pixeldrain CDN', url: `https://pixeldrain.com/api/file/${pd[1]}`, kind: 'mp4', type: 'pixeldrain' });
-  if (rec.st0807Link) out.push({ label: '0807', note: '0807.st direct', url: rec.st0807Link, kind: 'mp4', type: 'st0807' });
-  if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4', type: 'telegram' });
-  if (rec.archiveDirect && rec.archiveDirect !== rec.archiveNode) {
-    out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4', type: 'archive' });
   }
   // NEVER-DEAD guarantee: mirrors flagged dead by the latest health sweep
   // sink to the bottom of Auto's order, so playback always starts on a

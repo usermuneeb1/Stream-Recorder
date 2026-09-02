@@ -246,8 +246,13 @@ update_recordings_json() {
     fi
 
     # ── Read current recordings.json (array) ──────────────────────────────────
+    # NEVER rebuild the index blind: a failed read written back as [new-entry]
+    # would wipe every existing recording (found in 2026-09-02 audit).
     local current
-    current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="[]"
+    current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
+        log_warn "recordings.json unreadable — skipping gallery index update rather than risking a wipe"
+        return 1
+    }
     echo "$current" | jq -e 'type=="array"' >/dev/null 2>&1 || current="[]"
 
     # ── Quarantine gate: fragments & false captures never enter the gallery ──
