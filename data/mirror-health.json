@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-02T04:35:10Z",
+  "updated_at": "2026-09-02T11:18:48Z",
   "summary": {
     "total": 12,
     "healthy": 12,
@@ -49,7 +49,7 @@
     {
       "video_id": "lZwdaI5i9MA",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
-      "alive": 4,
+      "alive": 5,
       "dead": 0,
       "unverifiable": 2,
       "healthy": true,
@@ -61,7 +61,7 @@
         "pixeldrain": "alive",
         "mega": "alive",
         "github": "alive",
-        "st0807": null,
+        "st0807": "alive",
         "vikingfile": "unverifiable"
       }
     },
@@ -201,7 +201,7 @@
     {
       "video_id": "84lG-ZjxCGI",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 4,
+      "alive": 5,
       "dead": 0,
       "unverifiable": 2,
       "healthy": true,
@@ -213,7 +213,7 @@
         "pixeldrain": "alive",
         "mega": "alive",
         "github": "alive",
-        "st0807": null,
+        "st0807": "alive",
         "vikingfile": "unverifiable"
       }
     },
