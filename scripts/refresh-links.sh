@@ -19,14 +19,32 @@ check_link_alive() {
     local url="$1"
     local timeout="${REFRESH_CHECK_TIMEOUT:-30}"
     
+    # Pixeldrain: /api/file/<id>/info answers {"success":false,...} for a
+    # deleted/expired file. That verdict must be read with an EXPLICIT compare:
+    # jq's `//` is the alternative operator and replaces `false` as well as
+    # `null`, so the old `jq -r '.success // true'` returned "true" for
+    # {"success":false} too — every dead pixeldrain link was reported ALIVE
+    # (2026-09-02: cloud-refresh logged "✅ Alive, timer reset" for deleted
+    # files and counted dead=0, so nothing was ever marked or re-uploaded).
+    # Unparseable answers (HTML error page, provider outage) are NOT alive:
+    # there is no HTTP fallback that could prove a pixeldrain file exists.
     if [[ "$url" =~ pixeldrain\.com/u/([a-zA-Z0-9_-]+) ]]; then
         local file_id="${BASH_REMATCH[1]}"
         local info success message
         info=$(curl -s --max-time "$timeout" "https://pixeldrain.com/api/file/${file_id}/info" 2>/dev/null) || return 1
-        success=$(echo "$info" | jq -r '.success // true' 2>/dev/null)
-        message=$(echo "$info" | jq -r '.message // .value // empty' 2>/dev/null)
-        [[ "$success" == "false" ]] && { log_debug "    Pixeldrain API says dead: ${message:-unknown}"; return 1; }
-        return 0
+        success=$(jq -r 'if .success == false then "dead"
+                         elif .success == true then "alive"
+                         else "unknown" end' <<< "$info" 2>/dev/null || echo "unknown")
+        case "$success" in
+            alive) return 0 ;;
+            dead)
+                message=$(jq -r '.message // .value // empty' <<< "$info" 2>/dev/null)
+                log_debug "    Pixeldrain API says dead: ${message:-unknown}"
+                return 1 ;;
+            *)
+                log_warn "    Pixeldrain API returned no verdict for ${file_id}, treating as dead"
+                return 1 ;;
+        esac
     fi
 
     if [[ "$url" =~ vikingfile\.com/f/([a-zA-Z0-9_-]+) ]]; then
@@ -112,13 +130,24 @@ refresh_pixeldrain() {
     fi
     
     # Get file size via Pixeldrain API
-    local info_response
+    local info_response info_verdict
     info_response=$(curl -s --max-time 15 \
         "https://pixeldrain.com/api/file/${file_id}/info" 2>/dev/null) || {
         log_warn "    Could not fetch file info from Pixeldrain API"
         return 1
     }
-    
+
+    # Explicit compare — `// true` would turn {"success":false} into "true"
+    # (jq's `//` replaces false as well as null) and we would then spend 10%
+    # of a file's bandwidth refreshing something that no longer exists.
+    info_verdict=$(jq -r 'if .success == false then "dead"
+                          elif .success == true then "alive"
+                          else "unknown" end' <<< "$info_response" 2>/dev/null || echo "unknown")
+    if [[ "$info_verdict" != "alive" ]]; then
+        log_warn "    Pixeldrain file ${file_id} is not alive (${info_verdict}), nothing to refresh"
+        return 1
+    fi
+
     local file_size
     file_size=$(echo "$info_response" | jq -r '.size // 0' 2>/dev/null)
     

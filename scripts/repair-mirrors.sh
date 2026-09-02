@@ -59,10 +59,20 @@ _is_pixeldrain_alive() {
     local id
     id=$(grep -oE 'pixeldrain\.com/u/[A-Za-z0-9_-]+' <<< "$url" | cut -d/ -f3 | head -1)
     [[ -z "$id" ]] && return 1
-    local info success
+    local info verdict
     info=$(curl -s --max-time 20 "https://pixeldrain.com/api/file/${id}/info" 2>/dev/null) || return 1
-    success=$(jq -r '.success // true' <<< "$info" 2>/dev/null)
-    [[ "$success" != "false" ]]
+    # EXPLICIT compare. jq's `//` is the alternative operator: it replaces
+    # `false` as well as `null`, so the old `jq -r '.success // true'` answered
+    # "true" for {"success":false} — every dead pixeldrain link looked alive,
+    # need_pixel stayed false, and repair-mirrors finished green without
+    # re-uploading anything (2026-09-02, the "44s vacuous run").
+    verdict=$(jq -r 'if .success == false then "dead"
+                     elif .success == true then "alive"
+                     else "unknown" end' <<< "$info" 2>/dev/null || echo "unknown")
+    # "unknown" (HTML error page, rate limit, provider outage) is NOT alive:
+    # the repair path re-checks and re-uploads from a permanent mirror, and a
+    # wasted re-upload is far cheaper than a permanently dead public link.
+    [[ "$verdict" == "alive" ]]
 }
 
 _is_st0807_alive() {

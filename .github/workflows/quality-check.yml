@@ -46,7 +46,11 @@ jobs:
       - name: "Install linters"
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck jq python3
+          # bc  → scripts/utils.sh format_size (utils-robustness-test)
+          # git → tests/safe-push-race-test.sh builds a throwaway repo
+          sudo apt-get install -y -qq shellcheck jq python3 bc git
+          # requests → tests/test_status_contract.py imports scripts/discord_bot.py
+          python3 -m pip install -q --upgrade requests
 
       - name: "Bash syntax"
         run: |
@@ -81,6 +85,34 @@ jobs:
 
       - name: "Recording cascade test"
         run: bash tests/record-cascade-test.sh
+
+      # Every regression test in tests/ runs here. A test that is not wired into
+      # a gate is decoration: these seven existed but only record-cascade ran,
+      # which is why the pixeldrain dead-link verdict stayed broken after the
+      # mirror-health and refresh-links fixes landed.
+      - name: "Pixeldrain dead-verdict test"
+        run: bash tests/pixeldrain-dead-verdict-test.sh
+
+      - name: "Mirror-health vacuous-success test"
+        run: bash tests/mirror-health-vacuous-test.sh
+
+      - name: "Refresh-links gates test"
+        run: bash tests/refresh-links-gates-test.sh
+
+      - name: "Refresh-links entry-point test"
+        run: bash tests/refresh-links-entrypoint-test.sh
+
+      - name: "Safe-push race test"
+        run: bash tests/safe-push-race-test.sh
+
+      - name: "Utils robustness test"
+        run: bash tests/utils-robustness-test.sh
+
+      - name: "Install drift-check test"
+        run: bash tests/install-drift-check-test.sh
+
+      - name: "Status contract test"
+        run: python3 tests/test_status_contract.py
 
       - name: "Secret reference summary"
         run: |
