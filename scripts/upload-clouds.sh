@@ -528,7 +528,9 @@ _st0807_auth_args() {
 }
 
 _st0807_pow_json() {
-    python3 "$SCRIPT_DIR/st0807_pow.py" 2>/dev/null || true
+    # stderr stays VISIBLE in the run log (2026-09-02: PoW silently died for
+    # a week because failures were swallowed with 2>/dev/null)
+    python3 "$SCRIPT_DIR/st0807_pow.py" || true
 }
 
 _st0807_parse_url() {
@@ -543,7 +545,7 @@ upload_to_st0807() {
     local fsize
     fsize=$(get_file_size "$file")
 
-    log_info "  0807.st: Uploading $(basename \"$file\") ($(format_size \"$fsize\"))..."
+    log_info "  0807.st: Uploading $(basename "$file") ($(format_size "$fsize"))..."
 
     local max_retries="${ST0807_MAX_RETRIES:-3}"
     local attempt=1
@@ -676,7 +678,7 @@ upload_to_vikingfile() {
     local safe_name
     safe_name=$(make_safe_filename "$(basename "$file")")
 
-    log_info "  VikingFile: Uploading $(basename \"$file\") ($(format_size \"$fsize\"))..."
+    log_info "  VikingFile: Uploading $(basename "$file") ($(format_size "$fsize"))..."
 
     local max_retries="${VIKINGFILE_MAX_RETRIES:-3}"
     local attempt=1

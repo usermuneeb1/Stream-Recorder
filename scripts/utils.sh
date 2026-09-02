@@ -198,6 +198,10 @@ format_duration_human() {
 # Convert bytes to human-readable size (KB, MB, GB, TB)
 format_size() {
     local bytes="${1:-0}"
+    # Sanitize: callers have passed quoted numbers before ("392569774") which
+    # crashed every (( )) comparison below (2026-09-02 repair-run syntax errors).
+    bytes="${bytes//[^0-9]/}"
+    [[ -z "$bytes" ]] && bytes=0
     if (( bytes >= 1099511627776 )); then
         echo "$(echo "scale=2; $bytes / 1099511627776" | bc) TB"
     elif (( bytes >= 1073741824 )); then

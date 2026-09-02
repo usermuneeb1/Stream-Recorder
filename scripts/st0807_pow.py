@@ -14,6 +14,14 @@ import urllib.request
 
 POW_URL = "https://0807.st/pow"
 
+# urllib's default UA ("Python-urllib/3.x") is blocked by many CDN filters —
+# send an honest, browser-shaped one (2026-09-02: anonymous PoW fetch failed
+# instantly on every repair run).
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; Stream-Recorder bot; +github.com/usermuneeb1/Stream-Recorder)",
+    "Accept": "application/json",
+}
+
 
 def solve(pow_id: str, bits: int) -> str:
     prefix = f"{pow_id}.".encode()
@@ -28,7 +36,8 @@ def solve(pow_id: str, bits: int) -> str:
 
 def main() -> int:
     try:
-        with urllib.request.urlopen(POW_URL, timeout=20) as resp:
+        req = urllib.request.Request(POW_URL, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=20) as resp:
             chal = json.loads(resp.read().decode())
     except Exception as exc:
         print(f"pow fetch failed: {exc}", file=sys.stderr)
