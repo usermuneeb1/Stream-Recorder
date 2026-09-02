@@ -37,6 +37,23 @@ check_link_alive() {
         [[ "$vf_exist" == "true" ]] && return 0
         return 1
     fi
+
+    # Gofile: /d/<code> returns HTTP 200 with the SPA shell even for deleted
+    # folders — the page proves NOTHING. The Contents API with the PUBLIC
+    # website token (no account key, by policy 2026-09-02) is the only reliable
+    # signal. error-notFound → dead; error-token/network → unverifiable,
+    # fall through to HTTP rather than lying "dead".
+    if [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]]; then
+        local gf_code="${BASH_REMATCH[1]}"
+        local gf_status
+        gf_status=$(curl -s --max-time "$timeout" \
+            "https://api.gofile.io/contents/${gf_code}?wt=4fd6sg89d7s6" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
+        case "$gf_status" in
+            ok) return 0 ;;
+            *notFound*|*notfound*) log_debug "    Gofile API says dead: $gf_status"; return 1 ;;
+            *) : ;;  # error-token / network → unverifiable, fall through to HTTP
+        esac
+    fi
     
     local http_code
     http_code=$(curl -s -o /dev/null -w '%{http_code}' \
@@ -58,11 +75,22 @@ check_link_alive() {
 
 refresh_gofile() {
     local url="$1"
-    
+    local code=""
+    [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]] && code="${BASH_REMATCH[1]}"
+
+    # Best-effort keep-alive WITHOUT an account API key (policy 2026-09-02):
+    # hit the public Contents endpoint — real content access, unlike the bare
+    # /d/ page which only downloads the SPA shell (the old "refresh" was
+    # phantom and let every link expire). Falls back to the page ping.
+    if [[ -n "$code" ]]; then
+        curl -s -o /dev/null --max-time 30 \
+            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null && return 0
+    fi
+
     curl -s -o /dev/null --max-time 30 \
         -r "0-1023" \
         -L "$url" 2>/dev/null
-    
+
     return $?
 }
 
@@ -137,8 +165,9 @@ refresh_pixeldrain() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  0807.ST REFRESH, 1KB range ping (expiry=0 uploads never auto-delete, but
-#  a HEAD/range keeps the object warm on any CDN cache in front).
+#  0807.ST REFRESH, 1KB range ping. Files auto-delete after ~300 days of NO
+#  ACTIVITY (owner correction 2026-09-02) — this ping IS the keep-alive: it
+#  registers a download and resets the idle timer. Also keeps CDN caches warm.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 refresh_st0807() {
@@ -372,30 +401,48 @@ refresh_links() {
     # was a complete no-op and Discord reported 0 checked / 0 active / 0 expired.
     # Fix: pull URLs straight from entries_json (already JSON-parsed above),
     # split any pipe-joined values, drop empties, and dedup.
-    local gofile_urls=() pixeldrain_urls=() archive_urls=()
+    local gofile_urls=() pixeldrain_urls=() archive_urls=() st0807_urls=() vikingfile_urls=()
     readarray -t gofile_urls     < <(echo "$entries_json" | jq -r '[.[].gofile // ""     | split("|")[]] | map(select(length>0)) | unique | .[]')
     readarray -t pixeldrain_urls < <(echo "$entries_json" | jq -r '[.[].pixeldrain // "" | split("|")[]] | map(select(length>0)) | unique | .[]')
     readarray -t archive_urls    < <(echo "$entries_json" | jq -r '[.[].archive // ""    | split("|")[]] | map(select(length>0)) | unique | .[]')
+    readarray -t st0807_urls     < <(echo "$entries_json" | jq -r '[.[].st0807 // ""     | split("|")[]] | map(select(length>0)) | unique | .[]')
+    readarray -t vikingfile_urls < <(echo "$entries_json" | jq -r '[.[].vikingfile // "" | split("|")[]] | map(select(length>0)) | unique | .[]')
 
     local total_gofile=${#gofile_urls[@]}
     local total_pixeldrain=${#pixeldrain_urls[@]}
     local total_archive=${#archive_urls[@]}
+    local total_st0807=${#st0807_urls[@]}
+    local total_vikingfile=${#vikingfile_urls[@]}
 
     # ── Provider filtering (independent Gofile/Pixeldrain cadences) ───────────
     # REFRESH_PROVIDERS = "both" (default) | "gofile" | "pixeldrain" | comma-list.
     # Lets the workflow refresh Gofile every 5 days and Pixeldrain every 30 days
     # on separate schedules without duplicating the whole job.
     local providers="${REFRESH_PROVIDERS:-both}"
-    local do_gofile=false do_pixeldrain=false
+    local do_gofile=false do_pixeldrain=false do_st0807=false do_vikingfile=false
     [[ "$providers" == "both" || "$providers" == *"gofile"* ]]     && do_gofile=true
     [[ "$providers" == "both" || "$providers" == *"pixeldrain"* ]] && do_pixeldrain=true
-    log_info "Provider filter: '${providers}' → gofile=${do_gofile} pixeldrain=${do_pixeldrain}"
+    [[ "$providers" == "both" || "$providers" == *"st0807"* || "$providers" == *"0807"* ]]       && do_st0807=true
+    [[ "$providers" == "both" || "$providers" == *"vikingfile"* || "$providers" == *"viking"* ]] && do_vikingfile=true
+
+    # 0807.st deletes files after ~30 days of NO ACTIVITY, VikingFile has a
+    # similar idle TTL (owner correction 2026-09-02: it is NOT expiry-forever).
+    # The workflow has no cron slot for them; the 5-day gofile run is the
+    # keep-alive carrier: a 1KB ping every 5 days = 6x buffer against the
+    # 30-day TTL (the monthly pixeldrain run would have NO buffer at all).
+    if [[ "$do_gofile" == true ]]; then
+        do_st0807=true; do_vikingfile=true
+        log_info "5-day run → 0807.st + VikingFile keep-alive included (30-day idle TTL, 6x buffer)"
+    fi
+    log_info "Provider filter: '${providers}' → gofile=${do_gofile} pixeldrain=${do_pixeldrain} st0807=${do_st0807} vikingfile=${do_vikingfile}"
 
     # Count only the providers we'll actually refresh so totals are honest.
-    local eff_gofile=0 eff_pixeldrain=0
+    local eff_gofile=0 eff_pixeldrain=0 eff_st0807=0 eff_vikingfile=0
     [[ "$do_gofile" == true ]]     && eff_gofile=$total_gofile
     [[ "$do_pixeldrain" == true ]] && eff_pixeldrain=$total_pixeldrain
-    local total_links=$(( eff_gofile + eff_pixeldrain ))
+    [[ "$do_st0807" == true ]]     && eff_st0807=$total_st0807
+    [[ "$do_vikingfile" == true ]] && eff_vikingfile=$total_vikingfile
+    local total_links=$(( eff_gofile + eff_pixeldrain + eff_st0807 + eff_vikingfile ))
     
     log_info "Found links:"
     log_info "  Gofile     : ${total_gofile}${do_gofile:+ (refreshing)}${do_gofile:+}"
@@ -580,6 +627,26 @@ refresh_links() {
                 done
             fi
             
+            # Check 0807.st
+            if [[ -n "$e_st0807" ]]; then
+                IFS='|' read -ra s_urls <<< "$e_st0807"
+                for s_url in "${s_urls[@]}"; do
+                    for dead in "${dead_st0807_urls[@]:-}"; do
+                        [[ "$s_url" == "$dead" ]] && { dead_services+="st0807,"; break; }
+                    done
+                done
+            fi
+
+            # Check VikingFile
+            if [[ -n "$e_vikingfile" ]]; then
+                IFS='|' read -ra v_urls <<< "$e_vikingfile"
+                for v_url in "${v_urls[@]}"; do
+                    for dead in "${dead_vikingfile_urls[@]:-}"; do
+                        [[ "$v_url" == "$dead" ]] && { dead_services+="vikingfile,"; break; }
+                    done
+                done
+            fi
+
             # If this entry has dead links, edit its Discord message
             if [[ -n "$dead_services" ]]; then
                 dead_services="${dead_services%,}"  # remove trailing comma

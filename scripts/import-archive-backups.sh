@@ -138,7 +138,13 @@ import_archive_backups() {
     log_info "Display title: $display_title"
 
     local existing
-    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing="$(cat data/recordings.json 2>/dev/null || echo '[]')"
+    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing="$(cat data/recordings.json 2>/dev/null || echo '')"
+    # Refuse to merge from a blind read — writing merged=entries-only would
+    # wipe the existing index (found in 2026-09-02 audit).
+    if ! jq -e 'type == "array"' <<< "$existing" >/dev/null 2>&1; then
+        log_error "recordings.json unreadable — refusing to merge/write (would wipe existing entries)"
+        return 1
+    fi
     [[ -z "$existing" || "$existing" != "["* ]] && existing='[]'
 
     local existing_ids existing_archive_ids existing_base_ids
