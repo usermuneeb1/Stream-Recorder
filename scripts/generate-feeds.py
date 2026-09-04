@@ -49,9 +49,17 @@ def load_recordings() -> list[dict]:
             continue
         yt = m.group(1)
         ex = by_id.get(yt)
-        if not ex or len(json.dumps(r)) > len(json.dumps(ex)):
-            by_id[yt] = {**(ex or {}), **r}
-            by_id[yt]["video_id"] = yt
+        if not ex:
+            by_id[yt] = dict(r)
+        else:
+            # Fill-only-empty (mirrors fetcher.ts dedupAndMerge): a longer
+            # record must never wipe good mirrors with "".
+            for k, v in r.items():
+                if v not in ("", None, [], {}) and not by_id[yt].get(k):
+                    by_id[yt][k] = v
+            if len(str(r.get("title", ""))) > len(str(by_id[yt].get("title", ""))):
+                by_id[yt]["title"] = r["title"]
+        by_id[yt]["video_id"] = yt
     return sorted(by_id.values(), key=lambda r: r.get("date", ""), reverse=True)
 
 
@@ -158,7 +166,7 @@ def make_json_feed(items: list[dict]) -> str:
         "feed_url": f"{SITE}/feed.json",
         "description": DESC,
         "icon": COVER,
-        "favicon": f"{SITE}/logo-vertical.pn.jpg",
+        "favicon": f"{SITE}/logo-vertical.jpg",
         "authors": [{"name": AUTHOR}],
         "language": LANG,
         "items": [

@@ -10,9 +10,9 @@ Fixes three concrete bugs that broke playback:
      playback source is the (now-private) original YouTube VOD — nothing plays.
 
 archive_direct is derived deterministically from archive_link + title using the
-same make_safe_filename() rule upload-clouds.sh applies, a pattern proven by the
-already-enriched older records. archive_node (the 302 storage node) is left for
-the CI backfill (needs network).
+same sanitize_filename() rule the pipeline applies to uploaded basenames
+(spaces kept; multi-part _partNNN splits stay for the networked backfill).
+archive_node (the 302 storage node) is left for the CI backfill (needs network).
 
 Usage:  python3 scripts/normalize-recordings.py [--write]
         (default prints a summary; --write rewrites data/recordings.json)
@@ -33,7 +33,34 @@ def make_safe_filename(raw: str) -> str:
     safe = re.sub(r"[^a-zA-Z0-9._\-]", "_", safe)
     safe = re.sub(r"__+", "_", safe)
     safe = safe[:200]
-    return safe or f"recording_{0}.mp4"
+    if safe:
+        return safe
+    # Constant fallbacks collide across records; number them instead.
+    make_safe_filename.counter += 1
+    return f"recording_{make_safe_filename.counter}.mp4"
+
+
+make_safe_filename.counter = 0
+
+
+def sanitize_filename(raw: str) -> str:
+    """Port of utils.sh sanitize_filename(): the pipeline names uploaded
+    files from the post-processed basename (sanitized title, _raw stripped),
+    which KEEPS spaces — unlike make_safe_filename() above (underscores
+    them). Guesses built with this rule match single-file uploads exactly."""
+    s = re.sub(r"[\/:*?\"<>|#&%$!@^`~/]", "", raw or "")
+    s = re.sub(r"\.\.", "", s)
+    s = re.sub(r"^\.", "", s)
+    s = re.sub(r" {2,}", " ", s)
+    s = re.sub(r"-{2,}", "-", s)
+    s = s.strip(" \t\n\r\f\v-")[:180]
+    if s:
+        return s
+    sanitize_filename.counter += 1
+    return f"Live_Stream_fallback_{sanitize_filename.counter}"
+
+
+sanitize_filename.counter = 0
 
 
 def yt_id_of(rec: dict) -> str:
@@ -87,11 +114,14 @@ def main():
     out = [merged[k] for k in order]
 
     # Pass 3: derive archive_direct where missing but archive_link present.
-    # Filename = make_safe_filename(FULL title) + ".mp4" (proven by old records).
+    # Filename = sanitize_filename(title) + ".mp4": the pipeline uploads the
+    # post-processed basename (sanitized title, _raw stripped), so this rule
+    # matches single-file uploads. Multi-part splits (_partNNN) cannot be
+    # resolved offline — those stay for the networked backfill.
     for r in out:
         if not r.get("archive_direct") and r.get("archive_link"):
             ident = r["archive_link"].rstrip("/").split("/details/")[-1]
-            fname = make_safe_filename(r.get("title", "")) + ".mp4"
+            fname = sanitize_filename(r.get("title", "")) + ".mp4"
             r["archive_direct"] = f"https://archive.org/download/{ident}/{fname}"
             changes["archive_direct_added"] += 1
 
@@ -104,7 +134,7 @@ def main():
                 m = YT_ID.search(v)
                 if m:
                     r["video_url"] = f"https://www.youtube.com/watch?v={m.group(1)}"
-                    changes["video_id_fixed"] += 1  # reuse counter for "repaired"
+                    changes["youtube_id_added"] += 1
                     break
 
     print("Normalization summary:")

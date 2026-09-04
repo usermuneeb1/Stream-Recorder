@@ -7,6 +7,7 @@
 
 import json
 import os
+import sys
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,14 +35,37 @@ def badge(label, message, color):
     return {"schemaVersion": 1, "label": label, "message": str(message), "color": color}
 
 
+def _num(v):
+    """Coerce size_bytes-ish values (int/float/numeric-string) to float.
+
+    String sizes crashed sum() with TypeError; garbage coerces to 0.
+    """
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def main():
+    # Windows consoles default to cp1252, which cannot encode the ✅ below
+    # (crashed the script after it had already written everything). Ask for
+    # UTF-8 so the summary print works everywhere; CI is UTF-8 already.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     recordings = load(os.path.join(DATA, "recordings.json"), [])
+    if not isinstance(recordings, list):
+        recordings = []
     stats = load(os.path.join(ROOT, "stats.json"), {})
     yt = load(os.path.join(DATA, "youtube-stats.json"), {})
 
     total = len(recordings)
-    total_gb = round(sum((r.get("size_bytes", 0) or 0) for r in recordings) / 1073741824, 2)
-    latest = recordings[0] if recordings else {}
+    total_gb = round(sum(_num(r.get("size_bytes")) for r in recordings) / 1073741824, 2)
+    # Newest by date, not by file position (nothing guarantees [0] is latest).
+    latest = max(recordings, key=lambda r: str(r.get("date", ""))) if recordings else {}
 
     status = {
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),

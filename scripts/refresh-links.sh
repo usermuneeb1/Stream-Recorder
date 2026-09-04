@@ -23,7 +23,8 @@ check_link_alive() {
         local file_id="${BASH_REMATCH[1]}"
         local info success message
         info=$(curl -s --max-time "$timeout" "https://pixeldrain.com/api/file/${file_id}/info" 2>/dev/null) || return 1
-        success=$(echo "$info" | jq -r '.success // true' 2>/dev/null)
+        # Corrupt/empty bodies must read as dead, never alive (// false).
+        success=$(echo "$info" | jq -r '.success // false' 2>/dev/null)
         message=$(echo "$info" | jq -r '.message // .value // empty' 2>/dev/null)
         [[ "$success" == "false" ]] && { log_debug "    Pixeldrain API says dead: ${message:-unknown}"; return 1; }
         return 0

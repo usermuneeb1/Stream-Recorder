@@ -61,8 +61,10 @@ _is_pixeldrain_alive() {
     [[ -z "$id" ]] && return 1
     local info success
     info=$(curl -s --max-time 20 "https://pixeldrain.com/api/file/${id}/info" 2>/dev/null) || return 1
-    success=$(jq -r '.success // true' <<< "$info" 2>/dev/null)
-    [[ "$success" != "false" ]]
+    # Require an EXPLICIT success:true — empty/non-JSON bodies must NOT
+    # default to alive (dead links were skipped forever, never repaired).
+    success=$(jq -r '.success // false' <<< "$info" 2>/dev/null) || return 1
+    [[ "$success" == "true" ]]
 }
 
 _is_st0807_alive() {
@@ -114,11 +116,10 @@ _archive_best_file_url() {
     [[ -z "$selected" ]] && return 1
 
     local encoded
-    encoded=$(python3 - <<PY
-import urllib.parse
-print('/'.join(urllib.parse.quote(part) for part in '''$selected'''.split('/')))
-PY
-)
+    # Pass via env, never interpolate into the Python program: archive
+    # filenames containing quotes/newlines broke the old '''$var''' heredoc.
+    encoded=$(SELECTED="$selected" python3 -c 'import os,urllib.parse; print("/".join(urllib.parse.quote(p) for p in os.environ["SELECTED"].split("/")))') || return 1
+    [[ -z "$encoded" ]] && return 1
     echo "https://archive.org/download/${archive_id}/${encoded}"
 }
 
@@ -128,11 +129,8 @@ _download_archive_file() {
     local url filename out
     url=$(_archive_best_file_url "$archive_link") || return 1
     filename=$(basename "${url%%\?*}")
-    filename=$(python3 - <<PY
-import urllib.parse
-print(urllib.parse.unquote('''$filename'''))
-PY
-)
+    # Pass via env (see above): unquoting must survive quotes/newlines.
+    filename=$(FILENAME="$filename" python3 -c 'import os,urllib.parse; print(urllib.parse.unquote(os.environ["FILENAME"]))') || filename=""
     [[ -z "$filename" ]] && filename="$(sanitize_filename "$title").mp4"
     out="${REPAIR_DIR}/$(make_safe_filename "$filename")"
 
@@ -140,7 +138,7 @@ PY
     log_info "  Downloading to: $out" >&2
     if [[ ! -s "$out" ]]; then
         aria2c -x 8 -s 8 -k 1M --max-tries=5 --retry-wait=5 --dir="$REPAIR_DIR" --out="$(basename "$out")" "$url" >/dev/null 2>&1 || \
-        curl -L --retry 3 --max-time 7200 -o "$out" "$url"
+        curl -fL --retry 3 --max-time 7200 -o "$out" "$url"
     fi
     [[ -s "$out" ]] || return 1
     echo "$out"
@@ -200,15 +198,14 @@ repair_mirrors() {
     local records
     records=$(github_api_read_content "data/recordings.json" 2>/dev/null) || records="$(cat data/recordings.json 2>/dev/null || echo '[]')"
 
-    local filter
-    if [[ -n "$target_video" ]]; then
-        filter="map(select(.video_id == \"$target_video\"))"
-    else
-        filter='.'
-    fi
-
     local candidates
-    candidates=$(jq "$filter | [.[] | select((.archive_link // \"\") != \"\")]" <<< "$records") || candidates="[]"
+    # Pass the id via --arg: interpolating TARGET_VIDEO_ID into the jq
+    # program breaks on quotes/backslashes (injection).
+    if [[ -n "$target_video" ]]; then
+        candidates=$(jq --arg v "$target_video" 'map(select(.video_id == $v)) | [.[] | select((.archive_link // "") != "")]' <<< "$records") || candidates="[]"
+    else
+        candidates=$(jq '[.[] | select((.archive_link // "") != "")]' <<< "$records") || candidates="[]"
+    fi
     local count
     count=$(jq 'length' <<< "$candidates")
     log_info "Candidates with Archive.org source: $count"

@@ -253,7 +253,12 @@ update_recordings_json() {
         log_warn "recordings.json unreadable — skipping gallery index update rather than risking a wipe"
         return 1
     }
-    echo "$current" | jq -e 'type=="array"' >/dev/null 2>&1 || current="[]"
+    # Refuse a blind merge: resetting corrupt reads to [] would wipe the
+    # canonical index (same class as the 2026-09-02 wipe bugs).
+    if ! echo "$current" | jq -e 'type=="array"' >/dev/null 2>&1; then
+        log_warn "recordings.json is not an array — skipping gallery index update rather than risking a wipe"
+        return 1
+    fi
 
     # ── Quarantine gate: fragments & false captures never enter the gallery ──
     if ! quarantine_check "$video_id" "$title" "$date_str" "${dur_sec:-0}" "$current"; then
@@ -268,6 +273,15 @@ update_recordings_json() {
     # repair. Merge is preserve-first: existing enriched fields (thumbnail,
     # github_release, telegram_link, storyboard, ...) survive; new non-empty
     # values overwrite.
+    # Brand-new records need a thumbnail too: derive it from the Archive
+    # identifier (same rule as import-archive-backups.sh). The merge below
+    # strips empty values, so a literal "" here meant new entries kept none.
+    local archive_ident="" thumb_url=""
+    if [[ "$archive_link" =~ archive\.org/details/([^/?#]+) ]]; then
+        archive_ident="${BASH_REMATCH[1]}"
+        thumb_url="https://archive.org/services/img/${archive_ident}"
+    fi
+
     local updated
     updated=$(echo "$current" | jq \
         --arg vid "$video_id" \
@@ -289,6 +303,7 @@ update_recordings_json() {
         --arg st0807 "$st0807_link" \
         --arg viking "$vikingfile_link" \
         --arg chat "${RECORD_CHAT_URL:-}" \
+        --arg thumb "$thumb_url" \
         --arg rec "$recorded_at" '
         ([ .[] | select(.video_id == $vid) ][0] // {}) as $old
         | ({
@@ -296,7 +311,7 @@ update_recordings_json() {
             title: $title,
             channel: "The Muslim Lantern",
             video_url: $vurl,
-            thumbnail: "",
+            thumbnail: $thumb,
             duration_sec: $durs,
             duration_fmt: $durf,
             size_bytes: $sizeb,
@@ -342,8 +357,8 @@ read_links() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     update_links
-    # NOTE: recordings.json is owned by update-stats.sh (canonical schema, keyed
-    # by video_id, matches the existing gallery). update-links.sh used to also
-    # write it with a CONFLICTING schema (keyed by archive identifier), which
-    # produced duplicate/overwritten gallery entries. That write was removed.
+    # NOTE: the recordings.json gallery write lives in update_links() above
+    # (canonical schema, keyed by YouTube video_id). update-stats.sh owns
+    # stats.json plus its own recordings upsert; both merges are
+    # preserve-first ($old * $new) so enriched fields survive either path.
 fi

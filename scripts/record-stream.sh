@@ -423,6 +423,15 @@ validate_recorded_file() {
     fi
     
     if [[ -n "$found_file" ]]; then
+        # Strict content gate (ffprobe present): size alone passes truncated
+        # or zero-filled segments. Without ffprobe, keep the size gate so
+        # minimal environments still record.
+        if command -v ffprobe &>/dev/null; then
+            if ! is_valid_video "$found_file" "$min_bytes"; then
+                log_warn "  File failed video validation (no video stream or no duration): $found_file" >&2
+                return 1
+            fi
+        fi
         local final_size
         final_size=$(get_file_size "$found_file")
         log_ok "  Valid recording found: $(basename "$found_file") ($(format_size "$final_size"))" >&2
@@ -603,15 +612,18 @@ record_method_j() {
   fi
 
   local err_log="${RECORD_DIR}/method_logs/last_err.log"
-  local manifest_url
-  manifest_url=$(timeout 60 yt-dlp \
+  # yt-dlp -g prints ONE URL per line: a single muxed/HLS URL, or separate
+  # video+audio URLs for split manifests. head -1 silently dropped the audio
+  # track (video-only MP4s) — feed every URL to ffmpeg instead.
+  local manifest_raw
+  manifest_raw=$(timeout 60 yt-dlp \
     --no-download \
     --no-playlist \
     --no-warnings \
     --quiet \
     -f "best" \
     -g \
-    "${video_url}" 2>"${err_log}" | head -1) || {
+    "${video_url}" 2>"${err_log}") || {
     local resolve_status=$?
     local err
     err=$(tail -3 "${err_log}" 2>/dev/null)
@@ -620,16 +632,35 @@ record_method_j() {
     return 1
   }
 
-  if [[ -z "$manifest_url" ]]; then
+  local manifest_urls=()
+  mapfile -t manifest_urls <<< "$manifest_raw"
+  # Drop blank lines (trailing newline yields a phantom empty element).
+  local _m tmp_urls=()
+  for _m in ${manifest_urls[@]+"${manifest_urls[@]}"}; do
+      [[ -n "$_m" ]] && tmp_urls+=("$_m")
+  done
+  manifest_urls=(${tmp_urls[@]+"${tmp_urls[@]}"})
+
+  if (( ${#manifest_urls[@]} == 0 )); then
     _log_method_failure "Method J" "empty-manifest" "$video_url" "$output_file" "yt-dlp -g returned empty"
     log_warn " Method J: empty manifest URL"
     return 1
   fi
 
-  log_info " Method J: manifest = ${manifest_url:0:80}..."
+  local ffmpeg_inputs=() ffmpeg_maps=()
+  if (( ${#manifest_urls[@]} == 1 )); then
+    ffmpeg_inputs=(-i "${manifest_urls[0]}")
+  else
+    log_info " Method J: split manifest (${#manifest_urls[@]} URLs), mapping video+audio"
+    ffmpeg_inputs=(-i "${manifest_urls[0]}" -i "${manifest_urls[1]}")
+    ffmpeg_maps=(-map 0:v:0 -map 1:a:0)
+  fi
+
+  log_info " Method J: manifest = ${manifest_urls[0]:0:80}..."
 
   timeout "${MAX_RECORD_DURATION:-18000}" ffmpeg -y \
-    -i "$manifest_url" \
+    "${ffmpeg_inputs[@]}" \
+    ${ffmpeg_maps[@]+"${ffmpeg_maps[@]}"} \
     -c copy \
     -f mp4 \
     -movflags +faststart \
@@ -685,9 +716,15 @@ attempt_recording() {
         log_separator
         log_info "  Trying method ${label}..."
         
-        # Try the recording method
-        ${fn} "$video_url" "$output_base" || true
-        
+        # Try the recording method, capturing its output: previously only
+        # Method J logged to METHOD_FAILURE_LOG, so A–I failures left the
+        # Discord diagnostic dump empty. tee keeps the live console output
+        # while saving a per-method transcript for the failure entry below.
+        local mlog="${RECORD_DIR}/method_logs/${fn}.log"
+        local lines_before=0 lines_after=0 mstatus=0
+        lines_before=$(wc -l < "$METHOD_FAILURE_LOG" 2>/dev/null || echo 0)
+        ${fn} "$video_url" "$output_base" 2>&1 | tee "$mlog" || mstatus=$?
+
         # Check if a valid file was produced
         local valid_file
         valid_file=$(validate_recorded_file "$output_base") && {
@@ -695,7 +732,14 @@ attempt_recording() {
             RECORDED_FILES+=("$valid_file")
             return 0
         }
-        
+
+        # Log this method's failure unless it already logged itself (Method J
+        # logs resolve-stage context directly) — the dump must never be empty.
+        lines_after=$(wc -l < "$METHOD_FAILURE_LOG" 2>/dev/null || echo 0)
+        if (( lines_after == lines_before )); then
+            _log_method_failure "$label" "$mstatus" "$video_url" "$output_base" "$(tail -30 "$mlog" 2>/dev/null)"
+        fi
+
         log_warn "  Method ${label}, no valid file produced"
         
         # Small delay between methods

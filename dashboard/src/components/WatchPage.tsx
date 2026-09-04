@@ -49,14 +49,19 @@ interface Mirror {
 
 declare global { interface Window { __mlaContinueResume?: string } }
 
-function buildMirrors(rec: Ep): Mirror[] {
-  // Every recording's videoId IS its YouTube id (the pipeline records the
-  // original stream), so the YouTube provider is always available even when
-  // the file mirrors are still uploading.
-  const ytId =
+/* Every recording's videoId IS its YouTube id (the pipeline records the
+   original stream), so the YouTube provider is always available even when
+   the file mirrors are still uploading. */
+function ytIdOf(rec: Ep): string {
+  return (
     rec.youtubeId ||
     (rec.youtubeUnlisted?.match(/(?:v=|\/)([\w-]{11})/)?.[1] ?? '') ||
-    (/^[\w-]{11}$/.test(rec.videoId) ? rec.videoId : '');
+    (/^[\w-]{11}$/.test(rec.videoId) ? rec.videoId : '')
+  );
+}
+
+function buildMirrors(rec: Ep): Mirror[] {
+  const ytId = ytIdOf(rec);
   const out: Mirror[] = [];
   // CDN-first Auto order (2026-09-02): 0807.st serves direct MP4s and fronts
   // playback as the archive's CDN (its ~30-day idle deletion is covered by the
@@ -127,6 +132,9 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const [resumeAsk, setResumeAsk] = useState<number | null>(null);
   const [tick, setTick] = useState(0);                  // rerun side effects on rec change
   const [guests, setGuests] = useState<Guest[]>([]);
+  // YouTube's own chapters + storyboard for the GHOST copy (see ytmeta
+  // effect below). Used only when the record has none of its own.
+  const [ytMeta, setYtMeta] = useState<{ chapters: { time: number; label: string }[]; storyboard: boolean } | null>(null);
 
   const player = useRef<MediaPlayerInstance | null>(null);
   const next = pickNext(recs, rec.videoId);
@@ -139,6 +147,10 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const qoeTtffSent = useRef(false);
   const qoeStallMs = useRef(0);
   const qoeWaitStart = useRef(0);
+  // One explicit play() attempt per mirror (see onCanPlay). Without it a
+  // source that becomes playable after the autoPlay race just sits black
+  // behind the Start button even though the copy is fine.
+  const autoTriedRef = useRef(false);
 
 
   const sorted = useMemo(() => [...recs].sort((a, b) => b.date.localeCompare(a.date)), [recs]);
@@ -146,9 +158,15 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   const newer = idxInSorted > 0 ? sorted[idxInSorted - 1] : undefined;
   const older = idxInSorted >= 0 && idxInSorted < sorted.length - 1 ? sorted[idxInSorted + 1] : undefined;
 
-  /* Active mirror resolution */
+  /* Active mirror resolution.
+     srcIdx is 1-based (0 = Auto; the UI passes i+1 for mirrors[i]) while
+     activeIdx is 0-based. Returning srcIdx directly played the neighbour
+     mirror (e.g. clicking B3ING played N3ON). */
   const activeIdx = useMemo(() => {
-    if (srcIdx !== 0) return srcIdx;
+    if (srcIdx !== 0) {
+      const i = srcIdx - 1;
+      return i >= 0 && i < mirrors.length ? i : 0;
+    }
     const firstGood = mirrors.findIndex((_, i) => !failed.has(i));
     return firstGood === -1 ? 0 : firstGood;
   }, [srcIdx, failed, mirrors]);
@@ -160,6 +178,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
   useEffect(() => {
     qoeT0.current = performance.now();
     qoeTtffSent.current = false;
+    autoTriedRef.current = false;
   }, [active?.url]);
 
   useEffect(() => () => {
@@ -169,23 +188,35 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     }
   }, [rec.videoId]);
 
+  // Effective chapters: the archive's own AI chapters win; otherwise fall
+  // back to YouTube's own (description timestamps via ytmeta). Drives the
+  // in-player track, the highlight state, and the rail below.
+  const railChapters = useMemo(
+    () => (rec.chapters?.length ? rec.chapters : ytMeta?.chapters),
+    [rec.chapters, ytMeta],
+  );
+
   const chapterVtt = useMemo(() => {
-    if (!rec.chapters || rec.chapters.length < 2) return '';
-    return URL.createObjectURL(new Blob([chaptersToVtt(rec.chapters, duration || rec.durationSec)], { type: 'text/vtt' }));
-  }, [rec.chapters, rec.videoId, duration, rec.durationSec]);
+    if (!railChapters || railChapters.length < 2) return '';
+    return URL.createObjectURL(new Blob([chaptersToVtt(railChapters, duration || rec.durationSec)], { type: 'text/vtt' }));
+  }, [railChapters, duration, rec.durationSec]);
   useEffect(() => () => { if (chapterVtt) URL.revokeObjectURL(chapterVtt); }, [chapterVtt]);
 
   const thumbVtt = useMemo(() => {
     const m = rec.storyboard?.vtt?.match(/\/([^/]+)\.vtt(?:\?|$)/);
-    return m ? `/api/vtt/${m[1]}` : '';
-  }, [rec.storyboard]);
+    if (m) return `/api/vtt/${m[1]}`;
+    // No archive sprite (channel-only video, or AI enrichment hasn't run):
+    // YouTube's own storyboard, converted to VTT by the ytmeta endpoint.
+    const ytId = ytIdOf(rec);
+    return ytMeta?.storyboard && ytId ? `/api/ytmeta/${ytId}?format=vtt` : '';
+  }, [ytMeta, rec]);
 
   const activeChapter = useMemo(() => {
-    if (!rec.chapters?.length) return -1;
+    if (!railChapters?.length) return -1;
     let cur = 0;
-    for (let i = 0; i < rec.chapters.length; i++) if (time >= rec.chapters[i].time) cur = i;
+    for (let i = 0; i < railChapters.length; i++) if (time >= railChapters[i].time) cur = i;
     return cur;
-  }, [rec.chapters, time]);
+  }, [railChapters, time]);
 
   /* ── Guests (join/leave) ──────────────────────────────────────────── */
   useEffect(() => {
@@ -194,6 +225,35 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     fetchGuests(rec.videoId).then(g => { if (live) setGuests(g); });
     return () => { live = false; };
   }, [rec.videoId]);
+
+  /* ── YouTube fallback metadata (chapters + storyboard) ──────────────
+     Archive records carry AI chapters/sprites in the index, but channel-only
+     videos — and archive records whose enrichment hasn't run yet — have
+     neither, so GHOST plays with no chapters and no seek previews. The
+     ytmeta edge endpoint reads both from YouTube's own data. Fetched only
+     when something is actually missing and the YouTube copy is the one
+     playing (or the only copy); failures keep today's behavior. */
+  useEffect(() => {
+    setYtMeta(null);
+    const ytId = ytIdOf(rec);
+    if (!ytId) return;
+    if ((rec.chapters?.length ?? 0) >= 2 && rec.storyboard?.vtt) return;
+    if (active?.kind !== 'youtube' && !rec.fromYouTube) return;
+    const ctrl = new AbortController();
+    fetch(`/api/ytmeta/${ytId}`, { signal: ctrl.signal })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        if (!j || ctrl.signal.aborted) return;
+        setYtMeta({
+          chapters: Array.isArray(j.chapters)
+            ? j.chapters.filter((c: any) => c && typeof c.time === 'number' && typeof c.label === 'string')
+            : [],
+          storyboard: j.hasStoryboard === true,
+        });
+      })
+      .catch(() => { /* no chapters/preview — same as today */ });
+    return () => ctrl.abort();
+  }, [rec, active?.kind]);
 
   const activeGuest = useMemo(() => {
     return guests.find(g => time >= g.join && time <= g.leave) ?? null;
@@ -226,20 +286,29 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     const fromContinue = window.__mlaContinueResume === rec.videoId;
     window.__mlaContinueResume = undefined;
 
+    // Polling intervals are cleaned up on unmount/rec change: without this
+    // the old interval kept seeking the NEW video to the old position.
+    let stop: (() => void) | undefined;
     if (Number.isFinite(tParam) && tParam > 0) {
       const seek = () => { if (player.current) player.current.currentTime = tParam; };
       const iv = setInterval(() => { if (player.current?.state.canPlay) { seek(); clearInterval(iv); } }, 300);
-      setTimeout(() => clearInterval(iv), 15000);
+      const to = setTimeout(() => clearInterval(iv), 15000);
+      stop = () => { clearInterval(iv); clearTimeout(to); };
     } else if (fromContinue && saved && saved.t > 30) {
       const seek = () => { if (player.current) player.current.currentTime = saved.t; };
       const iv = setInterval(() => { if (player.current?.state.canPlay) { seek(); clearInterval(iv); toast(`Resumed at ${fmtTime(saved.t)}`); } }, 300);
-      setTimeout(() => clearInterval(iv), 15000);
+      const to = setTimeout(() => clearInterval(iv), 15000);
+      stop = () => { clearInterval(iv); clearTimeout(to); };
     } else if (saved && saved.t > 30 && saved.t < saved.d - 30) {
       setResumeAsk(saved.t);
     }
+    return stop;
   }, [rec.videoId, toast]);
 
-  /* ── Health probes ───────────────────────────────────────────────── */
+  /* ── Health probes (rough latency hints only) ────────────────────────
+     Cross-origin HEAD without CORS must use mode:'no-cors', whose opaque
+     responses resolve even for dead mirrors — so these probes can never
+     report down. Dead-marking comes from playback failures + deadMirrors. */
   useEffect(() => {
     const ctrl = new AbortController();
     mirrors.forEach((m, i) => {
@@ -266,6 +335,24 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     return () => clearInterval(iv);
   }, [litOnce]);
 
+  /* ── Stall watchdog — advance through untried mirrors while no frame has
+     ever played. A dead/slow first copy used to sit silent until the viewer
+     gave up (Start button at 8s, manual switches at 25s). Now Auto walks
+     the cascade itself, ~10s per copy; the buttons below stay as the last
+     resort once every copy is exhausted. Terminates: each advance resets
+     elapsed, and with nothing left untried this returns without writing. */
+  useEffect(() => {
+    if (litOnce || elapsed < 10) return;
+    const n = new Set(failed);
+    n.add(activeIdx);
+    const nextIdx = mirrors.findIndex((_, i) => !n.has(i));
+    if (nextIdx === -1 || nextIdx === activeIdx) return;
+    setFailed(n);
+    setSrcIdx(nextIdx + 1);
+    setLitOnce(false); setElapsed(0); setPlaying(false);
+    toast(`Mirror slow — trying ${mirrors[nextIdx].label}`);
+  }, [elapsed, litOnce, failed, activeIdx, mirrors, toast]);
+
   /* ── Position autosave (every 5 s) ───────────────────────────────── */
   useEffect(() => {
     const iv = setInterval(() => {
@@ -291,10 +378,10 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     return () => clearTimeout(t);
   }, [countdown, next, onOpen]);
 
-  /* ── Mirror selection + failover ─────────────────────────────────── */
+  /* ── Mirror selection + failover (srcIdx 1-based, failed 0-based) ───── */
   const selectMirror = useCallback((i: number) => {
     setSrcIdx(i);
-    setFailed(f => { const n = new Set(f); n.delete(i); return n; });
+    setFailed(f => { const n = new Set(f); n.delete(i - 1); return n; });
     setLitOnce(false); setElapsed(0); setPlaying(false);
   }, []);
 
@@ -304,7 +391,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       const nextIdx = mirrors.findIndex((_, i) => !n.has(i));
       if (nextIdx !== -1) {
         toast(`${mirrors[activeIdx]?.label ?? 'Mirror'} failed — switching to ${mirrors[nextIdx].label}`);
-        setSrcIdx(nextIdx);
+        setSrcIdx(nextIdx + 1);
         setLitOnce(false); setElapsed(0);
       } else {
         toast('All mirrors failed — try a download instead');
@@ -320,7 +407,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
 
-      if (/^[0-5]$/.test(e.key)) {
+      if (/^[0-8]$/.test(e.key)) {
         const i = parseInt(e.key);
         if (i <= mirrors.length) { selectMirror(i); toast(i === 0 ? 'Mirror: Auto' : `Mirror: ${mirrors[i - 1]?.label}`); }
       } else if (e.key === 't' || e.key === 'T') {
@@ -348,6 +435,12 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       const best = [...qs].filter(q => !q.height || q.height <= 1080).sort((a, b) => (b.height || 0) - (a.height || 0))[0];
       if (best) { try { best.selected = true; } catch { /* list locked */ } }
     }
+    // Still muted at this point, so no gesture is needed: one explicit
+    // play() per mirror covers the mounts where autoPlay lost its race.
+    if (!autoTriedRef.current) {
+      autoTriedRef.current = true;
+      void p.play().catch(() => { /* watchdog / Start button take over */ });
+    }
   }, [active?.kind]);
 
   const onPlaying = useCallback(async () => {
@@ -360,7 +453,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
     // If the listener unmuted through the player's own controls, follow suit.
     const p = player.current;
     if (p && !p.muted) setSoundOff(false);
-  }, []);
+  }, [active?.label]);
 
   const soundOn = () => {
     const p = player.current;
@@ -511,9 +604,10 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                     <DefaultVideoLayout icons={defaultLayoutIcons} thumbnails={thumbVtt || undefined} />
                   </MediaPlayer>
 
-                  {/* The one loader — an opaque veil with a single rotating
-                      ring. Covers both the player's spinner and the embed's
-                      native one until real frames roll, then fades. */}
+                  {/* Opaque blurred-art veil (no spinner): hides the player's
+                      native buffering circle until real frames roll, then
+                      fades. The Start button below is the only call to
+                      action while nothing plays. */}
                   {veil && (
                     <div className="load-veil" style={{ opacity: framesFlowing ? 0 : 1 }} aria-hidden="true">
                       {/* Shared-element landing target: the clicked card's art
@@ -522,19 +616,14 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                         style={{ viewTransitionName: `art-${rec.videoId}` }}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       <span className="tint" />
-                      {elapsed < 8 && (
-                        <span className="load-ring"><i /></span>
-                      )}
                     </div>
                   )}
 
                   {/* Seek beat — while the reel finds the new timestamp, a
                       backdrop-blur layer smears the embed's native seek
-                      spinner and shows our one ring instead. */}
+                      spinner (no second spinner of our own). */}
                   {seekVeil && framesFlowing && (
-                    <div className="seek-veil" aria-hidden="true">
-                      <span className="load-ring"><i /></span>
-                    </div>
+                    <div className="seek-veil" aria-hidden="true" />
                   )}
 
                   {/* Sound nudge — playing muted, one tap restores audio */}
@@ -563,10 +652,10 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
                         Start playback
                       </button>
-                      {elapsed >= 25 && (
+                      {elapsed >= 8 && (
                         <div className="flex gap-2 flex-wrap justify-center px-6">
                           {mirrors.map((m, i) => i !== activeIdx && !failed.has(i) ? (
-                            <button key={m.label} className="btn btn-ghost !py-2 !px-4 !text-[11px] pointer-events-auto" onClick={() => selectMirror(i)}>
+                            <button key={m.label} className="btn btn-ghost !py-2 !px-4 !text-[11px] pointer-events-auto" onClick={() => selectMirror(i + 1)}>
                               Switch to {m.label}
                             </button>
                           ) : null)}
@@ -689,20 +778,20 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                   </div>
                   <div className="flex-1" />
                   <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>
-                    mirrors <span className="kbd">0</span>–<span className="kbd">{Math.min(5, mirrors.length)}</span> · theatre <span className="kbd">T</span>
+                    mirrors <span className="kbd">0</span>–<span className="kbd">{Math.min(8, mirrors.length)}</span> · theatre <span className="kbd">T</span>
                   </span>
                 </div>
 
-                {/* Chapter rail */}
-                {rec.chapters && rec.chapters.length > 0 && (
+                {/* Chapter rail (archive chapters, else YouTube's own) */}
+                {railChapters && railChapters.length > 0 ? (
                   <div className="mb-8">
                     <div className="flex items-center gap-3 mb-3">
                       <span className="shelf-tick" />
                       <span className="eyebrow">Chapters</span>
-                      <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{rec.chapters.length} marked</span>
+                      <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>{railChapters.length} marked</span>
                     </div>
                     <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-                      {rec.chapters.map((c, i) => (
+                      {railChapters.map((c, i) => (
                         <button
                           key={i}
                           className={`chapter-card ${i === activeChapter ? 'active' : ''}`}
@@ -718,7 +807,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                       ))}
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Guests — join/leave timeline */}
                 {guests.length > 0 && (
@@ -779,7 +868,12 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                 </button>
                 {mirrors.map((m, i) => {
                   const ms = health[i];
-                  const dead = failed.has(i) || ms === -1;
+                  // Probes use mode:'no-cors', whose opaque responses resolve
+                  // even for dead mirrors — so ms===-1 is unreachable and must
+                  // never mark a mirror dead. Only explicit playback failures
+                  // do; the server-side deadMirrors demotion stays the
+                  // trustworthy signal. ms remains a rough latency hint.
+                  const dead = failed.has(i);
                   const state = dead ? 'dead' : ms == null ? 'slow' : ms < 300 ? 'fast' : ms < 1200 ? 'ok' : 'slow';
                   return (
                     <button

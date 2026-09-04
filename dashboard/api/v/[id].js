@@ -50,7 +50,7 @@ function findRec(recs, id) {
 
 function safeFilename(title) {
   let s = String(title || '');
-  s = [...s].filter(c => c.isprintable !== false && c >= ' ').join('');
+  s = [...s].filter(c => c >= ' ').join('');
   s = s.replace(/[^a-zA-Z0-9._\-]/g, '_').replace(/_{2,}/g, '_').slice(0, 200);
   return s || 'recording.mp4';
 }

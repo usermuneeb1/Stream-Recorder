@@ -43,7 +43,9 @@ jobs:
 
       - name: "Purge jsdelivr CDN cache (keep gallery data fresh)"
         run: |
-          for p in data/recordings.json data/youtube-stats.json data/system-status.json; do
+          # stats.json (repo root, written by update-stats.sh) must be purged
+          # too — otherwise the CDN keeps serving stale lifetime totals.
+          for p in data/recordings.json data/youtube-stats.json data/system-status.json stats.json; do
             curl -s -o /dev/null "https://purge.jsdelivr.net/gh/usermuneeb1/Stream-Recorder@main/$p" || true
           done
           echo "Requested jsDelivr purge for data files."
