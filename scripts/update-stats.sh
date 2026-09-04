@@ -43,8 +43,14 @@ update_stats() {
     # writer path (recorder, importer, reconciler, repairs) stays consistent
     # and past drift self-heals on the next recording.
     local rec_json total_streams=0 total_hours=0 total_gb=0 avg_duration=0
-    rec_json=$(github_api_read_content "data/recordings.json" 2>/dev/null) || rec_json="[]"
-    echo "$rec_json" | jq -e 'type=="array"' >/dev/null 2>&1 || rec_json="[]"
+    rec_json=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
+        log_error "recordings.json unreadable — refusing to publish zeroed stats"
+        return 1
+    }
+    if ! echo "$rec_json" | jq -e 'type=="array"' >/dev/null 2>&1; then
+        log_error "recordings.json is not an array — refusing to publish zeroed stats"
+        return 1
+    fi
 
     # Include the CURRENT capture even if its gallery entry isn't written yet
     local current_entry='null'
@@ -196,8 +202,14 @@ update_recordings_json() {
     fi
 
     local existing
-    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing='[]'
-    [[ -z "$existing" || "$existing" != "["* ]] && existing='[]'
+    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
+        log_warn "recordings.json unreadable — skipping dashboard index update rather than risking a wipe"
+        return 1
+    }
+    if ! echo "$existing" | jq -e 'type=="array"' >/dev/null 2>&1; then
+        log_warn "recordings.json is not an array — skipping dashboard index update rather than risking a wipe"
+        return 1
+    fi
 
     # ── Quarantine gate: fragments & false captures never enter the gallery ──
     # (file is already uploaded to the clouds; only the index is protected)
@@ -265,7 +277,11 @@ update_recordings_json() {
         | reduce .[] as $item ([];
             if any(.[]; .video_id == $item.video_id) then . else . + [$item] end
           )
-    ' 2>/dev/null) || merged="[$entry]"
+    ' 2>/dev/null) || { log_warn "jq failed to build recordings.json update"; return 1; }
+    if ! echo "$merged" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
+        log_warn "computed recordings.json update is empty — refusing to write (would wipe the index)"
+        return 1
+    fi
     github_api_write "data/recordings.json" "$merged" "Dashboard: ${STREAM_TITLE:-recording}" >/dev/null 2>&1 || true
 }
 

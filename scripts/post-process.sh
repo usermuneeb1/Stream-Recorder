@@ -240,7 +240,7 @@ smart_split() {
         while IFS= read -r part_file; do
             if [[ -f "$part_file" ]] && is_valid_video "$part_file" 500; then
                 PROCESSED_FILES+=("$part_file")
-                (( part_count++ ))
+                (( ++part_count ))
                 local psize
                 psize=$(get_file_size "$part_file")
                 log_info "  Part ${part_count}: $(basename "$part_file") ($(format_size "$psize"))"

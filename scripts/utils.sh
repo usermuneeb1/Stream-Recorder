@@ -218,6 +218,9 @@ format_size() {
 # Convert bytes to GB with 2 decimal places
 format_size_gb() {
     local bytes="${1:-0}"
+    # Same hardening as format_size(): quoted numbers ("392569774") killed bc.
+    bytes="${bytes//[^0-9]/}"
+    [[ -z "$bytes" ]] && bytes=0
     echo "scale=2; $bytes / 1073741824" | bc
 }
 
@@ -457,7 +460,7 @@ github_api_write() {
             log_error "jq failed to build valid JSON for $filepath (attempt $attempt)"
             rm -f "$tmp_payload"
             sleep $(( attempt * 2 ))
-            (( attempt++ ))
+            (( ++attempt ))
             continue
         fi
 
@@ -487,7 +490,7 @@ github_api_write() {
             local backoff=$(( attempt * attempt ))   # 1, 4, 9, 16, 25 s
             log_warn "GitHub returned ${http_code} for $filepath, retry $((attempt+1))/${max_attempts} in ${backoff}s"
             sleep "$backoff"
-            (( attempt++ ))
+            (( ++attempt ))
             continue
         fi
 
@@ -545,7 +548,7 @@ retry_command() {
             sleep "$delay"
             delay=$(( delay * 2 ))  # Exponential backoff
         fi
-        (( attempt++ ))
+        (( ++attempt ))
     done
     
     log_error "All $max_attempts attempts failed for: $*"

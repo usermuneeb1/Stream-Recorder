@@ -42,8 +42,9 @@ check_link_alive() {
     # Gofile: /d/<code> returns HTTP 200 with the SPA shell even for deleted
     # folders — the page proves NOTHING. The Contents API with the PUBLIC
     # website token (no account key, by policy 2026-09-02) is the only reliable
-    # signal. error-notFound → dead; error-token/network → unverifiable,
-    # fall through to HTTP rather than lying "dead".
+    # signal. error-notFound → dead; error-token/network → page-content
+    # heuristic (same rule as repair-mirrors _is_gofile_alive): only explicit
+    # dead markers count, because a bare page-200 must never mean "alive".
     if [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]]; then
         local gf_code="${BASH_REMATCH[1]}"
         local gf_status
@@ -52,7 +53,14 @@ check_link_alive() {
         case "$gf_status" in
             ok) return 0 ;;
             *notFound*|*notfound*) log_debug "    Gofile API says dead: $gf_status"; return 1 ;;
-            *) : ;;  # error-token / network → unverifiable, fall through to HTTP
+            *)
+                local gf_page
+                gf_page=$(curl -sL --max-time "$timeout" "$url" 2>/dev/null) || return 1
+                if echo "$gf_page" | grep -qiE "not found|file.*(removed|expired|deleted)|contentnotfound|page not found|file was deleted"; then
+                    log_debug "    Gofile page says dead"; return 1
+                fi
+                return 0
+                ;;
         esac
     fi
     
@@ -84,7 +92,7 @@ refresh_gofile() {
     # /d/ page which only downloads the SPA shell (the old "refresh" was
     # phantom and let every link expire). Falls back to the page ping.
     if [[ -n "$code" ]]; then
-        curl -s -o /dev/null --max-time 30 \
+        curl -sf -o /dev/null --max-time 30 \
             "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null && return 0
     fi
 
@@ -157,8 +165,9 @@ refresh_pixeldrain() {
         log_info "    Downloading ${size_human} (10% of $(format_size "$file_size" 2>/dev/null || echo "${file_size} bytes"))..."
     fi
 
-    # Fetch the range from the direct download endpoint.
-    curl -s -o /dev/null --max-time 300 \
+    # Fetch the range from the direct download endpoint (-f: an HTTP
+    # error page must not count as a successful refresh).
+    curl -sf -o /dev/null --max-time 300 \
         -r "0-${ten_percent}" \
         -L "https://pixeldrain.com/api/file/${file_id}" 2>/dev/null
 
@@ -468,21 +477,21 @@ refresh_links() {
                 continue
             fi
             
-            (( total_checked++ ))
+            (( ++total_checked ))
             log_info "  [${total_checked}/${total_links}] Checking: $url"
             
             if check_link_alive "$url"; then
-                (( total_alive++ ))
+                (( ++total_alive ))
                 if [[ "$dry_run" == "true" ]]; then
                     log_ok "    ✅ Alive, dry run, no refresh ping"
                 elif refresh_gofile "$url"; then
-                    (( total_refreshed++ ))
+                    (( ++total_refreshed ))
                     log_ok "    ✅ Alive, timer reset (1KB)"
                 else
                     log_warn "    ⚠️ Alive but refresh ping failed"
                 fi
             else
-                (( total_dead++ ))
+                (( ++total_dead ))
                 dead_gofile_urls+=("$url")
                 updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
@@ -503,21 +512,21 @@ refresh_links() {
                 continue
             fi
             
-            (( total_checked++ ))
+            (( ++total_checked ))
             log_info "  [${total_checked}/${total_links}] Checking: $url"
             
             if check_link_alive "$url"; then
-                (( total_alive++ ))
+                (( ++total_alive ))
                 if [[ "$dry_run" == "true" ]]; then
                     log_ok "    ✅ Alive, dry run, no refresh download"
                 elif refresh_pixeldrain "$url"; then
-                    (( total_refreshed++ ))
+                    (( ++total_refreshed ))
                     log_ok "    ✅ Alive, timer reset (10% downloaded)"
                 else
                     log_warn "    ⚠️ Alive but 10% download failed"
                 fi
             else
-                (( total_dead++ ))
+                (( ++total_dead ))
                 dead_pixeldrain_urls+=("$url")
                 updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
@@ -535,20 +544,20 @@ refresh_links() {
                 log_info "  [skip] Already expired: $url"
                 continue
             fi
-            (( total_checked++ ))
+            (( ++total_checked ))
             log_info "  [${total_checked}/${total_links}] Checking: $url"
             if check_link_alive "$url"; then
-                (( total_alive++ ))
+                (( ++total_alive ))
                 if [[ "$dry_run" == "true" ]]; then
                     log_ok "    ✅ Alive, dry run, no refresh ping"
                 elif refresh_st0807 "$url"; then
-                    (( total_refreshed++ ))
+                    (( ++total_refreshed ))
                     log_ok "    ✅ Alive, timer reset (1KB)"
                 else
                     log_warn "    ⚠️ Alive but refresh ping failed"
                 fi
             else
-                (( total_dead++ ))
+                (( ++total_dead ))
                 dead_st0807_urls+=("$url")
                 updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
@@ -565,20 +574,20 @@ refresh_links() {
                 log_info "  [skip] Already expired: $url"
                 continue
             fi
-            (( total_checked++ ))
+            (( ++total_checked ))
             log_info "  [${total_checked}/${total_links}] Checking: $url"
             if check_link_alive "$url"; then
-                (( total_alive++ ))
+                (( ++total_alive ))
                 if [[ "$dry_run" == "true" ]]; then
                     log_ok "    ✅ Alive, dry run, no refresh ping"
                 elif refresh_vikingfile "$url"; then
-                    (( total_refreshed++ ))
+                    (( ++total_refreshed ))
                     log_ok "    ✅ Alive, timer reset (1KB)"
                 else
                     log_warn "    ⚠️ Alive but refresh ping failed"
                 fi
             else
-                (( total_dead++ ))
+                (( ++total_dead ))
                 dead_vikingfile_urls+=("$url")
                 updated_links=$(mark_dead_in_links_txt "$url" "$updated_links")
                 log_warn "    DEAD, link expired"
@@ -665,7 +674,7 @@ refresh_links() {
                 
                 if [[ -n "$e_msgid" ]] && [[ "$e_msgid" != "null" ]] && [[ "$e_msgid" != "" ]]; then
                     if edit_discord_dead_links "$e_msgid" "$e_title" "$dead_services" "$first_archive"; then
-                        (( total_edited++ ))
+                        (( ++total_edited ))
                     fi
                     sleep 2  # Rate limit protection
                 else
@@ -673,7 +682,7 @@ refresh_links() {
                 fi
             fi
             
-            (( i++ ))
+            (( ++i ))
         done
     fi
     

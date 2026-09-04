@@ -223,7 +223,7 @@ repair_mirrors() {
         mega_old=$(jq -r '.mega_link // empty' <<< "$rec")
         st0807_old=$(jq -r '.st0807_link // empty' <<< "$rec")
         viking_old=$(jq -r '.vikingfile_link // empty' <<< "$rec")
-        ((idx++)); ((checked++))
+        ((++idx)); ((++checked))
 
         log_separator
         log_info "Checking: ${video_id}, ${title}"

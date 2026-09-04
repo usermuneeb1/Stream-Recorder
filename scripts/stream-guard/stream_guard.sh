@@ -125,7 +125,7 @@ guard_record() {
                 # Stall, check if stream is still live and restart
                 echo "   Guard: Checking if stream is still live..."
                 if is_stream_still_live "$video_id" 2>/dev/null; then
-                    (( _guard_restart_count++ ))
+                    (( ++_guard_restart_count ))
                     echo "   Guard: Stream still live, restarting (${_guard_restart_count}/${GUARD_MAX_RESTARTS})"
                     sleep 10
                     continue
@@ -142,7 +142,7 @@ guard_record() {
             *)
                 # Other error, check if stream still live
                 if is_stream_still_live "$video_id" 2>/dev/null; then
-                    (( _guard_restart_count++ ))
+                    (( ++_guard_restart_count ))
                     echo "   Guard: Error but stream still live, restarting"
                     sleep 10
                     continue

@@ -48,7 +48,7 @@ for row in "${ROWS[@]}"; do
             direct="$derived"
             jq --arg v "$vid" --arg d "$direct" 'map(if .video_id == $v then .archive_direct = $d else . end)' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
             log_ok "${vid}: archive_direct derived"
-            ((fixed++))
+            ((++fixed))
         else
             log_warn "${vid}: derived direct unreachable (HTTP ${code}), skipping"
         fi
@@ -59,7 +59,7 @@ for row in "${ROWS[@]}"; do
         if [[ -n "$node" && "$node" != "$direct" && "$node" == https* ]]; then
             jq --arg v "$vid" --arg n "$node" 'map(if .video_id == $v then .archive_node = $n else . end)' "$REC" > "$REC.tmp" && mv "$REC.tmp" "$REC"
             log_ok "${vid}: archive_node resolved (${node:0:60}...)"
-            ((fixed++))
+            ((++fixed))
         else
             log_warn "${vid}: node probe failed"
         fi

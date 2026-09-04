@@ -41,7 +41,10 @@ if [[ -f data/recordings.json ]]; then
     fi
 
     # sane dates (YYYY-MM-DD)
-    BADDATES=$(jq -r '.[].date // ""' data/recordings.json | grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | head -3)
+    # NOTE: the || true sits OUTSIDE the $(...) — on valid data grep -vE
+    # matches nothing (exit 1), which under bash -eo pipefail would abort
+    # the whole gate before it reports anything.
+    BADDATES=$(jq -r '.[].date // ""' data/recordings.json | grep -vE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | head -3) || true
     if [[ -n "$BADDATES" ]]; then
         fail "malformed date(s): $BADDATES"
     else

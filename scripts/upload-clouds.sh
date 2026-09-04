@@ -156,7 +156,7 @@ upload_to_gofile() {
         fi
 
         log_warn "  Gofile: Upload failed on ${endpoint} (attempt ${attempt}), ${upload_response:0:200}"
-        (( attempt++ ))
+        (( ++attempt ))
         endpoint_idx=$(( (endpoint_idx + 1) % ${#endpoints[@]} ))
         sleep 5
     done
@@ -266,7 +266,7 @@ upload_to_pixeldrain() {
             return 1
         fi
 
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
     done
 
@@ -370,7 +370,7 @@ EOF
 
         log_warn "  MEGA.nz: Upload attempt ${attempt} failed"
         log_warn "  MEGA.nz: Error: ${mega_error}"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 10
     done
 
@@ -501,7 +501,7 @@ upload_to_archive() {
             *)  log_warn "  Archive.org: curl exit ${curl_exit} / HTTP ${http_code} (attempt ${attempt})" ;;
         esac
 
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 15
     done
 
@@ -567,7 +567,7 @@ upload_to_st0807() {
                 pow=$(_st0807_pow_json)
                 if [[ -z "$pow" ]] || ! echo "$pow" | jq -e '.pow_nonce' >/dev/null 2>&1; then
                     log_warn "  0807.st: proof-of-work failed (attempt ${attempt})"
-                    (( attempt++ )); sleep 5; continue
+                    (( ++attempt )); sleep 5; continue
                 fi
                 curl_args+=(-F "pow_id=$(echo "$pow" | jq -r '.pow_id')")
                 curl_args+=(-F "pow_ts=$(echo "$pow" | jq -r '.pow_ts')")
@@ -593,7 +593,7 @@ upload_to_st0807() {
         fi
 
         log_warn "  0807.st: attempt ${attempt} failed, ${upload_response:0:200}"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
     done
 
@@ -704,7 +704,7 @@ upload_to_vikingfile() {
         fi
 
         log_warn "  VikingFile: attempt ${attempt} failed"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
     done
 
@@ -745,7 +745,7 @@ _vikingfile_multipart() {
         rm -f "$part" "$headers"
         [[ -z "$etag" ]] && return 1
         etags+=("$etag")
-        (( i++ ))
+        (( ++i ))
     done
 
     local -a form=(-F "key=${key}" -F "uploadId=${upload_id}" -F "name=${name}" -F "user=${user}")
@@ -753,7 +753,7 @@ _vikingfile_multipart() {
     for etag in "${etags[@]}"; do
         form+=(-F "parts[${idx}][PartNumber]=$(( idx + 1 ))")
         form+=(-F "parts[${idx}][ETag]=${etag}")
-        (( idx++ ))
+        (( ++idx ))
     done
 
     local complete url
@@ -950,12 +950,12 @@ upload_to_clouds() {
 
     # Count active services dynamically
     local active_services=0
-    [[ "${GOFILE_SKIP:-false}" != "true" ]] && (( active_services++ ))
-    [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]] && (( active_services++ ))
-    [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]] && (( active_services++ ))
-    [[ "${ARCHIVE_SKIP:-false}" != "true" ]] && [[ -n "${ARCHIVE_ACCESS_KEY:-}" ]] && (( active_services++ ))
-    [[ "${ST0807_SKIP:-false}" != "true" ]] && (( active_services++ ))
-    [[ "${VIKINGFILE_SKIP:-false}" != "true" ]] && (( active_services++ ))
+    [[ "${GOFILE_SKIP:-false}" != "true" ]] && (( ++active_services ))
+    [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]] && (( ++active_services ))
+    [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]] && (( ++active_services ))
+    [[ "${ARCHIVE_SKIP:-false}" != "true" ]] && [[ -n "${ARCHIVE_ACCESS_KEY:-}" ]] && (( ++active_services ))
+    [[ "${ST0807_SKIP:-false}" != "true" ]] && (( ++active_services ))
+    [[ "${VIKINGFILE_SKIP:-false}" != "true" ]] && (( ++active_services ))
     UPLOAD_TOTAL_SERVICES=$active_services
 
     log_info "Files to upload: ${total_files}"
@@ -971,7 +971,7 @@ upload_to_clouds() {
     local file_num=0
     local expected_total_uploads=0
     for f in "${FILES[@]}"; do
-        (( file_num++ ))
+        (( ++file_num ))
         if [[ ! -f "$f" ]]; then
             log_warn "File not found: $f, skipping"
             continue
@@ -994,14 +994,14 @@ upload_to_clouds() {
 
         # ── 1. Gofile (HD only) ──
         if [[ "${GOFILE_SKIP:-false}" != "true" ]]; then
-            (( expected_total_uploads++ ))
+            (( ++expected_total_uploads ))
             if upload_to_gofile "$f" "$part_name"; then
-                (( svc_success++ ))
+                (( ++svc_success ))
             else
                 log_warn "  Gofile: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_gofile "$f" "$part_name"; then
-                    (( svc_success++ ))
+                    (( ++svc_success ))
                 fi
             fi
         else
@@ -1010,14 +1010,14 @@ upload_to_clouds() {
 
         # ── 2. Pixeldrain (HD only) ──
         if [[ "${PIXELDRAIN_SKIP:-false}" != "true" ]]; then
-            (( expected_total_uploads++ ))
+            (( ++expected_total_uploads ))
             if upload_to_pixeldrain "$f" "$part_name"; then
-                (( svc_success++ ))
+                (( ++svc_success ))
             else
                 log_warn "  Pixeldrain: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_pixeldrain "$f" "$part_name"; then
-                    (( svc_success++ ))
+                    (( ++svc_success ))
                 fi
             fi
         else
@@ -1026,14 +1026,14 @@ upload_to_clouds() {
 
         # ── 3. Archive.org (HD) ──
         if [[ "${ARCHIVE_SKIP:-false}" != "true" ]]; then
-            (( expected_total_uploads++ ))
+            (( ++expected_total_uploads ))
             if upload_to_archive "$f" "$part_name"; then
-                (( svc_success++ ))
+                (( ++svc_success ))
             else
                 log_warn "  Archive.org: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_archive "$f" "$part_name"; then
-                    (( svc_success++ ))
+                    (( ++svc_success ))
                 fi
             fi
         else
@@ -1042,14 +1042,14 @@ upload_to_clouds() {
 
         # ── 4. MEGA.nz (HD) ──
         if [[ "${MEGA_SKIP:-false}" != "true" ]] && [[ -n "${MEGA_EMAIL:-}" ]]; then
-            (( expected_total_uploads++ ))
+            (( ++expected_total_uploads ))
             if upload_to_mega "$f" "$part_name"; then
-                (( svc_success++ ))
+                (( ++svc_success ))
             else
                 log_warn "  MEGA.nz: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_mega "$f" "$part_name"; then
-                    (( svc_success++ ))
+                    (( ++svc_success ))
                 fi
             fi
         elif [[ "${MEGA_SKIP:-false}" == "true" ]]; then
@@ -1060,14 +1060,14 @@ upload_to_clouds() {
 
         # ── 5. 0807.st (HD) ──
         if [[ "${ST0807_SKIP:-false}" != "true" ]]; then
-            (( expected_total_uploads++ ))
+            (( ++expected_total_uploads ))
             if upload_to_st0807 "$f" "$part_name"; then
-                (( svc_success++ ))
+                (( ++svc_success ))
             else
                 log_warn "  0807.st: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_st0807 "$f" "$part_name"; then
-                    (( svc_success++ ))
+                    (( ++svc_success ))
                 fi
             fi
         else
@@ -1076,14 +1076,14 @@ upload_to_clouds() {
 
         # ── 6. VikingFile (HD) ──
         if [[ "${VIKINGFILE_SKIP:-false}" != "true" ]]; then
-            (( expected_total_uploads++ ))
+            (( ++expected_total_uploads ))
             if upload_to_vikingfile "$f" "$part_name"; then
-                (( svc_success++ ))
+                (( ++svc_success ))
             else
                 log_warn "  VikingFile: First attempt failed, retrying after 10s..."
                 sleep 10
                 if upload_to_vikingfile "$f" "$part_name"; then
-                    (( svc_success++ ))
+                    (( ++svc_success ))
                 fi
             fi
         else
@@ -1101,7 +1101,7 @@ upload_to_clouds() {
     log_separator
 
     # ── Export results ──
-    local gofile_str="" pixeldrain_str="" archive_str="" mega_str=""
+    local gofile_str="" pixeldrain_str="" archive_str="" mega_str="" st0807_str="" vikingfile_str=""
     if (( ${#GOFILE_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; gofile_str="${GOFILE_LINKS[*]}"; IFS="$_ifs"
     fi
@@ -1114,11 +1114,21 @@ upload_to_clouds() {
     if (( ${#MEGA_LINKS[@]} > 0 )); then
         local _ifs="$IFS"; IFS=';'; mega_str="${MEGA_LINKS[*]}"; IFS="$_ifs"
     fi
+    # These two were referenced by the summary below but never assigned —
+    # under set -u that aborted every successful run at the finish line.
+    if (( ${#ST0807_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; st0807_str="${ST0807_LINKS[*]}"; IFS="$_ifs"
+    fi
+    if (( ${#VIKINGFILE_LINKS[@]} > 0 )); then
+        local _ifs="$IFS"; IFS=';'; vikingfile_str="${VIKINGFILE_LINKS[*]}"; IFS="$_ifs"
+    fi
 
     set_env "GOFILE_LINKS"         "$gofile_str"
     set_env "PIXELDRAIN_LINKS"     "$pixeldrain_str"
     set_env "ARCHIVE_LINKS"        "$archive_str"
     set_env "MEGA_LINKS"           "$mega_str"
+    set_env "ST0807_LINKS"         "$st0807_str"
+    set_env "VIKINGFILE_LINKS"     "$vikingfile_str"
     set_env "UPLOAD_SUCCESS_COUNT" "$UPLOAD_SUCCESS_COUNT"
     set_env "UPLOAD_EXPECTED_COUNT" "$expected_total_uploads"
     set_env "UPLOAD_TOTAL_SERVICES" "$UPLOAD_TOTAL_SERVICES"

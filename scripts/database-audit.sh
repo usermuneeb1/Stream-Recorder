@@ -76,7 +76,7 @@ _audit_recordings() {
                               else . end)' "$file" 2>/dev/null)
                     if echo "$tmp" | jq -e 'type=="array"' >/dev/null 2>&1; then
                         printf '%s' "$tmp" > "$file"
-                        (( swapped++ ))
+                        (( ++swapped ))
                         _report ok "Swapped cross-wired archive_link: ${vid} ↔ ${owner}"
                     fi
                 fi

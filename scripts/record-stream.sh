@@ -930,7 +930,7 @@ record_stream() {
             consecutive_failures=0
             log_ok "Attempt ${attempt} produced a valid recording"
         else
-            (( consecutive_failures++ ))
+            (( ++consecutive_failures ))
             log_warn "Attempt ${attempt} failed to produce a recording (${consecutive_failures} consecutive failure(s))"
             # If we've had 2+ consecutive failures on non-first attempt, stream is likely over
             if (( attempt > 1 && consecutive_failures >= 2 )) && [[ "$ever_succeeded" == "true" ]]; then
@@ -957,7 +957,7 @@ record_stream() {
                 local is_ended="true"
                 while (( wait_iters < 10 )); do
                     sleep 60
-                    (( wait_iters++ ))
+                    (( ++wait_iters ))
                     if is_stream_still_live "$video_id"; then
                         log_warn "Stream came back online during cooldown! Resuming recording loop..."
                         is_ended="false"
@@ -972,7 +972,7 @@ record_stream() {
             
             if is_stream_still_live "$video_id"; then
                 log_info "Stream is still live, recording next segment"
-                (( attempt++ ))
+                (( ++attempt ))
                 continue
             else
                 log_info "Stream has ended, stopping recording loop"
@@ -980,7 +980,7 @@ record_stream() {
             fi
         fi
         
-        (( attempt++ ))
+        (( ++attempt ))
     done
     
     # ── Check Results ────────────────────────────────────────────────────────
@@ -1056,7 +1056,7 @@ record_stream() {
             fi
             log_info "VOD not yet available (HTTP $http_code), waiting 60s more... [$((vod_wait_iters + 1))/${max_vod_wait}]"
             sleep 60
-            (( vod_wait_iters++ ))
+            (( ++vod_wait_iters ))
         done
 
         # VOD clients are DATA: "client-id|display-label" travel together so

@@ -183,10 +183,10 @@ _alert_should_send() {
 
     if (( count < ALERT_MAX_SENDS_PER_DAY )); then
         decision="send"
-        (( count++ ))
+        (( ++count ))
     else
         decision="suppress"
-        (( suppressed++ ))
+        (( ++suppressed ))
         _digest_note="🔇 ${suppressed} repeat alert(s) suppressed in the last 24h (same title)"
     fi
 

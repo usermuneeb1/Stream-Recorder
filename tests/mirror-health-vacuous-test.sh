@@ -131,6 +131,48 @@ DEAD_LINKS=$(jq -r '.summary.dead_links // -1' "$WORKDIR/health.json" 2>/dev/nul
 [[ "$DEGRADED" == "1" ]]    && ok "degraded=1"                              || bad "degraded=$DEGRADED"
 [[ "$DEAD_LINKS" -ge 2 ]]   && ok "dead_links=$DEAD_LINKS (pixeldrain+gofile)" || bad "dead_links=$DEAD_LINKS"
 
+echo "── 3: archive + 0807.st alive, nothing else → healthy (fast bar includes 0807/viking) ──"
+cat > "$WORKDIR/recordings.json" <<'JSON'
+[
+  {
+    "video_id": "st0807only0001",
+    "title": "0807-only Fixture",
+    "archive_link": "https://archive.org/details/fixture-item",
+    "st0807_link": "https://0807.st/FixtureAa1"
+  }
+]
+JSON
+cat > "$STUBBIN/curl" <<'STUB'
+#!/usr/bin/env bash
+OUT=""; WRITE_CODE=""
+args=" $* "
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) OUT="$2"; shift 2;;
+    -w) WRITE_CODE="$2"; shift 2;;
+    *) shift;;
+  esac
+done
+emit() { [[ -n "$OUT" ]] && printf '%s' "$1" > "$OUT" || printf '%s' "$1"; }
+emit_code() { printf '%s' "$1"; }   # -w output: always stdout, even with -o
+case "$args" in
+  *api.gofile.io/contents/*) emit '{"status":"error-notFound"}'; exit 0;;
+  *api.mega.co.nz/cs*|*g.api.mega.co.nz/cs*) emit '-9'; exit 0;;
+  *pixeldrain.com*) [[ -n "$WRITE_CODE" ]] && emit_code '404'; exit 0;;
+  *archive.org*) [[ -n "$WRITE_CODE" ]] && emit_code '200'; exit 0;;
+  *0807.st*|*vikingfile.com*) [[ -n "$WRITE_CODE" ]] && emit_code '200'; exit 0;;
+  *) [[ -n "$WRITE_CODE" ]] && emit_code '404'; exit 0;;
+esac
+STUB
+chmod +x "$STUBBIN/curl"
+: > "$WORKDIR/state"
+RC=0; run_health || RC=$?
+HEALTHY3=$(jq -r '.recordings[0].healthy // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+FASTOK3=$(jq -r '.recordings[0].fast_ok // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+[[ "$RC" -eq 0 ]]            && ok "exit 0 when archive+0807 alive" || bad "exit $RC (0807 not counted as fast!)"
+[[ "$HEALTHY3" == "true" ]]  && ok "recording marked healthy"       || bad "healthy=$HEALTHY3"
+[[ "$FASTOK3" == "true" ]]   && ok "fast_ok includes 0807.st"        || bad "fast_ok=$FASTOK3"
+
 echo ""
 if (( FAILURES > 0 )); then echo "RESULT: RED — $FAILURES case(s) failed"; exit 1; fi
 echo "RESULT: GREEN — mirror-health always enumerates recordings and fails when degraded"; exit 0

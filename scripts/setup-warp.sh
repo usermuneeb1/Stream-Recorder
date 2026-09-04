@@ -58,7 +58,7 @@ setup_warp() {
       if ! curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | \
            sudo gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg 2>/dev/null; then
         log_warn "Attempt ${attempt}: failed to add Cloudflare GPG key"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
         continue
       fi
@@ -75,7 +75,7 @@ setup_warp() {
         sudo apt-get update -qq 2>/dev/null
         if ! sudo apt-get install -y -qq cloudflare-warp 2>/dev/null; then
           log_warn "Attempt ${attempt}: install failed"
-          (( attempt++ ))
+          (( ++attempt ))
           sleep 5
           continue
         fi
@@ -97,7 +97,7 @@ setup_warp() {
     local reg_output
     reg_output=$(warp-cli --accept-tos registration new 2>&1) || {
       log_warn "Attempt ${attempt}: registration failed: ${reg_output}"
-      (( attempt++ ))
+      (( ++attempt ))
       sleep 5
       continue
     }
@@ -116,7 +116,7 @@ setup_warp() {
     if ! warp-cli --accept-tos connect 2>/dev/null; then
       if ! warp-cli connect 2>/dev/null; then
         log_warn "Attempt ${attempt}: connect command failed"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
         continue
       fi
@@ -142,7 +142,7 @@ setup_warp() {
     fi
 
     log_warn "Attempt ${attempt}: did not connect within ${timeout}s"
-    (( attempt++ ))
+    (( ++attempt ))
     sleep 5
   done
 

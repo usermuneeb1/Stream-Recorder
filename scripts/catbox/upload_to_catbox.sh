@@ -50,7 +50,7 @@ upload_to_catbox() {
         fi
 
         echo "  ⚠️ Catbox: Failed (attempt ${attempt}), ${response:0:200}"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
     done
 
@@ -89,7 +89,7 @@ upload_to_litterbox() {
         fi
 
         echo "  ⚠️ Litterbox: Failed (attempt ${attempt}), ${response:0:200}"
-        (( attempt++ ))
+        (( ++attempt ))
         sleep 5
     done
 

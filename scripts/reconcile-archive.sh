@@ -173,14 +173,14 @@ reconcile() {
 
         log_warn "MISSED STREAM FOUND: ${vid} — ${vtitle} (${odate}, ${lstatus})"
         note_missed "$vid" "${vtitle}" "missed"
-        (( missed++ ))
+        (( ++missed ))
 
         if rescue_stream "$vid" "${vtitle}"; then
-            (( rescued++ ))
+            (( ++rescued ))
             note_missed "$vid" "${vtitle}" "rescued"
             log_ok "RESCUED ${vid}"
         else
-            (( failed++ ))
+            (( ++failed ))
             note_missed "$vid" "${vtitle}" "rescue-failed"
             log_error "Rescue failed for ${vid}"
         fi

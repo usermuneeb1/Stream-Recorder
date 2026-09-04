@@ -164,15 +164,18 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
 
     permanent_ok=false; fast_ok=false
     if is_alive "$a" || is_alive "$m"; then permanent_ok=true; fi
-    if is_alive "$p" || is_alive "$g" || is_alive "$gh"; then fast_ok=true; fi
+    # FAST = Pixeldrain, Gofile, GitHub release, 0807.st, VikingFile (see the
+    # bar comment above): omitting $s/$v marked 0807-only recordings degraded
+    # and triggered needless repair storms.
+    if is_alive "$p" || is_alive "$g" || is_alive "$gh" || is_alive "$s" || is_alive "$v"; then fast_ok=true; fi
 
     alive=0; dead=0; unverifiable=0
     for st in "$a" "$g" "$p" "$m" "$gh" "$s" "$v"; do
         [[ "$st" == "null" ]] && continue
         case "$st" in
-            alive) ((alive++)) ;;
-            dead) ((dead++)) ;;
-            *) ((unverifiable++)) ;;
+            alive) ((++alive)) ;;
+            dead) ((++dead)) ;;
+            *) ((++unverifiable)) ;;
         esac
     done
 
