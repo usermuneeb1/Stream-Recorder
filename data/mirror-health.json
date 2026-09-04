@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-09-04T11:18:34Z",
+  "updated_at": "2026-09-04T16:24:48Z",
   "summary": {
     "total": 12,
     "healthy": 12,
@@ -24,7 +24,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -43,7 +46,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -62,7 +68,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": "alive",
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -81,7 +90,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -100,7 +112,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -119,7 +134,10 @@
         "mega": "alive",
         "github": "dead",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "alive",
+        "archive_direct": "alive"
       }
     },
     {
@@ -138,7 +156,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -157,7 +178,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -176,7 +200,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -195,7 +222,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     },
     {
@@ -214,7 +244,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": "alive",
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "alive",
+        "archive_direct": "alive"
       }
     },
     {
@@ -233,7 +266,10 @@
         "mega": "alive",
         "github": "alive",
         "st0807": null,
-        "vikingfile": "unverifiable"
+        "vikingfile": "unverifiable",
+        "telegram": "alive",
+        "youtube": "dead",
+        "archive_direct": "alive"
       }
     }
   ]
