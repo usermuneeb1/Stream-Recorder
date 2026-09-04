@@ -76,9 +76,12 @@ export interface Ep extends Recording {
   viewCount?: number;     // YouTube views (feed videos)
   topics?: string[];      // free-form tags (series / subject / format)
   deadMirrors?: string[]; // mirror types flagged dead by the latest health sweep
-                          // ('archive'|'gofile'|'pixeldrain'|'mega'|'github'|'st0807'|'vikingfile') — the
-                          // repair workflow replaces them automatically; the UI
-                          // demotes/labels them until fresh links land.
+                          // (repairable: 'archive'|'gofile'|'pixeldrain'|'mega'|
+                          // 'github'|'st0807'|'vikingfile'; demotion-only:
+                          // 'telegram'|'youtube'|'archive_direct') — the repair
+                          // workflow replaces repairable ones automatically;
+                          // the UI demotes/labels all of them until fresh
+                          // links land.
 }
 
 export interface SystemStatus {

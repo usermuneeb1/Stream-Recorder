@@ -44,7 +44,7 @@ interface Mirror {
   note: string;
   url: string;
   kind: 'youtube' | 'mp4';
-  type?: 'archive' | 'pixeldrain' | 'github' | 'telegram' | 'youtube' | 'st0807' | 'vikingfile';
+  type?: 'archive' | 'archive_direct' | 'pixeldrain' | 'github' | 'telegram' | 'youtube' | 'st0807' | 'vikingfile';
 }
 
 declare global { interface Window { __mlaContinueResume?: string } }
@@ -63,13 +63,15 @@ function ytIdOf(rec: Ep): string {
 function buildMirrors(rec: Ep): Mirror[] {
   const ytId = ytIdOf(rec);
   const out: Mirror[] = [];
-  // CDN-first Auto order (2026-09-02): 0807.st serves direct MP4s and fronts
-  // playback as the archive's CDN (its ~30-day idle deletion is covered by the
-  // 5-day keep-alive ping); VikingFile direct follows; then Pixeldrain.
+  // CDN-first Auto order (2026-09-02, VKNG removed 2026-09-04): 0807.st
+  // serves direct MP4s and fronts playback as the archive's CDN (its ~30-day
+  // idle deletion is covered by the 5-day keep-alive ping); then Pixeldrain.
   // Permanent mirrors (Archive/GitHub) trail as expiry-proof fallbacks,
   // YouTube ghost last.
+  // NOTE: VikingFile is intentionally NOT in the cascade — its links are
+  // share pages (200 text/html), unplayable in <video> (proven 2026-09-04).
+  // It stays in THE VAULT below as a download link.
   if (rec.st0807Link) out.push({ label: '0807', note: '0807.st CDN', url: rec.st0807Link, kind: 'mp4', type: 'st0807' });
-  if (rec.vikingfileLink) out.push({ label: 'VKNG', note: 'VikingFile direct', url: rec.vikingfileLink, kind: 'mp4', type: 'vikingfile' });
   // Pixeldrain direct stream — derivable from the u/<id> page link; a real
   // CDN playback source (present for every recording) that never depends on
   // the guessed archive filename or the Telegram worker.
@@ -80,7 +82,9 @@ function buildMirrors(rec: Ep): Mirror[] {
   if (gh) out.push({ label: 'B3ING', note: 'GitHub release', url: gh, kind: 'mp4', type: 'github' });
   if (rec.cfStream) out.push({ label: 'STORM', note: 'Telegram stream', url: rec.cfStream, kind: 'mp4', type: 'telegram' });
   if (rec.archiveDirect && rec.archiveDirect !== rec.archiveNode) {
-    out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4', type: 'archive' });
+    // Own sweep flag (archive_direct): R3AL and BUNNY are different URLs
+    // with independent fates — one shared flag demoted both together.
+    out.push({ label: 'BUNNY', note: 'Archive.org direct', url: rec.archiveDirect, kind: 'mp4', type: 'archive_direct' });
   }
   if (ytId) {
     out.push({
@@ -407,7 +411,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable) return;
 
-      if (/^[0-8]$/.test(e.key)) {
+      if (/^[0-7]$/.test(e.key)) {
         const i = parseInt(e.key);
         if (i <= mirrors.length) { selectMirror(i); toast(i === 0 ? 'Mirror: Auto' : `Mirror: ${mirrors[i - 1]?.label}`); }
       } else if (e.key === 't' || e.key === 'T') {
@@ -778,7 +782,7 @@ export default function WatchPage({ rec, recs, onClose, onOpen, toast }: Props) 
                   </div>
                   <div className="flex-1" />
                   <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>
-                    mirrors <span className="kbd">0</span>–<span className="kbd">{Math.min(8, mirrors.length)}</span> · theatre <span className="kbd">T</span>
+                    mirrors <span className="kbd">0</span>–<span className="kbd">{Math.min(7, mirrors.length)}</span> · theatre <span className="kbd">T</span>
                   </span>
                 </div>
 

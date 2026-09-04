@@ -15,8 +15,18 @@ interface HistItem { id: string; at: number }
 function read<T>(k: string, dflt: T): T {
   try { return JSON.parse(localStorage.getItem(k) || '') as T; } catch { return dflt; }
 }
+/** localStorage access itself throws when storage is blocked (private-mode
+ *  iframes) — never call getItem outside try. */
+function get(k: string): string | null {
+  try { return localStorage.getItem(k); } catch { return null; }
+}
 function write(k: string, v: unknown) {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota */ }
+}
+/** Poisoned values (e.g. {"x":1} from another version) must not crash callers. */
+function readArr<T>(k: string): T[] {
+  const v = read<T[]>(k, []);
+  return Array.isArray(v) ? v : [];
 }
 
 /* ── Continue-watching positions ─────────────────────────────────────── */
@@ -48,17 +58,17 @@ export function clearPosition(id: string) {
 
 export function pushHistory(id: string) {
   if (!id) return;
-  let list = read<HistItem[]>(HIST_KEY, []).filter(x => x.id !== id);
+  const list = readArr<HistItem>(HIST_KEY).filter(x => x && x.id !== id);
   list.unshift({ id, at: Date.now() });
   write(HIST_KEY, list.slice(0, 20));
 }
 
 export function removeFromHistory(id: string) {
-  write(HIST_KEY, read<HistItem[]>(HIST_KEY, []).filter(x => x.id !== id));
+  write(HIST_KEY, readArr<HistItem>(HIST_KEY).filter(x => x && x.id !== id));
 }
 
 export function getHistory(): string[] {
-  return read<HistItem[]>(HIST_KEY, []).map(x => x.id);
+  return readArr<HistItem>(HIST_KEY).map(x => x.id);
 }
 
 /* ── My List ─────────────────────────────────────────────────────────── */
@@ -83,18 +93,18 @@ export function toggleList(id: string): boolean {
 
 /* ── Prefs ───────────────────────────────────────────────────────────── */
 
-export function getNick(): string { return localStorage.getItem(NICK_KEY) || ''; }
+export function getNick(): string { return get(NICK_KEY) || ''; }
 export function setNick(n: string) {
   try { localStorage.setItem(NICK_KEY, n); } catch { /* ignore */ }
 }
 
-export function getTheatre(): boolean { return localStorage.getItem(THEATRE_KEY) === '1'; }
+export function getTheatre(): boolean { return get(THEATRE_KEY) === '1'; }
 export function setTheatre(on: boolean) {
   try { localStorage.setItem(THEATRE_KEY, on ? '1' : '0'); } catch { /* ignore */ }
 }
 
 export function getRate(): number {
-  const r = parseFloat(localStorage.getItem(RATE_KEY) || '');
+  const r = parseFloat(get(RATE_KEY) || '');
   return Number.isFinite(r) && r >= 0.25 && r <= 4 ? r : 1;
 }
 export function setRate(r: number) {

@@ -1,5 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { parseChapters, buildStoryboardVtt, fmtVtt } from './[id].js';
+import { parseChapters, buildStoryboardVtt, fmtVtt, normalizeMeta } from './[id].js';
+
+describe('ytmeta normalizeMeta', () => {
+  it('normalizes Invidious payloads (storyboards kept)', () => {
+    const n = normalizeMeta('invidious', {
+      description: 'hello', lengthSeconds: 300, storyboards: [{ url: 'x' }],
+    });
+    expect(n).toEqual({ description: 'hello', duration: 300, storyboards: [{ url: 'x' }] });
+  });
+
+  it('normalizes Piped payloads (description only, no storyboards)', () => {
+    const n = normalizeMeta('piped', { title: 't', description: 'd', duration: 123 });
+    expect(n).toEqual({ description: 'd', duration: 123, storyboards: [] });
+  });
+
+  it('coerces garbage to empty', () => {
+    expect(normalizeMeta('piped', {})).toEqual({ description: '', duration: 0, storyboards: [] });
+    expect(normalizeMeta('invidious', null)).toEqual({ description: '', duration: 0, storyboards: [] });
+  });
+});
 
 describe('ytmeta parseChapters', () => {
   it('parses description timestamp lines into chapters', () => {

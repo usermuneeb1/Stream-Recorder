@@ -7,7 +7,8 @@
  * chapters and no seek-preview thumbnails on the YouTube copy.
  *
  * This endpoint reads both from YouTube's own data via Invidious
- * (verified against https://docs.invidious.io/api/):
+ * (verified against https://docs.invidious.io/api/), with Piped as a
+ * description-only fallback when every Invidious instance is down:
  *   GET /api/ytmeta/<id>            → JSON { videoId, duration, chapters[], hasStoryboard }
  *   GET /api/ytmeta/<id>?format=vtt → text/vtt storyboard (same shape the
  *                                     Vidstack `thumbnails` prop already
@@ -36,6 +37,16 @@ const INVIDIOUS = [
   'https://invidious.lunar.icu',
 ];
 
+// Piped has no storyboard spec, but its description field feeds the same
+// chapter parser — a second source when every Invidious instance is down
+// (all six were unreachable at once on 2026-09-04).
+const PIPED = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.leptons.xyz',
+  'https://api.piped.private.coffee',
+];
+
 const ID_RE = /^[\w-]{11}$/;
 const MAX_CUES = 1500;
 
@@ -47,17 +58,49 @@ function cors(extra = {}) {
   };
 }
 
-async function fetchMeta(id, signal) {
-  const probes = INVIDIOUS.map(async (inst) => {
-    const r = await fetch(`${inst}/api/v1/videos/${id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 ytmeta/1' },
-      signal,
-    });
-    if (!r.ok) throw new Error('not ok');
-    const j = await r.json();
-    if (!j || typeof j !== 'object' || j.error || j.videoId !== id) throw new Error('bad payload');
-    return j;
+async function fetchJson(url, signal) {
+  const r = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 ytmeta/1' },
+    signal,
   });
+  if (!r.ok) throw new Error('not ok');
+  const j = await r.json();
+  if (!j || typeof j !== 'object' || j.error) throw new Error('bad payload');
+  return j;
+}
+
+/** Normalize either source to { description, duration, storyboards }. */
+export function normalizeMeta(kind, j) {
+  const p = (j && typeof j === 'object') ? j : {};
+  if (kind === 'piped') {
+    return {
+      description: typeof p.description === 'string' ? p.description : '',
+      duration: Number(p.duration) || 0,
+      storyboards: [],
+    };
+  }
+  return {
+    description: typeof p.description === 'string' ? p.description : '',
+    duration: Number(p.lengthSeconds) || 0,
+    storyboards: Array.isArray(p.storyboards) ? p.storyboards : [],
+  };
+}
+
+async function fetchMeta(id, signal) {
+  // First success of either kind wins (availability first): storyboard
+  // previews only exist on Invidious payloads; chapters work from both.
+  const probes = [
+    ...INVIDIOUS.map((inst) => fetchJson(`${inst}/api/v1/videos/${id}`, signal)
+      .then((j) => {
+        if (j.videoId !== id) throw new Error('id mismatch');
+        return { kind: 'invidious', j };
+      })),
+    ...PIPED.map((inst) => fetchJson(`${inst}/streams/${id}`, signal)
+      .then((j) => {
+        if (typeof j.description !== 'string' || typeof j.title !== 'string') throw new Error('not a stream payload');
+        return { kind: 'piped', j };
+      })),
+  ];
   return Promise.any(probes);
 }
 
@@ -170,7 +213,8 @@ export default async function handler(request) {
 
   let meta = null;
   try {
-    meta = await fetchMeta(id, signal);
+    const hit = await fetchMeta(id, signal);
+    meta = normalizeMeta(hit.kind, hit.j);
   } catch { /* all instances failed — graceful empty below */ }
   ctrl.abort();
 
@@ -181,7 +225,7 @@ export default async function handler(request) {
     });
   }
 
-  const duration = Number(meta.lengthSeconds) || 0;
+  const duration = meta.duration;
   if (wantVtt) {
     const vtt = buildStoryboardVtt(meta.storyboards, duration);
     if (!vtt) {

@@ -13,8 +13,10 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
    links.txt — that’s the legacy Discord-facing feed). State files also live in
    `data/` (mirror-health, source-health, system-status, backups/).
 3. **Dashboard** — `dashboard/` React 19 + Vite + TS + Vidstack. Playback cascade
-   order (Auto): 0807 → VKNG → N3ON(pixeldrain) → R3AL(archive node) →
+   order (Auto): 0807 → N3ON(pixeldrain) → R3AL(archive node) →
    B3ING(github) → STORM(telegram) → BUNNY(archive direct) → GHOST(youtube).
+   VikingFile is download-only (its links are share pages, unplayable in
+   `<video>` — proven 2026-09-04), so it sits in THE VAULT, never in Auto.
    Health sweep sinks dead mirrors to the bottom via `deadMirrors`.
 
 ## Hard-won invariants (do not break)

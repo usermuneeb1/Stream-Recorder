@@ -137,7 +137,9 @@ log_info "Checking $(jq length "$RECORDINGS_JSON" 2>/dev/null || echo '?') recor
 # ── build health JSON ───────────────────────────────────────────────────────
 # COPY GUARANTEE (the settled bar):
 #   every recording needs ≥1 PERMANENT mirror alive (Archive.org or MEGA)
-#   AND ≥1 FAST mirror alive (Pixeldrain, Gofile, GitHub release, 0807.st, VikingFile).
+#   AND ≥1 PLAYABLE FAST mirror alive (Pixeldrain, Gofile, GitHub release,
+#   0807.st). VikingFile is presence-checked but never fast: its links are
+#   share pages, unplayable in <video>.
 # Gofile is disposable by policy — it can satisfy "fast" but nothing else.
 TMP_JSON="$(mktemp)"
 jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
@@ -150,8 +152,19 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     ghrel=$(echo "$rec" | jq -r '.github_release // .github_direct // empty')
     st0807=$(echo "$rec" | jq -r '.st0807_link // empty')
     viking=$(echo "$rec" | jq -r '.vikingfile_link // empty')
+    telegram=$(echo "$rec" | jq -r '.cf_stream // empty')
+    archdir=$(echo "$rec" | jq -r '.archive_direct // empty')
+    # YouTube id for the GHOST copy: original stream URL first, 11-char
+    # video_id as fallback. (|| true: no match just means "no id", and a
+    # failing grep inside $() would abort CI's -eo pipefail shell.)
+    ytid=$(echo "$rec" | jq -r '.video_url // empty' | grep -oE '(v=|/)[A-Za-z0-9_-]{11}' | tail -1 | grep -oE '[A-Za-z0-9_-]{11}$' || true)
+    if [[ -z "$ytid" ]]; then
+        ytid=$(echo "$rec" | jq -r '.video_id // empty')
+        [[ "$ytid" =~ ^[A-Za-z0-9_-]{11}$ ]] || ytid=""
+    fi
 
     a="null"; g="null"; p="null"; m="null"; gh="null"; s="null"; v="null"
+    t="null"; y="null"; ad="null"
     if [[ -n "$archive" ]]; then a=$(classify "$archive"); fi
     if [[ -n "$gofile" ]]; then g=$(classify_gofile "$gofile"); fi
     if [[ -n "$pixel" ]]; then p=$(classify "$pixel"); fi
@@ -159,17 +172,30 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
     if [[ -n "$ghrel" ]]; then gh=$(classify_gh "$ghrel"); fi
     if [[ -n "$st0807" ]]; then s=$(classify_st0807 "$st0807"); fi
     if [[ -n "$viking" ]]; then v=$(classify_vikingfile "$viking"); fi
+    # Demotion-only signals (see the repair-gate contract below): the
+    # Telegram worker URL, the YouTube thumbnail (404s for private/deleted
+    # VODs), and the direct archive MP4 (R3AL and BUNNY must not share one
+    # flag — they are different URLs with independent fates).
+    if [[ -n "$telegram" ]]; then t=$(classify "$telegram"); fi
+    if [[ -n "$archdir" ]]; then ad=$(classify "$archdir"); fi
+    if [[ -n "$ytid" ]]; then y=$(classify "https://i.ytimg.com/vi/${ytid}/default.jpg"); fi
 
     is_alive() { [[ "$1" == "alive" ]] && return 0 || return 1; }
 
     permanent_ok=false; fast_ok=false
     if is_alive "$a" || is_alive "$m"; then permanent_ok=true; fi
-    # FAST = Pixeldrain, Gofile, GitHub release, 0807.st, VikingFile (see the
-    # bar comment above): omitting $s/$v marked 0807-only recordings degraded
-    # and triggered needless repair storms.
-    if is_alive "$p" || is_alive "$g" || is_alive "$gh" || is_alive "$s" || is_alive "$v"; then fast_ok=true; fi
+    # FAST = PLAYABLE fast mirrors: Pixeldrain, Gofile, GitHub release,
+    # 0807.st. VikingFile is deliberately excluded — its links are share
+    # pages (200 text/html), unplayable in <video> (proven 2026-09-04), so a
+    # Viking-only recording must NOT read as healthy.
+    if is_alive "$p" || is_alive "$g" || is_alive "$gh" || is_alive "$s"; then fast_ok=true; fi
 
     alive=0; dead=0; unverifiable=0
+    # Repair-gate contract: only mirrors repair-mirrors can re-upload count
+    # toward dead/dead_links (they dispatch repair). telegram/youtube/
+    # archive_direct are DEMOTION-only: read from mirrors{} by the dashboard
+    # to sink dead player copies. A privated VOD must sink GHOST without
+    # paging for a repair run that cannot fix YouTube.
     for st in "$a" "$g" "$p" "$m" "$gh" "$s" "$v"; do
         [[ "$st" == "null" ]] && continue
         case "$st" in
@@ -203,7 +229,10 @@ jq -c '.[]' "$RECORDINGS_JSON" | while IFS= read -r rec; do
         --argjson github "$(jv "$ghrel" "$gh")" \
         --argjson st0807 "$(jv "$st0807" "$s")" \
         --argjson vikingfile "$(jv "$viking" "$v")" \
-        '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, permanent_ok:$permanent_ok, fast_ok:$fast_ok, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega, github:$github, st0807:$st0807, vikingfile:$vikingfile}}'
+        --argjson telegram "$(jv "$telegram" "$t")" \
+        --argjson youtube "$(jv "$ytid" "$y")" \
+        --argjson archive_direct "$(jv "$archdir" "$ad")" \
+        '{video_id:$id, title:$title, alive:$alive, dead:$dead, unverifiable:$unverifiable, healthy:$healthy, permanent_ok:$permanent_ok, fast_ok:$fast_ok, mirrors:{archive:$archive, gofile:$gofile, pixeldrain:$pixeldrain, mega:$mega, github:$github, st0807:$st0807, vikingfile:$vikingfile, telegram:$telegram, youtube:$youtube, archive_direct:$archive_direct}}'
 done > "$TMP_JSON"
 
 # ── vacuous-output guard (2026-09-02: emitter broke silently, wrote total:0, ──
@@ -216,9 +245,12 @@ if [[ "$EXPECTED_TOTAL" == "?" ]] || (( TOTAL != EXPECTED_TOTAL )); then
 fi
 
 # ── aggregate ───────────────────────────────────────────────────────────────
+# dead_links drives repair dispatch: only repairable mirrors count here.
+# telegram/youtube/archive_direct are demotion-only (dashboard reads them
+# from mirrors{}); including them would page for unfixable "repairs".
 HEALTHY=$(jq -s '[.[] | select(.healthy==true)] | length' "$TMP_JSON")
 DEAD_RECS=$(jq -s '[.[] | select(.healthy==false)] | length' "$TMP_JSON")
-DEAD_LINKS=$(jq -s '[.[] | .mirrors | to_entries[] | select(.value=="dead")] | length' "$TMP_JSON")
+DEAD_LINKS=$(jq -s '[.[] | .mirrors | to_entries[] | select(.key != "telegram" and .key != "youtube" and .key != "archive_direct") | select(.value=="dead")] | length' "$TMP_JSON")
 UNVER=$(jq -s '[.[] | .mirrors | to_entries[] | select(.value=="unverifiable")] | length' "$TMP_JSON")
 
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)

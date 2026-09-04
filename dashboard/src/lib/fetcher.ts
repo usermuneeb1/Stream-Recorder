@@ -265,10 +265,13 @@ export async function fetchPrediction(): Promise<StreamPrediction | null> {
 /** Mirror liveness from the latest automated health sweep
  *  (data/mirror-health.json, refreshed every few hours by CI).
  *  Returns videoId → array of dead mirror types
- *  ('archive'|'gofile'|'pixeldrain'|'mega'|'github'|'st0807'|'vikingfile'). The repair workflow
- *  re-uploads dead mirrors from Archive.org and rewrites recordings.json,
- *  so a dead entry here means "link currently being replaced" — the UI
- *  demotes it so visitors only ever click working links. */
+ *  ('archive'|'gofile'|'pixeldrain'|'mega'|'github'|'st0807'|'vikingfile'
+ *  repairable mirrors, plus demotion-only 'telegram'|'youtube'|
+ *  'archive_direct' which the UI sinks but repair cannot fix). The repair
+ *  workflow re-uploads dead mirrors from Archive.org and rewrites
+ *  recordings.json, so a dead repairable entry here means "link currently
+ *  being replaced" — the UI demotes it so visitors only ever click
+ *  working links. */
 export async function fetchMirrorHealth(): Promise<Record<string, string[]>> {
   const j = await fetchFirstJson<any>('data/mirror-health.json');
   if (!j || !Array.isArray(j?.recordings)) return {};

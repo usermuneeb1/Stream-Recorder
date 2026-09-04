@@ -167,11 +167,101 @@ STUB
 chmod +x "$STUBBIN/curl"
 : > "$WORKDIR/state"
 RC=0; run_health || RC=$?
-HEALTHY3=$(jq -r '.recordings[0].healthy // "missing"' "$WORKDIR/health.json" 2>/dev/null)
-FASTOK3=$(jq -r '.recordings[0].fast_ok // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+# NOTE: never use `// "missing"` on booleans — jq's // treats false like
+# null, so healthy=false misreads as "missing". tostring keeps all states.
+HEALTHY3=$(jq -r '.recordings[0].healthy | tostring' "$WORKDIR/health.json" 2>/dev/null)
+FASTOK3=$(jq -r '.recordings[0].fast_ok | tostring' "$WORKDIR/health.json" 2>/dev/null)
 [[ "$RC" -eq 0 ]]            && ok "exit 0 when archive+0807 alive" || bad "exit $RC (0807 not counted as fast!)"
 [[ "$HEALTHY3" == "true" ]]  && ok "recording marked healthy"       || bad "healthy=$HEALTHY3"
 [[ "$FASTOK3" == "true" ]]   && ok "fast_ok includes 0807.st"        || bad "fast_ok=$FASTOK3"
+
+echo "── 4: archive + vikingfile alive, nothing else → DEGRADED (viking is a share page, not playable) ──"
+cat > "$WORKDIR/recordings.json" <<'JSON'
+[
+  {
+    "video_id": "vikingonly0001",
+    "title": "Viking-only Fixture",
+    "archive_link": "https://archive.org/details/fixture-item",
+    "vikingfile_link": "https://vikingfile.com/f/FixtureCc3"
+  }
+]
+JSON
+cat > "$STUBBIN/curl" <<'STUB'
+#!/usr/bin/env bash
+OUT=""; WRITE_CODE=""
+args=" $* "
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) OUT="$2"; shift 2;;
+    -w) WRITE_CODE="$2"; shift 2;;
+    *) shift;;
+  esac
+done
+emit() { [[ -n "$OUT" ]] && printf '%s' "$1" > "$OUT" || printf '%s' "$1"; }
+emit_code() { printf '%s' "$1"; }   # -w output: always stdout, even with -o
+case "$args" in
+  *vikingfile.com/api/check-file*) emit '{"exist":true}'; exit 0;;
+  *archive.org*) [[ -n "$WRITE_CODE" ]] && emit_code '200'; exit 0;;
+  *) [[ -n "$WRITE_CODE" ]] && emit_code '404'; exit 0;;
+esac
+STUB
+chmod +x "$STUBBIN/curl"
+: > "$WORKDIR/state"
+RC=0; run_health || RC=$?
+HEALTHY4=$(jq -r '.recordings[0].healthy | tostring' "$WORKDIR/health.json" 2>/dev/null)
+VALIVE4=$(jq -r '.recordings[0].mirrors.vikingfile // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+[[ "$RC" -ne 0 ]]            && ok "non-zero exit (no playable fast mirror)" || bad "exit $RC (viking counted as fast!)"
+[[ "$HEALTHY4" == "false" ]] && ok "recording marked degraded"               || bad "healthy=$HEALTHY4"
+[[ "$VALIVE4" == "alive" ]]  && ok "viking presence still reported alive"    || bad "vikingfile=$VALIVE4"
+
+echo "── 5: demotion-only keys (telegram/youtube/archive_direct dead) sink the player copies but never dispatch repair ──"
+cat > "$WORKDIR/recordings.json" <<'JSON'
+[
+  {
+    "video_id": "demote00000001",
+    "title": "Demotion Fixture",
+    "video_url": "https://www.youtube.com/watch?v=ABCDEFGHIJK",
+    "archive_link": "https://archive.org/details/fixture-item",
+    "archive_direct": "https://archive.org/download/fixture-item/guess.mp4",
+    "pixeldrain_link": "https://pixeldrain.com/u/FixtureBb2",
+    "cf_stream": "https://cfstream.example.net/v/xyz"
+  }
+]
+JSON
+cat > "$STUBBIN/curl" <<'STUB'
+#!/usr/bin/env bash
+OUT=""; WRITE_CODE=""
+args=" $* "
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) OUT="$2"; shift 2;;
+    -w) WRITE_CODE="$2"; shift 2;;
+    *) shift;;
+  esac
+done
+emit() { [[ -n "$OUT" ]] && printf '%s' "$1" > "$OUT" || printf '%s' "$1"; }
+emit_code() { printf '%s' "$1"; }   # -w output: always stdout, even with -o
+case "$args" in
+  *archive.org/download/*) [[ -n "$WRITE_CODE" ]] && emit_code '404'; exit 0;;
+  *archive.org*|*pixeldrain.com*) [[ -n "$WRITE_CODE" ]] && emit_code '200'; exit 0;;
+  *i.ytimg.com*|*cfstream.example*) [[ -n "$WRITE_CODE" ]] && emit_code '404'; exit 0;;
+  *) [[ -n "$WRITE_CODE" ]] && emit_code '404'; exit 0;;
+esac
+STUB
+chmod +x "$STUBBIN/curl"
+: > "$WORKDIR/state"
+RC=0; run_health || RC=$?
+DEGRADED5=$(jq -r '.summary.degraded // -1' "$WORKDIR/health.json" 2>/dev/null)
+DEAD5=$(jq -r '.summary.dead_links // -1' "$WORKDIR/health.json" 2>/dev/null)
+T5=$(jq -r '.recordings[0].mirrors.telegram // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+Y5=$(jq -r '.recordings[0].mirrors.youtube // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+AD5=$(jq -r '.recordings[0].mirrors.archive_direct // "missing"' "$WORKDIR/health.json" 2>/dev/null)
+[[ "$RC" -eq 0 ]]         && ok "exit 0 (playable bar intact)"              || bad "exit $RC"
+[[ "$DEGRADED5" == "0" ]] && ok "degraded=0 (no repair dispatched)"         || bad "degraded=$DEGRADED5"
+[[ "$DEAD5" == "0" ]]     && ok "dead_links=0 (demotion keys excluded)"     || bad "dead_links=$DEAD5"
+[[ "$T5" == "dead" ]]     && ok "telegram demoted (STORM sinks)"            || bad "telegram=$T5"
+[[ "$Y5" == "dead" ]]     && ok "youtube demoted (GHOST sinks)"             || bad "youtube=$Y5"
+[[ "$AD5" == "dead" ]]    && ok "archive_direct demoted (BUNNY sinks)"      || bad "archive_direct=$AD5"
 
 echo ""
 if (( FAILURES > 0 )); then echo "RESULT: RED — $FAILURES case(s) failed"; exit 1; fi
