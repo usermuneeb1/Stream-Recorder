@@ -1,21 +1,32 @@
-========================================
-Date:     2026-09-13 06:35:33 AM PKT
-Title:    Non-Muslims Question Islam Live! Muhammed Ali 2026-09-13
-Channel:  The Muslim Lantern
-File:     Non-Muslims Question Islam Live Muhammed Ali 2026-09-13 (1 part(s))
-URL:      https://www.youtube.com/watch?v=YsaWlm-YVxY
-Duration: 04:36:55
-Size:     969.64 MB (.94 GB)
-Uploads:  5/6
-Thumbnail: https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-YVxY.jpg
---- Links ---
-[gofile:HD] https://gofile.io/d/7G5yB2LI
-[mega:HD] https://mega.nz/#!tjMVVbRQ!PTYFL2umts2FeXaCg9Mn5XaZNI37gPuxjFWtHtIcpfU (PERMANENT)
-[pixeldrain:HD] https://pixeldrain.com/u/w6ak7tz2
-[archive:HD] https://archive.org/details/tml-2026-09-YsaWlm-YVxY-1789263149 (PERMANENT)
-[vikingfile:HD] https://vikingfile.com/f/o7G22XwHYr
-========================================
 [
+  {
+    "video_id": "YsaWlm-YVxY",
+    "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-13",
+    "channel": "The Muslim Lantern",
+    "video_url": "https://www.youtube.com/watch?v=YsaWlm-YVxY",
+    "thumbnail": "https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-YVxY.jpg",
+    "thumbnail_mega": "",
+    "duration_sec": 16615,
+    "duration_fmt": "04:36:55",
+    "size_bytes": 1016747961,
+    "size_human": "969.64 MB",
+    "size_gb": 0.94,
+    "resolution": "1920x1080",
+    "date": "2026-09-13",
+    "month": "2026-09",
+    "gofile_link": "https://gofile.io/d/7G5yB2LI",
+    "pixeldrain_link": "https://pixeldrain.com/u/w6ak7tz2",
+    "archive_link": "https://archive.org/details/tml-2026-09-YsaWlm-YVxY-1789263149",
+    "mega_link": "https://mega.nz/#!tjMVVbRQ!PTYFL2umts2FeXaCg9Mn5XaZNI37gPuxjFWtHtIcpfU",
+    "st0807_link": "",
+    "vikingfile_link": "https://vikingfile.com/f/dHQFQleAnd [EXPIRED]",
+    "chat_url": "",
+    "recorded_at": "2026-09-13T01:35:32.000Z",
+    "telegram_link": "https://t.me/c/4304551882/24",
+    "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAxhqpg5Lka5iRPcxaA7m5dWk0rVVIwACPSAAAlZoMVHsR6xYAQcDgR4E",
+    "cf_stream": "https://tg-stream.isthatdxture.workers.dev/?file_id=BQACAgQAAyEGAAMBAAGSP8oAAxhqpg5Lka5iRPcxaA7m5dWk0rVVIwACPSAAAlZoMVHsR6xYAQcDgR4E",
+    "mirrors_repaired_at": "2026-09-15T13:49:16.000Z"
+  },
   {
     "video_id": "y84vFOO8onU",
     "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-15",
@@ -43,10 +54,10 @@ Thumbnail: https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-Y
     "archive_direct": "https://archive.org/download/tml-2026-08-y84vFOO8onU-1786743675/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-15.mp4",
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-08-y84vFOO8onU-1786743675/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-15.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-08-y84vFOO8onU-1786743675/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-15.mp4",
-    "mirrors_repaired_at": "2026-09-10T13:04:24.000Z",
+    "mirrors_repaired_at": "2026-09-15T13:50:15.000Z",
     "archive_node": "https://ia800408.us.archive.org/1/items/tml-2026-08-y84vFOO8onU-1786743675/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-15.mp4",
     "st0807_link": "",
-    "vikingfile_link": "https://vikingfile.com/f/A7ERcNJK9T [EXPIRED]"
+    "vikingfile_link": "https://vikingfile.com/f/XBN7fshR88 [EXPIRED]"
   },
   {
     "video_id": "ASWJmIsyd9s",
@@ -69,7 +80,7 @@ Thumbnail: https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-Y
     "mega_link": "https://mega.nz/#!rxJxnQKY!yPq1kk-FujCyV0iQjLVCHeeYONsTC_GuSkvEoW3qb34",
     "chat_url": "",
     "recorded_at": "2026-08-12T23:49:34.000Z",
-    "mirrors_repaired_at": "2026-09-10T13:05:18.000Z",
+    "mirrors_repaired_at": "2026-09-15T13:51:26.000Z",
     "telegram_link": "https://t.me/c/4304551882/18",
     "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAxJqhZ4yt6_G0AjIp5wzsnURu77KkQACbCIAAjh1MVAnMNy_gcjGWh4E",
     "cf_stream": "https://tg-stream.isthatdxture.workers.dev/?file_id=BQACAgQAAyEGAAMBAAGSP8oAAxJqhZ4yt6_G0AjIp5wzsnURu77KkQACbCIAAjh1MVAnMNy_gcjGWh4E",
@@ -78,7 +89,7 @@ Thumbnail: https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-Y
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-08-ASWJmIsyd9s-1786578401/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
     "archive_node": "https://ia800505.us.archive.org/9/items/tml-2026-08-ASWJmIsyd9s-1786578401/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
     "st0807_link": "",
-    "vikingfile_link": "https://vikingfile.com/f/n5dGeMIpeJ [EXPIRED]"
+    "vikingfile_link": "https://vikingfile.com/f/1qfHr2UAsW [EXPIRED]"
   },
   {
     "video_id": "lZwdaI5i9MA",
@@ -107,10 +118,10 @@ Thumbnail: https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-Y
     "archive_direct": "https://archive.org/download/tml-2026-08-lZwdaI5i9MA-1786568243/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
     "github_release": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-08-lZwdaI5i9MA-1786568243/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
     "github_direct": "https://github.com/usermuneeb1/Stream-Recorder/releases/download/v-tml-2026-08-lZwdaI5i9MA-1786568243/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
-    "mirrors_repaired_at": "2026-09-10T13:05:26.000Z",
+    "mirrors_repaired_at": "2026-09-12T12:20:40.000Z",
     "archive_node": "https://ia801500.us.archive.org/19/items/tml-2026-08-lZwdaI5i9MA-1786568243/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
     "st0807_link": "https://0807.st/vHrRrhl.mp4",
-    "vikingfile_link": "https://vikingfile.com/f/hmNNvWSZtW [EXPIRED]"
+    "vikingfile_link": "https://vikingfile.com/f/FS01DfvBrm [EXPIRED]"
   },
   {
     "video_id": "6AlPqgkHC-Q",
