@@ -1,24 +1,24 @@
 {
-  "updated_at": "2026-09-20T11:26:09Z",
+  "updated_at": "2026-09-20T16:10:14Z",
   "summary": {
     "total": 14,
     "healthy": 14,
     "degraded": 0,
     "dead_links": 1,
-    "unverifiable_links": 28
+    "unverifiable_links": 32
   },
   "recordings": [
     {
       "video_id": "Q4RtBMoMANk",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-20",
-      "alive": 3,
+      "alive": 2,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 3,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
@@ -33,14 +33,14 @@
     {
       "video_id": "YsaWlm-YVxY",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-13",
-      "alive": 3,
+      "alive": 2,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 3,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
@@ -77,14 +77,14 @@
     {
       "video_id": "ASWJmIsyd9s",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
-      "alive": 4,
+      "alive": 3,
       "dead": 0,
-      "unverifiable": 2,
+      "unverifiable": 3,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
@@ -165,14 +165,14 @@
     {
       "video_id": "X05zRHM4kVs",
       "title": "Forced Recording 2026-07-27",
-      "alive": 3,
+      "alive": 2,
       "dead": 1,
-      "unverifiable": 2,
+      "unverifiable": 3,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
