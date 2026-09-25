@@ -1,11 +1,11 @@
 {
-  "updated_at": "2026-09-25T11:53:44Z",
+  "updated_at": "2026-09-25T17:14:25Z",
   "summary": {
     "total": 15,
     "healthy": 15,
     "degraded": 0,
     "dead_links": 1,
-    "unverifiable_links": 30
+    "unverifiable_links": 31
   },
   "recordings": [
     {
@@ -187,14 +187,14 @@
     {
       "video_id": "X05zRHM4kVs",
       "title": "Forced Recording 2026-07-27",
-      "alive": 3,
+      "alive": 2,
       "dead": 1,
-      "unverifiable": 2,
+      "unverifiable": 3,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "alive",
+        "archive": "unverifiable",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
