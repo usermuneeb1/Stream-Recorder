@@ -1,11 +1,11 @@
 {
-  "updated_at": "2026-10-01T12:09:03.000Z",
+  "updated_at": "2026-10-02T12:20:56.000Z",
   "dry_run": false,
   "totals": {
-    "checked": 32,
-    "alive": 17,
-    "refreshed": 17,
-    "dead": 15,
+    "checked": 15,
+    "alive": 15,
+    "refreshed": 15,
+    "dead": 0,
     "discord_messages_edited": 0
   },
   "providers": {
