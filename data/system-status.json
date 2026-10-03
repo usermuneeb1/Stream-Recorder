@@ -1,22 +1,15 @@
 {
-  "updated_at": "2026-10-03T20:25:55Z",
-  "recordings_total": 16,
-  "total_size_gb": 7.88,
-  "total_hours": 33.74,
+  "updated_at": "2026-10-03T22:07:19Z",
+  "recordings_total": 17,
+  "total_size_gb": 8.33,
+  "total_hours": 35.99,
   "latest_recording": {
-    "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-03",
-    "date": "2026-10-03"
+    "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-04",
+    "date": "2026-10-04"
   },
   "youtube": {
     "subscribers": "633K",
     "views": "183M",
     "videos": 651
-  },
-  "mirror_health": {
-    "healthy": true,
-    "total": 16,
-    "degraded": 0,
-    "dead_links": 1,
-    "updated_at": "2026-10-03T21:17:13Z"
   }
 }
