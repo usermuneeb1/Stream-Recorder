@@ -15,7 +15,7 @@
     7,
     8
   ],
-  "avg_gap_days": 11.3,
+  "avg_gap_days": 11.1,
   "tiers": {
     "high": {
       "description": "Peak window, most likely to go live",
@@ -106,6 +106,6 @@
     "*/30 * * * 2,3,5,6"
   ],
   "estimated_savings_percent": 50.3,
-  "generated_at": "2026-10-02T18:52:59.794087+00:00",
-  "based_on_recordings": 15
+  "generated_at": "2026-10-03T09:35:22.638082+00:00",
+  "based_on_recordings": 16
 }
