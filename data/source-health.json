@@ -1,25 +1,25 @@
 {
-  "updated_at": "2026-10-02T12:20:56.000Z",
+  "updated_at": "2026-10-06T12:31:05.000Z",
   "dry_run": false,
   "totals": {
-    "checked": 15,
-    "alive": 15,
-    "refreshed": 15,
-    "dead": 0,
+    "checked": 36,
+    "alive": 19,
+    "refreshed": 19,
+    "dead": 17,
     "discord_messages_edited": 0
   },
   "providers": {
     "gofile": {
-      "total": 15
+      "total": 17
     },
     "pixeldrain": {
-      "total": 15
+      "total": 17
     },
     "st0807": {
       "total": 2
     },
     "vikingfile": {
-      "total": 15
+      "total": 17
     },
     "archive": {
       "permanent": true
