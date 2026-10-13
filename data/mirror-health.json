@@ -1,11 +1,11 @@
 {
-  "updated_at": "2026-10-12T15:28:28Z",
+  "updated_at": "2026-10-13T00:43:32Z",
   "summary": {
     "total": 18,
     "healthy": 18,
     "degraded": 0,
     "dead_links": 1,
-    "unverifiable_links": 41
+    "unverifiable_links": 36
   },
   "recordings": [
     {
@@ -99,14 +99,14 @@
     {
       "video_id": "Q4RtBMoMANk",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-20",
-      "alive": 2,
+      "alive": 3,
       "dead": 0,
-      "unverifiable": 3,
+      "unverifiable": 2,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "unverifiable",
+        "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
@@ -225,20 +225,20 @@
         "vikingfile": "unverifiable",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": "unverifiable"
+        "archive_direct": "alive"
       }
     },
     {
       "video_id": "iWMtQ-tA6EA",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-07-30",
-      "alive": 3,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 3,
+      "unverifiable": 2,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "unverifiable",
+        "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
@@ -291,20 +291,20 @@
         "vikingfile": "unverifiable",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": "unverifiable"
+        "archive_direct": "alive"
       }
     },
     {
       "video_id": "vSKAJZkhuq4",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 3,
+      "alive": 4,
       "dead": 0,
-      "unverifiable": 3,
+      "unverifiable": 2,
       "healthy": true,
       "permanent_ok": true,
       "fast_ok": true,
       "mirrors": {
-        "archive": "unverifiable",
+        "archive": "alive",
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
