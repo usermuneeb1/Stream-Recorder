@@ -77,7 +77,12 @@ jobs:
           echo "- $DEGRADED recording(s) below the copy guarantee" >> "$GITHUB_STEP_SUMMARY"
           echo "- $DEAD dead mirror link(s)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          jq -r '.recordings[] | select(.healthy == false) | "- \`\(.video_id)\`: \(.alive) alive, \(.dead) dead"' data/mirror-health.json >> "$GITHUB_STEP_SUMMARY"
+          # Literal backticks: inside a single-quoted jq program `\`` is NOT a
+          # valid escape — it was a compile error (exit 3) that killed this step
+          # under bash -e on 95/100 runs (2026-09-02 → 2026-10-14), so neither
+          # the Discord alert nor the repair dispatch below ever ran.
+          # tests/mirror-health-alert-step-test.sh replays this step.
+          jq -r '.recordings[] | select(.healthy == false) | "- `\(.video_id)`: \(.alive) alive, \(.dead) dead"' data/mirror-health.json >> "$GITHUB_STEP_SUMMARY"
 
           # Discord alert
           MSG="⚠️ **Mirror health degraded**: $DEGRADED recording(s) below guarantee, $DEAD dead link(s). Triggering repair."
