@@ -217,8 +217,13 @@ jobs:
               exit 1
           fi
 
-      - name: "Discord alert if any method failed"
-        if: always() && steps.tests.outputs.failed != '0'
+      # Owner request 2026-10-14: no more "some methods broke (recorder still
+      # works, 3/5 passing)" posts — android_vr/mweb fail most days and the
+      # recorder only needs one method. Post ONLY when fewer than 2 methods
+      # pass, i.e. the same condition that fails this job (recorder at risk).
+      # Partial results stay in the step summary.
+      - name: "Discord alert only when the recorder is at risk (<2 methods passing)"
+        if: always() && (steps.tests.outputs.passed == '0' || steps.tests.outputs.passed == '1')
         run: |
           WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-$DISCORD_WEBHOOK_URL}"
           [[ -z "$WEBHOOK" ]] && { echo "No webhook"; exit 0; }

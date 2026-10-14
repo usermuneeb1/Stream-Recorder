@@ -12,12 +12,47 @@ _cookie_alert() {
     local status="$1"
     local detail="$2"
 
-    # SETTLED DESIGN (zero-touch): cookie state is a logged NON-EVENT.
-    # The cascade is cookieless-first; stale cookies can only ever disable
-    # the two bonus cookie methods, never lose a public-stream recording.
-    # Cookie problems are therefore logged for the run summary and NEVER
-    # sent to Discord — no more manual cookie chores as wake-up calls.
-    log_info "Cookie status: ${status} (non-event under cookieless-first design) ${detail:+— ${detail}}"
+    # Owner decision 2026-10-14: cookie expiry IS an event worth a Discord
+    # alert — the recorder runs HYBRID (cookieless first, cookie methods A/B
+    # rescue LOGIN_REQUIRED streams), so a dead cookie silently removes that
+    # rescue. Alert on expiring / expired / old; throttled per state so the
+    # owner gets one actionable message per day, not a nag every run.
+    # Irrelevant when cookies are not used at all (pure cookieless mode or
+    # no cookie file): log and return.
+    if [[ "${PUBLIC_STREAM_ONLY:-false}" == "true" ]] || [[ "${FORCE_RECORD:-false}" == "true" ]]; then
+        log_info "Cookie alert suppressed (PUBLIC_STREAM_ONLY=${PUBLIC_STREAM_ONLY:-false}, FORCE_RECORD=${FORCE_RECORD:-false})"
+        return 0
+    fi
+    if [[ "$detail" == "no cookie file" ]]; then
+        log_info "Cookie status: ${status} (no cookie file — nothing to renew, running cookieless)"
+        return 0
+    fi
+
+    local throttle_file="cookie_${status}_warning_sent.txt"
+    local throttle_seconds
+    case "$status" in
+        warning) throttle_seconds="${COOKIE_AGE_WARNING_THROTTLE_SECONDS:-604800}" ;;   # 7 days
+        *)       throttle_seconds="${COOKIE_WARNING_THROTTLE_SECONDS:-86400}" ;;        # 24 hours
+    esac
+    local now_ts last_sent
+    now_ts=$(now_epoch)
+    last_sent=$(github_api_read_content "$throttle_file" 2>/dev/null) || last_sent=0
+    last_sent="${last_sent//[[:space:]]/}"
+    [[ ! "$last_sent" =~ ^[0-9]+$ ]] && last_sent=0
+
+    if (( now_ts - last_sent < throttle_seconds )); then
+        log_warn "Cookie ${status} alert throttled (last sent $(( (now_ts - last_sent) / 3600 ))h ago, window $(( throttle_seconds / 3600 ))h)"
+        return 0
+    fi
+
+    # shellcheck source=scripts/discord-notify.sh
+    source "$SCRIPT_DIR/discord-notify.sh"
+    if notify_cookie_warning "$status" "$detail"; then
+        log_ok "Cookie ${status} alert sent to Discord"
+    else
+        log_warn "Cookie ${status} alert could not be sent"
+    fi
+    github_api_write "$throttle_file" "$now_ts" "Cookie ${status} alert sent ($(now_pkt))" >/dev/null 2>&1 || true
     return 0
 }
 

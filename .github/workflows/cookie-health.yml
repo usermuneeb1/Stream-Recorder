@@ -6,18 +6,22 @@
 name: "Cookie health sentinel"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DISABLED: The recorder runs in permanent cookieless mode (PUBLIC_STREAM_ONLY=true)
-# because The Muslim Lantern only broadcasts public streams which never need
-# YouTube authentication. Cookie health is irrelevant.
+# Re-enabled 2026-10-14 (owner request): the recorder runs HYBRID — cookieless
+# methods first, cookie methods A/B as the rescue for LOGIN_REQUIRED streams
+# (real miss on 2026-06-27). A dead cookie silently removes that rescue, so
+# this sentinel checks the critical YouTube session cookie once a day and
+# posts ONE Discord alert per day per state (expiring ≤5 days / expired),
+# weekly when the file is merely old. Nothing is posted while the cookie is
+# healthy. scripts/check-cookies.sh also runs inside every recording job, so
+# the same throttled alert fires from there on stream days.
 #
-# To re-enable (only if you ever start recording members-only / age-restricted
-# streams), uncomment the `schedule:` block below and set repo variable
-# PUBLIC_STREAM_ONLY=false.
+# To silence completely: set repo variable PUBLIC_STREAM_ONLY=true (pure
+# cookieless mode — then cookies are irrelevant and never alerted on).
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
-  # schedule:
-  #   - cron: "0 */6 * * *"   # ← disabled; re-enable if you ever need cookies again
+  schedule:
+    - cron: "0 9 * * *"      # daily 09:00 UTC = 14:00 PKT
   workflow_dispatch:
 
 permissions:
@@ -39,6 +43,7 @@ env:
   DISCORD_WEBHOOK_REPORTS: ${{ secrets.DISCORD_WEBHOOK_REPORTS }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
   COOKIES_FILE: cookies.txt
+  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'false' }}
   TZ: Asia/Karachi
 
 jobs:
