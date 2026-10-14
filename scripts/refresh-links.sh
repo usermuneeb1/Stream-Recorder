@@ -33,10 +33,17 @@ check_link_alive() {
     if [[ "$url" =~ vikingfile\.com/f/([a-zA-Z0-9_-]+) ]]; then
         local vf_hash="${BASH_REMATCH[1]}"
         local vf_info vf_exist
-        vf_info=$(curl -s --max-time "$timeout" -X POST "https://vikingfile.com/api/check-file" -F "hash=${vf_hash}" 2>/dev/null) || return 1
-        vf_exist=$(echo "$vf_info" | jq -r '.exist // empty' 2>/dev/null)
-        [[ "$vf_exist" == "true" ]] && return 0
-        return 1
+        vf_info=$(curl -s --max-time "$timeout" -X POST "https://vikingfile.com/api/check-file" -F "hash=${vf_hash}" 2>/dev/null) || vf_info=""
+        # Array response, shared parser (utils.sh). Only an explicit
+        # exist:false is dead; an unverifiable answer must never put an
+        # [EXPIRED] marker on a link (2026-09..10: every refresh marked all
+        # 18 VikingFile links expired because the array was mis-parsed).
+        vf_exist=$(vikingfile_exist_state "$vf_info")
+        case "$vf_exist" in
+            alive) return 0 ;;
+            dead)  log_debug "    VikingFile API says dead"; return 1 ;;
+            *)     log_debug "    VikingFile check unverifiable, not marking dead"; return 0 ;;
+        esac
     fi
 
     # Gofile: /d/<code> returns HTTP 200 with the SPA shell even for deleted

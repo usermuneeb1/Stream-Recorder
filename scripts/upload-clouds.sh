@@ -520,11 +520,34 @@ upload_to_archive() {
 #  Simple POST for files under ~1.8 GB; chunked (16 MB) above that.
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Honest browser-shaped UA on EVERY 0807.st call — the PoW fetch already
+# needed it (urllib's default UA was filtered, 2026-09-02); curl's default
+# "curl/8.x" on /upload is the same class of filter target.
+ST0807_UA="${ST0807_UA:-Mozilla/5.0 (X11; Linux x86_64; Stream-Recorder bot; +github.com/usermuneeb1/Stream-Recorder)}"
+
 _st0807_auth_args() {
     local token="${ST0807_TOKEN:-}"
     if [[ -n "$token" ]]; then
         printf -- '-H\nAuthorization: Bearer %s\n' "$token"
     fi
+}
+
+# Does an upload response look like a size/limit rejection? Used to escalate
+# a simple POST to the chunked endpoints once. Evidence (2026-10-14): the only
+# two anonymous uploads that ever succeeded were the two smallest files
+# (8 MB, 92 MB); all 16 files ≥ 255 MB failed on every attempt since 09-02.
+_st0807_size_rejected() {
+    local http_code="$1" body="$2"
+    [[ "$http_code" == "413" ]] && return 0
+    grep -qiE 'too large|file size|size limit|max(imum)? (file )?size|exceeds|quota|limit' <<< "$body"
+}
+
+_st0807_report_failure() {   # $1 stage, $2 http code, $3 body, $4 fsize
+    local stage="$1" code="$2" body="$3" fsize="$4"
+    local excerpt="${body:0:200}"
+    excerpt="${excerpt//$'\n'/ }"
+    log_warn "  0807.st: ${stage} failed — HTTP ${code:-000}, $(format_size "$fsize"), body: ${excerpt:-<empty>}"
+    append_summary "- ⚠️ 0807.st ${stage} failed — HTTP ${code:-000}, $(format_size "$fsize"), token=$([[ -n "${ST0807_TOKEN:-}" ]] && echo yes || echo no): \`${excerpt:-<empty>}\`"
 }
 
 _st0807_pow_json() {
@@ -558,8 +581,9 @@ upload_to_st0807() {
         [[ -n "$token" ]] && tok_state="yes"
         log_debug "  0807.st attempt ${attempt}/${max_retries} (token=$tok_state)"
 
-        if (( fsize <= simple_limit )); then
-            local -a curl_args=(-s --max-time "${UPLOAD_TIMEOUT:-3600}" -F "file=@${file}" -F "expiry=0" -F "maxdl=0")
+        local http_code="" stage="simple POST"
+        if (( fsize <= simple_limit )) && [[ "${ST0807_FORCE_CHUNKED:-false}" != "true" ]]; then
+            local -a curl_args=(-s -A "$ST0807_UA" --max-time "${UPLOAD_TIMEOUT:-3600}" -w $'\n%{http_code}' -F "file=@${file}" -F "expiry=0" -F "maxdl=0")
             if [[ -n "$token" ]]; then
                 curl_args+=(-H "Authorization: Bearer ${token}")
             else
@@ -575,8 +599,14 @@ upload_to_st0807() {
                 curl_args+=(-F "pow_sig=$(echo "$pow" | jq -r '.pow_sig')")
                 curl_args+=(-F "pow_nonce=$(echo "$pow" | jq -r '.pow_nonce')")
             fi
-            upload_response=$(curl "${curl_args[@]}" "https://0807.st/upload" 2>/dev/null) || true
+            local raw
+            raw=$(curl "${curl_args[@]}" "https://0807.st/upload" 2>/dev/null) || true
+            # last line = http code (from -w), everything before = body
+            http_code="${raw##*$'\n'}"
+            upload_response="${raw%$'\n'*}"
+            [[ "$raw" != *$'\n'* ]] && { http_code=""; upload_response="$raw"; }
         else
+            stage="chunked"
             upload_response=$(_st0807_chunked_upload "$file" "$token") || true
         fi
 
@@ -586,15 +616,22 @@ upload_to_st0807() {
         if [[ -n "$link" ]]; then
             local speed
             (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  0807.st: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
+            log_ok "  0807.st: ✅ Upload complete (${stage}), ${upload_elapsed}s (${speed}/s)"
             log_info "  0807.st: Link → ${link}"
             ST0807_LINKS+=("${part_name}|${link}")
             return 0
         fi
 
-        log_warn "  0807.st: attempt ${attempt} failed, ${upload_response:0:200}"
+        _st0807_report_failure "${stage} (attempt ${attempt}/${max_retries})" "$http_code" "$upload_response" "$fsize"
+
+        # A size rejection on the simple POST will not change on retry —
+        # escalate to the chunked endpoints for the remaining attempts.
+        if [[ "$stage" == "simple POST" ]] && _st0807_size_rejected "$http_code" "$upload_response"; then
+            log_warn "  0807.st: simple POST rejected on size, switching to chunked upload"
+            ST0807_FORCE_CHUNKED=true
+        fi
         (( ++attempt ))
-        sleep 5
+        sleep "${ST0807_RETRY_SLEEP:-5}"
     done
 
     log_error "  0807.st: ❌ All ${max_retries} attempts failed"
@@ -629,7 +666,7 @@ _st0807_chunked_upload() {
         }')
     fi
 
-    init_body=$(curl -s --max-time 60 "${hdr[@]}" -H "Content-Type: application/json" \
+    init_body=$(curl -s -A "$ST0807_UA" --max-time 60 "${hdr[@]}" -H "Content-Type: application/json" \
         -d "$init_json" "https://0807.st/upload/init" 2>/dev/null) || true
     upload_id=$(echo "$init_body" | jq -r '.uploadId // .id // empty' 2>/dev/null)
     if [[ -z "$upload_id" ]]; then
@@ -647,7 +684,7 @@ _st0807_chunked_upload() {
         dd if="$file" of="$chunk" bs=1 skip="$offset" count="$this" status=none 2>/dev/null || \
             dd if="$file" of="$chunk" bs="$chunk_size" skip=$(( offset / chunk_size )) count=1 status=none 2>/dev/null
         local chunk_resp
-        chunk_resp=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" "${hdr[@]}" \
+        chunk_resp=$(curl -s -A "$ST0807_UA" --max-time "${UPLOAD_TIMEOUT:-3600}" "${hdr[@]}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @"$chunk" \
             "https://0807.st/upload/chunk?id=${upload_id}&offset=${offset}" 2>/dev/null) || true
@@ -657,7 +694,7 @@ _st0807_chunked_upload() {
 
     local finish_json finish_body
     finish_json=$(jq -n --arg id "$upload_id" '{id:$id, expiry:"0", maxdl:"0", password:"", vanity:""}')
-    finish_body=$(curl -s --max-time 120 "${hdr[@]}" -H "Content-Type: application/json" \
+    finish_body=$(curl -s -A "$ST0807_UA" --max-time 120 "${hdr[@]}" -H "Content-Type: application/json" \
         -d "$finish_json" "https://0807.st/upload/finish" 2>/dev/null) || true
     echo "$finish_body"
 }

@@ -20,9 +20,9 @@ on:
         default: "3"
         type: string
       destinations:
-        description: "Comma list: gofile,pixeldrain,mega"
+        description: "Comma list: gofile,pixeldrain,mega,st0807,vikingfile"
         required: false
-        default: "gofile,pixeldrain,mega"
+        default: "gofile,pixeldrain,mega,st0807,vikingfile"
         type: string
       force_repair:
         description: "Force re-upload ALL mirrors (ignore alive checks)"
@@ -54,6 +54,9 @@ env:
   GH_PAT: ${{ secrets.GH_PAT }}
   GOFILE_API_KEY: ${{ secrets.GOFILE_API_KEY }}
   PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  # Optional 0807.st partner token: skips the proof-of-work and lifts the
+  # anonymous size cap. Empty = anonymous PoW upload (unchanged behaviour).
+  ST0807_TOKEN: ${{ secrets.ST0807_TOKEN }}
   MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -88,7 +91,7 @@ jobs:
         env:
           TARGET_VIDEO_ID: ${{ github.event.inputs.video_id }}
           MAX_ITEMS: ${{ github.event.inputs.max_items || '3' }}
-          DESTINATIONS: ${{ github.event.inputs.destinations || 'gofile,pixeldrain,mega' }}
+          DESTINATIONS: ${{ github.event.inputs.destinations || 'gofile,pixeldrain,mega,st0807,vikingfile' }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: bash scripts/repair-mirrors.sh
 

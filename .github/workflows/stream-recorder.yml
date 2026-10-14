@@ -90,6 +90,9 @@ env:
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
   # Pixeldrain (60-day retention, 10GB/file)
   PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
+  # Optional 0807.st partner token: skips the proof-of-work and lifts the
+  # anonymous size cap. Empty = anonymous PoW upload (unchanged behaviour).
+  ST0807_TOKEN: ${{ secrets.ST0807_TOKEN }}
   GH_PAT: ${{ secrets.GH_PAT }}
   WARP_LICENSE_KEY: ${{ secrets.WARP_LICENSE_KEY }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
