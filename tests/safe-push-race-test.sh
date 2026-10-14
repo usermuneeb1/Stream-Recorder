@@ -68,6 +68,34 @@ remote_moves   # one more race for realism, then push it quiet
   && bash "$SAFE_PUSH" main >/dev/null 2>&1 ) && RC3=0 || RC3=$?
 [[ "${RC3:-1}" -eq 0 ]] && ok "no-op push exits 0" || bad "no-op push failed (rc=$RC3)"
 
+echo "── Case 4: TRUE conflict (both sides edit the same line) → loud exit 1, nothing silently lost ──"
+# 2026-10-14: the old script failed `git pull --rebase` mid-rebase, then its
+# "nothing to push" check compared origin/main with a HEAD that the stalled
+# rebase had parked ON origin/main → printed "✅ nothing to push", exit 0,
+# while the worker's commit was gone and the tree sat in UU conflict. A green
+# step with the work dropped — the wipe class, in a new costume.
+(
+    cd "$T/worker" || exit 1
+    git fetch -q origin && git reset -q --hard origin/main
+    echo "worker version" > shared.json && git add shared.json
+    git commit -q -m "worker: shared A"
+)
+( cd "$T/mover" && git fetch -q origin && git reset -q --hard origin/main \
+  && echo "mover version" > shared.json && git add shared.json \
+  && git commit -q -m "mover: shared B" && git push -q origin HEAD:main )
+OUT4=$( cd "$T/worker" && SAFE_PUSH_SLEEP=0 bash "$SAFE_PUSH" main 2>&1 ); RC4=$?
+echo "$OUT4" | sed 's/^/     /'
+[[ $RC4 -ne 0 ]] && ok "conflict exits non-zero (rc=$RC4)" || bad "conflict exited 0 — silent data loss (the incident)"
+echo "$OUT4" | grep -qi 'nothing to push' && bad "claimed 'nothing to push' during a conflict" || ok "did not claim 'nothing to push'"
+( cd "$T/worker" && [[ ! -d .git/rebase-merge && ! -d .git/rebase-apply ]] ) \
+    && ok "no rebase left in progress" || bad "rebase left in progress (next git command will fail)"
+( cd "$T/worker" && git log --format=%s -1 | grep -q 'worker: shared A' ) \
+    && ok "worker's local commit preserved for manual merge" || bad "worker's local commit lost"
+( cd "$T/worker" && git diff --quiet && git diff --cached --quiet ) \
+    && ok "working tree clean (no UU markers)" || bad "working tree left dirty/conflicted"
+( cd "$T/mover" && git fetch -q origin && git reset -q --hard origin/main && grep -q 'mover version' shared.json ) \
+    && ok "main untouched by the failed push" || bad "main was altered by a conflicting push"
+
 echo ""
 if (( FAILURES > 0 )); then echo "RESULT: RED — $FAILURES case(s) failed"; exit 1; fi
 echo "RESULT: GREEN — push-race immunity locked"; exit 0

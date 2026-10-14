@@ -76,6 +76,11 @@ _is_st0807_alive() {
     [[ "$code" =~ ^(2|3)[0-9]{2}$ ]]
 }
 
+# Returns 0 alive, 1 dead/missing (re-upload), 2 unverifiable (leave alone).
+# Three states on purpose: until 2026-10-14 "unverifiable" (the check-file
+# array was mis-parsed) counted as dead, so the same three newest recordings
+# were re-uploaded to VikingFile every single day, each counting as a
+# "repair" and exhausting MAX_ITEMS before older recordings were reached.
 _is_vikingfile_alive() {
     local url="$1"
     [[ -z "$url" ]] && return 1
@@ -83,10 +88,14 @@ _is_vikingfile_alive() {
     local hash
     hash=$(echo "$url" | sed -n 's#.*vikingfile.com/f/\([^/?#]*\).*#\1#p')
     [[ -z "$hash" ]] && return 1
-    local info exist
-    info=$(curl -s --max-time 20 -X POST "https://vikingfile.com/api/check-file" -F "hash=${hash}" 2>/dev/null) || return 1
-    exist=$(jq -r '.exist // empty' <<< "$info" 2>/dev/null)
-    [[ "$exist" == "true" ]]
+    local info state
+    info=$(curl -s --max-time 20 -X POST "https://vikingfile.com/api/check-file" -F "hash=${hash}" 2>/dev/null) || info=""
+    state=$(vikingfile_exist_state "$info")
+    case "$state" in
+        alive) return 0 ;;
+        dead)  return 1 ;;
+        *)     return 2 ;;
+    esac
 }
 
 _archive_id_from_url() {
@@ -184,6 +193,12 @@ repair_mirrors() {
 
     local target_video="${TARGET_VIDEO_ID:-}"
     local max_items="${MAX_ITEMS:-3}"
+    # MAX_ITEMS counts SUCCESSFUL repairs. If one host rejects every upload
+    # (0807.st, 2026-09..10) a run would otherwise download the Archive.org
+    # source of every candidate (~10 GB/day) and fail on each. Bound the
+    # number of candidates that reach the download/upload stage too.
+    local max_attempts="${MAX_ATTEMPTS:-$(( max_items * 2 ))}"
+    local attempted=0
     local dry_run="${DRY_RUN:-false}"
     local destinations="${DESTINATIONS:-gofile,pixeldrain,mega,st0807,vikingfile}"
     # Older workflow YAML still passes DESTINATIONS=gofile,pixeldrain,mega.
@@ -242,7 +257,12 @@ repair_mirrors() {
             _is_st0807_alive "$st0807_old" || need_st0807=true
         fi
         if [[ "$destinations" == *vikingfile* || "$destinations" == *viking* ]]; then
-            _is_vikingfile_alive "$viking_old" || need_viking=true
+            local viking_rc=0
+            _is_vikingfile_alive "$viking_old" || viking_rc=$?
+            case "$viking_rc" in
+                1) need_viking=true ;;
+                2) log_warn "  VikingFile: check-file unverifiable for ${viking_old} — keeping the existing link (no re-upload)" ;;
+            esac
         fi
 
         if [[ "$need_gofile" != true && "$need_pixel" != true && "$need_mega" != true && "$need_st0807" != true && "$need_viking" != true ]]; then
@@ -254,6 +274,11 @@ repair_mirrors() {
         if [[ "$dry_run" == "true" ]]; then
             continue
         fi
+        if (( attempted >= max_attempts )); then
+            log_warn "  Attempt budget reached (MAX_ATTEMPTS=${max_attempts}) — left for the next run"
+            continue
+        fi
+        attempted=$((attempted + 1))
 
         local file
         file=$(_download_archive_file "$archive_link" "$title" | tail -n 1) || { log_error "  Could not download Archive.org source"; continue; }
@@ -327,7 +352,8 @@ repair_mirrors() {
     done
 
     log_separator
-    log_ok "Mirror repair complete: checked=${checked}, repaired=${repaired}"
+    log_ok "Mirror repair complete: checked=${checked}, attempted=${attempted}, repaired=${repaired}"
+    append_summary "- Mirror repair: checked ${checked}, attempted ${attempted}, repaired ${repaired} (MAX_ITEMS=${max_items}, MAX_ATTEMPTS=${max_attempts})"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

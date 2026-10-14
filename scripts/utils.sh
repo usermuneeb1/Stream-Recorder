@@ -830,6 +830,31 @@ append_summary() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  VIKINGFILE check-file PARSER (shared by mirror-health, repair, refresh)
+#  POST https://vikingfile.com/api/check-file -F hash=<id> answers a JSON ARRAY:
+#      [{"exist":true,"name":"…","size":123}]
+#  (JDownloader VikingfileCom.java and VNMaster vikingfile.py parse it the same
+#  way; a few clients see a bare object — accept both). Until 2026-10-14 every
+#  consumer did `jq '.exist // empty'`, which errors on an array → "" →
+#  unverifiable, and `//` also swallows a literal false. Prints exactly one of:
+#  alive | dead | unverifiable.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+vikingfile_exist_state() {
+    local body="${1:-}" exist=""
+    [[ -z "$body" ]] && { printf 'unverifiable'; return 0; }
+    exist=$(jq -r '
+        (if type == "array" then .[0] else . end)
+        | if type == "object" and has("exist") then (.exist | tostring) else "" end
+    ' <<< "$body" 2>/dev/null || true)
+    case "$exist" in
+        true)  printf 'alive' ;;
+        false) printf 'dead' ;;
+        *)     printf 'unverifiable' ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  CONFIGURATION LOADER
 #  Load configuration from config.env
 # ═══════════════════════════════════════════════════════════════════════════════

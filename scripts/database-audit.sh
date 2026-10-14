@@ -90,9 +90,20 @@ _audit_recordings() {
 _audit_links() {
     local file="links.txt"
     [[ ! -f "$file" ]] && { _report warn "links.txt missing"; return; }
+    # links.txt is the legacy text feed (header + "====" separated blocks).
+    # Between 2026-07-12 and 2026-10-14 refresh-links.sh overwrote it with a
+    # JSON copy of recordings.json on every run; this audit scored that as
+    # "0 separators" and stayed green. Detect the shape explicitly.
+    local first_char
+    first_char=$(tr -d '[:space:]' < "$file" 2>/dev/null | head -c1)
+    if [[ "$first_char" == "[" || "$first_char" == "{" ]] && ! grep -q '^Title:' "$file"; then
+        _report warn "links.txt is not in the legacy text format (it is a JSON document) — a writer replaced the feed; restore it from git history before the next 'New recording' prepends text on top of JSON"
+    fi
     local blocks youtube_count no_archive
-    blocks=$(grep -c '^========================================' "$file" 2>/dev/null || echo 0)
-    youtube_count=$(grep -Eic '^URL:[[:space:]]+https?://(www\.)?(youtube\.com|youtu\.be)' "$file" 2>/dev/null || echo 0)
+    # grep -c prints the count (0 included) and exits 1 on no match, so
+    # `|| echo 0` would yield "0\n0"; only default when grep printed nothing.
+    blocks=$(grep -c '^========================================' "$file" 2>/dev/null) || blocks="${blocks:-0}"
+    youtube_count=$(grep -Eic '^URL:[[:space:]]+https?://(www\.)?(youtube\.com|youtu\.be)' "$file" 2>/dev/null) || youtube_count="${youtube_count:-0}"
     no_archive=$(awk '
       /^========================================/ { if (inb && title != "" && archive == 0) missing++; inb=1; title=""; archive=0 }
       /^Title:/ { title=$0 }

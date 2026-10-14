@@ -207,7 +207,7 @@ jobs:
             git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}.git"
           fi
           
-          git push
+          bash scripts/safe-push.sh
           echo "✅ Account changes committed and pushed"
 
       # ─── 6. DISCORD NOTIFICATION ──────────────────────────────────────────

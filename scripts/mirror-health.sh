@@ -121,14 +121,10 @@ classify_vikingfile() {
     if [[ -z "$hash" ]]; then
         printf 'unverifiable'; return
     fi
+    # Response is a JSON array — parsed by utils.sh vikingfile_exist_state().
     exist=$(curl -sS --max-time "$CHECK_TIMEOUT" -X POST \
-        "https://vikingfile.com/api/check-file" -F "hash=${hash}" 2>/dev/null \
-        | jq -r '.exist // empty' 2>/dev/null || echo "")
-    case "$exist" in
-        true) printf 'alive' ;;
-        false) printf 'dead' ;;
-        *) printf 'unverifiable' ;;
-    esac
+        "https://vikingfile.com/api/check-file" -F "hash=${hash}" 2>/dev/null || true)
+    vikingfile_exist_state "$exist"
 }
 
 log_header "MIRROR HEALTH CHECK"

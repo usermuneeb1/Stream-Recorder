@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  actions: read   # lets the github.token fallback list runs when GH_PAT is absent
 
 defaults:
   run:
@@ -49,31 +50,19 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq
 
+      # 2026-10-14: the inspection moved to scripts/workflow-watchdog.sh (tested by
+      # tests/workflow-watchdog-test.sh). The previous inline jq piped the
+      # critical-names array into index() and then read `.path` off THAT array →
+      # "Cannot index array with string path", exit 5, on every hourly run since
+      # 2026-08-26. The watchdog never reached Discord once in 7 weeks.
       - name: "Inspect workflows"
+        env:
+          LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '6' }}
+          GITHUB_TOKEN: ${{ github.token }}   # real fallback when GH_PAT is unset
         run: |
           set -euo pipefail
-          LOOKBACK="${{ github.event.inputs.lookback_hours }}"
-          LOOKBACK="${LOOKBACK:-6}"
-          SINCE_EPOCH=$(date -u -d "${LOOKBACK} hours ago" +%s)
-          TOKEN="${GH_PAT:-${GITHUB_TOKEN:-}}"
-          if [[ -z "$TOKEN" ]]; then
-            echo "GH_PAT missing; cannot inspect workflow runs"
-            exit 0
-          fi
-
-          CRITICAL='stream-recorder.yml cookie-health.yml cloud-refresh.yml account-keepalive.yml youtube-to-archive.yml archive-to-mega.yml deploy-pages.yml quality-check.yml'
-          RUNS=$(curl -fsS \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=60")
-
-          FAILURES=$(echo "$RUNS" | jq -r --argjson since "$SINCE_EPOCH" --arg critical "$CRITICAL" '
-            .workflow_runs[]
-            | select((.status == "completed") and (.conclusion != "success") and (.conclusion != "cancelled"))
-            | select((.updated_at | fromdateiso8601) >= $since)
-            | select(($critical | split(" ")) as $c | $c | index(.path | split("/")[-1]))
-            | "- **" + .name + "**, `" + .conclusion + "`, " + .html_url
-          ')
+          LOOKBACK="${LOOKBACK_HOURS:-6}"
+          FAILURES=$(bash scripts/workflow-watchdog.sh)
 
           COUNT=$(printf '%s\n' "$FAILURES" | sed '/^$/d' | wc -l | tr -d ' ')
           echo "Found $COUNT recent critical failure(s)"
@@ -91,6 +80,11 @@ jobs:
 
           WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
           [[ -z "$WEBHOOK" ]] && exit 0
+          # Discord caps an embed description at 4096 chars; a 400 here would
+          # turn the alert itself into a failure. Keep the first ~3500 chars.
+          if (( ${#FAILURES} > 3500 )); then
+            FAILURES="${FAILURES:0:3500}"$'\n'"… (truncated — ${COUNT} total, see the Actions tab)"
+          fi
           PAYLOAD=$(jq -n \
             --arg username "☪️ The Muslim Lantern" \
             --arg avatar "${AVATAR_URL:-}" \

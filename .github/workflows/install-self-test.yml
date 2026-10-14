@@ -138,7 +138,7 @@ jobs:
       # stream-recorder.yml hasn't gained new commands that aren't replayed
       # here. Compares a fingerprint of the install lines.
       # ─────────────────────────────────────────────────────────────────────
-            - name: "Drift check against the real workflow"
+      - name: "Drift check against the real workflow"
         run: bash scripts/check-install-drift.sh .github/workflows/stream-recorder.yml .github/workflows/install-self-test.yml
 
       - name: "Discord alert on failure"

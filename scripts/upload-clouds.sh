@@ -513,12 +513,32 @@ upload_to_archive() {
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  SERVICE 5: 0807.ST UPLOAD
-#  Direct hotlink URLs. Anonymous uploads solve a tiny proof-of-work
-#  (scripts/st0807_pow.py). Partner token ST0807_TOKEN skips PoW and raises
-#  the size cap. Always uploaded with expiry=0 (never auto-delete).
-#  Simple POST for files under ~1.8 GB; chunked (16 MB) above that.
+#  SERVICE 5: 0807.ST UPLOAD  (API: https://0807.st/api, owner-pasted 2026-10-14)
+#  Direct hotlink URLs, expiry=0 (never auto-delete), maxdl=0.
+#
+#  Anonymous uploads: 2 GB per POST, 10 GB chunked, rate-limited, and every
+#  request that creates an upload must carry a proof-of-work (scripts/
+#  st0807_pow.py solves GET /pow → {id, ts, bits, sig, ttl}). Partner token
+#  ST0807_TOKEN (Authorization: Bearer) skips the PoW and the rate limit and
+#  lifts the cap to 50 GB.
+#
+#  WHY LARGE ANONYMOUS FILES GO CHUNKED (2026-10-14): of 18 recordings only the
+#  two smallest (8 MB, 92 MB) ever landed on 0807.st; all 16 files ≥ 255 MB
+#  failed on every attempt since 09-02. The anonymous POST cap is 2 GB, so
+#  size itself is not the reason. The PoW challenge has a ttl, and a simple
+#  multipart POST can only be validated once the whole body has streamed in —
+#  for a 500 MB file that is well after the proof was issued. The chunked flow
+#  attaches the proof to /upload/init (a tiny JSON request, validated at
+#  once); the 16 MB chunks and /upload/finish carry no proof. So: anonymous
+#  files above ST0807_ANON_SIMPLE_LIMIT (32 MB) always go chunked, and the
+#  simple POST sends the pow_* fields BEFORE the file part.
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# Honest browser-shaped UA on EVERY 0807.st call — the PoW fetch already
+# needed it (urllib's default UA was filtered, 2026-09-02); curl's default
+# "curl/8.x" on /upload is the same class of filter target.
+ST0807_UA="${ST0807_UA:-Mozilla/5.0 (X11; Linux x86_64; Stream-Recorder bot; +github.com/usermuneeb1/Stream-Recorder)}"
+ST0807_CHUNK_SIZE="${ST0807_CHUNK_SIZE:-16777216}"     # 16 MB, the API maximum
 
 _st0807_auth_args() {
     local token="${ST0807_TOKEN:-}"
@@ -538,6 +558,44 @@ _st0807_parse_url() {
     echo "$body" | jq -r '.url // empty' 2>/dev/null
 }
 
+# Does an upload response look like a size/limit rejection? A 413 on the
+# simple POST will not change on retry — escalate to the chunked endpoints.
+_st0807_size_rejected() {
+    local http_code="$1" body="$2"
+    [[ "$http_code" == "413" ]] && return 0
+    grep -qiE 'too large|file size|size limit|max(imum)? (file )?size|exceeds' <<< "$body"
+}
+
+_st0807_report_failure() {   # $1 stage, $2 http code, $3 body, $4 fsize
+    local stage="$1" code="$2" body="$3" fsize="$4"
+    local excerpt="${body:0:200}"
+    excerpt="${excerpt//$'\n'/ }"
+    log_warn "  0807.st: ${stage} failed — HTTP ${code:-000}, $(format_size "$fsize"), body: ${excerpt:-<empty>}"
+    append_summary "- ⚠️ 0807.st ${stage} failed — HTTP ${code:-000}, $(format_size "$fsize"), token=$([[ -n "${ST0807_TOKEN:-}" ]] && echo yes || echo no): \`${excerpt:-<empty>}\`"
+}
+
+# Anonymous requests are rate-limited; a 429 means wait, not hammer.
+_st0807_rate_limit_pause() {
+    local secs="${ST0807_RATE_LIMIT_SLEEP:-60}"
+    log_warn "  0807.st: rate limited (429), pausing ${secs}s before the next attempt"
+    sleep "$secs"
+}
+
+# curl wrapper: prints "<body>\n<http_code>" semantics split into two globals.
+# $@ = curl args (URL included). Sets ST0807_HTTP and ST0807_BODY.
+ST0807_HTTP=""; ST0807_BODY=""
+_st0807_curl() {
+    local raw
+    raw=$(curl -s -A "$ST0807_UA" -w $'\n%{http_code}' "$@" 2>/dev/null) || true
+    if [[ "$raw" == *$'\n'* ]]; then
+        ST0807_HTTP="${raw##*$'\n'}"
+        ST0807_BODY="${raw%$'\n'*}"
+    else
+        ST0807_HTTP=""
+        ST0807_BODY="$raw"
+    fi
+}
+
 upload_to_st0807() {
     local file="$1"
     local part_name="$2"
@@ -549,17 +607,29 @@ upload_to_st0807() {
 
     local max_retries="${ST0807_MAX_RETRIES:-3}"
     local attempt=1
-    local simple_limit=$((1800 * 1024 * 1024))  # 1.8 GB, under anonymous 2 GB POST cap
+    local simple_limit=$((1800 * 1024 * 1024))                                   # under the 2 GB single-POST cap
+    local anon_simple_limit="${ST0807_ANON_SIMPLE_LIMIT:-$((32 * 1024 * 1024))}" # PoW ttl race, see header
+
+    local use_chunked=false
+    if [[ "${ST0807_FORCE_CHUNKED:-false}" == "true" ]] || (( fsize > simple_limit )); then
+        use_chunked=true
+    elif [[ -z "$token" ]] && (( fsize > anon_simple_limit )); then
+        use_chunked=true
+        log_info "  0807.st: anonymous + $(format_size "$fsize") > $(format_size "$anon_simple_limit") → chunked flow (PoW validated at /upload/init)"
+    fi
 
     while (( attempt <= max_retries )); do
         local upload_start upload_response link
         upload_start=$(now_epoch)
         local tok_state="pow"
         [[ -n "$token" ]] && tok_state="yes"
-        log_debug "  0807.st attempt ${attempt}/${max_retries} (token=$tok_state)"
+        log_debug "  0807.st attempt ${attempt}/${max_retries} (token=$tok_state, chunked=$use_chunked)"
 
-        if (( fsize <= simple_limit )); then
-            local -a curl_args=(-s --max-time "${UPLOAD_TIMEOUT:-3600}" -F "file=@${file}" -F "expiry=0" -F "maxdl=0")
+        local http_code="" stage="simple POST"
+        if [[ "$use_chunked" != true ]]; then
+            # Field ORDER matters for anonymous uploads: the proof must reach
+            # the server before the file body, so pow_* come first.
+            local -a curl_args=(--max-time "${UPLOAD_TIMEOUT:-3600}" -F "expiry=0" -F "maxdl=0")
             if [[ -n "$token" ]]; then
                 curl_args+=(-H "Authorization: Bearer ${token}")
             else
@@ -567,7 +637,7 @@ upload_to_st0807() {
                 pow=$(_st0807_pow_json)
                 if [[ -z "$pow" ]] || ! echo "$pow" | jq -e '.pow_nonce' >/dev/null 2>&1; then
                     log_warn "  0807.st: proof-of-work failed (attempt ${attempt})"
-                    (( ++attempt )); sleep 5; continue
+                    (( ++attempt )); sleep "${ST0807_RETRY_SLEEP:-5}"; continue
                 fi
                 curl_args+=(-F "pow_id=$(echo "$pow" | jq -r '.pow_id')")
                 curl_args+=(-F "pow_ts=$(echo "$pow" | jq -r '.pow_ts')")
@@ -575,9 +645,14 @@ upload_to_st0807() {
                 curl_args+=(-F "pow_sig=$(echo "$pow" | jq -r '.pow_sig')")
                 curl_args+=(-F "pow_nonce=$(echo "$pow" | jq -r '.pow_nonce')")
             fi
-            upload_response=$(curl "${curl_args[@]}" "https://0807.st/upload" 2>/dev/null) || true
+            curl_args+=(-F "file=@${file}")
+            _st0807_curl "${curl_args[@]}" "https://0807.st/upload"
+            http_code="$ST0807_HTTP"; upload_response="$ST0807_BODY"
         else
+            stage="chunked"
+            # runs in a subshell: the HTTP code travels inside the JSON (.http)
             upload_response=$(_st0807_chunked_upload "$file" "$token") || true
+            http_code=$(jq -r '.http // empty' <<< "$upload_response" 2>/dev/null || true)
         fi
 
         local upload_elapsed=$(( $(now_epoch) - upload_start ))
@@ -586,25 +661,41 @@ upload_to_st0807() {
         if [[ -n "$link" ]]; then
             local speed
             (( upload_elapsed > 0 )) && speed=$(format_size $(( fsize / upload_elapsed ))) || speed="instant"
-            log_ok "  0807.st: ✅ Upload complete, ${upload_elapsed}s (${speed}/s)"
+            log_ok "  0807.st: ✅ Upload complete (${stage}), ${upload_elapsed}s (${speed}/s)"
             log_info "  0807.st: Link → ${link}"
+            # The deletion URL is the ONLY way to remove the file later. Run
+            # logs are private to the repo; never put it in public JSON.
+            local del_url
+            del_url=$(echo "$upload_response" | jq -r '.deletion_url // empty' 2>/dev/null)
+            [[ -n "$del_url" ]] && log_info "  0807.st: deletion_url (keep private) → ${del_url}"
             ST0807_LINKS+=("${part_name}|${link}")
             return 0
         fi
 
-        log_warn "  0807.st: attempt ${attempt} failed, ${upload_response:0:200}"
+        _st0807_report_failure "${stage} (attempt ${attempt}/${max_retries})" "$http_code" "$upload_response" "$fsize"
+
+        if [[ "$http_code" == "429" ]]; then
+            _st0807_rate_limit_pause
+        elif [[ "$stage" == "simple POST" ]] && _st0807_size_rejected "$http_code" "$upload_response"; then
+            log_warn "  0807.st: simple POST rejected on size, switching to chunked upload"
+            use_chunked=true
+        fi
         (( ++attempt ))
-        sleep 5
+        sleep "${ST0807_RETRY_SLEEP:-5}"
     done
 
     log_error "  0807.st: ❌ All ${max_retries} attempts failed"
     return 1
 }
 
+# Chunked flow: POST /upload/init (JSON, carries the PoW when anonymous) →
+# POST /upload/chunk?id=&offset= (raw bytes, ≤16 MB each, each verified and
+# retried) → POST /upload/finish (JSON) which answers like a simple upload.
+# Prints the finish body, or a JSON error {error, http, body, offset?}.
 _st0807_chunked_upload() {
     local file="$1"
     local token="$2"
-    local fsize name mime init_body upload_id
+    local fsize name mime upload_id
     fsize=$(get_file_size "$file")
     name=$(make_safe_filename "$(basename "$file")")
     mime="video/mp4"
@@ -629,37 +720,66 @@ _st0807_chunked_upload() {
         }')
     fi
 
-    init_body=$(curl -s --max-time 60 "${hdr[@]}" -H "Content-Type: application/json" \
-        -d "$init_json" "https://0807.st/upload/init" 2>/dev/null) || true
-    upload_id=$(echo "$init_body" | jq -r '.uploadId // .id // empty' 2>/dev/null)
+    _st0807_curl --max-time 60 "${hdr[@]}" -H "Content-Type: application/json" \
+        -d "$init_json" "https://0807.st/upload/init"
+    upload_id=$(echo "$ST0807_BODY" | jq -r '.uploadId // .id // empty' 2>/dev/null)
     if [[ -z "$upload_id" ]]; then
-        echo "$init_body"
+        jq -cn --arg http "${ST0807_HTTP:-000}" --arg body "${ST0807_BODY:0:200}" '{error:"init_failed", http:$http, body:$body}'
         return 1
     fi
 
-    local chunk_size=16777216  # 16 MB
-    local offset=0
+    local chunk_size="$ST0807_CHUNK_SIZE"
+    local total_chunks=$(( (fsize + chunk_size - 1) / chunk_size ))
+    local offset=0 n=0
+    log_info "  0807.st: upload id ${upload_id}, ${total_chunks} chunk(s) of $(format_size "$chunk_size")" >&2
     while (( offset < fsize )); do
-        local this=$chunk_size
-        (( offset + this > fsize )) && this=$(( fsize - offset ))
         local chunk
         chunk=$(mktemp /tmp/st0807_chunk_XXXX)
-        dd if="$file" of="$chunk" bs=1 skip="$offset" count="$this" status=none 2>/dev/null || \
-            dd if="$file" of="$chunk" bs="$chunk_size" skip=$(( offset / chunk_size )) count=1 status=none 2>/dev/null
-        local chunk_resp
-        chunk_resp=$(curl -s --max-time "${UPLOAD_TIMEOUT:-3600}" "${hdr[@]}" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @"$chunk" \
-            "https://0807.st/upload/chunk?id=${upload_id}&offset=${offset}" 2>/dev/null) || true
+        # offset is always a multiple of chunk_size, so a block-sized dd is
+        # exact (the last block is naturally short). The old bs=1 copy issued
+        # one syscall per byte — minutes per chunk.
+        if ! dd if="$file" of="$chunk" bs="$chunk_size" skip=$(( offset / chunk_size )) count=1 iflag=fullblock status=none 2>/dev/null; then
+            rm -f "$chunk"
+            jq -cn --argjson offset "$offset" '{error:"chunk_read_failed", offset:$offset, http:"000"}'
+            return 1
+        fi
+        local this
+        this=$(get_file_size "$chunk")
+
+        local try=1 sent=false
+        while (( try <= 3 )); do
+            _st0807_curl --max-time "${UPLOAD_TIMEOUT:-3600}" "${hdr[@]}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$chunk" \
+                "https://0807.st/upload/chunk?id=${upload_id}&offset=${offset}"
+            if [[ "$ST0807_HTTP" =~ ^2[0-9][0-9]$ ]]; then sent=true; break; fi
+            log_warn "  0807.st: chunk $((n + 1))/${total_chunks} (offset ${offset}) failed — HTTP ${ST0807_HTTP:-000}: ${ST0807_BODY:0:120} (try ${try}/3)" >&2
+            if [[ "$ST0807_HTTP" == "429" ]]; then _st0807_rate_limit_pause >&2; else sleep "${ST0807_RETRY_SLEEP:-5}"; fi
+            (( ++try ))
+        done
         rm -f "$chunk"
+        if [[ "$sent" != true ]]; then
+            jq -cn --arg http "${ST0807_HTTP:-000}" --arg body "${ST0807_BODY:0:200}" --argjson offset "$offset" \
+                '{error:"chunk_failed", offset:$offset, http:$http, body:$body}'
+            return 1
+        fi
         offset=$(( offset + this ))
+        (( ++n ))
+        if (( n % 8 == 0 || n == total_chunks )); then
+            log_info "  0807.st: ${n}/${total_chunks} chunks sent ($(format_size "$offset"))" >&2
+        fi
     done
 
-    local finish_json finish_body
+    local finish_json
     finish_json=$(jq -n --arg id "$upload_id" '{id:$id, expiry:"0", maxdl:"0", password:"", vanity:""}')
-    finish_body=$(curl -s --max-time 120 "${hdr[@]}" -H "Content-Type: application/json" \
-        -d "$finish_json" "https://0807.st/upload/finish" 2>/dev/null) || true
-    echo "$finish_body"
+    _st0807_curl --max-time 120 "${hdr[@]}" -H "Content-Type: application/json" \
+        -d "$finish_json" "https://0807.st/upload/finish"
+    if [[ -n "$(echo "$ST0807_BODY" | jq -r '.url // empty' 2>/dev/null)" ]]; then
+        echo "$ST0807_BODY"
+    else
+        jq -cn --arg http "${ST0807_HTTP:-000}" --arg body "${ST0807_BODY:0:200}" '{error:"finish_failed", http:$http, body:$body}'
+        return 1
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

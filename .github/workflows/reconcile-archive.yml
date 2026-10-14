@@ -41,6 +41,9 @@ env:
   MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
   PIXELDRAIN_API_KEY: ${{ secrets.PIXELDRAIN_API_KEY }}
   GOFILE_API_KEY: ${{ secrets.GOFILE_API_KEY }}
+  # Optional 0807.st partner token: skips the proof-of-work and lifts the
+  # anonymous size cap. Empty = anonymous PoW upload (unchanged behaviour).
+  ST0807_TOKEN: ${{ secrets.ST0807_TOKEN }}
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
   RECORD_DIR: /tmp/stream-recorder
   TZ: Asia/Karachi

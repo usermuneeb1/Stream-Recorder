@@ -13,6 +13,7 @@ on:
     paths:
       - "dashboard/**"
       - "scripts/**"
+      - "tests/**"
       - ".github/workflows/**"
       - "package*.json"
   push:
@@ -20,6 +21,7 @@ on:
     paths:
       - "dashboard/**"
       - "scripts/**"
+      - "tests/**"
       - ".github/workflows/**"
       - "package*.json"
 
@@ -46,7 +48,7 @@ jobs:
       - name: "Install linters"
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck jq python3
+          sudo apt-get install -y -qq shellcheck jq python3 python3-yaml python3-pytest python3-requests
 
       - name: "Bash syntax"
         run: |
@@ -63,7 +65,7 @@ jobs:
 
       - name: "Python syntax"
         run: |
-          python3 -m py_compile scripts/mega/*.py
+          python3 -m compileall -q scripts
 
       - name: "GitHub actions lint"
         run: |
@@ -79,8 +81,24 @@ jobs:
       - name: "Data gate"
         run: bash scripts/data-gate.sh
 
-      - name: "Recording cascade test"
-        run: bash tests/record-cascade-test.sh
+      # Every tests/*.sh harness exits non-zero on RED (see each banner). Until
+      # 2026-10-14 only record-cascade-test.sh ran here; the other regression
+      # tests existed but gated nothing.
+      - name: "Regression tests (tests/*.sh)"
+        run: |
+          failed=()
+          for t in tests/*.sh; do
+            echo "::group::$t"
+            if bash "$t"; then echo "GREEN $t"; else echo "RED   $t"; failed+=("$t"); fi
+            echo "::endgroup::"
+          done
+          if (( ${#failed[@]} > 0 )); then
+            echo "::error::${#failed[@]} regression test(s) RED: ${failed[*]}"
+            exit 1
+          fi
+
+      - name: "Regression tests (pytest)"
+        run: python3 -m pytest tests -q
 
       - name: "Secret reference summary"
         run: |

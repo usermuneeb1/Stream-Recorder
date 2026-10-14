@@ -28,9 +28,20 @@ regexes = [
   '''KEY_ALG_RSA_2048''',
   '''TYPE_GOOGLE_CREDENTIALS_FILE''',
 ]
-# Stop scanning at this commit's parent — earlier history was reviewed when
-# gitleaks v2 was the standard. Switching to v3 surfaced cosmetic findings
-# in already-deleted files; this avoids re-flagging them on every push.
+# NOTE: `commits` does NOT mean "stop scanning here" — gitleaks skips findings
+# in exactly these SHAs and nothing else. The previous entry (784c714e, the
+# commit AFTER the reviewed history) suppressed nothing, so the weekly
+# full-history schedule scan failed 6/6 times (2026-08-03 → 2026-10-12) and
+# paged Discord "Potential secret detected!" every Monday, while push scans
+# (which only cover the pushed range) stayed green.
+#
+# 8e495b07 (2026-04-17, "Premium dashboard v3") is the only commit that fires:
+# 208 findings in lofi.html / sava.html / streams.html (deleted 2026-06-13) —
+# saved YouTube page blobs (entityKey/rolloutToken/... generic-api-key hits)
+# plus one `AIza…` gcp-api-key repeated 96×. That key is NOT YouTube's public
+# innertube web key; if it was ever a project key, make sure it is restricted
+# or rotated — this allowlist silences the weekly alarm, it does not purge it
+# from history.
 commits = [
-  "784c714e5cd94e0a9f3ae141ec138a06ccaa415d",
+  "8e495b07ca232bbc999ce43047064495548fd6c0",
 ]

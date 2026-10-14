@@ -33,10 +33,17 @@ check_link_alive() {
     if [[ "$url" =~ vikingfile\.com/f/([a-zA-Z0-9_-]+) ]]; then
         local vf_hash="${BASH_REMATCH[1]}"
         local vf_info vf_exist
-        vf_info=$(curl -s --max-time "$timeout" -X POST "https://vikingfile.com/api/check-file" -F "hash=${vf_hash}" 2>/dev/null) || return 1
-        vf_exist=$(echo "$vf_info" | jq -r '.exist // empty' 2>/dev/null)
-        [[ "$vf_exist" == "true" ]] && return 0
-        return 1
+        vf_info=$(curl -s --max-time "$timeout" -X POST "https://vikingfile.com/api/check-file" -F "hash=${vf_hash}" 2>/dev/null) || vf_info=""
+        # Array response, shared parser (utils.sh). Only an explicit
+        # exist:false is dead; an unverifiable answer must never put an
+        # [EXPIRED] marker on a link (2026-09..10: every refresh marked all
+        # 18 VikingFile links expired because the array was mis-parsed).
+        vf_exist=$(vikingfile_exist_state "$vf_info")
+        case "$vf_exist" in
+            alive) return 0 ;;
+            dead)  log_debug "    VikingFile API says dead"; return 1 ;;
+            *)     log_debug "    VikingFile check unverifiable, not marking dead"; return 0 ;;
+        esac
     fi
 
     # Gofile: /d/<code> returns HTTP 200 with the SPA shell even for deleted
@@ -350,9 +357,25 @@ mark_dead_in_links_txt() {
     local dead_url="$1"
     local links_content="$2"
     
-    # Replace the dead URL line with [EXPIRED] marker
-    # e.g. "[gofile:Full] https://gofile.io/d/xxx" → "[gofile:Full] https://gofile.io/d/xxx [EXPIRED]"
-    echo "$links_content" | sed "s|${dead_url}|${dead_url} [EXPIRED]|g"
+    # Append exactly one " [EXPIRED]" marker after the dead URL, e.g.
+    #   "[gofile:Full] https://gofile.io/d/xxx" → "[gofile:Full] https://gofile.io/d/xxx [EXPIRED]"
+    # Literal match (no regex: URLs carry . ? & | which sed would interpret),
+    # the URL must end at a word boundary (so /d/abc never marks /d/abcd), and
+    # existing markers are collapsed so repeated refreshes are idempotent.
+    DEAD_URL="$dead_url" awk '
+        {
+            line = $0
+            url  = ENVIRON["DEAD_URL"]
+            i    = index(line, url)
+            if (i > 0) {
+                rest = substr(line, i + length(url))
+                if (rest == "" || substr(rest, 1, 1) ~ /[[:space:])\]]/) {
+                    while (substr(rest, 1, 10) == " [EXPIRED]") rest = substr(rest, 11)
+                    line = substr(line, 1, i - 1) url " [EXPIRED]" rest
+                }
+            }
+            print line
+        }' <<< "$links_content"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -379,8 +402,22 @@ refresh_links() {
     }
     
     if [[ -z "$links_content" ]]; then
-        log_info "links.txt is empty, nothing to refresh"
+        log_info "recordings.json is empty, nothing to refresh"
         return 0
+    fi
+    
+    # ── Read links.txt (legacy Discord-facing feed) ───────────────────────────
+    # The [EXPIRED] markers belong in THIS file. $links_content above is
+    # recordings.json despite its name (the URL source moved there in v2);
+    # until 2026-10-14 the markers were applied to that JSON text and the
+    # result was written to links.txt, which replaced the legacy feed with a
+    # JSON copy on every refresh and deleted every entry update-links.sh had
+    # prepended since the previous run. Missing/unreadable → skip the marking,
+    # never fabricate the file.
+    local links_txt_content=""
+    links_txt_content=$(github_api_read_content "links.txt" 2>/dev/null) || links_txt_content=""
+    if [[ -z "$links_txt_content" ]]; then
+        log_warn "links.txt missing or unreadable, [EXPIRED] markers will not be written this run"
     fi
     
     # ── Parse into structured entries ─────────────────────────────────────────
@@ -464,7 +501,7 @@ refresh_links() {
     # ── Track results ─────────────────────────────────────────────────────────
     local total_checked=0 total_alive=0 total_refreshed=0 total_dead=0 total_edited=0
     local dead_gofile_urls=() dead_pixeldrain_urls=() dead_st0807_urls=() dead_vikingfile_urls=()
-    local updated_links="$links_content"
+    local updated_links="$links_txt_content"
     
     # ── Refresh Gofile links (1KB ping) ───────────────────────────────────────
     if [[ "$do_gofile" == true ]] && (( total_gofile > 0 )); then
@@ -686,8 +723,10 @@ refresh_links() {
         done
     fi
     
-    # ── Save updated links.txt if any links died ─────────────────────────────
-    if [[ "$updated_links" != "$links_content" ]] && [[ "$dry_run" != "true" ]]; then
+    # ── Save updated links.txt if a marker was added ─────────────────────────
+    # Compared against the links.txt we read (not recordings.json), so a file
+    # whose dead links are already marked produces no commit.
+    if [[ -n "$links_txt_content" ]] && [[ "$updated_links" != "$links_txt_content" ]] && [[ "$dry_run" != "true" ]]; then
         log_step "Saving updated links.txt (marking expired links)..."
         
         if github_api_write "links.txt" "$updated_links" "Link refresh: ${total_dead} expired links marked [$(now_pkt)]"; then

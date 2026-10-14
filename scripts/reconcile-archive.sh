@@ -137,8 +137,8 @@ reconcile() {
     skip_map=$(jq -r '.[] // empty' "$SKIP_JSON" 2>/dev/null | sort -u || true)
     local cutoff_epoch=$(( $(date +%s) - WINDOW_DAYS * 86400 ))
 
-    log_info "Known recordings : $(echo "$known" | grep -c . || echo 0)"
-    log_info "Skip list        : $(echo "$skip_map" | grep -c . || echo 0)"
+    log_info "Known recordings : $(echo "$known" | grep -c . || true)"
+    log_info "Skip list        : $(echo "$skip_map" | grep -c . || true)"
     log_info "Window           : last ${WINDOW_DAYS} days"
 
     local missed=0 rescued=0 failed=0

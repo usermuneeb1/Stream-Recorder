@@ -158,7 +158,7 @@ jobs:
           git add data/recordings.json
           git diff --cached --quiet || {
             git commit -m "Telegram: uploaded all recordings"
-            git push
+            bash scripts/safe-push.sh
           }
 
       - name: Alert if any Telegram upload failed

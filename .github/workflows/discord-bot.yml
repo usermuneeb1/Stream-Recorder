@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  DISCORD BOT, Scheduled Status & Manual Commands                             ║
 # ║                                                                              ║
-# ║ Runs every 6 hours to post system status to Discord.                         ║
-# ║ Can also be triggered manually with a specific command.                      ║
+# ║ Manual commands only (status/latest/accounts/record/refresh) — the          ║
+# ║ 6-hourly status post was switched off on 2026-10-14 at the owner's request. ║
 # ║                                                                              ║
 # ║ SAFE: Standalone workflow. Does NOT modify existing workflows.               ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -10,9 +10,9 @@
 name: Discord bot
 
 on:
-  schedule:
-    # Post status every 6 hours
-    - cron: "0 */6 * * *"
+  # Schedule removed 2026-10-14 (owner request): the 6-hourly "Stream Recorder
+  # system status" embed was pure noise. The bot is manual-only now; the
+  # dashboard shows the same numbers live.
   workflow_dispatch:
     inputs:
       command:

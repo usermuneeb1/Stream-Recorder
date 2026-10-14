@@ -60,5 +60,5 @@ jobs:
             echo "no new chats to commit"
           else
             git commit -m "Archive live chats ($(git diff --cached --name-only | wc -l) files)"
-            git push
+            bash scripts/safe-push.sh
           fi

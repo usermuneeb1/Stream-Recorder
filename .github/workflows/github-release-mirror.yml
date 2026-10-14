@@ -65,7 +65,7 @@ jobs:
             git config user.email "bot@stream-recorder.local"
             git add data/recordings.json
             git commit -m "Mirror: upload videos to GitHub Releases, $(date -u '+%Y-%m-%d')"
-            git push
+            bash scripts/safe-push.sh
             echo "✅ Release links committed."
           else
             echo "No changes to commit."
