@@ -39,7 +39,7 @@ jobs:
           if ! git diff --quiet -- data/recordings.json; then
             git add data/recordings.json
             git commit -m "Reset youtube_id/youtube_unlisted for non-embeddable videos"
-            git push
+            bash scripts/safe-push.sh
           else
             echo "No changes to commit."
           fi

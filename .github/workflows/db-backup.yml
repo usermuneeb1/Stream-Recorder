@@ -58,7 +58,7 @@ jobs:
             git config user.email "bot@stream-recorder.local"
             git add data/backups
             git commit -m "DB backup snapshot, $(date -u '+%Y-%m-%d')"
-            git push
+            bash scripts/safe-push.sh
             echo "✅ Backup committed."
           else
             echo "Nothing to commit."

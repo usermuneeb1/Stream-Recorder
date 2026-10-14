@@ -57,5 +57,5 @@ jobs:
           git add data/recordings.json
           git diff --cached --quiet || {
             git commit -m "Auto-generated custom thumbnails"
-            git push
+            bash scripts/safe-push.sh
           }

@@ -70,5 +70,5 @@ jobs:
           git add data/predicted-schedule.json data/upcoming-streams.json 2>/dev/null || true
           git diff --cached --quiet || {
             git commit -m "Update stream schedule predictions"
-            git push
+            bash scripts/safe-push.sh
           }

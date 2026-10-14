@@ -91,5 +91,5 @@ jobs:
           git add data/recordings.json
           git diff --cached --quiet || {
             git commit -m "Add Catbox thumbnail mirrors"
-            git push
+            bash scripts/safe-push.sh
           }

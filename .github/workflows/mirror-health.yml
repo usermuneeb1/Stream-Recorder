@@ -132,6 +132,6 @@ jobs:
           git add data/mirror-health.json data/system-status.json
           git diff --cached --quiet || {
             git commit -m "mirror health snapshot, $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git push
+            bash scripts/safe-push.sh
             echo "committed mirror health"
           }
