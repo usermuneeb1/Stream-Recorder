@@ -15,9 +15,9 @@ on:
         default: ""
         type: string
       max_items:
-        description: "Maximum recordings to repair this run"
+        description: "Maximum recordings to repair this run (18 = whole archive in one pass)"
         required: false
-        default: "3"
+        default: "6"
         type: string
       destinations:
         description: "Comma list: gofile,pixeldrain,mega,st0807,vikingfile"
@@ -90,7 +90,9 @@ jobs:
       - name: "Repair from Archive.org"
         env:
           TARGET_VIDEO_ID: ${{ github.event.inputs.video_id }}
-          MAX_ITEMS: ${{ github.event.inputs.max_items || '3' }}
+          # 6/day (was 3): 16 recordings are missing their 0807.st mirror
+          # (2026-10-14); each repair = one Archive.org download + uploads.
+          MAX_ITEMS: ${{ github.event.inputs.max_items || '6' }}
           DESTINATIONS: ${{ github.event.inputs.destinations || 'gofile,pixeldrain,mega,st0807,vikingfile' }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: bash scripts/repair-mirrors.sh
