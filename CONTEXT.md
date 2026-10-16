@@ -27,11 +27,28 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
 - **`mirror-health.sh` must never emit fewer rows than input recordings** — a
   structural guard exits 2 (vacuous-success outage 2026-09-02: workflow was
   green while checking nothing, so repair never dispatched).
-- **Gofile is keyless by owner policy (2026-09-02).** Detection = public `wt`
-  token contents endpoint only; upload = auto-minted guest token. The gofile
-  SPA page returns 200 for dead folders — never treat page-200 as “alive”.
+- **Gofile detection needs a real bearer token (corrected 2026-10-16).** Use
+  `utils.sh gofile_contents_status()`, never a raw `?wt=` call: `GOFILE_API_KEY`
+  when the operator set it, else ONE auto-minted guest account per run (the same
+  flow the uploader already used). The public `wt` website token comes from
+  gofile's obfuscated `wt.obf.js` and **rotates**; a stale one returns
+  `error-token`, which must read as *unverifiable* — never *alive*. Three
+  consequences of the old hardcoded `wt=4fd6sg89d7s6`: every gofile mirror read
+  unverifiable (18/18 in mirror-health.json), `repair-mirrors` fell through to
+  grepping the `/d/` SPA shell (HTTP 200, no error text) and reported DELETED
+  folders as alive, and `refresh_gofile`'s keep-alive was phantom again.
+  The gofile SPA page returns 200 for dead folders — never treat page-200 as
+  “alive”.
 - **Host TTLs**: gofile 10d idle · 0807.st ~30d idle (owner correction) ·
   pixeldrain 60d. Keep-alive rides the 5-day gofile run (carries 0807+viking).
+- **Every host counted in `summary.dead_links` must have a repairer.** dead_links
+  dispatches `repair-mirrors.yml`, whose destinations are
+  gofile/pixeldrain/mega/st0807/vikingfile. **GitHub releases are NOT among
+  them** — they are repaired by `github-release-mirror.yml`, which is why
+  `github-release-upload.py` must re-verify existing `github_release` URLs and
+  re-upload a 404 asset. Until 2026-10-16 it skipped any recording with a
+  non-empty `github_release`, so a deleted asset was unfixable and re-paged
+  every 6h forever. telegram/youtube/archive_direct stay demotion-only.
 - **Workflow `shell: bash` = `bash -eo pipefail`.** Every pipeline must be
   -e-safe (`|| true` OUTSIDE the `$(...)` assignment). The install drift
   sentinel died silently for days because `awk … | grep … | wc -l` returned 1

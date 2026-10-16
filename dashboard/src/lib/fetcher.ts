@@ -249,6 +249,11 @@ export async function fetchStatus(): Promise<SystemStatus | null> {
     mirrorHealthy:    mh ? mh.healthy : undefined,
     mirrorTotal:      mh ? mh.total : undefined,
     mirrorDegraded:   mh ? mh.degraded : undefined,
+    // dead_links is a SEPARATE failure from degraded: every recording can still
+    // meet the copy guarantee (degraded=0) while individual mirror links are
+    // dead and queued for repair. Dropping it made the tile read "healthy"
+    // while the health sweep was paging about dead links every 6 hours.
+    mirrorDeadLinks:  mh ? (mh.dead_links ?? undefined) : undefined,
   };
 }
 

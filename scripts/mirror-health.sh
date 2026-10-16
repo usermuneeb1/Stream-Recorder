@@ -44,31 +44,15 @@ classify() {
 }
 
 # Gofile: the /d/<code> page returns 200 even for a deleted/expired folder, so
-# the page can't prove existence. Preferred: Contents API with the account key
-# (GOFILE_API_KEY). Fallback: the SAME API with the public website token (wt)
-# from gofile.io/js/wt.obf.js — but that file is obfuscated and the token
-# rotates, so a hardcoded wt usually returns "error-token" → unverifiable.
-# That is ACCEPTABLE by policy: gofile is disposable; it can satisfy the fast
-# side of the bar only when actually verifiable. Pixeldrain + GitHub releases
-# carry the fast side otherwise.
+# the page can't prove existence. Verify through the Contents API with a real
+# bearer token (utils.sh gofile_contents_status): GOFILE_API_KEY when the
+# operator set it, otherwise ONE auto-minted guest account per run — the same
+# flow the uploader uses. The public `wt` website token is the last resort only
+# and it ROTATES: a stale one yields error-token, which is reported as
+# unverifiable (never "alive"), and the pixeldrain/github/0807 classifiers
+# still carry the fast side of the bar.
 classify_gofile() {
-    local url="$1" code status
-    code=$(echo "$url" | sed -n 's#.*/d/\([^/?#]*\).*#\1#p')
-    if [[ -z "$code" ]]; then
-        printf 'unverifiable'; return
-    fi
-    # Public website token only — no account API key anywhere (owner policy
-    # 2026-09-02). A stale wt yields error-token → unverifiable, and the
-    # pixeldrain/github/archive classifiers still carry the verdict.
-    status=$(curl -sS --max-time "$CHECK_TIMEOUT" \
-        "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null \
-        | jq -r '.status // "error"' 2>/dev/null || echo error)
-    case "$status" in
-        ok) printf 'alive' ;;
-        # API returns "error-notFound" — glob the substring, never exact-match
-        *notFound*|*notfound*) printf 'dead' ;;
-        *) printf 'unverifiable' ;;
-    esac
+    gofile_contents_status "$1" "$CHECK_TIMEOUT"
 }
 
 # MEGA: the HTML page returns 200 whether or not the file exists (key is in

@@ -97,6 +97,8 @@ export interface SystemStatus {
   mirrorHealthy?: boolean;
   mirrorTotal?: number;
   mirrorDegraded?: number;
+  /** Dead mirror links awaiting repair, even when the guarantee still holds. */
+  mirrorDeadLinks?: number;
 }
 
 export interface StreamPrediction {

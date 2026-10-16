@@ -73,6 +73,12 @@ jobs:
         run: |
           DEAD="${{ steps.result.outputs.dead }}"
           DEGRADED="${{ steps.result.outputs.degraded }}"
+          # Two different failures share this step: a recording BELOW the copy
+          # guarantee, and a recording that still meets it but carries dead
+          # mirror links. The summary used to list only `.healthy == false`,
+          # so the common case (degraded=0, dead>0) alerted "N dead link(s)"
+          # and named nothing — the owner could not tell whether repair was
+          # converging or the same links were dying forever.
           echo "###  Mirror health degraded" >> "$GITHUB_STEP_SUMMARY"
           echo "- $DEGRADED recording(s) below the copy guarantee" >> "$GITHUB_STEP_SUMMARY"
           echo "- $DEAD dead mirror link(s)" >> "$GITHUB_STEP_SUMMARY"
@@ -82,10 +88,33 @@ jobs:
           # under bash -e on 95/100 runs (2026-09-02 → 2026-10-14), so neither
           # the Discord alert nor the repair dispatch below ever ran.
           # tests/mirror-health-alert-step-test.sh replays this step.
-          jq -r '.recordings[] | select(.healthy == false) | "- `\(.video_id)`: \(.alive) alive, \(.dead) dead"' data/mirror-health.json >> "$GITHUB_STEP_SUMMARY"
+          # `.mirrors // {}`: tolerate rows written before mirrors{} existed.
+          DETAIL=$(jq -r '
+            .recordings[]
+            | select((.healthy == false) or ((.dead // 0) > 0))
+            | [.video_id,
+               (if .healthy then "guarantee met" else "BELOW GUARANTEE" end),
+               ((.mirrors // {}) | to_entries | map(select(.value == "dead") | .key) | join(", "))]
+            | "- `\(.[0])`: \(.[1]) — dead: \(.[2])"
+          ' data/mirror-health.json)
+          echo "$DETAIL" >> "$GITHUB_STEP_SUMMARY"
 
-          # Discord alert
+          # Discord alert — carries the same detail, so the ping is actionable
+          # without opening the run log.
           MSG="⚠️ **Mirror health degraded**: $DEGRADED recording(s) below guarantee, $DEAD dead link(s). Triggering repair."
+          # Build the multi-line message WITHOUT literal newlines in the script:
+          # this body is a YAML block scalar, so a continuation line at column 0
+          # ends the scalar and breaks the whole workflow file. $'\n' instead.
+          # Also `if`, never `(( )) &&` — the runner shell is bash -eo pipefail
+          # and a false arithmetic test would abort the step.
+          if [[ -n "$DETAIL" ]]; then
+            TOP="$(echo "$DETAIL" | head -8)"
+            MSG="${MSG}"$'\n'"${TOP}"
+            EXTRA=$(( $(echo "$DETAIL" | wc -l) - 8 ))
+            if (( EXTRA > 0 )); then
+              MSG="${MSG}"$'\n'"…and ${EXTRA} more (see the run summary)"
+            fi
+          fi
           WEBHOOK="${DISCORD_WEBHOOK_ALERTS:-${DISCORD_WEBHOOK_URL:-}}"
           if [[ -n "$WEBHOOK" ]]; then
             curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" \

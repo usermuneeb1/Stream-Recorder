@@ -855,6 +855,117 @@ vikingfile_exist_state() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  GOFILE API TOKEN + CONTENTS STATUS (shared by health, repair, refresh)
+#
+#  The website token `?wt=4fd6sg89d7s6` is embedded in gofile's obfuscated
+#  /js/wt.obf.js and ROTATES. Once it goes stale the Contents API answers
+#  "error-token" for every folder, so:
+#    - mirror-health reported all 18 gofile mirrors "unverifiable"
+#    - repair-mirrors' gate fell through to the /d/ page heuristic and read a
+#      DELETED folder as ALIVE (the SPA shell is HTTP 200 with no error text)
+#    - refresh_gofile's keep-alive ping was phantom again (the 2026-09-02 bug)
+#  A real bearer token is authoritative, so obtain one the same way the
+#  uploader does: GOFILE_API_KEY if the operator set it, else mint ONE guest
+#  account per run and reuse it. Prints exactly one of:
+#    alive | dead | unverifiable
+#  Never treat a page-200 or an error-token as "alive".
+# ═══════════════════════════════════════════════════════════════════════════════
+
+GOFILE_API_TOKEN_CACHE=""
+# classify_* run inside $(...) subshells, so an in-memory cache never persists
+# across recordings and the old code minted one guest account PER LINK (18 per
+# health sweep). Gofile's docs say never mint an account per call, so keep the
+# minted token in a 0600 file with a short TTL instead.
+GOFILE_TOKEN_CACHE_FILE="${GOFILE_TOKEN_CACHE_FILE:-${TMPDIR:-/tmp}/.stream-recorder-gofile-token}"
+GOFILE_TOKEN_TTL="${GOFILE_TOKEN_TTL:-3600}"
+
+gofile_api_token() {
+    # Echoes a usable bearer token; returns 1 when none can be obtained.
+    if [[ -n "${GOFILE_API_KEY:-}" ]]; then
+        echo "$GOFILE_API_KEY"
+        return 0
+    fi
+    if [[ -n "$GOFILE_API_TOKEN_CACHE" ]]; then
+        echo "$GOFILE_API_TOKEN_CACHE"
+        return 0
+    fi
+    # Reuse a token minted earlier in this run (or a recent one).
+    if [[ -r "$GOFILE_TOKEN_CACHE_FILE" ]]; then
+        local cached age now ts
+        ts=$(cut -d' ' -f1 < "$GOFILE_TOKEN_CACHE_FILE" 2>/dev/null)
+        cached=$(cut -d' ' -f2 < "$GOFILE_TOKEN_CACHE_FILE" 2>/dev/null)
+        now=$(date +%s)
+        if [[ "$ts" =~ ^[0-9]+$ && -n "$cached" ]]; then
+            age=$(( now - ts ))
+            if (( age >= 0 && age < GOFILE_TOKEN_TTL )); then
+                GOFILE_API_TOKEN_CACHE="$cached"
+                echo "$cached"
+                return 0
+            fi
+        fi
+    fi
+    local resp tok
+    resp=$(curl -s --max-time 30 -X POST "https://api.gofile.io/accounts" \
+        -H "Content-Type: application/json" -d '{}' 2>/dev/null) || true
+    tok=$(echo "$resp" | jq -r '.data.token // empty' 2>/dev/null)
+    if [[ -n "$tok" ]]; then
+        GOFILE_API_TOKEN_CACHE="$tok"
+        { umask 077; printf '%s %s\n' "$(date +%s)" "$tok" > "$GOFILE_TOKEN_CACHE_FILE"; } 2>/dev/null || true
+        echo "$tok"
+        return 0
+    fi
+    return 1
+}
+
+gofile_contents_status() {
+    # $1 = folder code (or full /d/ URL), $2 = optional curl timeout
+    local ref="${1:-}" timeout="${2:-20}" code="" tok="" resp="" status=""
+    [[ -z "$ref" ]] && { printf 'unverifiable'; return 0; }
+    if [[ "$ref" == *"/d/"* ]]; then
+        code=$(sed -n 's#.*gofile\.io/d/\([^/?# ]*\).*#\1#p' <<< "$ref" | head -1)
+    else
+        code="$ref"
+    fi
+    [[ -z "$code" ]] && { printf 'unverifiable'; return 0; }
+
+    if tok=$(gofile_api_token 2>/dev/null) && [[ -n "$tok" ]]; then
+        resp=$(curl -s --max-time "$timeout" \
+            -H "Authorization: Bearer ${tok}" \
+            "https://api.gofile.io/contents/${code}" 2>/dev/null) || resp=""
+        status=$(jq -r '.status // "error"' <<< "$resp" 2>/dev/null) || status="error"
+    else
+        # No token at all: last-resort public website token. A stale wt yields
+        # error-token, which MUST read as unverifiable, never alive.
+        resp=$(curl -s --max-time "$timeout" \
+            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null) || resp=""
+        status=$(jq -r '.status // "error"' <<< "$resp" 2>/dev/null) || status="error"
+    fi
+    case "$status" in
+        ok)                     printf 'alive' ;;
+        *notFound*|*notfound*)  printf 'dead' ;;
+        # error-token → the token is stale; drop the cache and retry once
+        *token*)
+            GOFILE_API_TOKEN_CACHE=""
+            rm -f "$GOFILE_TOKEN_CACHE_FILE" 2>/dev/null || true
+            if tok=$(gofile_api_token 2>/dev/null) && [[ -n "$tok" ]]; then
+                status=$(curl -s --max-time "$timeout" \
+                    -H "Authorization: Bearer ${tok}" \
+                    "https://api.gofile.io/contents/${code}" 2>/dev/null \
+                    | jq -r '.status // "error"' 2>/dev/null) || status="error"
+                case "$status" in
+                    ok)                    printf 'alive' ;;
+                    *notFound*|*notfound*) printf 'dead' ;;
+                    *)                     printf 'unverifiable' ;;
+                esac
+            else
+                printf 'unverifiable'
+            fi
+            ;;
+        *)                      printf 'unverifiable' ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  CONFIGURATION LOADER
 #  Load configuration from config.env
 # ═══════════════════════════════════════════════════════════════════════════════

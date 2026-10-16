@@ -75,25 +75,16 @@ GOFILE_GUEST_TOKEN=""
 
 _gofile_token() {
     # Echoes a usable bearer token; empty string on failure.
-    if [[ -n "${GOFILE_API_KEY:-}" ]]; then
-        echo "${GOFILE_API_KEY}"
-        return 0
-    fi
-    if [[ -n "$GOFILE_GUEST_TOKEN" ]]; then
-        echo "$GOFILE_GUEST_TOKEN"
-        return 0
-    fi
-    local resp
-    resp=$(curl -s --max-time 30 -X POST "https://api.gofile.io/accounts" \
-        -H "Content-Type: application/json" -d '{}' 2>/dev/null) || true
-    local tok
-    tok=$(echo "$resp" | jq -r '.data.token // empty' 2>/dev/null)
-    if [[ -n "$tok" ]]; then
+    # Delegates to the shared utils.sh implementation so the uploader and the
+    # three VERIFICATION paths (mirror-health, repair-mirrors, refresh-links)
+    # always agree on how a gofile token is obtained.
+    local tok=""
+    if tok=$(gofile_api_token 2>/dev/null) && [[ -n "$tok" ]]; then
         GOFILE_GUEST_TOKEN="$tok"
         echo "$tok"
         return 0
     fi
-    log_warn "  Gofile: could not mint guest account (${resp:0:120})"
+    log_warn "  Gofile: could not mint guest account"
     return 1
 }
 

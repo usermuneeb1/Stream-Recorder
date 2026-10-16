@@ -16,40 +16,22 @@ REPAIR_DIR="${REPAIR_DIR:-/tmp/stream-repair}"
 FORCE_REPAIR="${FORCE_REPAIR:-false}"
 mkdir -p "$REPAIR_DIR"
 
+# Returns 0 alive, 1 dead (re-upload), 2 unverifiable (leave alone).
+# Same 3-state contract as _is_vikingfile_alive below: an unverifiable answer
+# must never read as "dead" (that churned re-uploads) and must never read as
+# "alive" either — the /d/ page is the SPA shell, HTTP 200 with no error text,
+# so the old page-grep fallback reported EVERY deleted folder as alive
+# (2026-09-02 bug class) once the public `wt` token went stale.
 _is_gofile_alive() {
     local url="$1"
     [[ -z "$url" ]] && return 1
     # FORCE mode = always consider dead (force re-upload)
     [[ "${FORCE_REPAIR:-false}" == "true" ]] && return 1
-    # The Contents API (public website token — no account key, by policy
-    # 2026-09-02) is authoritative; /d/ pages return 200 even when expired
-    # (SPA shell). 2026-09-02: page-grep said "alive" for every dead folder.
-    local code status
-    code=$(sed -n 's#.*gofile\.io/d/\([^/?# ]*\).*#\1#p' <<< "$url" | head -1)
-    if [[ -n "$code" ]]; then
-        status=$(curl -s --max-time 20 \
-            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
-        case "$status" in
-            ok) return 0 ;;
-            *notFound*|*notfound*) return 1 ;;
-            *) : ;;  # token/network error → unverifiable, fall through to heuristic
-        esac
-    fi
-    # Gofile pages return HTTP 200 even when expired. Check actual content.
-    local page
-    page=$(curl -sL --max-time 20 "$url" 2>/dev/null) || return 1
-    # If page contains "not found" or "expired" or lacks download button, it's dead
-    if echo "$page" | grep -qiE "not found|file.*(removed|expired|deleted)|contentnotfound"; then
-        return 1
-    fi
-    # Also check if the page is basically empty / error page
-    local size=${#page}
-    # Check for known Gofile error indicators (more reliable than byte count)
-    if echo "$page" | grep -qiE "(page not found|file was deleted|removed|expired|404)"; then
-        return 1
-    fi
-    (( size < 300 )) && return 1
-    return 0
+    case "$(gofile_contents_status "$url" 20)" in
+        alive) return 0 ;;
+        dead)  return 1 ;;
+        *)     return 2 ;;
+    esac
 }
 
 _is_pixeldrain_alive() {
@@ -245,7 +227,18 @@ repair_mirrors() {
 
         local need_gofile=false need_pixel=false need_mega=false need_st0807=false need_viking=false
         if [[ "$destinations" == *gofile* ]]; then
-            _is_gofile_alive "$gofile_old" || need_gofile=true
+            # 3-state: 0 alive, 1 dead → re-upload, 2 unverifiable → leave the
+            # existing link alone (an empty link still counts as "needs upload").
+            if [[ -z "$gofile_old" ]]; then
+                need_gofile=true
+            else
+                local gofile_rc=0
+                _is_gofile_alive "$gofile_old" || gofile_rc=$?
+                case "$gofile_rc" in
+                    1) need_gofile=true ;;
+                    2) log_warn "  Gofile: Contents API unverifiable for ${gofile_old} — keeping the existing link (no re-upload)" ;;
+                esac
+            fi
         fi
         if [[ "$destinations" == *pixeldrain* ]]; then
             _is_pixeldrain_alive "$pixel_old" || need_pixel=true

@@ -47,30 +47,19 @@ check_link_alive() {
     fi
 
     # Gofile: /d/<code> returns HTTP 200 with the SPA shell even for deleted
-    # folders — the page proves NOTHING. The Contents API with the PUBLIC
-    # website token (no account key, by policy 2026-09-02) is the only reliable
-    # signal. error-notFound → dead; error-token/network → page-content
-    # heuristic (same rule as repair-mirrors _is_gofile_alive): only explicit
-    # dead markers count, because a bare page-200 must never mean "alive".
+    # folders — the page proves NOTHING. The Contents API with a real bearer
+    # token (utils.sh gofile_contents_status: GOFILE_API_KEY, else a minted
+    # guest account) is the only reliable signal. error-notFound → dead;
+    # error-token/network → unverifiable, and like VikingFile an unverifiable
+    # answer must NEVER put an [EXPIRED] marker on the link.
     if [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]]; then
-        local gf_code="${BASH_REMATCH[1]}"
-        local gf_status
-        gf_status=$(curl -s --max-time "$timeout" \
-            "https://api.gofile.io/contents/${gf_code}?wt=4fd6sg89d7s6" 2>/dev/null | jq -r '.status // "error"' 2>/dev/null)
-        case "$gf_status" in
-            ok) return 0 ;;
-            *notFound*|*notfound*) log_debug "    Gofile API says dead: $gf_status"; return 1 ;;
-            *)
-                local gf_page
-                gf_page=$(curl -sL --max-time "$timeout" "$url" 2>/dev/null) || return 1
-                if echo "$gf_page" | grep -qiE "not found|file.*(removed|expired|deleted)|contentnotfound|page not found|file was deleted"; then
-                    log_debug "    Gofile page says dead"; return 1
-                fi
-                return 0
-                ;;
+        case "$(gofile_contents_status "$url" "$timeout")" in
+            alive) return 0 ;;
+            dead)  log_debug "    Gofile API says dead"; return 1 ;;
+            *)     log_debug "    Gofile check unverifiable, not marking dead"; return 0 ;;
         esac
     fi
-    
+
     local http_code
     http_code=$(curl -s -o /dev/null -w '%{http_code}' \
         --max-time "$timeout" \
@@ -94,13 +83,24 @@ refresh_gofile() {
     local code=""
     [[ "$url" =~ gofile\.io/d/([a-zA-Z0-9_-]+) ]] && code="${BASH_REMATCH[1]}"
 
-    # Best-effort keep-alive WITHOUT an account API key (policy 2026-09-02):
-    # hit the public Contents endpoint — real content access, unlike the bare
-    # /d/ page which only downloads the SPA shell (the old "refresh" was
-    # phantom and let every link expire). Falls back to the page ping.
+    # Keep-alive through the Contents API with a REAL bearer token: that is
+    # genuine content access, unlike the bare /d/ page which only serves the
+    # SPA shell (the old page ping was phantom and let every link expire).
+    # A stale public `wt` returns HTTP 200 + error-token, so the JSON status —
+    # not the exit code — is what proves the refresh actually landed.
     if [[ -n "$code" ]]; then
-        curl -sf -o /dev/null --max-time 30 \
-            "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null && return 0
+        local tok="" body=""
+        if tok=$(gofile_api_token 2>/dev/null) && [[ -n "$tok" ]]; then
+            body=$(curl -s --max-time 30 -H "Authorization: Bearer ${tok}" \
+                "https://api.gofile.io/contents/${code}" 2>/dev/null) || body=""
+        else
+            body=$(curl -s --max-time 30 \
+                "https://api.gofile.io/contents/${code}?wt=4fd6sg89d7s6" 2>/dev/null) || body=""
+        fi
+        if [[ "$(jq -r '.status // "error"' <<< "$body" 2>/dev/null)" == "ok" ]]; then
+            return 0
+        fi
+        log_debug "    Gofile keep-alive not confirmed (status=$(jq -r '.status // "error"' <<< "$body" 2>/dev/null)) — falling back to page ping"
     fi
 
     curl -s -o /dev/null --max-time 30 \

@@ -8,7 +8,11 @@
 # ║    3. Upload the .mp4 as a release asset (≤2 GiB/file, no total/bandwidth ca ║
 # ║    4. Save the permanent fast CDN URL into data/recordings.json              ║
 # ║                                                                              ║
-# ║  Idempotent: skips recordings that already have github_release.              ║
+# ║  Idempotent: skips recordings whose github_release asset still resolves.     ║
+# ║  A github_release URL that 404s is treated as MISSING and re-uploaded,      ║
+# ║  otherwise mirror-health counts it as a dead link and pages every 6h for a  ║
+# ║  repair that repair-mirrors cannot perform (github is not one of its        ║
+# ║  destinations) — a permanent, unfixable alert loop.                         ║
 # ║  Safe: never deletes existing data; only adds github_release / github_direct ║
 # ║                                                                              ║
 # ║  Env:  GITHUB_TOKEN (required)  REPO (owner/name)  GH_MAX_ITEMS (default 5)  ║
@@ -48,6 +52,29 @@ def gh(method, url, *, data=None, headers=None, raw=False):
         return r.status_code, r.json()
     except Exception:
         return r.status_code, {}
+
+
+def release_asset_alive(url):
+    """True/False for a definitive answer, None when the check is inconclusive.
+
+    Only an explicit 404/410 counts as dead. Anything else (redirect, timeout,
+    5xx) is inconclusive so a flaky runner never triggers a multi-GB re-upload.
+    """
+    if not url:
+        return False
+    import requests
+    try:
+        r = requests.get(url, stream=True, timeout=60, allow_redirects=True,
+                         headers={"Range": "bytes=0-0"})
+        r.close()
+    except Exception as e:
+        log(f"   ⚠️ could not verify release asset ({e}) — leaving it alone")
+        return None
+    if r.status_code in (404, 410):
+        return False
+    if 200 <= r.status_code < 400:
+        return True
+    return None
 
 
 def archive_mp4_url(rec):
@@ -115,6 +142,35 @@ def upload_asset(release_id, filepath, name):
         return r.status_code, {}
 
 
+def select_todo(recs, max_items):
+    """Recordings that still need a release asset.
+
+    A recording qualifies when it has NO github_release, or when its existing
+    github_release 404s. Verifying existing links is what closes the loop
+    mirror-health opens: without it a deleted asset stays in recordings.json
+    forever, gets counted as a dead link on every 6-hourly sweep, and pages for
+    a repair that repair-mirrors cannot perform (github is not one of its
+    destinations) — a permanent, unfixable alert loop.
+    """
+    todo, stale = [], []
+    for r in recs:
+        if not archive_mp4_url(r):
+            continue
+        if not r.get("github_release"):
+            todo.append(r)
+            continue
+        if release_asset_alive(r["github_release"]) is False:
+            stale.append(r)
+    if stale:
+        log(f"\u267b\ufe0f {len(stale)} existing github_release link(s) 404 \u2014 re-uploading from Archive.org")
+        for r in stale:
+            log(f"   dead: {r.get('video_id','?')} \u2192 {r['github_release']}")
+            # Drop the dead URL so the upload path cannot reuse it.
+            r.pop("github_release", None)
+            r.pop("github_direct", None)
+    return (todo + stale)[:max_items]
+
+
 def main():
     if not TOKEN:
         log("ℹ️ GITHUB_TOKEN not set, GitHub Releases upload skipped (no-op).")
@@ -126,7 +182,7 @@ def main():
     with open(RECORDINGS) as f:
         recs = json.load(f)
 
-    todo = [r for r in recs if archive_mp4_url(r) and not r.get("github_release")][:MAX_ITEMS]
+    todo = select_todo(recs, MAX_ITEMS)
     if not todo:
         log("✅ All recordings already mirrored to GitHub Releases.")
         return 0
