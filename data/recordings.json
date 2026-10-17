@@ -10,7 +10,7 @@
     "duration_fmt": "03:16:20",
     "size_bytes": 653564735,
     "size_human": "623.28 MB",
-    "size_gb": 0.60,
+    "size_gb": 0.6,
     "resolution": "1920x1080",
     "date": "2026-10-18",
     "month": "2026-10",
@@ -21,7 +21,10 @@
     "st0807_link": "https://0807.st/EtCEO5C.mp4",
     "vikingfile_link": "https://vikingfile.com/f/BH4AC2zWF4",
     "chat_url": "",
-    "recorded_at": "2026-10-17T23:56:36.000Z"
+    "recorded_at": "2026-10-17T23:56:36.000Z",
+    "telegram_link": "https://t.me/c/4304551882/34",
+    "telegram_file_id": "BQACAgQAAyEGAAMBAAGSP8oAAyJq1AtIKAABhppxQ_FAb5wkJz704SAAAiEfAAK7H6FSJgny1jQu6eIeBA",
+    "cf_stream": "https://tg-stream.isthatdxture.workers.dev/?file_id=BQACAgQAAyEGAAMBAAGSP8oAAyJq1AtIKAABhppxQ_FAb5wkJz704SAAAiEfAAK7H6FSJgny1jQu6eIeBA"
   },
   {
     "video_id": "kgg3P0w853s",
