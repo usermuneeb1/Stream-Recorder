@@ -10,8 +10,12 @@ Fixes three concrete bugs that broke playback:
      playback source is the (now-private) original YouTube VOD — nothing plays.
 
 archive_direct is derived deterministically from archive_link + title using the
-same sanitize_filename() rule the pipeline applies to uploaded basenames
-(spaces kept; multi-part _partNNN splits stay for the networked backfill).
+SAME rule the uploader applies to Archive.org object names — make_safe_filename()
+in upload-clouds.sh: non-alphanumerics (incl. spaces) -> "_". Pass 3 originally
+used sanitize_filename() ("spaces kept"), which produced URLs for objects that
+do not exist (0% hit rate; proven against data/backups historical entries and
+the uploader itself, 2026-10-23). Multi-part _partNNN splits stay for the
+networked backfill.
 archive_node (the 302 storage node) is left for the CI backfill (needs network).
 
 Usage:  python3 scripts/normalize-recordings.py [--write]
@@ -114,14 +118,16 @@ def main():
     out = [merged[k] for k in order]
 
     # Pass 3: derive archive_direct where missing but archive_link present.
-    # Filename = sanitize_filename(title) + ".mp4": the pipeline uploads the
-    # post-processed basename (sanitized title, _raw stripped), so this rule
-    # matches single-file uploads. Multi-part splits (_partNNN) cannot be
-    # resolved offline — those stay for the networked backfill.
+    # Filename = make_safe_filename(title) + ".mp4" — the rule
+    # upload-clouds.sh actually names the object with (underscores, spaces
+    # folded). Using sanitize_filename() here (spaces kept) built a URL for a
+    # file that is never uploaded, so BUNNY 404'd for every derived record.
+    # Multi-part splits (_partNNN) cannot be resolved offline — those stay for
+    # the networked backfill.
     for r in out:
         if not r.get("archive_direct") and r.get("archive_link"):
             ident = r["archive_link"].rstrip("/").split("/details/")[-1]
-            fname = sanitize_filename(r.get("title", "")) + ".mp4"
+            fname = make_safe_filename(r.get("title", "") + ".mp4")
             r["archive_direct"] = f"https://archive.org/download/{ident}/{fname}"
             changes["archive_direct_added"] += 1
 

@@ -42,6 +42,39 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
   `tests/browser-session-test.sh` locks: reuse window, blocked-jar handling,
   id-less capture rejection, jar→yt-dlp handoff, ffmpeg manifest fallback,
   `BROWSER_ASSIST=off` no-op.
+- **Archive.org object names are underscore-folded (2026-10-23).** The uploader
+  names uploads with `make_safe_filename()` (`upload-clouds.sh`): spaces and
+  punctuation become `_`. Any offline derivation of `archive_direct` MUST use
+  that rule — `normalize-recordings.py` used the space-keeping
+  `sanitize_filename()` and pointed BUNNY at files that are never uploaded.
+  `tests/archive-filename-contract-test.sh` locks the contract.
+- **Writers must reach the repo, not the checkout (2026-10-23).**
+  `repair-mirrors.yml` has no commit step, and `repair-mirrors.sh` rewrites the
+  index through the Contents API from a fresh read — a script that edits
+  `data/recordings.json` locally inside that job has written nothing.
+  `backfill-archive-nodes.sh` had done exactly that since it was added (plus a
+  tab-collapsing `read` that shifted `title` into `archive_direct`), so 0/20
+  recordings ever carried `archive_direct`/`archive_node`: R3AL/BUNNY were dead
+  and feeds fell back to a private YouTube page. Persist via
+  `github_api_write` (validate the read first), fall back to the file only for
+  manual runs. `tests/backfill-archive-nodes-test.sh` locks all three defects.
+- **Feeds are build artifacts (2026-10-23).** Vercel serves
+  `dashboard/public/feed.xml|podcast.xml|feed.json|sitemap.xml` straight from
+  the repo, and `npm run build` never regenerated them — they were 4 months
+  stale (5 of 20 recordings). The build now runs
+  `dashboard/scripts/generate-feeds.mjs`, a byte-compatible twin of
+  `scripts/generate-feeds.py` (GitHub Pages keeps calling the Python one);
+  `tests/feeds-freshness-test.sh` diffs both and rejects any enclosure that is
+  not a direct-media URL (`<enclosure type="video/mp4">` pointing at a watch
+  page was the old fallback).
+- **The cookieless smoke test is the recorder's early warning (2026-10-23).**
+  `scripts/cookieless-smoke-test.sh` exercises every no-cookie method in the
+  cascade (D, C, G, E, J, H, I, F, K — A/B are cookie-jar methods and are
+  excluded by definition) and only counts a method as passing on real pixels
+  (size + `ffprobe` height), never on "downloaded". `tests/cookieless-smoke-test.sh`
+  diffs the matrix against `scripts/record-stream.sh`, so **adding a recording
+  method without adding it to the smoke matrix is a red test** — the old inline
+  YAML tested 5 of 11, hardcoded `/5`, and could not fail on Method K.
 - **Gofile is keyless by owner policy (2026-09-02).** Detection = public `wt`
   token contents endpoint only; upload = auto-minted guest token. The gofile
   SPA page returns 200 for dead folders — never treat page-200 as “alive”.

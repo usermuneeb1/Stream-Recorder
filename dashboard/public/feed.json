@@ -1,6 +1,6 @@
 {
   "version": "https://jsonfeed.org/version/1.1",
-  "title": "The Muslim Lantern — Stream Archive",
+  "title": "The Muslim Lantern, Stream Archive",
   "home_page_url": "https://muslim-lantern-archive.vercel.app",
   "feed_url": "https://muslim-lantern-archive.vercel.app/feed.json",
   "description": "Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.",
@@ -14,15 +14,236 @@
   "language": "en",
   "items": [
     {
+      "id": "5mI5dC1VxaE",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/5mI5dC1VxaE",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-18",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-18",
+      "image": "https://archive.org/download/tml-thumb-5mI5dC1VxaE/thumbnail_5mI5dC1VxaE.jpg",
+      "date_published": "2026-10-17T23:56:36+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/dujIg7O.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 653564735,
+          "duration_in_seconds": 11780
+        }
+      ]
+    },
+    {
+      "id": "kgg3P0w853s",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/kgg3P0w853s",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-17",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-17",
+      "image": "https://archive.org/download/tml-thumb-kgg3P0w853s/thumbnail_kgg3P0w853s.jpg",
+      "date_published": "2026-10-16T21:40:33+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/bx882Tk.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 380102254,
+          "duration_in_seconds": 7260
+        }
+      ]
+    },
+    {
+      "id": "iOHEsTldVPY",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/iOHEsTldVPY",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-10",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-10",
+      "image": "https://archive.org/download/tml-thumb-iOHEsTldVPY/thumbnail_iOHEsTldVPY.jpg",
+      "date_published": "2026-10-09T22:37:07+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/iW3DrWr.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 720156216,
+          "duration_in_seconds": 9087
+        }
+      ]
+    },
+    {
+      "id": "sTBamxxHEuA",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/sTBamxxHEuA",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-04",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-04",
+      "image": "https://archive.org/download/tml-thumb-sTBamxxHEuA/thumbnail_sTBamxxHEuA.jpg",
+      "date_published": "2026-10-03T22:07:07+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/X5FL9t1.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 490557860,
+          "duration_in_seconds": 8101
+        }
+      ]
+    },
+    {
+      "id": "OrliN1T8jPM",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/OrliN1T8jPM",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-03",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-03",
+      "image": "https://archive.org/download/tml-thumb-OrliN1T8jPM/thumbnail_OrliN1T8jPM.jpg",
+      "date_published": "2026-10-02T22:16:50+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/ztspfyG.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 570852868,
+          "duration_in_seconds": 9310
+        }
+      ]
+    },
+    {
+      "id": "0k1yY4S4PEE",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/0k1yY4S4PEE",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-24",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-24",
+      "image": "https://archive.org/download/tml-thumb-0k1yY4S4PEE/thumbnail_0k1yY4S4PEE.jpg",
+      "date_published": "2026-09-23T23:31:28+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/yQwjLXK.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 347675980,
+          "duration_in_seconds": 6343
+        }
+      ]
+    },
+    {
+      "id": "Q4RtBMoMANk",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/Q4RtBMoMANk",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-20",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-20",
+      "image": "https://archive.org/download/tml-thumb-Q4RtBMoMANk/thumbnail_Q4RtBMoMANk.jpg",
+      "date_published": "2026-09-19T23:01:26+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/t3k5dLw.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 515134156,
+          "duration_in_seconds": 7745
+        }
+      ]
+    },
+    {
+      "id": "YsaWlm-YVxY",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/YsaWlm-YVxY",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-13",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-09-13",
+      "image": "https://archive.org/download/tml-thumb-YsaWlm-YVxY/thumbnail_YsaWlm-YVxY.jpg",
+      "date_published": "2026-09-13T01:35:32+00:00",
+      "attachments": [
+        {
+          "url": "https://0807.st/YhpuAqg.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 1016747961,
+          "duration_in_seconds": 16615
+        }
+      ]
+    },
+    {
+      "id": "y84vFOO8onU",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/y84vFOO8onU",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-15",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-15",
+      "image": "https://archive.org/download/tml-thumb-y84vFOO8onU/thumbnail_y84vFOO8onU.jpg",
+      "date_published": "2026-08-14T21:44:04+00:00",
+      "attachments": [
+        {
+          "url": "https://ia800408.us.archive.org/1/items/tml-2026-08-y84vFOO8onU-1786743675/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-15.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 392569774,
+          "duration_in_seconds": 7011
+        }
+      ]
+    },
+    {
+      "id": "ASWJmIsyd9s",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/ASWJmIsyd9s",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
+      "image": "https://archive.org/download/tml-thumb-ASWJmIsyd9s/thumbnail_ASWJmIsyd9s.jpg",
+      "date_published": "2026-08-12T23:49:34+00:00",
+      "attachments": [
+        {
+          "url": "https://ia800505.us.archive.org/9/items/tml-2026-08-ASWJmIsyd9s-1786578401/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 613184434,
+          "duration_in_seconds": 10001
+        }
+      ]
+    },
+    {
+      "id": "lZwdaI5i9MA",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/lZwdaI5i9MA",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-13",
+      "image": "https://archive.org/download/tml-thumb-lZwdaI5i9MA/thumbnail_lZwdaI5i9MA.jpg",
+      "date_published": "2026-08-12T20:58:19+00:00",
+      "attachments": [
+        {
+          "url": "https://ia801500.us.archive.org/19/items/tml-2026-08-lZwdaI5i9MA-1786568243/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-13.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 8997569,
+          "duration_in_seconds": 162
+        }
+      ]
+    },
+    {
+      "id": "6AlPqgkHC-Q",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/6AlPqgkHC-Q",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-10",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-08-10",
+      "image": "https://archive.org/download/tml-thumb-6AlPqgkHC-Q/thumbnail_6AlPqgkHC-Q.jpg",
+      "date_published": "2026-08-09T22:32:41+00:00",
+      "attachments": [
+        {
+          "url": "https://ia600502.us.archive.org/23/items/tml-2026-08-6AlPqgkHC-Q-1786314499/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-08-10.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 562086589,
+          "duration_in_seconds": 8948
+        }
+      ]
+    },
+    {
+      "id": "iWMtQ-tA6EA",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/iWMtQ-tA6EA",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-07-30",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-07-30",
+      "image": "https://archive.org/download/tml-thumb-iWMtQ-tA6EA/thumbnail_iWMtQ-tA6EA.jpg",
+      "date_published": "2026-07-29T22:50:37+00:00",
+      "attachments": [
+        {
+          "url": "https://ia600809.us.archive.org/18/items/tml-2026-07-iWMtQ-tA6EA-1785365306/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-07-30.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 363884156,
+          "duration_in_seconds": 6048
+        }
+      ]
+    },
+    {
+      "id": "X05zRHM4kVs",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/X05zRHM4kVs",
+      "title": "Forced Recording 2026-07-27",
+      "summary": "Forced Recording 2026-07-27",
+      "image": "https://archive.org/download/tml-thumb-X05zRHM4kVs/thumbnail_X05zRHM4kVs.jpg",
+      "date_published": "2026-07-27T05:35:05+00:00",
+      "attachments": [
+        {
+          "url": "https://ia801804.us.archive.org/26/items/tml-2026-07-X05zRHM4kVs-1785130245/Forced_Recording_2026-07-27.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 1550589404,
+          "duration_in_seconds": 2766
+        }
+      ]
+    },
+    {
       "id": "PYkqrEBc_zY",
       "url": "https://muslim-lantern-archive.vercel.app/#/watch/PYkqrEBc_zY",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18",
       "summary": "Non-Muslims Question Islam Live! Muhammed Ali 2026-06-18",
-      "image": "https://i.ytimg.com/vi/PYkqrEBc_zY/hqdefault.jpg",
-      "date_published": "2026-06-17T22:28:47+00:00",
-      "tags": [
-        "Creedence joins"
-      ],
+      "image": "https://archive.org/download/tml-thumb-PYkqrEBc_zY/thumbnail_PYkqrEBc_zY.jpg",
+      "date_published": "2026-06-17T22:28:45+00:00",
       "attachments": [
         {
           "url": "https://ia902900.us.archive.org/5/items/tml-2026-06-PYkqrEBc_zY-1781734865/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-06-18.mp4",
@@ -39,13 +260,9 @@
       "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
       "image": "https://i.ytimg.com/vi/vSKAJZkhuq4/hqdefault.jpg",
       "date_published": "2026-05-17T00:00:00+00:00",
-      "tags": [
-        "Mira joins",
-        "Josh Bandeira joins"
-      ],
       "attachments": [
         {
-          "url": "https://ia800409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
+          "url": "https://ia600409.us.archive.org/6/items/tml-2026-05-vSKAJZkhuq4-1778975061/Non-Muslims_Question_Islam_Live_Muhammed_Ali.mp4",
           "mime_type": "video/mp4",
           "size_in_bytes": 632857397,
           "duration_in_seconds": 11265
@@ -59,9 +276,6 @@
       "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
       "image": "https://i.ytimg.com/vi/lQySsXx00Io/hqdefault.jpg",
       "date_published": "2026-05-11T00:00:00+00:00",
-      "tags": [
-        "Odens joins"
-      ],
       "attachments": [
         {
           "url": "https://ia800802.us.archive.org/16/items/tml-2026-05-lQySsXx00Io-1778454605/Non-Muslims_Question_Islam_Live_Muhammed_Ali_2026-05-11_0126_-_2026-05-11.mp4",
@@ -78,18 +292,28 @@
       "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
       "image": "https://i.ytimg.com/vi/LT7jTHW_e8Y/hqdefault.jpg",
       "date_published": "2026-04-26T00:00:00+00:00",
-      "tags": [
-        "Sister in chat joins",
-        "Lucid joins",
-        "Brother joins",
-        "Last caller joins"
-      ],
       "attachments": [
         {
-          "url": "https://ia800900.us.archive.org/31/items/tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
+          "url": "https://ia600900.us.archive.org/31/items/tml-2026-04-LT7jTHW_e8Y-1777157490/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-26.mp4",
           "mime_type": "video/mp4",
           "size_in_bytes": 268115000,
           "duration_in_seconds": 4935
+        }
+      ]
+    },
+    {
+      "id": "84lG-ZjxCGI",
+      "url": "https://muslim-lantern-archive.vercel.app/#/watch/84lG-ZjxCGI",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "image": "https://i.ytimg.com/vi/84lG-ZjxCGI/hqdefault.jpg",
+      "date_published": "2026-04-19T00:00:00+00:00",
+      "attachments": [
+        {
+          "url": "https://ia800808.us.archive.org/0/items/tml-2026-04-1-Rb7AkebH4-1776546681/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
+          "mime_type": "video/mp4",
+          "size_in_bytes": 96700000,
+          "duration_in_seconds": 2533
         }
       ]
     },
@@ -100,13 +324,6 @@
       "summary": "Non-Muslims Question Islam Live! Muhammed Ali",
       "image": "https://i.ytimg.com/vi/1-Rb7AkebH4/hqdefault.jpg",
       "date_published": "2026-04-19T00:00:00+00:00",
-      "tags": [
-        "Najeeb quranist joins",
-        "Asel Sikriye joins",
-        "Kainat joins",
-        "Kris joins",
-        "Ron Brailey joins"
-      ],
       "attachments": [
         {
           "url": "https://ia802907.us.archive.org/11/items/tml-2026-04-1-Rb7AkebH4-1776554397/Non-Muslims_Question_Islam_Live_Muhammed_Ali_-_2026-04-19.mp4",
