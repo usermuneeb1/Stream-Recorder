@@ -17,8 +17,9 @@
 # ║  Nothing here needs a Google account, so PUBLIC streams keep working         ║
 # ║  WITHOUT ever refreshing a hand-pasted YOUTUBE_COOKIES secret.              ║
 # ║                                                                              ║
-# ║  Exit codes: 0 = session captured (cookies written)                          ║
-# ║              2 = YouTube still blocked after retries                         ║
+# ║  Exit codes: 0 = cookies captured (even if the page still showed the wall,   ║
+# ║                  because a wall-page jar is often enough for yt-dlp)         ║
+# ║              2 = no cookies captured (blocked or unusable)                   ║
 # ║              3 = SeleniumBase unavailable (feature not installed)            ║
 # ║              4 = unexpected error (partial output may still exist)           ║
 # ║                                                                              ║
@@ -509,11 +510,13 @@ def capture_session(url: str, outdir: str, headed: bool = False,
     if player_facts["dash_manifest_url"]:
         log("  dash manifest: captured")
 
-    if blocked and not cookies:
-        return 2
+    # Deliberately NOT "return 2 when blocked": a wall page still sets
+    # VISITOR_INFO1_LIVE / __Secure-*PSID / SOCS, and that jar is frequently
+    # enough for yt-dlp to get through on the next hop. The caller decides how
+    # much to trust it (it logs the blocked flag and keeps the jar).
     if not cookies:
         return 2
-    return 0 if stream["ok"] else 2
+    return 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

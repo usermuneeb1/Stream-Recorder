@@ -221,13 +221,20 @@ else
     bad "stale capture for another video was reused"
 fi
 
-# ── TEST 7: blocked capture keeps the jar but reports failure ───────────────
+# ── TEST 7: blocked capture keeps the jar and stays usable ──────────────────
+# A wall page still sets cookies, and that jar often gets yt-dlp through on
+# the next hop — so a blocked capture must hand the jar over, not discard it.
 reset_session
 export FAKE_MODE=blocked
 if browser_mint_session "TESTVIDEO01" > "$WORK/blocked.out" 2>&1; then
-    bad "blocked capture reported success"
+    ok "blocked capture still returns success (jar adopted)"
 else
-    ok "blocked capture returns failure"
+    bad "blocked capture discarded a usable jar"
+fi
+if [[ "${BROWSER_SESSION_BLOCKED:-}" == "1" ]]; then
+    ok "blocked capture is flagged in BROWSER_SESSION_BLOCKED"
+else
+    bad "blocked capture lost its blocked flag"
 fi
 if [[ -s "$BROWSER_SESSION_DIR/cookies.txt" ]]; then
     ok "blocked capture leaves the partial jar in place (best effort)"

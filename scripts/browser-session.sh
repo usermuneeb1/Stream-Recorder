@@ -267,8 +267,12 @@ browser_mint_session() {
             local blocked
             blocked=$(_browser_json_get "$dir/stream.json" "blocked")
             if [[ "$blocked" == "true" ]]; then
-                log_warn "  Browser session: YouTube still showed the bot wall (jar kept as best effort)"
-                return 1
+                # The page still showed the wall, but the jar it set is usually
+                # enough for yt-dlp on the next hop, so this is NOT a failure:
+                # hand it over, flag it, and let the method decide.
+                BROWSER_SESSION_BLOCKED=1
+                export BROWSER_SESSION_BLOCKED
+                log_warn "  Browser session: bot wall still shown, jar kept and tried anyway"
             fi
             log_ok "  Browser session: minted fresh cookies ($(grep -c $'\t' "$dir/cookies.txt" 2>/dev/null || echo "?") rows)"
             return 0
@@ -308,6 +312,15 @@ browser_detect_live() {
     log_info "  Method 5: real browser session on ${channel_url}"
     if ! browser_mint_session "$channel_url"; then
         log_info "  Method 5: no session / channel not broadcasting"
+        return 1
+    fi
+
+    # A wall page can still carry a stale/embedded player blob; never trust
+    # player facts from a capture that admits it was blocked.
+    local blocked
+    blocked=$(browser_session_jq blocked)
+    if [[ "$blocked" == "true" ]]; then
+        log_info "  Method 5: page still showed the bot wall, not trusting player data"
         return 1
     fi
 
