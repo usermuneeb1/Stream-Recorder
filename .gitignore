@@ -60,3 +60,7 @@ scripts/mega/accounts.old.csv
 # Agent skills — local toolkit only, never part of the repo
 .agents/
 skills-lock.json
+
+# SeleniumBase runtime scratch (driver downloads, locks) — never commit
+downloaded_files/
+saved_cookies/

@@ -29,7 +29,10 @@ run_setup_check() {
 
     local checks=(
         "YOUTUBE_CHANNEL_ID:true"
-        "YOUTUBE_COOKIES:true"
+        # OPTIONAL since the browser bypass landed (2026-10): Method K mints a
+        # fresh session per run, so a missing/stale cookie jar no longer stops
+        # a public stream from recording.
+        "YOUTUBE_COOKIES:false"
         "DISCORD_WEBHOOK_URL:true"
         "ARCHIVE_ACCESS_KEY:true"
         "ARCHIVE_SECRET_KEY:true"
@@ -61,9 +64,17 @@ run_setup_check() {
     log_info "Display name: ${CHANNEL_DISPLAY_NAME:-The Muslim Lantern}"
 
     if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] || [[ -n "${YOUTUBE_COOKIES:-}" ]]; then
-        log_ok "YouTube cookies present in this run"
+        log_ok "YouTube cookies present in this run (optional)"
     else
-        log_warn "No cookies in runner env (expected if only checking secrets)"
+        log_info "No stored cookies, cookieless methods + Method K will carry the recording"
+    fi
+
+    # Browser bypass readiness (SeleniumBase UC). Purely informational here.
+    if [[ -f "$SCRIPT_DIR/browser-session.sh" ]]; then
+        # shellcheck disable=SC1091
+        source "$SCRIPT_DIR/browser-session.sh"
+        log_info "Browser bypass: $(browser_assist_mode) / $(browser_session_why_unavailable)"
+        report+="| \`BROWSER_ASSIST\` | $(browser_assist_mode) ($(browser_session_why_unavailable)) |\n"
     fi
 
     {

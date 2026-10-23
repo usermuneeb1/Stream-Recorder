@@ -9,6 +9,12 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
    (`upload-clouds.sh`: gofile, pixeldrain, mega, archive.org, 0807.st, vikingfile)
    → health (`mirror-health.yml` 6h) → repair (`repair-mirrors.yml` daily 08:30 UTC)
    → keep-alive (`cloud-refresh.yml`: gofile every 5d 06:00 UTC, pixeldrain monthly).
+   Bot detection: recording **Method K** (`scripts/browser_session.py` via
+   `scripts/browser-session.sh`) opens the watch page in SeleniumBase UC-mode
+   Chrome, mints a cookie jar + direct HLS/DASH URLs, and replaces
+   `COOKIES_FILE` for the rest of the run. Detection **Method 5** reuses the
+   same helper when every HTTP client is bot-walled. Gated by `BROWSER_ASSIST`
+   (`auto|first|off`), installed by `scripts/setup-browser.sh`.
 2. **Data** — JSON-as-database. **Canonical index: `data/recordings.json`** (NOT
    links.txt — that’s the legacy Discord-facing feed). State files also live in
    `data/` (mirror-health, source-health, system-status, backups/).
@@ -27,6 +33,15 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
 - **`mirror-health.sh` must never emit fewer rows than input recordings** — a
   structural guard exits 2 (vacuous-success outage 2026-09-02: workflow was
   green while checking nothing, so repair never dispatched).
+- **The bot wall is an IP/fingerprint challenge, not a login (2026-10-23).**
+  Never "fix" a bot wall by asking the owner for a fresher cookie: Method K
+  mints a session per run and publishes it through `set_env COOKIES_FILE`, so
+  a stale `YOUTUBE_COOKIES` secret must never be able to block a public
+  stream. Browser capture failures are non-fatal by design (return 1, cascade
+  continues) — Method K sits *after* the fast cookieless paths, before A/B.
+  `tests/browser-session-test.sh` locks: reuse window, blocked-jar handling,
+  id-less capture rejection, jar→yt-dlp handoff, ffmpeg manifest fallback,
+  `BROWSER_ASSIST=off` no-op.
 - **Gofile is keyless by owner policy (2026-09-02).** Detection = public `wt`
   token contents endpoint only; upload = auto-minted guest token. The gofile
   SPA page returns 200 for dead folders — never treat page-200 as “alive”.
@@ -39,6 +54,9 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
 - **Sandbox integration token cannot** push `.github/workflows/*` nor fire
   `workflow_dispatch` (403). Owner applies workflow-file edits via web editor.
 - Tests: `tests/*.sh` harnesses exit non-zero on RED; stubs fake curl/network.
+  `record-cascade-test.sh` is a drift lock on the method table (now
+  D,C,G,E,J,H,I,F,K,A,B) — adding a method without updating its
+  `EXPECTED_ORDER` and the "All N methods failed" string is a red test.
   Existing test list + conventions live in each file’s banner comment.
 
 ## Sentinels whose red means something

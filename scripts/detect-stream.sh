@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  STREAM RECORDER, TRIPLE-LAYER LIVE STREAM DETECTION                         ║
-# ║  Uses 3 independent methods to detect if a YouTube channel is live.          ║
+# ║  Uses 5 independent methods to detect if a YouTube channel is live.          ║
 # ║  If ANY method detects a live stream → proceed to recording.                 ║
 # ║  If ALL methods find nothing → exit silently.                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -9,6 +9,13 @@
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
+
+# Real-browser detection (Method 5) + cookie minting live here. Sourced
+# defensively: detection must still work if the helper is missing.
+if [[ -f "$SCRIPT_DIR/browser-session.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/browser-session.sh"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  GLOBAL VARIABLES, set by detection methods
@@ -20,6 +27,18 @@ DETECTED_CHANNEL=""
 DETECTED_THUMBNAIL=""
 DETECTED_METHOD=""
 DETECTED_URL=""
+
+# Set to "true" whenever a method sees YouTube's bot interstitial instead of
+# content. Method 5 (real browser) only runs when this flag is up, so a normal
+# "channel is not live" poll stays fast and never pays for a Chrome launch.
+DETECT_BOT_WALL="${DETECT_BOT_WALL:-false}"
+
+# _is_botwall_text <text> → 0 when the text is YouTube's bot/consent wall
+_is_botwall_text() {
+    local text="${1:-}"
+    [[ -n "$text" ]] || return 1
+    grep -qiE "confirm you('| a)re not a bot|unusual traffic|this request looks automated|sign in to confirm" <<< "$text"
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  URL SANITIZER
@@ -230,6 +249,10 @@ detect_method_2_ytdlp() {
         "$live_url" 2>"$ytdlp_err") || {
         local err_msg
         err_msg=$(tail -3 "$ytdlp_err" 2>/dev/null)
+        if _is_botwall_text "$err_msg"; then
+            DETECT_BOT_WALL="true"
+            log_warn "Method 2: bot wall detected (Sign in to confirm you're not a bot)"
+        fi
         log_warn "Method 2: yt-dlp dump-json failed"
         [[ -n "$err_msg" ]] && log_info "  yt-dlp error: ${err_msg}"
         log_info "  URL tried: ${live_url}"
@@ -336,6 +359,11 @@ detect_method_3_streams_tab() {
     if [[ -z "$page_content" ]]; then
         log_info "Method 3: Empty page response"
         return 1
+    fi
+
+    if _is_botwall_text "$page_content"; then
+        DETECT_BOT_WALL="true"
+        log_warn "Method 3: bot wall detected on the /streams tab"
     fi
     
     # Quickly parse the HTML to find a video tied to the LIVE badge
@@ -451,6 +479,10 @@ detect_method_4_rss() {
     watch=$(curl -s --max-time 20 -H "User-Agent: ${ua}" \
         -H "Cookie: CONSENT=YES+cb.20230101-00-p0.en+FX+414; SOCS=CAI" \
         "https://www.youtube.com/watch?v=${video_id}" 2>/dev/null) || true
+    if _is_botwall_text "$watch"; then
+        DETECT_BOT_WALL="true"
+        log_warn "Method 4: bot wall detected on the watch page"
+    fi
     # v5 FIX: require isLiveNow (the authoritative "broadcasting now" flag).
     # The loose '"isLive":true' alternative false-positives on UPCOMING scheduled
     # events (the player embed can show isLive:true while waiting), which made
@@ -525,9 +557,36 @@ detect_live_stream() {
         return 0
     fi
 
+    random_sleep 1 3
+
+    # ── Method 5: Real browser session (SeleniumBase UC) ─────────────────────
+    # Last resort, and the only method that survives YouTube answering every
+    # HTTP client with "Sign in to confirm you're not a bot": a real Chrome on
+    # this runner asks the player directly. It also warms the cookie jar that
+    # recording Method K reuses seconds later, so a stale YOUTUBE_COOKIES
+    # secret cannot make detection blind.
+    local browser_mode
+    browser_mode="$(browser_assist_mode 2>/dev/null || echo off)"
+    if [[ "$browser_mode" == "off" ]]; then
+        log_debug "Method 5 skipped (BROWSER_ASSIST=off)"
+    elif [[ "${DETECT_BOT_WALL:-false}" != "true" ]] \
+        && [[ "$browser_mode" != "first" ]] \
+        && [[ "${BROWSER_DETECT_ALWAYS:-false}" != "true" ]]; then
+        # Nothing looked bot-walled, so the channel is simply not live. Do not
+        # pay for a Chrome launch on every 5-minute poll.
+        log_info "Method 5 skipped (no bot wall seen; set BROWSER_DETECT_ALWAYS=true to force)"
+    elif ! declare -F browser_detect_live >/dev/null 2>&1; then
+        log_debug "Method 5 skipped (helper not loaded)"
+    elif ! browser_session_available; then
+        log_info "Method 5 skipped (browser stack not installed: $(browser_session_why_unavailable))"
+    elif browser_detect_live; then
+        _export_detection_results || return 1
+        return 0
+    fi
+
     # ── All methods found nothing ────────────────────────────────────────────
     log_separator
-    log_info "All 4 detection methods completed, channel is NOT live"
+    log_info "All detection methods completed, channel is NOT live"
     log_info "Detection completed at: $(now_pkt)"
     
     set_output "is_live" "false"

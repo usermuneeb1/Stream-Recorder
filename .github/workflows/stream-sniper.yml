@@ -58,6 +58,9 @@ env:
   RECORD_DIR: /tmp/stream-sniper
   COOKIES_FILE: cookies.txt
   PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'false' }}
+  # Real-browser bypass (SeleniumBase UC), same contract as stream-recorder.
+  BROWSER_ASSIST: ${{ vars.BROWSER_ASSIST || 'auto' }}
+  BROWSER_SESSION_TIMEOUT: "240"
   RECORDER_NAME: "Go-Live Sniper"
   TZ: Asia/Karachi
 
@@ -114,6 +117,13 @@ jobs:
 
       - name: "Setup Cloudflare WARP"
         run: bash scripts/setup-warp.sh
+
+      # ─── 1b. BROWSER BYPASS STACK (best effort) ───────────────────────────
+      # Gives detection Method 5 (real Chrome) a chance to run when YouTube is
+      # bot-walling curl/yt-dlp on this IP. Never blocks the sniper.
+      - name: "Install browser bypass stack"
+        continue-on-error: true
+        run: bash scripts/setup-browser.sh
 
       # ─── 2. GO-LIVE DETECT (single pass, authoritative) ───────────────────
       - name: "Detect Go-live"

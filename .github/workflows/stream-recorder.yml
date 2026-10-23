@@ -106,6 +106,12 @@ env:
   # PUBLIC_STREAM_ONLY=true ONLY if you're certain all streams are fully
   # public AND never restricted.
   PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'false' }}
+  # Real-browser bypass (SeleniumBase UC). auto = Method K runs after the fast
+  # cookieless paths; first = run it before everything; off = disable.
+  # With this on, a stale/missing YOUTUBE_COOKIES secret can no longer stop a
+  # public stream from being recorded, because the session is minted per run.
+  BROWSER_ASSIST: ${{ vars.BROWSER_ASSIST || 'auto' }}
+  BROWSER_SESSION_TIMEOUT: "240"
   TZ: Asia/Karachi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -230,6 +236,23 @@ jobs:
           fi
           echo "✅ All critical tools present, recording can proceed"
 
+
+      # ─── 4b. BROWSER BYPASS STACK (SeleniumBase UC) ───────────────────────
+      # Installs Xvfb + seleniumbase + uc_driver so Method K can open a real
+      # Chrome and clear "Sign in to confirm you're not a bot". Deliberately
+      # separate from the pinned install block above (check-install-drift.sh
+      # tracks that block); this step is best-effort and never blocks a run.
+      - name: "Install browser bypass stack"
+        continue-on-error: true
+        run: bash scripts/setup-browser.sh
+
+      - name: "Browser bypass readiness"
+        continue-on-error: true
+        run: |
+          source scripts/utils.sh
+          source scripts/browser-session.sh
+          log_header "BROWSER BYPASS READINESS"
+          browser_session_selfcheck | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: "Check disk space"
         id: disk_check
@@ -547,13 +570,14 @@ jobs:
           pot_state="${POT_PROVIDER_READY:-unknown}"
           ip_state="${WARP_IP:-${ORIGINAL_IP:-unknown}}"
           cookie_state="${COOKIE_STATUS:-unknown}"
+          browser_state="${BROWSER_SESSION_OK:-not_run} (${BROWSER_ASSIST:-auto})"
 
           # Diagnostic: single-line printf, 5 specifiers = 5 args (aligned).
           # Fixes: (1) prior 4-spec/5-arg mismatch made printf re-use the format,
           # duplicating the dump; (2) pot_state was under "Cookies" and cookie_state
           # under "Last method failures"; (3) \\:\\n escapes rendered as literal
           # \: and \n text, now bare colons + single-backslash \n.
-          detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP: %s\nIP: %s\nCookies: %s\nPoToken: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." "$warp_state" "$ip_state" "$cookie_state" "$pot_state" "${failures:-no log captured}")
+          detail=$(printf "**Diagnostic dump:**\n\`\`\`\nWARP: %s\nIP: %s\nCookies: %s\nPoToken: %s\nBrowser session: %s\n\`\`\`\n**Last method failures:**\n\`\`\`\n%s\n\`\`\`\nAuto-retry dispatched." "$warp_state" "$ip_state" "$cookie_state" "$pot_state" "$browser_state" "${failures:-no log captured}")
           notify_recording_failed "Recording failed" "$detail"
 
       # ─── 15. AUTO-RETRY ON FAILURE ────────────────────────────────────────
