@@ -67,6 +67,14 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
   `tests/feeds-freshness-test.sh` diffs both and rejects any enclosure that is
   not a direct-media URL (`<enclosure type="video/mp4">` pointing at a watch
   page was the old fallback).
+- **The cookieless smoke test is the recorder's early warning (2026-10-23).**
+  `scripts/cookieless-smoke-test.sh` exercises every no-cookie method in the
+  cascade (D, C, G, E, J, H, I, F, K — A/B are cookie-jar methods and are
+  excluded by definition) and only counts a method as passing on real pixels
+  (size + `ffprobe` height), never on "downloaded". `tests/cookieless-smoke-test.sh`
+  diffs the matrix against `scripts/record-stream.sh`, so **adding a recording
+  method without adding it to the smoke matrix is a red test** — the old inline
+  YAML tested 5 of 11, hardcoded `/5`, and could not fail on Method K.
 - **Gofile is keyless by owner policy (2026-09-02).** Detection = public `wt`
   token contents endpoint only; upload = auto-minted guest token. The gofile
   SPA page returns 200 for dead folders — never treat page-200 as “alive”.
