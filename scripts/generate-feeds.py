@@ -18,6 +18,7 @@ server-side rendering needed.
 
 from __future__ import annotations
 import json
+import os
 import pathlib
 import re
 import sys
@@ -27,7 +28,9 @@ from xml.sax.saxutils import quoteattr
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RECS = ROOT / "data" / "recordings.json"
-OUT = ROOT / "dashboard" / "public"
+# FEEDS_OUT lets tests / alternative deploys write elsewhere (default: the
+# committed public/ directory the static hosts serve).
+OUT = pathlib.Path(os.environ.get("FEEDS_OUT") or (ROOT / "dashboard" / "public"))
 
 SITE = "https://muslim-lantern-archive.vercel.app"
 TITLE = "The Muslim Lantern, Stream Archive"
@@ -63,13 +66,27 @@ def load_recordings() -> list[dict]:
     return sorted(by_id.values(), key=lambda r: r.get("date", ""), reverse=True)
 
 
+def _pixeldrain_direct(url: str) -> str:
+    """https://pixeldrain.com/u/<id> -> the /api/file/<id> bytes endpoint."""
+    m = re.search(r"pixeldrain\.com/(?:u|api/file)/([\w-]+)", url or "")
+    return f"https://pixeldrain.com/api/file/{m.group(1)}" if m else ""
+
+
 def best_audio_or_video_url(r: dict) -> str:
-    """Pick the single most reliable, publicly streamable URL."""
-    for k in ("archive_node", "archive_direct", "github_direct", "github_release"):
-        u = r.get(k)
-        if u:
+    """Pick the single most reliable DIRECT-MEDIA URL for an enclosure.
+
+    2026-10-23: this used to fall back to r["video_url"] — a YouTube *watch
+    page*. Every item therefore declared `<enclosure type="video/mp4">`
+    pointing at HTML (and those VODs are private), so podcast clients had
+    nothing playable for any recording. An enclosure must be real bytes: when
+    no direct mirror is known the item ships without one instead.
+    """
+    for k in ("archive_node", "archive_direct", "github_direct",
+              "github_release", "st0807_link"):
+        u = (r.get(k) or "").strip()
+        if u.startswith("http"):
             return u
-    return r.get("video_url", "")
+    return _pixeldrain_direct(r.get("pixeldrain_link", ""))
 
 
 def watch_url(r: dict) -> str:
