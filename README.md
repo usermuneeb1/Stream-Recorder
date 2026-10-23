@@ -76,6 +76,55 @@ Deploy targets: **Vercel** (`dashboard/vercel.json`, serverless API routes in
 
 ---
 
+## Recording without cookies (bot-detection bypass)
+
+YouTube answers datacenter IPs with **"Sign in to confirm you're not a bot"**.
+That is an IP + browser-fingerprint challenge, not a login problem, so a
+hand-pasted `YOUTUBE_COOKIES` secret works for a few days and then rots —
+which is exactly the "I have to keep changing the cookie" pain.
+
+The recorder no longer depends on that secret for public streams:
+
+| Layer | What it does |
+|---|---|
+| **Detection Method 5** | If curl/yt-dlp detection is bot-walled, a real Chrome opens the channel's `/live` page and reads the player directly. |
+| **Recording Method K** | Opens the watch page in **SeleniumBase UC mode** (undetected-chromedriver), clears the consent/bot interstitial, then exports (a) its cookie jar to `cookies.txt` and (b) the live `hlsManifestUrl` / `dashManifestUrl` / format URLs for a pure-ffmpeg download. |
+| **Auto-adoption** | The minted jar replaces `COOKIES_FILE` for the rest of the run, so a stale cookie file can never poison methods A/B or the pre-flight liveness recheck. |
+
+No Google account is ever used, so this is still **cookieless in the sense that
+matters**: nothing is stored, nothing expires, nothing needs manual rotation.
+
+### Controls
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BROWSER_ASSIST` | `auto` | `auto` = Method K after the fast cookieless paths · `first` = before everything · `off` = disable |
+| `BROWSER_SESSION_TIMEOUT` | `240` | Hard cap for one browser launch (seconds) |
+| `BROWSER_SESSION_MAX_AGE` | `900` | Reuse a captured session for this long (same video only) |
+| `BROWSER_HEADED` | `false` | Force headed mode (Xvfb) |
+
+Set `BROWSER_ASSIST` as a repository **variable** (Settings → Secrets and
+variables → Actions → Variables) to change it for every workflow.
+
+### Install / verify
+
+```bash
+bash scripts/setup-browser.sh              # Xvfb + seleniumbase + uc_driver
+bash scripts/setup-browser.sh --check-only # verdict only
+bash scripts/setup-browser.sh --verify-launch  # prove Chrome really launches
+bash scripts/browser_session.py --selftest     # offline logic check
+bash tests/browser-session-test.sh             # hermetic plumbing test
+```
+
+The **Cookieless smoke test** workflow runs the browser bypass once a day and
+reports `session minted / N cookies / HLS manifest captured` in its summary, so
+rot is visible hours before a stream.
+
+> `PUBLIC_STREAM_ONLY=true` still skips cookie methods A/B. Method K keeps
+> working there — it is a session, not a login.
+
+---
+
 ## Repository map
 
 | Path | Purpose |
@@ -84,7 +133,7 @@ Deploy targets: **Vercel** (`dashboard/vercel.json`, serverless API routes in
 | `scripts/` | Bash/Python tooling: record, upload, mirrors, thumbnails |
 | `dashboard/` | React streaming app + serverless API routes |
 | `data/` | Canonical JSON state + daily backups |
-| `tests/` | Recording-cascade integration test |
+| `tests/` | Recording-cascade + browser-bypass integration tests |
 
 ## Principles
 

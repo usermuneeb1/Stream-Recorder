@@ -3,13 +3,14 @@
 #
 # Sources the REAL scripts/record-stream.sh, mocks the four external tools
 # (yt-dlp, streamlink, ytarchive, ffmpeg) with PATH shims, and asserts:
-#   1. Cascade order + labels match the documented D,C,G,E,J,H,I,F,A,B order
+#   1. Cascade order + labels match the documented D,C,G,E,J,H,I,F,K,A,B order
 #      (locks the method-table-as-data refactor: a label can never drift from
 #      the method it names).
 #   2. Fallback: when only streamlink works, the cascade walks D,C,G,E,J,H
 #      and stops at I (success) — proving order + retry-to-next-method.
 #   3. First-method success: when only yt-dlp works, it stops at D.
-#   4. Total failure: returns 1 with "All 10 methods failed".
+#   4. Total failure: returns 1 with "All 11 methods failed".
+#   5. BROWSER_ASSIST=off drops Method K and keeps the old 10-method order.
 #
 # No network, no YouTube, no cookies. Deterministic and fast.
 # Mocks emit the embedded FIXTURE_B64 valid MP4 (not zeros): the cascade
@@ -107,18 +108,19 @@ J: ffmpeg HLS direct (independent path)
 H: ytarchive (cookieless, purpose-built for live)
 I: streamlink hardened (cookieless, independent codebase)
 F: Streamlink (HLS, default flags)
+K: Real browser session (SeleniumBase UC)
 A: Cookies+web_creator (bonus)
 B: Cookies+tv_embedded (bonus)"
 
 GOT="$(trying_lines "$OUT")"
 if [[ "$GOT" == "$EXPECTED_ORDER" ]]; then
-    ok "cascade order + labels match documented D,C,G,E,J,H,I,F,A,B (drift lock)"
+    ok "cascade order + labels match documented D,C,G,E,J,H,I,F,K,A,B (drift lock)"
 else
     bad "cascade order/labels differ"
     diff <(echo "$EXPECTED_ORDER") <(echo "$GOT") | head -10
 fi
-if [[ "$RC" == "1" ]] && echo "$OUT" | grep -q "All 10 methods failed"; then
-    ok "all-methods-fail returns 1 with 'All 10 methods failed'"
+if [[ "$RC" == "1" ]] && echo "$OUT" | grep -q "All 11 methods failed"; then
+    ok "all-methods-fail returns 1 with 'All 11 methods failed'"
 else
     bad "all-methods-fail path wrong (rc=$RC)"
 fi
@@ -161,6 +163,35 @@ if ! echo "$OUT" | grep -q "Trying method C:"; then
 else
     bad "cascade continued past first success"
 fi
+
+# ── TEST 4: BROWSER_ASSIST=off removes Method K from the cascade ───────────
+reset_work
+export BROWSER_ASSIST=off
+export MOCK_SUCCEED_TOOL=none
+OUT=$(attempt_recording "https://youtu.be/TEST" 1 2>&1)
+RC=$?
+if [[ "$RC" == "1" ]] && echo "$OUT" | grep -q "All 10 methods failed"; then
+    ok "BROWSER_ASSIST=off: 10-method cascade preserved, K absent"
+else
+    bad "BROWSER_ASSIST=off run wrong (rc=$RC)"
+fi
+if ! echo "$OUT" | grep -q "Trying method K:"; then
+    ok "BROWSER_ASSIST=off: Method K never attempted"
+else
+    bad "BROWSER_ASSIST=off still tried Method K"
+fi
+
+# ── TEST 5: BROWSER_ASSIST=first puts Method K at the head ─────────────────
+reset_work
+export BROWSER_ASSIST=first
+OUT=$(attempt_recording "https://youtu.be/TEST" 1 2>&1)
+FIRST_LABEL="$(trying_lines "$OUT" | head -1)"
+if [[ "$FIRST_LABEL" == "K: Real browser session (SeleniumBase UC)" ]]; then
+    ok "BROWSER_ASSIST=first: Method K runs before every other method"
+else
+    bad "BROWSER_ASSIST=first: first method was '${FIRST_LABEL}'"
+fi
+export BROWSER_ASSIST=auto
 
 echo
 echo "== cascade test: ${PASS} passed, ${FAIL} failed =="
