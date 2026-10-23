@@ -1,17 +1,17 @@
 {
-  "updated_at": "2026-10-23T11:44:05Z",
+  "updated_at": "2026-10-23T17:16:25Z",
   "summary": {
     "total": 20,
     "healthy": 20,
     "degraded": 0,
     "dead_links": 1,
-    "unverifiable_links": 20
+    "unverifiable_links": 21
   },
   "recordings": [
     {
       "video_id": "5mI5dC1VxaE",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-18",
-      "alive": 5,
+      "alive": 6,
       "dead": 0,
       "unverifiable": 1,
       "healthy": true,
@@ -22,18 +22,18 @@
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
-        "github": null,
+        "github": "alive",
         "st0807": "alive",
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
       "video_id": "kgg3P0w853s",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-17",
-      "alive": 5,
+      "alive": 6,
       "dead": 0,
       "unverifiable": 1,
       "healthy": true,
@@ -44,18 +44,18 @@
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
-        "github": null,
+        "github": "alive",
         "st0807": "alive",
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
       "video_id": "iOHEsTldVPY",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-10",
-      "alive": 5,
+      "alive": 6,
       "dead": 0,
       "unverifiable": 1,
       "healthy": true,
@@ -66,18 +66,18 @@
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
-        "github": null,
+        "github": "alive",
         "st0807": "alive",
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
       "video_id": "sTBamxxHEuA",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-04",
-      "alive": 5,
+      "alive": 6,
       "dead": 0,
       "unverifiable": 1,
       "healthy": true,
@@ -88,18 +88,18 @@
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
-        "github": null,
+        "github": "alive",
         "st0807": "alive",
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
       "video_id": "OrliN1T8jPM",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-10-03",
-      "alive": 5,
+      "alive": 6,
       "dead": 0,
       "unverifiable": 1,
       "healthy": true,
@@ -110,12 +110,12 @@
         "gofile": "unverifiable",
         "pixeldrain": "alive",
         "mega": "alive",
-        "github": null,
+        "github": "alive",
         "st0807": "alive",
         "vikingfile": "alive",
-        "telegram": "alive",
+        "telegram": "unverifiable",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
@@ -137,7 +137,7 @@
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
@@ -159,7 +159,7 @@
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
@@ -181,7 +181,7 @@
         "vikingfile": "alive",
         "telegram": "alive",
         "youtube": "dead",
-        "archive_direct": null
+        "archive_direct": "alive"
       }
     },
     {
