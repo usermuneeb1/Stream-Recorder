@@ -25,9 +25,18 @@ on:
         default: "gofile,pixeldrain,mega,st0807,vikingfile"
         type: string
       force_repair:
-        description: "Force re-upload ALL mirrors (ignore alive checks)"
+        # MUST default to false: this workflow is also triggered by the
+        # mirror-health API dispatch with NO inputs (`-d '{"ref":"main"}'`),
+        # and GitHub fills omitted inputs with their declared defaults. With
+        # "true" every 6-hourly automated run bypassed all alive checks and
+        # re-uploaded the newest MAX_ITEMS recordings' mirrors — ~24 working
+        # links replaced per run while the older recordings that actually
+        # needed repair were never reached (2026-10-24). Keep this an
+        # explicit, human-only escape hatch. Locked by
+        # tests/repair-mirrors-force-default-test.sh.
+        description: "Force re-upload ALL mirrors (ignore alive checks) — manual escape hatch only"
         required: false
-        default: "true"
+        default: "false"
         type: boolean
       dry_run:
         description: "Check only; do not download/upload/update"
