@@ -58,6 +58,22 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
   and feeds fell back to a private YouTube page. Persist via
   `github_api_write` (validate the read first), fall back to the file only for
   manual runs. `tests/backfill-archive-nodes-test.sh` locks all three defects.
+- **An unattended repair dispatch must never force re-uploads (2026-10-24).**
+  `mirror-health` triggers `repair-mirrors.yml` through the dispatch API with
+  no inputs (`-d '{"ref":"main"}'`), and GitHub fills omitted
+  `workflow_dispatch` inputs from their *declared defaults*. `force_repair`
+  defaulted to `"true"`, so every 6-hourly health dispatch ran with
+  `FORCE_REPAIR=true`: all alive checks were bypassed and the newest
+  `MAX_ITEMS` (6) recordings were re-downloaded from Archive.org and
+  re-uploaded to gofile/pixeldrain/0807/viking. Evidence: the 17:16 and 21:33
+  dispatched runs on 2026-10-23 replaced all four mirrors of the same six
+  newest recordings, while the 13:43 *scheduled* run (force=false) skipped
+  them and repaired three older ones. Net effect: ~24 working links churned
+  per run and the recordings that actually had dead mirrors were never
+  reached — the same "dead links never update themselves" symptom as
+  2026-09-02, different cause. Default is now `false`, the health dispatch
+  sends `force_repair:false` explicitly, and force stays a human-only escape
+  hatch. `tests/repair-mirrors-force-default-test.sh` locks both ends.
 - **Feeds are build artifacts (2026-10-23).** Vercel serves
   `dashboard/public/feed.xml|podcast.xml|feed.json|sitemap.xml` straight from
   the repo, and `npm run build` never regenerated them — they were 4 months
@@ -108,3 +124,22 @@ the undefined 0807 gates (added 2026-08-30, `fe803d41`) after the gofile loop
 → all bookkeeping lost; gofile keep-alive was phantom (SPA page ping).
 PRs #109 (merged, pipeline fixed) + #110 (PoW/quoting fallout fixes).
 Verification loop: `bash .debug/mirror-pipeline-check.sh` (reads main via API).
+
+## Open threads (observed 2026-10-24)
+
+- `mirror-health` counts the dead **GitHub release** asset of `X05zRHM4kVs`
+  in `summary.dead_links`, but `repair-mirrors` has no GitHub destination
+  (`DESTINATIONS` = gofile,pixeldrain,mega,st0807,vikingfile) and
+  `github-release-mirror.yml` only fills *missing* `github_release` links.
+  So `dead_links` stays at 1 forever, the health step dispatches a repair
+  every 6 h, and sends a degraded Discord alert every 6 h for a mirror no
+  automated path can fix. Either exclude `github` from the dispatch gate
+  (demotion-only, like telegram/youtube/archive_direct) or give repair a
+  GitHub-release re-upload path. Not changed here — it needs an owner call
+  on whether a dead B3ING asset should page at all.
+- `CHECK 2` of `.debug/mirror-pipeline-check.sh` reads `mirrors_repaired_at`
+  as if it were a gofile keep-alive timestamp; only `repair-mirrors` writes
+  it, and it only writes when a mirror is replaced. A healthy recording can
+  therefore look "past the 10-day gofile window" forever. Kept as a
+  throwaway probe; the authoritative loop for this class of bug is
+  `tests/repair-mirrors-force-default-test.sh`.
