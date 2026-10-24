@@ -261,8 +261,11 @@ record_method_e() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # Cookieless method per design — only attach cookies when verified-valid.
+    # A stale/rotated cookie file can make YouTube reject the request and poison
+    # the cookieless cascade, so gate on COOKIE_STATUS like D/H/I (see D).
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -305,9 +308,10 @@ record_method_f() {
     local restart_flag="--hls-live-restart"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && restart_flag=""
     
-    # Use cookies with streamlink if available
+    # Cookieless method per design — only attach cookies when verified-valid
+    # (a stale cookie file can poison the cookieless cascade; see method D).
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -339,8 +343,11 @@ record_method_g() {
     local live_start_flag="--live-from-start"
     [[ "$CUSTOM_DURATION_MODE" == "true" ]] && live_start_flag=""
     
+    # Cookieless method per design — only attach cookies when verified-valid.
+    # A stale/rotated cookie file can make YouTube reject the request and poison
+    # the cookieless cascade, so gate on COOKIE_STATUS like D/H/I (see D).
     local -a cookies_args=()
-    if [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
