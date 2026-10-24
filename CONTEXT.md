@@ -67,6 +67,20 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
   `tests/feeds-freshness-test.sh` diffs both and rejects any enclosure that is
   not a direct-media URL (`<enclosure type="video/mp4">` pointing at a watch
   page was the old fallback).
+- **Forced repair is opt-in and single-recording (2026-10-24).**
+  `repair-mirrors.yml` declared `force_repair` with `default: "true"`, and
+  `mirror-health.yml` dispatches it with `{"ref":"main"}` and no inputs, so
+  GitHub injected that default: every automated repair ran in force mode, which
+  marks every mirror dead. Each pass therefore re-uploaded all five mirrors of
+  the first `MAX_ITEMS` candidates — `recordings.json` is newest-first, so that
+  was always the same six newest recordings, four times a day — while the other
+  14 recordings were only reached by the once-daily schedule, and every
+  published link (Discord post, `links.txt`, feeds) was silently replaced under
+  it. `repair_mirrors()` now ignores `FORCE_REPAIR` unless `TARGET_VIDEO_ID`
+  names one recording, the workflow default is `"false"`, and candidates are
+  ordered by `mirrors_repaired_at` (never repaired first, then oldest) so
+  consecutive bounded passes walk the archive instead of re-touching its head.
+  `tests/repair-mirrors-dispatch-test.sh` locks all three.
 - **The cookieless smoke test is the recorder's early warning (2026-10-23).**
   `scripts/cookieless-smoke-test.sh` exercises every no-cookie method in the
   cascade (D, C, G, E, J, H, I, F, K — A/B are cookie-jar methods and are
@@ -107,4 +121,4 @@ vacuous-green (0/12) → repair never dispatched; refresh-links.sh crashed at
 the undefined 0807 gates (added 2026-08-30, `fe803d41`) after the gofile loop
 → all bookkeeping lost; gofile keep-alive was phantom (SPA page ping).
 PRs #109 (merged, pipeline fixed) + #110 (PoW/quoting fallout fixes).
-Verification loop: `bash .debug/mirror-pipeline-check.sh` (reads main via API).
+Verification loop: `bash tests/repair-mirrors-dispatch-test.sh` (hermetic, no network).

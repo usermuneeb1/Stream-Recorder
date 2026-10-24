@@ -201,6 +201,22 @@ repair_mirrors() {
     local attempted=0
     local dry_run="${DRY_RUN:-false}"
     local destinations="${DESTINATIONS:-gofile,pixeldrain,mega,st0807,vikingfile}"
+
+    # ── Force mode is a single-recording tool, never a bulk pass (2026-10-24) ──
+    # `repair-mirrors.yml` declares `force_repair` with `default: "true"`, and
+    # mirror-health.yml dispatches it with `{"ref":"main"}` and no inputs, so
+    # GitHub injected that default and EVERY automated repair ran forced. Force
+    # mode marks every mirror dead, so each pass re-uploaded all five mirrors of
+    # the first MAX_ITEMS candidates — data/recordings.json is newest-first, so
+    # that is always the same six newest recordings, four times a day. The other
+    # 14 recordings were only ever reached by the once-daily schedule, and every
+    # published link (Discord/links.txt/feeds) was replaced under it.
+    # Force stays available where it is meaningful: a targeted repair
+    # (TARGET_VIDEO_ID) that re-uploads one recording's mirrors.
+    if [[ "${FORCE_REPAIR:-false}" == "true" && -z "$target_video" ]]; then
+        log_warn "FORCE_REPAIR ignored: force mode requires TARGET_VIDEO_ID (an untargeted forced pass re-uploads every mirror of the first MAX_ITEMS recordings and starves the rest of the archive)"
+        FORCE_REPAIR=false
+    fi
     # Older workflow YAML still passes DESTINATIONS=gofile,pixeldrain,mega.
     # Keep the new hosts in the repair set unless the caller opted out.
     if [[ "${ST0807_SKIP:-false}" != "true" && "$destinations" != *st0807* && "$destinations" != *0807* ]]; then
@@ -216,10 +232,19 @@ repair_mirrors() {
     local candidates
     # Pass the id via --arg: interpolating TARGET_VIDEO_ID into the jq
     # program breaks on quotes/backslashes (injection).
+    # Rotation (2026-10-24): MAX_ITEMS caps how many recordings one pass may
+    # repair, and data/recordings.json is newest-first — so a pass that simply
+    # stopped at the first N candidates needing repair re-touched the newest
+    # recordings every run and never reached the tail (14 of 20 recordings were
+    # never repaired while the newest six were re-uploaded 4×/day). Order by
+    # mirrors_repaired_at instead: never repaired first, then oldest, with file
+    # order as the deterministic tie-break, so consecutive passes walk the
+    # archive and every temporary mirror is refreshed inside its TTL.
+    local order='to_entries | sort_by([(.value.mirrors_repaired_at // ""), .key]) | map(.value)'
     if [[ -n "$target_video" ]]; then
-        candidates=$(jq --arg v "$target_video" 'map(select(.video_id == $v)) | [.[] | select((.archive_link // "") != "")]' <<< "$records") || candidates="[]"
+        candidates=$(jq --arg v "$target_video" "map(select(.video_id == \$v)) | [.[] | select((.archive_link // \"\") != \"\")] | $order" <<< "$records") || candidates="[]"
     else
-        candidates=$(jq '[.[] | select((.archive_link // "") != "")]' <<< "$records") || candidates="[]"
+        candidates=$(jq "[.[] | select((.archive_link // \"\") != \"\")] | $order" <<< "$records") || candidates="[]"
     fi
     local count
     count=$(jq 'length' <<< "$candidates")
@@ -353,7 +378,7 @@ repair_mirrors() {
 
     log_separator
     log_ok "Mirror repair complete: checked=${checked}, attempted=${attempted}, repaired=${repaired}"
-    append_summary "- Mirror repair: checked ${checked}, attempted ${attempted}, repaired ${repaired} (MAX_ITEMS=${max_items}, MAX_ATTEMPTS=${max_attempts})"
+    append_summary "- Mirror repair: checked ${checked}, attempted ${attempted}, repaired ${repaired} (MAX_ITEMS=${max_items}, MAX_ATTEMPTS=${max_attempts}, FORCE_REPAIR=${FORCE_REPAIR:-false}, TARGET=${target_video:-none})"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

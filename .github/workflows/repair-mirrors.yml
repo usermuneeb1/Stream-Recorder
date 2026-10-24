@@ -25,9 +25,15 @@ on:
         default: "gofile,pixeldrain,mega,st0807,vikingfile"
         type: string
       force_repair:
-        description: "Force re-upload ALL mirrors (ignore alive checks)"
+        description: "Force re-upload ALL mirrors of `video_id` (ignore alive checks). Requires video_id."
         required: false
-        default: "true"
+        # 2026-10-24: was "true". mirror-health.yml dispatches this workflow with
+        # {"ref":"main"} and no inputs, so GitHub injected this default and every
+        # automated repair ran forced: all five mirrors of the first six
+        # (newest-first) recordings were re-uploaded 4x/day and the other 14
+        # recordings were never reached. Forced repair is now opt-in and
+        # script-scoped to a targeted video_id.
+        default: "false"
         type: boolean
       dry_run:
         description: "Check only; do not download/upload/update"
