@@ -84,7 +84,7 @@ def upload_video(file_path: str) -> str:
     if CUSTOM_TITLE:
         title = CUSTOM_TITLE
     else:
-        prefix = "" if IS_MORPHED else ""
+        prefix = "[MORPHED] " if IS_MORPHED else ""
         title = f"{prefix}Backup, {file_name}"
 
     description = CUSTOM_DESC or (
