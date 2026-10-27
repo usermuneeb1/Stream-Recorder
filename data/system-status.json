@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-10-27T11:21:33Z",
+  "updated_at": "2026-10-27T14:53:06Z",
   "recordings_total": 21,
   "total_size_gb": 10.33,
   "total_hours": 45.74,
@@ -11,12 +11,5 @@
     "subscribers": "633K",
     "views": "1M",
     "videos": 651
-  },
-  "mirror_health": {
-    "healthy": true,
-    "total": 21,
-    "degraded": 0,
-    "dead_links": 1,
-    "updated_at": "2026-10-27T12:20:24Z"
   }
 }
