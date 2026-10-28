@@ -1,7 +1,18 @@
 {
-  "checked_at": "2026-10-28T10:15:31.168322+00:00",
+  "checked_at": "2026-10-28T19:14:39.953042+00:00",
   "channel": "@TheMuslimLantern",
-  "upcoming": [],
-  "page_schedule": null,
-  "has_upcoming": false
+  "upcoming": [
+    {
+      "video_id": "aE9DKeELxVk",
+      "title": "Non-Muslims Question Islam Live! Muhammed Ali",
+      "status": "is_upcoming",
+      "url": "https://www.youtube.com/watch?v=aE9DKeELxVk"
+    }
+  ],
+  "page_schedule": {
+    "scheduled_epoch": 1793220000,
+    "scheduled_utc": "2026-10-28T20:40:00+00:00",
+    "source": "page_scrape"
+  },
+  "has_upcoming": true
 }
