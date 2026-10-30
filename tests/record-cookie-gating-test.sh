@@ -17,6 +17,7 @@
 #   valid status                   -> cookie flag present on every method
 #   valid_unverified status        -> cookie flag present on every method
 set -uo pipefail
+export PUBLIC_STREAM_ONLY=false
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$TEST_DIR/.." && pwd)"

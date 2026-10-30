@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  BROWSER SESSION, BOT-DETECTION BYPASS (SeleniumBase UC mode)                ║
+# ║  BROWSER SESSION, SeleniumBase CDP (default) / legacy UC fallback                ║
 # ║                                                                              ║
-# ║  Opens the YouTube watch page in a REAL, undetected Chrome (SeleniumBase     ║
-# ║  UC mode) and harvests three things from that genuine browser session:      ║
+# ║  DEFAULT: SeleniumBase Pure CDP Mode. Opens the YouTube watch page in a      ║
+# ║  fresh guest Chrome and writes only anonymous player facts:                 ║
 # ║                                                                              ║
-# ║    1. cookies.txt      Netscape jar (VISITOR_INFO1_LIVE, __Secure-*PSID,     ║
-# ║                        SOCS, etc.) for yt-dlp / ytarchive / streamlink      ║
-# ║    2. stream.json      ytInitialPlayerResponse: live status + direct         ║
-# ║                        hlsManifestUrl / dashManifestUrl / format URLs       ║
-# ║    3. browser.env      shell-sourceable facts (UA, visitorData, paths)       ║
+# ║    1. stream.json      live status + hlsManifestUrl / dashManifestUrl /      ║
+# ║                        muxed or video+audio format URLs                     ║
+# ║    2. browser.env      shell-sourceable facts (UA, visitorData, paths)       ║
 # ║                                                                              ║
-# ║  WHY: "Sign in to confirm you're not a bot" is an IP/fingerprint challenge,  ║
-# ║  not a login problem. A real browser on the same runner IP clears it, and    ║
-# ║  the session cookies it exports are accepted by yt-dlp on the next hop.      ║
-# ║  Nothing here needs a Google account, so PUBLIC streams keep working         ║
-# ║  WITHOUT ever refreshing a hand-pasted YOUTUBE_COOKIES secret.              ║
+# ║  CDP exports NO cookies.txt and loads NO account profile. Legacy UC mode     ║
+# ║  (BROWSER_MODE=uc) is opt-in and retains the old cookie-jar handoff.         ║
 # ║                                                                              ║
-# ║  Exit codes: 0 = cookies captured (even if the page still showed the wall,   ║
-# ║                  because a wall-page jar is often enough for yt-dlp)         ║
-# ║              2 = no cookies captured (blocked or unusable)                   ║
+# ║  Exit codes: 0 = unblocked playable player captured (CDP) / jar captured (UC)║
+# ║              2 = blocked or no usable anonymous media (CDP) / no jar (UC)    ║
 # ║              3 = SeleniumBase unavailable (feature not installed)            ║
 # ║              4 = unexpected error (partial output may still exist)           ║
 # ║                                                                              ║
@@ -38,7 +32,11 @@ import re
 import shlex
 import shutil
 import sys
+import tempfile
 import time
+import uuid
+from pathlib import Path
+from urllib.parse import urlparse
 
 # ── Bot / consent page markers ────────────────────────────────────────────────
 BOT_MARKERS = (
@@ -187,6 +185,8 @@ def summarize_player(player: dict | None, max_height: int = 1080) -> dict:
         "dash_manifest_url": "",
         "video_url": "",
         "audio_url": "",
+        "muxed_url": "",
+        "muxed_quality": "",
         "video_itag": "",
         "audio_itag": "",
         "video_quality": "",
@@ -226,15 +226,23 @@ def summarize_player(player: dict | None, max_height: int = 1080) -> dict:
 
     videos = []
     audios = []
+    muxed = []
     for fmt in formats:
+        if not isinstance(fmt, dict):
+            continue
         url = fmt.get("url") or ""
         if not url:
             continue  # ciphered URL: only the manifest path can play it
         mime = (fmt.get("mimeType") or "").lower()
-        if "video" in mime and not fmt.get("audioQuality"):
+        audio_quality = str(fmt.get("audioQuality") or "").upper()
+        has_audio = "audio" in mime or (audio_quality and audio_quality != "AUDIO_QUALITY_NONE")
+        if "video" in mime and has_audio:
+            if _height(fmt) and _height(fmt) <= max_height:
+                muxed.append(fmt)
+        elif "video" in mime:
             if _height(fmt) and _height(fmt) <= max_height:
                 videos.append(fmt)
-        elif "audio" in mime or fmt.get("audioQuality"):
+        elif has_audio:
             audios.append(fmt)
 
     if videos:
@@ -242,6 +250,10 @@ def summarize_player(player: dict | None, max_height: int = 1080) -> dict:
         facts["video_url"] = best.get("url") or ""
         facts["video_itag"] = str(best.get("itag") or "")
         facts["video_quality"] = str(best.get("qualityLabel") or best.get("quality") or "")
+    if muxed:
+        best_m = max(muxed, key=lambda f: (_height(f), _bitrate(f)))
+        facts["muxed_url"] = best_m.get("url") or ""
+        facts["muxed_quality"] = str(best_m.get("qualityLabel") or best_m.get("quality") or "")
     if audios:
         best_a = max(audios, key=lambda f: (_bitrate(f), str(f.get("mimeType", ""))))
         facts["audio_url"] = best_a.get("url") or ""
@@ -280,6 +292,286 @@ def is_blocked_text(text: str) -> bool:
 def needs_consent(text: str) -> bool:
     low = (text or "").lower()
     return any(marker in low for marker in CONSENT_MARKERS)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  COOKIE-FREE CDP CAPTURE (SeleniumBase Pure CDP Mode)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+MEDIA_FIELDS = ("hls_manifest_url", "dash_manifest_url", "video_url", "audio_url", "muxed_url")
+
+
+def normalize_mode(value: str | None) -> str:
+    mode = (value or "cdp").strip().lower()
+    if mode not in {"cdp", "uc"}:
+        raise ValueError("BROWSER_MODE must be cdp or uc")
+    return mode
+
+
+def validate_target_url(url: str, allow_local: bool = False) -> str:
+    """Accept public YouTube pages; loopback fixtures require an explicit flag."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if allow_local and host in LOCAL_HOSTS and parsed.scheme in {"http", "https"}:
+        if parsed.username or parsed.password:
+            raise ValueError("credentials in fixture URLs are not allowed")
+        return url
+    if parsed.scheme != "https" or host not in YOUTUBE_HOSTS:
+        raise ValueError("expected an https YouTube URL (local fixtures need --allow-local)")
+    if parsed.username or parsed.password:
+        raise ValueError("credentials in YouTube URLs are not allowed")
+    return url
+
+
+def valid_media_url(url: str, allow_local: bool = False) -> bool:
+    """Never hand file://, loopback, or credential-bearing URLs to ffmpeg in prod."""
+    if not isinstance(url, str) or not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if parsed.username or parsed.password or parsed.fragment:
+            return False
+        if allow_local:
+            return parsed.scheme in {"http", "https"} and host in LOCAL_HOSTS
+        if parsed.scheme != "https":
+            return False
+        return any(host == d or host.endswith("." + d)
+                   for d in ("googlevideo.com", "youtube.com", "youtu.be"))
+    except ValueError:
+        return False
+
+
+def has_playable_media(facts: dict, allow_local: bool = False) -> bool:
+    """A jar, visitor id, or player blob alone is NOT a recording capability."""
+    def ok(key):
+        return valid_media_url(facts.get(key, ""), allow_local)
+    return bool(ok("hls_manifest_url") or ok("dash_manifest_url") or ok("muxed_url")
+                or (ok("video_url") and ok("audio_url")))
+
+
+def sanitize_player_urls(player: dict | None, allow_local: bool = False) -> dict | None:
+    if not isinstance(player, dict):
+        return player
+    streaming = player.get("streamingData")
+    if isinstance(streaming, dict):
+        for key in ("hlsManifestUrl", "dashManifestUrl"):
+            if streaming.get(key) and not valid_media_url(streaming[key], allow_local):
+                streaming[key] = ""
+        for key in ("adaptiveFormats", "formats"):
+            for fmt in streaming.get(key) or []:
+                if isinstance(fmt, dict) and fmt.get("url") and not valid_media_url(fmt["url"], allow_local):
+                    fmt["url"] = ""
+    return player
+
+
+def _write_capture_files(outdir: str, stream: dict, env_facts: dict) -> None:
+    """Atomically publish a capture; never create a Netscape jar in CDP mode."""
+    directory = Path(outdir)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    for name, body in (("stream.json", json.dumps(stream, indent=2) + "\n"),
+                       ("browser.env", to_env(env_facts))):
+        target = directory / name
+        tmp = directory / (name + ".tmp")
+        tmp.write_text(body, encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, target)
+
+
+def _cdp_env_facts(stream: dict, stream_path: str) -> dict:
+    return {
+        "BROWSER_MODE": "cdp",
+        "BROWSER_SESSION_OK": "1" if stream["ok"] else "0",
+        "BROWSER_SESSION_BLOCKED": "1" if stream["blocked"] else "0",
+        "BROWSER_COOKIES_FILE": "",
+        "BROWSER_COOKIE_COUNT": "0",
+        "BROWSER_STREAM_JSON": stream_path,
+        "BROWSER_UA": stream.get("user_agent", ""),
+        "BROWSER_VISITOR_DATA": stream.get("visitor_data", ""),
+        "BROWSER_IS_LIVE": "1" if stream.get("is_live") else "0",
+        "BROWSER_PLAYABILITY": stream.get("playability", ""),
+        "BROWSER_HLS_MANIFEST": stream.get("hls_manifest_url", ""),
+        "BROWSER_DASH_MANIFEST": stream.get("dash_manifest_url", ""),
+    }
+
+
+def _cdp_player(sb) -> dict | None:
+    raw = sb.evaluate(
+        "window.ytInitialPlayerResponse ? JSON.stringify(window.ytInitialPlayerResponse) : null"
+    )
+    if isinstance(raw, dict):
+        return raw
+    if raw:
+        try:
+            value = json.loads(raw)
+            return value if isinstance(value, dict) else None
+        except (TypeError, json.JSONDecodeError):
+            pass
+    return parse_player_from_html(sb.get_page_source())
+
+
+def _cdp_accept_consent(sb) -> None:
+    # This only dismisses the interstitial. No cookie is read or exported.
+    sb.evaluate("""(() => {
+      const wanted = /^(reject all|accept all|i agree|agree to all)$/i;
+      const nodes = [...document.querySelectorAll('button, tp-yt-paper-button, a')];
+      const hit = nodes.find(n => wanted.test((n.innerText || n.getAttribute('aria-label') || '').trim()));
+      if (hit) hit.click();
+    })()""")
+
+
+def capture_cdp_session(url: str, outdir: str, headed: bool = False,
+                        max_wait: int = 60, max_height: int = 1080,
+                        binary: str = "", cdp_host: str = "", cdp_port: int = 0,
+                        allow_local: bool = False) -> int:
+    """Read anonymous player URLs through Pure CDP. Never export browser cookies.
+
+    With cdp_host/cdp_port, attach to a dedicated recorder Chrome and close only
+    the CDP connection on exit. Otherwise launch a fresh guest browser with a
+    temporary profile that is removed on exit. No account/profile is loaded.
+    """
+    try:
+        url = validate_target_url(url, allow_local)
+    except ValueError as exc:
+        log(f"CDP capture rejected: {exc}")
+        return 4
+    try:
+        from seleniumbase import sb_cdp
+    except Exception as exc:
+        log(f"SeleniumBase CDP unavailable: {type(exc).__name__}: {exc}")
+        return 3
+
+    stream_path = str(Path(outdir) / "stream.json")
+    facts = summarize_player(None, max_height=max_height)
+    stream = {
+        "ok": False, "blocked": False, "mode": "cdp", "cookie_export": False,
+        "url": url, "video_id": "", "user_agent": "", "visitor_data": "",
+        "cookies_file": "", "cookie_count": 0, "capture_id": uuid.uuid4().hex,
+        "captured_at": int(time.time()), **facts,
+    }
+    rc = 2
+    sb = None
+    profile_context = None
+    try:
+        kwargs = dict(
+            headless=not headed,
+            xvfb=bool(headed and sys.platform.startswith("linux") and not os.environ.get("DISPLAY")),
+            guest=True,
+            ad_block=False,
+            lang="en-US",
+            binary_location=binary or None,
+        )
+        if cdp_host or cdp_port:
+            if not cdp_host or not (1 <= int(cdp_port) <= 65535):
+                raise ValueError("CDP attachment needs both a host and a valid port")
+            kwargs.update(host=cdp_host, port=int(cdp_port))
+            # SeleniumBase still probes for a local binary when attaching.
+            kwargs["browser_executable_path"] = binary or shutil.which("google-chrome") \
+                or shutil.which("chromium") or shutil.which("chrome")
+            if not kwargs["browser_executable_path"]:
+                raise ValueError("set BROWSER_BINARY when attaching to a remote/dedicated Chrome")
+            log(f"  attaching to dedicated CDP browser at {cdp_host}:{cdp_port}")
+        else:
+            profile_context = tempfile.TemporaryDirectory(prefix="stream-recorder-cdp-")
+            kwargs.update(user_data_dir=profile_context.name,
+                          sandbox=os.environ.get("BROWSER_NO_SANDBOX", "false").lower() != "true")
+        sb = sb_cdp.Chrome(**kwargs)
+        sb.goto(url)
+        deadline = time.monotonic() + max(1, max_wait)
+        captcha_tried = False
+        player = None
+        while time.monotonic() < deadline:
+            try:
+                text = sb.get_text("body") or ""
+            except Exception:
+                text = ""
+            if needs_consent(text):
+                try:
+                    _cdp_accept_consent(sb)
+                except Exception:
+                    pass
+            try:
+                player = _cdp_player(sb)
+            except Exception:
+                player = None
+            player = sanitize_player_urls(player, allow_local)
+            facts = summarize_player(player, max_height=max_height)
+            blocked = is_blocked_text(text) or (
+                facts["playability"] not in {"", "OK"}
+                and (is_blocked_text(facts["playability_reason"])
+                     or facts["playability"] in {"LOGIN_REQUIRED", "ERROR", "UNPLAYABLE"})
+            )
+            if blocked and not captcha_tried and not allow_local:
+                captcha_tried = True
+                log("  bot interstitial detected; trying SeleniumBase CDP captcha handler")
+                try:
+                    sb.solve_captcha()
+                except Exception as exc:
+                    log(f"  CDP captcha handler unavailable: {type(exc).__name__}")
+            if has_playable_media(facts, allow_local) and facts["playability"] == "OK" and not blocked:
+                break
+            time.sleep(1)
+        else:
+            player = player if player is not None else None
+
+        # Re-read after the loop so a final-iteration player is not discarded.
+        try:
+            final_player = sanitize_player_urls(_cdp_player(sb), allow_local)
+            if final_player:
+                player = final_player
+        except Exception:
+            pass
+        facts = summarize_player(player, max_height=max_height)
+        try:
+            text = sb.get_text("body") or ""
+        except Exception:
+            text = ""
+        blocked = is_blocked_text(text) or (
+            facts["playability"] not in {"", "OK"}
+            and (is_blocked_text(facts["playability_reason"])
+                 or facts["playability"] in {"LOGIN_REQUIRED", "ERROR", "UNPLAYABLE"})
+        )
+        try:
+            ua = sb.get_user_agent() or ""
+        except Exception:
+            ua = ""
+        try:
+            visitor = sb.evaluate("(() => { try { return ytcfg.get('VISITOR_DATA'); } catch(e) { return ''; } })()") or ""
+        except Exception:
+            visitor = ""
+        video_id = facts["video_id"]
+        if not video_id:
+            match = re.search(r"(?:v=|youtu\.be/|/live/)([A-Za-z0-9_-]{11})", url)
+            video_id = match.group(1) if match else ""
+        ok = (not blocked and facts["playability"] == "OK"
+              and has_playable_media(facts, allow_local) and bool(video_id))
+        stream.update(facts)
+        stream.update(ok=ok, blocked=blocked, video_id=video_id,
+                      user_agent=ua, visitor_data=visitor, captured_at=int(time.time()))
+        rc = 0 if ok else 2
+        if blocked:
+            log("  CDP page is still blocked; no playable capture claimed")
+        elif not ok:
+            log("  CDP page exposed no usable anonymous video+audio/manifest URL")
+    except Exception as exc:
+        log(f"CDP capture error: {type(exc).__name__}: {exc}")
+        stream["error"] = type(exc).__name__
+        rc = 4
+    finally:
+        if sb is not None:
+            try:
+                sb.quit()
+            except Exception:
+                pass
+        if profile_context is not None:
+            profile_context.cleanup()
+
+    _write_capture_files(outdir, stream, _cdp_env_facts(stream, stream_path))
+    log(f"  mode: CDP; cookie files exported: 0; playable: {stream['ok']}")
+    log(f"  playability: {stream.get('playability') or 'unknown'}; live: {stream.get('is_live', False)}")
+    return rc
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -466,6 +758,8 @@ def capture_session(url: str, outdir: str, headed: bool = False,
     stream = {
         "ok": bool(cookies) and not blocked,
         "blocked": blocked,
+        "mode": "uc",
+        "cookie_export": True,
         "video_id": "",
         "url": url,
         "user_agent": ua,
@@ -487,6 +781,7 @@ def capture_session(url: str, outdir: str, headed: bool = False,
         json.dump(stream, fh, indent=2)
 
     env_facts = {
+        "BROWSER_MODE": "uc",
         "BROWSER_SESSION_OK": "1" if stream["ok"] else "0",
         "BROWSER_SESSION_BLOCKED": "1" if blocked else "0",
         "BROWSER_COOKIES_FILE": cookies_path,
@@ -617,7 +912,13 @@ def main(argv=None) -> int:
                     help="run a headed browser (needs a display / Xvfb)")
     ap.add_argument("--max-wait", type=int, default=int(os.environ.get("BROWSER_MAX_WAIT", "60")))
     ap.add_argument("--max-height", type=int, default=int(os.environ.get("BROWSER_MAX_HEIGHT", "1080")))
-    ap.add_argument("--profile-dir", default=os.environ.get("BROWSER_USER_DATA_DIR", ""))
+    ap.add_argument("--profile-dir", default=os.environ.get("BROWSER_USER_DATA_DIR", ""),
+                    help="legacy UC mode only; ignored by cookie-free CDP")
+    ap.add_argument("--mode", choices=("cdp", "uc"), default=os.environ.get("BROWSER_MODE", "cdp"))
+    ap.add_argument("--binary", default=os.environ.get("BROWSER_BINARY", ""))
+    ap.add_argument("--cdp-host", default=os.environ.get("BROWSER_CDP_HOST", ""))
+    ap.add_argument("--cdp-port", type=int, default=int(os.environ.get("BROWSER_CDP_PORT", "0")))
+    ap.add_argument("--allow-local", action="store_true", help="test-only loopback fixture URLs")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
 
@@ -631,15 +932,21 @@ def main(argv=None) -> int:
         log("error: need --video-id or --url")
         return 4
 
-    log(f"opening {url} in {'headed' if args.headed else 'xvfb/headless'} UC Chrome")
-    rc = capture_session(
-        url=url,
-        outdir=args.outdir,
-        headed=args.headed,
-        max_wait=max(10, args.max_wait),
-        max_height=max(144, args.max_height),
-        profile_dir=args.profile_dir,
-    )
+    mode = normalize_mode(args.mode)
+    log(f"opening {url} in SeleniumBase {mode.upper()} mode")
+    if mode == "cdp":
+        rc = capture_cdp_session(
+            url=url, outdir=args.outdir, headed=args.headed,
+            max_wait=max(1, args.max_wait), max_height=max(144, args.max_height),
+            binary=args.binary, cdp_host=args.cdp_host, cdp_port=args.cdp_port,
+            allow_local=args.allow_local,
+        )
+    else:
+        rc = capture_session(
+            url=url, outdir=args.outdir, headed=args.headed,
+            max_wait=max(10, args.max_wait), max_height=max(144, args.max_height),
+            profile_dir=args.profile_dir,
+        )
     log(f"{DONE_MARKER}={rc}")
     return rc
 

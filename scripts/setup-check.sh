@@ -69,7 +69,7 @@ run_setup_check() {
         log_info "No stored cookies, cookieless methods + Method K will carry the recording"
     fi
 
-    # Browser bypass readiness (SeleniumBase UC). Purely informational here.
+    # Browser readiness (SeleniumBase CDP default). Purely informational here.
     if [[ -f "$SCRIPT_DIR/browser-session.sh" ]]; then
         # shellcheck disable=SC1091
         source "$SCRIPT_DIR/browser-session.sh"
