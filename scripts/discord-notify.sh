@@ -398,6 +398,29 @@ notify_recording_complete() {
     local process_time="${PROCESS_ELAPSED:-N/A}"
     local warp_ip="${WARP_IP:-N/A}"
 
+    # ── HOW was this recorded? (CDP browser / cookies / cookieless client) ──
+    # The card used to hide this entirely, so "did it use CDP or cookies?"
+    # could only be answered by digging through the workflow log (2026-10-30).
+    local record_method="${RECORD_METHOD_DESC:-unknown}"
+    local record_tool="${RECORD_METHOD_TOOL:-}"
+    local record_auth="${RECORD_METHOD_AUTH:-}"
+    # Keep the box line readable and markup-safe.
+    local record_method_short="${record_method//\`/}"
+    record_method_short="${record_method_short//$'\n'/ }"
+    (( ${#record_method_short} > 46 )) && record_method_short="${record_method_short:0:45}…"
+
+    local auth_val="—"
+    case "$record_auth" in
+        cookieless)   auth_val="🚫 No cookies (cookieless)" ;;
+        cookies)      auth_val="🍪 Yes (verified cookie jar)" ;;
+        "browser jar") auth_val="🍪 Browser-minted jar (UC mode)" ;;
+        "")           auth_val="—" ;;
+        *)            auth_val="$record_auth" ;;
+    esac
+
+    local method_val="$record_method"
+    [[ -n "$record_tool" && "$record_tool" != "unknown" ]] && method_val+="\n\`${record_tool}\`"
+
     # Color based on upload success
     local color=5763757         # green, all good
     [[ "$upload_count" == "0" ]]                     && color=15158332   # red, all failed
@@ -483,8 +506,25 @@ notify_recording_complete() {
         done
     fi
 
+    # Live chat: say whether it was archived AND why not when it wasn't.
+    # "❌ Not archived" with no reason cost hours of guessing (2026-10-30).
     local chat_status="❌ Not archived"
     [[ -n "${RECORD_CHAT_URL:-}" ]] && chat_status="✅ [Chat Log Available](${RECORD_CHAT_URL})"
+
+    local chat_note=""
+    if (( ${RECORD_CHAT_MESSAGES:-0} > 0 )); then
+        chat_note="${RECORD_CHAT_MESSAGES} messages"
+        [[ -n "${RECORD_CHAT_REPO:-}" ]] && chat_note+=" · in dashboard"
+    elif [[ -n "${RECORD_CHAT_REASON:-}" ]]; then
+        chat_note="${RECORD_CHAT_REASON}"
+    fi
+    if [[ -n "$chat_note" ]]; then
+        # Discord markdown: strip backticks/newlines so the note can't break it.
+        chat_note="${chat_note//\`/}"
+        chat_note="${chat_note//$'\n'/ }"
+        (( ${#chat_note} > 90 )) && chat_note="${chat_note:0:89}…"
+        chat_status+="\n\`${chat_note}\`"
+    fi
 
     # Build upload status summary line
     local upstatus=""
@@ -519,6 +559,9 @@ notify_recording_complete() {
         --arg upload_elapsed "$upload_elapsed" \
         --arg process_time   "$process_time" \
         --arg warp_ip        "$warp_ip" \
+        --arg record_method  "$record_method_short" \
+        --arg method_val     "$method_val" \
+        --arg auth_val       "$auth_val" \
         --arg upstatus       "$upstatus" \
         --arg gofile_url       "$gofile_url" \
         --arg pixeldrain_url   "$pixeldrain_url" \
@@ -557,7 +600,8 @@ notify_recording_complete() {
                     "\u001b[1;32m║\u001b[0m   Resolution " + $resolution + "\n" +
                     "\u001b[1;32m║\u001b[0m   Date       " + $date + "\n" +
                     "\u001b[1;32m║\u001b[0m   Parts      " + $parts + "\n" +
-                    "\u001b[1;32m║\u001b[0m   Uploads   " + $uploads + " services\n" +
+                    "\u001b[1;32m║\u001b[0m   Uploads    " + $uploads + " services\n" +
+                    "\u001b[1;32m║\u001b[0m   Method     " + $record_method + "\n" +
                     "\u001b[1;32m╚══════════════════════════════════════╝\u001b[0m\n" +
                     "```"
                 ),
@@ -582,6 +626,8 @@ notify_recording_complete() {
                             { name: "❌  Downloads",  value: "All cloud uploads failed, files may be lost. Check workflow logs.", inline: false }
                         else empty end),
                         { name: "⸻⸻⸻⸻⸻⸻⸻", value: "** Additional Info**", inline: false },
+                        { name: " Recorded via", value: $method_val,     inline: true },
+                        { name: " Cookies",      value: $auth_val,       inline: true },
                         { name: " Live Chat",    value: $chat_status,   inline: true },
                         { name: " Original",     value: ("[Watch on YT](" + $video_url + ")"), inline: true },
                         { name: " Upload Time",  value: $upload_elapsed, inline: true },

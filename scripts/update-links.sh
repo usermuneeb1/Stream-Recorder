@@ -48,6 +48,13 @@ update_links() {
     entry+="URL:      ${stream_url}\n"
     entry+="Duration: ${duration_fmt}\n"
     entry+="Size:     ${size_human} (${size_gb} GB)\n"
+    # HOW it was captured — the permanent record answers "CDP or cookies?"
+    if [[ -n "${RECORD_METHOD_DESC:-}" ]]; then
+        entry+="Method:   ${RECORD_METHOD_DESC} [${RECORD_METHOD_TOOL:-unknown} / ${RECORD_METHOD_AUTH:-unknown}]\n"
+    fi
+    if [[ -n "${RECORD_CHAT_URL:-}" ]]; then
+        entry+="Chat:     ${RECORD_CHAT_URL} (${RECORD_CHAT_MESSAGES:-?} msgs)\n"
+    fi
     entry+="Uploads:  ${upload_count}/${upload_total}\n"
     if [[ -n "${THUMBNAIL_CLOUD_URL:-}" ]]; then
         entry+="Thumbnail: ${THUMBNAIL_CLOUD_URL}\n"

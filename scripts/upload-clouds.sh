@@ -380,6 +380,79 @@ EOF
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  LIVE CHAT PUBLISHING (repo data/chat + archive.org chat.json)
+#
+#  The dashboard replays `data/chat/<video_id>.json` from the repo CDN; the
+#  archive.org `chat.json` is the permanent copy that links.txt points at.
+#
+#  Before 2026-10-30 only the archive copy was attempted, from whatever raw
+#  dump the recorder happened to leave behind (chat_downloader's JSON array,
+#  which nothing could read), and the URL was published even when the upload
+#  had failed. Net effect: the Discord card said "Live Chat: ❌ Not archived"
+#  and the dashboard replay was empty for every recording.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Path of the compact chat replay, if one exists.
+chat_file_path() {
+    local f="${RECORD_CHAT_FILE:-}"
+    [[ -n "$f" && -f "$f" && -s "$f" ]] && { echo "$f"; return 0; }
+    f="${RECORD_DIR:-/tmp/stream-recorder}/chat.json"
+    [[ -f "$f" && -s "$f" ]] && { echo "$f"; return 0; }
+    return 1
+}
+
+chat_message_count() {
+    local f
+    f=$(chat_file_path) || { echo 0; return 0; }
+    jq -r '(.messages // []) | length' "$f" 2>/dev/null || echo 0
+}
+
+# Publish the compact replay into the repo so the dashboard can serve it.
+# Best-effort: a GitHub API hiccup must never fail the upload step.
+publish_chat_to_repo() {
+    local vid="${STREAM_VIDEO_ID:-}"
+    if [[ ! "$vid" =~ ^[A-Za-z0-9_-]{11}$ ]]; then
+        log_warn "Chat: no valid YouTube id, skipping data/chat publish"
+        return 1
+    fi
+
+    local f msgs
+    if ! f=$(chat_file_path); then
+        log_warn "Chat: no replay to publish (${RECORD_CHAT_REASON:-nothing captured})"
+        return 1
+    fi
+
+    msgs=$(jq -r '(.messages // []) | length' "$f" 2>/dev/null || echo 0)
+    if (( msgs == 0 )); then
+        log_warn "Chat: replay holds 0 messages, not publishing"
+        return 1
+    fi
+
+    # Contents API caps a file at ~100 MB and base64 inflates by 4/3; skip the
+    # repo copy for absurdly long chats, the archive.org copy still stands.
+    local bytes
+    bytes=$(get_file_size "$f")
+    if (( bytes > 25000000 )); then
+        log_warn "Chat: replay is $(format_size "$bytes"), too large for the repo API, archive.org only"
+        return 1
+    fi
+
+    if github_api_write "data/chat/${vid}.json" "$(cat "$f")" \
+        "Archive live chat for ${vid} (${msgs} messages)"; then
+        log_ok "Chat: published data/chat/${vid}.json (${msgs} messages) → dashboard replay"
+        set_env "RECORD_CHAT_REPO" "data/chat/${vid}.json"
+        if [[ -z "${RECORD_CHAT_URL:-}" ]]; then
+            set_env "RECORD_CHAT_URL" \
+                "https://raw.githubusercontent.com/${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}/main/data/chat/${vid}.json"
+        fi
+        return 0
+    fi
+
+    log_warn "Chat: repo publish failed (GH_PAT missing or API error), archive.org copy unaffected"
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  SERVICE 4: ARCHIVE.ORG UPLOAD
 #  PERMANENT storage, files NEVER expire. Rich metadata.
 #
@@ -469,22 +542,27 @@ upload_to_archive() {
             log_info "  Archive.org: Link → ${link} (PERMANENT)"
             ARCHIVE_LINKS+=("${part_name}|${link}|${identifier}")
 
-            # Upload chat.json if available (only when it has real content).
-            # Prefer the path the recorder reported; fall back to the default.
-            local chat_file="${RECORD_CHAT_FILE:-${RECORD_DIR:-/tmp/stream-recorder}/chat.json}"
-            if [[ -f "$chat_file" ]] && [[ $(wc -c < "$chat_file" 2>/dev/null || echo 0) -gt 50 ]]; then
-                log_info "   Archive.org: Uploading chat.json ($(wc -c < "$chat_file") bytes)..."
-                curl -s -o /dev/null \
+            # Upload the COMPACT replay (the format the dashboard reads) and
+            # only publish a URL after the server confirms the write.
+            local chat_file chat_msgs
+            if chat_file=$(chat_file_path) && (( $(chat_message_count) > 0 )); then
+                chat_msgs=$(chat_message_count)
+                log_info "   Archive.org: Uploading chat.json (${chat_msgs} messages)..."
+                local chat_code
+                chat_code=$(curl -s -o /dev/null -w '%{http_code}' \
                     --max-time 300 --location \
                     -H "authorization: LOW ${access_key}:${secret_key}" \
                     -H "Content-Type: application/json" \
                     --upload-file "$chat_file" \
-                    "https://s3.us.archive.org/${identifier}/chat.json" \
-                    2>/dev/null || true
-                set_env "RECORD_CHAT_URL" "https://archive.org/download/${identifier}/chat.json"
-                log_ok "  Archive.org: Chat log uploaded"
+                    "https://s3.us.archive.org/${identifier}/chat.json" 2>/dev/null) || chat_code="000"
+                if [[ "$chat_code" =~ ^2[0-9]{2}$ ]]; then
+                    set_env "RECORD_CHAT_URL" "https://archive.org/download/${identifier}/chat.json"
+                    log_ok "  Archive.org: Chat log uploaded (${chat_msgs} messages)"
+                else
+                    log_warn "  Archive.org: Chat upload failed (HTTP ${chat_code}), no link published"
+                fi
             else
-                log_info "  Archive.org: No chat log to upload (file missing or empty)"
+                log_info "  Archive.org: No chat replay to upload (${RECORD_CHAT_REASON:-nothing captured})"
             fi
 
             return 0
@@ -1217,6 +1295,10 @@ upload_to_clouds() {
 
     # Dashboard thumbnail (cloud URL, not committed to repo)
     upload_thumbnail_to_cloud || true
+
+    # Live-chat replay → repo data/chat (the dashboard's source). Independent
+    # of the archive.org upload above; either copy alone is still useful.
+    publish_chat_to_repo || true
 
     log_separator
 

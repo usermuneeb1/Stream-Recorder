@@ -81,6 +81,71 @@ recording_cookies_allowed() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  METHOD TELEMETRY — which method actually won, and what it authenticated with
+#
+#  The Discord "ARCHIVED" card never said HOW the file was captured, so
+#  "did it use the CDP browser or cookies?" was unanswerable after the fact
+#  (2026-10-30). The cascade now records the winning method as it returns:
+#      RECORD_METHOD_DESC  "K: Real browser session (SeleniumBase cdp)"
+#      RECORD_METHOD_CODE  "K"
+#      RECORD_METHOD_TOOL  "SeleniumBase CDP + ffmpeg"
+#      RECORD_METHOD_AUTH  "cookieless" | "cookies" | "browser jar"
+#  These flow to GITHUB_ENV, so the notification step, links.txt and the run
+#  summary all report the same thing.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+RECORD_METHOD_DESC=""
+RECORD_METHOD_CODE=""
+RECORD_METHOD_TOOL=""
+RECORD_METHOD_AUTH=""
+
+# <method-function> → "tool|auth-class". Tool names live next to the scorer so
+# a rename in one place cannot silently mislabel a recording.
+method_meta() {
+    case "$1" in
+        record_method_a) echo "yt-dlp (web_creator)|cookies" ;;
+        record_method_b) echo "yt-dlp (tv_embedded)|cookies" ;;
+        record_method_c) echo "yt-dlp (mediaconnect)|cookieless" ;;
+        record_method_d) echo "yt-dlp (android_vr)|cookieless" ;;
+        record_method_e) echo "yt-dlp (mweb)|cookieless" ;;
+        record_method_f) echo "streamlink (default)|cookieless" ;;
+        record_method_g) echo "yt-dlp (default)|cookieless" ;;
+        record_method_h) echo "ytarchive|cookieless" ;;
+        record_method_i) echo "streamlink (hardened)|cookieless" ;;
+        record_method_j) echo "ffmpeg (HLS manifest)|cookieless" ;;
+        record_method_k)
+            if [[ "$(browser_mode 2>/dev/null || echo cdp)" == "uc" ]]; then
+                echo "SeleniumBase UC + yt-dlp|browser jar"
+            else
+                echo "SeleniumBase CDP + ffmpeg|cookieless"
+            fi ;;
+        *) echo "unknown|unknown" ;;
+    esac
+}
+
+# _note_recording_method <desc> <tool> <auth>
+_note_recording_method() {
+    RECORD_METHOD_DESC="$1"
+    RECORD_METHOD_CODE="${1%%:*}"
+    RECORD_METHOD_TOOL="$2"
+    RECORD_METHOD_AUTH="$3"
+    set_env "RECORD_METHOD_DESC" "$RECORD_METHOD_DESC"
+    set_env "RECORD_METHOD_CODE" "$RECORD_METHOD_CODE"
+    set_env "RECORD_METHOD_TOOL" "$RECORD_METHOD_TOOL"
+    set_env "RECORD_METHOD_AUTH" "$RECORD_METHOD_AUTH"
+}
+
+# _note_recording_method_for <method-function> <label>
+_note_recording_method_for() {
+    local fn="$1" label="$2" meta tool auth
+    meta=$(method_meta "$fn")
+    tool="${meta%%|*}"
+    auth="${meta#*|}"
+    _note_recording_method "$label" "$tool" "$auth"
+    log_info "  Method telemetry: ${label} → ${tool} (${auth})"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ═══════════════════════════════════════════════════════════════════════════════
 #  RECORDING METHOD A: Cookies + web_creator Player
 #  web_creator bypasses the n-challenge that blocks the regular 'web' client
@@ -917,6 +982,7 @@ attempt_recording() {
         valid_file=$(validate_recorded_file "$output_base") && {
             log_ok "  ✅ Method ${label} succeeded!"
             RECORDED_FILES+=("$valid_file")
+            _note_recording_method_for "$fn" "$label"
             return 0
         }
 
@@ -1073,13 +1139,22 @@ record_stream() {
     set_env "RECORD_OUTPUT_TITLE" "$safe_title"
     set_env "RECORD_RAW_FILE" "$raw_output"
     
-    # ── Live Chat Extractor ──────────────────────────────────────────────────
-    # FIX: the old check `command -v chat_downloader` matched only one of the
-    # possible CLI names (pip installs `chat-downloader`; some environments
-    # expose `chat_downloader` or only the module). When none matched, chat
-    # capture silently never ran — 1 chat file across 12 recordings. Now we
-    # resolve ANY working invocation, keep stderr for diagnosis, and retry
-    # against the VOD replay if the live capture came back empty.
+    # ── Live Chat Extractor (v5) ─────────────────────────────────────────────
+    # Contract: RECORD_CHAT_FILE is the COMPACT replay the dashboard serves
+    # ({messages:[{t,a,m}]}), never a raw tool dump.
+    #
+    # What went wrong before (2026-10-30): chat_downloader was started with
+    # `--output chat.json`, which writes a JSON *array*, and that file was
+    # handed to Discord/archive as-is. Nothing converted it to the compact
+    # format `data/chat/<id>.json` uses, so a successful capture still showed
+    # as "Live Chat: Not archived" and never appeared in the dashboard replay.
+    # Capture also depended on ONE tool: if chat_downloader was missing or
+    # bot-walled, the chat was simply lost. Now:
+    #   1. chat_downloader runs live in the background (any CLI/module name),
+    #   2. yt-dlp's live_chat replay is the fallback,
+    #   3. both are converted, counted, and only N>0 messages count as success,
+    #   4. a short bounded retry covers the replay-build lag after a stream ends.
+    local chat_raw="${RECORD_DIR}/chat.raw.json"
     local chat_output="${RECORD_DIR}/chat.json"
     local chat_err="${RECORD_DIR}/method_logs/chat.err"
     local chat_pid=""
@@ -1092,19 +1167,36 @@ record_stream() {
         return 1
     }
 
+    # raw dump (either tool's format) → compact replay; echoes message count.
+    # Anything else (replay fetch, retries, tool fallback) lives in ONE place:
+    # scripts/archive-chat.sh, which this function calls with --output below.
+    # Duplicating that logic here is how the two copies drifted apart before.
+    _chat_normalize() {
+        : > "$chat_output"
+        [[ -s "$chat_raw" ]] || { echo 0; return 0; }
+        if ! command -v node >/dev/null 2>&1 || [[ ! -f "${SCRIPT_DIR}/convert-chat.mjs" ]]; then
+            echo 0
+            return 0
+        fi
+        node "${SCRIPT_DIR}/convert-chat.mjs" "$chat_raw" "$chat_output" >>"$chat_err" 2>&1 || { echo 0; return 0; }
+        jq -r '(.messages // []) | length' "$chat_output" 2>/dev/null || echo 0
+    }
+
     log_info "Spawning chat downloader in background..."
+    : > "$chat_err"
     chat_bin=$(_resolve_chat_downloader) || true
     if [[ -n "$chat_bin" ]]; then
-        : > "$chat_err"
         if [[ "$chat_bin" == "__module__" ]]; then
-            python3 -m chat_downloader "$video_url" --output "$chat_output" >/dev/null 2>"$chat_err" &
+            python3 -m chat_downloader "$video_url" --output "$chat_raw" \
+                --message_groups all >/dev/null 2>"$chat_err" &
         else
-            "$chat_bin" "$video_url" --output "$chat_output" >/dev/null 2>"$chat_err" &
+            "$chat_bin" "$video_url" --output "$chat_raw" \
+                --message_groups all >/dev/null 2>"$chat_err" &
         fi
         chat_pid=$!
         log_info "Chat downloader started (${chat_bin}, PID: $chat_pid)"
     else
-        log_warn "chat_downloader unavailable (pip install chat-downloader), skipping live chat extraction"
+        log_warn "chat_downloader unavailable (pip install chat-downloader), live capture skipped, will use yt-dlp replay"
     fi
     
     # ── Recording Loop ───────────────────────────────────────────────────────
@@ -1186,33 +1278,40 @@ record_stream() {
         wait "$chat_pid" 2>/dev/null || true
     fi
 
-    # ── Chat validation + VOD-replay retry ───────────────────────────────────
-    # A live capture can come back empty (tool died mid-stream, WARP hiccup).
-    # Once the stream has ended, the live-chat REPLAY is fetchable from the
-    # VOD page — retry synchronously before giving up. Only a file with real
-    # content (>50 bytes) counts as success.
-    _chat_valid() { [[ -f "$chat_output" ]] && [[ $(wc -c < "$chat_output" 2>/dev/null || echo 0) -gt 50 ]]; }
+    # ── Chat validation + normalisation + fallbacks ──────────────────────────
+    # 1. convert what the background capture wrote (chat_downloader / live tail)
+    # 2. if that is empty, run the shared capture (yt-dlp replay + retries)
+    # 3. publish only a real replay: N>0 messages, never a bare `[]`
+    local chat_msgs=0 chat_reason=""
+    chat_msgs=$(_chat_normalize)
 
-    if ! _chat_valid; then
-        log_warn "Live chat capture empty or missing, trying VOD replay..."
-        chat_bin=$(_resolve_chat_downloader) || chat_bin=""
-        if [[ -n "$chat_bin" ]]; then
-            if [[ "$chat_bin" == "__module__" ]]; then
-                python3 -m chat_downloader "$video_url" --output "$chat_output" >>"$chat_err" 2>&1 || true
-            else
-                "$chat_bin" "$video_url" --output "$chat_output" >>"$chat_err" 2>&1 || true
-            fi
-            _chat_valid && log_ok "Chat recovered from VOD replay ($(wc -c < "$chat_output") bytes)"
+    if (( chat_msgs == 0 )); then
+        log_warn "Live chat capture empty or missing, fetching the replay (yt-dlp + chat-downloader)…"
+        bash "${SCRIPT_DIR}/archive-chat.sh" "$video_url" \
+            --output "$chat_output" \
+            --wait "${CHAT_REPLAY_WAIT:-180}" \
+            --force >>"$chat_err" 2>&1 || true
+        chat_msgs=0
+        if [[ -s "$chat_output" ]]; then
+            chat_msgs=$(jq -r '(.messages // []) | length' "$chat_output" 2>/dev/null || echo 0)
         fi
     fi
 
-    if _chat_valid; then
-        log_ok "Chat log captured: $(wc -c < "$chat_output") bytes"
-        set_env "RECORD_CHAT_FILE" "$chat_output"
+    if (( chat_msgs > 0 )); then
+        log_ok "Chat log captured: ${chat_msgs} messages"
+        set_env "RECORD_CHAT_FILE"     "$chat_output"
+        set_env "RECORD_CHAT_MESSAGES" "$chat_msgs"
+        set_env "RECORD_CHAT_REASON"   "captured ${chat_msgs} messages"
     else
-        log_warn "No chat log captured ($(tail -2 "$chat_err" 2>/dev/null | tr '\n' ' ' | cut -c1-160))"
+        if [[ -z "$chat_bin" ]] && ! command -v yt-dlp >/dev/null 2>&1; then
+            chat_reason="no chat tool available (chat-downloader / yt-dlp)"
+        else
+            chat_reason="no chat replay yet ($(tail -1 "$chat_err" 2>/dev/null | tr -d '\n' | cut -c1-90))"
+        fi
+        log_warn "No chat log captured, ${chat_reason}"
+        set_env "RECORD_CHAT_REASON" "$chat_reason"
     fi
-    
+
     if [[ ${#RECORDED_FILES[@]} -eq 0 ]]; then
         log_warn "═══ LIVE RECORDING FAILED, TRYING VOD RESCUE ═══"
         log_info "All live methods failed, attempting to grab VOD replay before it goes private..."
@@ -1293,6 +1392,7 @@ record_stream() {
                         RECORDED_FILES+=("$vod_output")
                         RECORDING_SUCCESS=true
                         vod_rescued=true
+                        _note_recording_method "VOD rescue: ${mname}" "yt-dlp (post-stream VOD)" "cookieless"
                         break
                     else
                         log_warn "  VOD file too small ($(format_size "$vod_size")), trying next method"
@@ -1325,6 +1425,7 @@ record_stream() {
                             RECORDED_FILES+=("$vod_output")
                             RECORDING_SUCCESS=true
                             vod_rescued=true
+                            _note_recording_method "VOD rescue (cookies): ${mname}" "yt-dlp (post-stream VOD)" "cookies"
                             break
                         else
                             rm -f "$vod_output"
@@ -1379,6 +1480,15 @@ record_stream() {
     fi
     
     # ── Record end time ──────────────────────────────────────────────────────
+    # Telemetry: the notification must be able to answer "how was this
+    # captured?" (CDP browser vs cookies vs a cookieless yt-dlp client).
+    if [[ -n "$RECORD_METHOD_DESC" ]]; then
+        log_ok "Recorded via: ${RECORD_METHOD_DESC} → ${RECORD_METHOD_TOOL} (${RECORD_METHOD_AUTH})"
+    else
+        log_warn "Recording method telemetry missing, reporting 'unknown'"
+        _note_recording_method "unknown" "unknown" "unknown"
+    fi
+
     set_env "STREAM_END_EPOCH" "$(now_epoch)"
     set_env "STREAM_END_TIME" "$(now_pkt)"
     set_env "RECORDING_SUCCESS" "true"

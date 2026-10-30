@@ -195,6 +195,33 @@ else
 fi
 export BROWSER_ASSIST=auto
 
+# ── TEST 6: the winning method is reported (Discord "Recorded via") ────────
+# The ARCHIVED card used to hide HOW a recording was captured (2026-10-30).
+# attempt_recording() must publish the winner as it returns, and Method K must
+# describe itself as the CDP browser — never as a cookie path.
+reset_work
+export MOCK_SUCCEED_TOOL=yt-dlp
+RECORD_METHOD_DESC=""; RECORD_METHOD_CODE=""; RECORD_METHOD_TOOL=""; RECORD_METHOD_AUTH=""
+attempt_recording "https://youtu.be/TEST" 1 >/dev/null 2>&1
+if [[ "${RECORD_METHOD_CODE:-}" == "D" && "${RECORD_METHOD_TOOL:-}" == "yt-dlp (android_vr)" && "${RECORD_METHOD_AUTH:-}" == "cookieless" ]]; then
+    ok "winning method reported as D / yt-dlp (android_vr) / cookieless"
+else
+    bad "method telemetry wrong: code='${RECORD_METHOD_CODE:-}' tool='${RECORD_METHOD_TOOL:-}' auth='${RECORD_METHOD_AUTH:-}'"
+fi
+
+META=$(method_meta record_method_k)
+if [[ "${META%%|*}" == "SeleniumBase CDP + ffmpeg" && "${META#*|}" == "cookieless" ]]; then
+    ok "method K self-describes as CDP + ffmpeg (cookieless)"
+else
+    bad "method K metadata wrong: '${META}'"
+fi
+META=$(BROWSER_MODE=uc method_meta record_method_k)
+if [[ "${META%%|*}" == "SeleniumBase UC + yt-dlp" && "${META#*|}" == "browser jar" ]]; then
+    ok "legacy UC mode reports the browser-minted jar, not the operator cookie file"
+else
+    bad "method K UC metadata wrong: '${META}'"
+fi
+
 echo
 echo "== cascade test: ${PASS} passed, ${FAIL} failed =="
 [[ "$FAIL" == "0" ]]

@@ -4,6 +4,14 @@ name: Chat archiver
 # private hours after airing, once that happens the chat is unrecoverable.
 # Runs the moment a recording finishes (workflow_run) and every 6h as a
 # safety net for anything the immediate pass missed.
+#
+# 2026-10-30: this job was green while archiving nothing. It installed only
+# yt-dlp (no chat-downloader fallback), treated a non-empty file as "done"
+# (so a bare `[]` from a failed capture blocked every retry forever), and had
+# no failure condition at all. Now the work lives in scripts/archive-chat.sh
+# (one implementation, shared with the recorder), a replay only counts when it
+# holds messages, and an archive with zero chats fails loudly instead of
+# reporting success.
 
 on:
   workflow_run:
@@ -32,24 +40,73 @@ jobs:
       - name: Set up tools
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq jq nodejs > /dev/null
-          sudo python3 -m pip install -q -U yt-dlp > /dev/null 2>&1 || sudo pip3 install -q -U yt-dlp > /dev/null 2>&1
+          # yt-dlp = primary (live_chat subtitles); chat-downloader = fallback
+          # for videos where yt-dlp is bot-walled. Either alone can capture.
+          sudo python3 -m pip install -q -U yt-dlp chat-downloader > /dev/null 2>&1 \
+            || sudo pip3 install -q -U yt-dlp chat-downloader > /dev/null 2>&1 \
+            || true
           yt-dlp --version
+          node --version
+          python3 -c "import chat_downloader; print('chat-downloader available')" 2>/dev/null \
+            || echo "::warning::chat-downloader unavailable, yt-dlp is the only capture path"
 
       - name: Capture missing chats (newest first, privates race the clock)
         run: |
           chmod +x scripts/archive-chat.sh
           mkdir -p data/chat
+
+          if ! jq -e 'type == "array" and length > 0' data/recordings.json > /dev/null 2>&1; then
+            echo "::error::data/recordings.json is missing or empty — nothing to scan, refusing to report success"
+            exit 1
+          fi
+
+          total=0; existing=0; archived=0; missing=0
           # newest recordings first: they are the most likely still-public
-          jq -r 'sort_by(.date) | reverse | .[] | "\(.video_id) \(.video_url)"' \
-            data/recordings.json 2>/dev/null | while read -r vid url; do
-              [[ -z "$vid" && -z "$url" ]] && continue
-              if [[ -s "data/chat/$vid.json" ]]; then
-                echo "already archived: $vid"
-                continue
-              fi
-              echo "→ trying: $vid"
-              ./scripts/archive-chat.sh "$url" || true
-          done
+          while read -r vid url; do
+            [[ -z "$vid" && -z "$url" ]] && continue
+            total=$((total + 1))
+
+            # A file only counts when it holds messages: `[]` is a failed
+            # capture, and the old `-s` check let it block every retry.
+            # `demo: true` is the dashboard's sample replay — not a real capture
+            if jq -e '(.demo != true) and (((.messages // []) | length) > 0)' "data/chat/$vid.json" > /dev/null 2>&1; then
+              echo "already archived: $vid ($(jq -r '.messages | length' "data/chat/$vid.json"))"
+              existing=$((existing + 1))
+              continue
+            fi
+
+            echo "→ trying: $vid"
+            if ./scripts/archive-chat.sh "$url" --wait 120; then
+              archived=$((archived + 1))
+            else
+              missing=$((missing + 1))
+              echo "::warning title=Live chat not archived::$vid — no replay available yet ($url)"
+            fi
+          done < <(jq -r 'sort_by(.date) | reverse | .[] | "\(.video_id) \(.video_url)"' data/recordings.json)
+
+          {
+            echo "### 💬 Live chat archive"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Recordings checked | ${total} |"
+            echo "| Already archived | ${existing} |"
+            echo "| Newly archived | ${archived} |"
+            echo "| No replay available | ${missing} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "checked=${total} archived=${archived} existing=${existing} missing=${missing}"
+          echo "total=${total}" >> "$GITHUB_OUTPUT"
+          echo "archived=${archived}" >> "$GITHUB_OUTPUT"
+          echo "existing=${existing}" >> "$GITHUB_OUTPUT"
+          echo "missing=${missing}" >> "$GITHUB_OUTPUT"
+
+          # Sentinel: an archive with zero chat replays is broken tooling, not
+          # "nothing to do". (Green-while-broken is this repo's worst bug class.)
+          if (( total > 0 && archived == 0 && existing == 0 )); then
+            echo "::error::chat capture is broken: ${total} recording(s) scanned, 0 replays archived — check archive-chat.sh / cookies / yt-dlp bot walls"
+            exit 1
+          fi
 
       - name: Commit newly archived chats
         run: |
