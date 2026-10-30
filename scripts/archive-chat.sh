@@ -74,6 +74,13 @@ tool_timeout="${CHAT_REPLAY_TIMEOUT:-180}"
 message_count() {
     local f="$1"
     [[ -s "$f" ]] || { echo 0; return 0; }
+    # `demo: true` is the dashboard's SAMPLE replay (data/chat/eIn7iwVa8fg.json),
+    # not a capture of that video — checked before conversion, which strips the
+    # flag. A JSON-Lines dump is not a single JSON object, so jq just says no.
+    if jq -e '.demo == true' "$f" >/dev/null 2>&1; then
+        echo 0
+        return 0
+    fi
     node "$CONVERT" "$f" "$TMP_DIR/probe.json" >/dev/null 2>&1 || { echo 0; return 0; }
     jq -r '(.messages // []) | length' "$TMP_DIR/probe.json" 2>/dev/null || echo 0
 }

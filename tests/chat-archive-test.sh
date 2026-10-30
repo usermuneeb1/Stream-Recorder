@@ -154,6 +154,15 @@ OUT=$(PATH="$FIX/bin:$PATH" CHAT_DIR="$FIX/chat" MOCK_CHAT_MESSAGES=9 bash "$ARC
 after=$(md5sum "$FIX/chat/$VID.json" | cut -d' ' -f1)
 [[ $RC -eq 0 && "$before" == "$after" ]] && ok "second run leaves the archived replay untouched" || bad "existing replay was overwritten (rc=$RC)"
 
+echo "── a demo fixture is not an archived chat ──"
+VIDD="DEMOVID0001"
+printf '{"demo":true,"messages":[{"t":1,"a":"x","m":"sample"}]}' > "$FIX/chat/$VIDD.json"
+rm -f "$FIX/ytdlp_calls"
+OUT=$(PATH="$FIX/bin:$PATH" CHAT_DIR="$FIX/chat" MOCK_CHAT_MESSAGES=4 bash "$ARCHIVE" "$VIDD" 2>&1); RC=$?
+[[ $RC -eq 0 ]] && ok "demo replay re-captured instead of skipped" || bad "demo replay was treated as archived (rc=$RC)"
+[[ "$(jq -r '.messages | length' "$FIX/chat/$VIDD.json" 2>/dev/null || echo 0)" == "4" ]] \
+    && ok "demo file replaced by the real capture" || bad "demo file not replaced"
+
 echo "── archive-chat.sh: an EMPTY dump is a failure, not a success ──"
 VID2="EMPTYVID002"
 OUT=$(PATH="$FIX/bin:$PATH" CHAT_DIR="$FIX/chat" MOCK_CHAT_EMPTY=1 bash "$ARCHIVE" "https://www.youtube.com/watch?v=$VID2" 2>&1); RC=$?

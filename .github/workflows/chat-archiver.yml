@@ -68,7 +68,8 @@ jobs:
 
             # A file only counts when it holds messages: `[]` is a failed
             # capture, and the old `-s` check let it block every retry.
-            if jq -e '(.messages // []) | length > 0' "data/chat/$vid.json" > /dev/null 2>&1; then
+            # `demo: true` is the dashboard's sample replay — not a real capture
+            if jq -e '(.demo != true) and (((.messages // []) | length) > 0)' "data/chat/$vid.json" > /dev/null 2>&1; then
               echo "already archived: $vid ($(jq -r '.messages | length' "data/chat/$vid.json"))"
               existing=$((existing + 1))
               continue
