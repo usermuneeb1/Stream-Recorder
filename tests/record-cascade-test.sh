@@ -95,6 +95,8 @@ trying_lines() {  # attempt_recording stdout -> "Trying method" lines only
 }
 
 # ── TEST 1: cascade order + labels (all methods fail, order is observable) ──
+# This locks the opt-in auto cascade; CI/config default is BROWSER_ASSIST=first.
+export BROWSER_ASSIST=auto
 reset_work
 export MOCK_SUCCEED_TOOL=none
 OUT=$(attempt_recording "https://youtu.be/TEST" 1 2>&1)
@@ -108,7 +110,7 @@ J: ffmpeg HLS direct (independent path)
 H: ytarchive (cookieless, purpose-built for live)
 I: streamlink hardened (cookieless, independent codebase)
 F: Streamlink (HLS, default flags)
-K: Real browser session (SeleniumBase UC)
+K: Real browser session (SeleniumBase cdp)
 A: Cookies+web_creator (bonus)
 B: Cookies+tv_embedded (bonus)"
 
@@ -186,7 +188,7 @@ reset_work
 export BROWSER_ASSIST=first
 OUT=$(attempt_recording "https://youtu.be/TEST" 1 2>&1)
 FIRST_LABEL="$(trying_lines "$OUT" | head -1)"
-if [[ "$FIRST_LABEL" == "K: Real browser session (SeleniumBase UC)" ]]; then
+if [[ "$FIRST_LABEL" == "K: Real browser session (SeleniumBase cdp)" ]]; then
     ok "BROWSER_ASSIST=first: Method K runs before every other method"
 else
     bad "BROWSER_ASSIST=first: first method was '${FIRST_LABEL}'"

@@ -76,52 +76,62 @@ Deploy targets: **Vercel** (`dashboard/vercel.json`, serverless API routes in
 
 ---
 
-## Recording without cookies (bot-detection bypass)
+## Recording without cookies (SeleniumBase Pure CDP Mode)
 
-YouTube answers datacenter IPs with **"Sign in to confirm you're not a bot"**.
-That is an IP + browser-fingerprint challenge, not a login problem, so a
-hand-pasted `YOUTUBE_COOKIES` secret works for a few days and then rots —
-which is exactly the "I have to keep changing the cookie" pain.
+Public streams are recorded **without a supplied or exported cookie jar**.
+Method K uses [SeleniumBase Pure CDP Mode](https://github.com/seleniumbase/SeleniumBase/blob/master/examples/cdp_mode/ReadMe.md)
+(`seleniumbase.sb_cdp`) to open the watch page in a fresh guest Chrome, read the
+anonymous `ytInitialPlayerResponse`, and hand the playable HLS/DASH/muxed URL to
+ffmpeg. It does **not** use WebDriver/uc_driver, does **not** call yt-dlp with
+`--cookies`, and does **not** load a Google account profile.
 
-The recorder no longer depends on that secret for public streams:
+“Cookie-free” here means no operator cookie file, no exported Netscape jar, and
+no persistent login profile. Chrome may still use ordinary anonymous first-party
+cookies internally while loading the page; those are never handed to the recorder.
 
 | Layer | What it does |
 |---|---|
-| **Detection Method 5** | If curl/yt-dlp detection is bot-walled, a real Chrome opens the channel's `/live` page and reads the player directly. |
-| **Recording Method K** | Opens the watch page in **SeleniumBase UC mode** (undetected-chromedriver), clears the consent/bot interstitial, then exports (a) its cookie jar to `cookies.txt` and (b) the live `hlsManifestUrl` / `dashManifestUrl` / format URLs for a pure-ffmpeg download. |
-| **Auto-adoption** | The minted jar replaces `COOKIES_FILE` for the rest of the run, so a stale cookie file can never poison methods A/B or the pre-flight liveness recheck. |
-
-No Google account is ever used, so this is still **cookieless in the sense that
-matters**: nothing is stored, nothing expires, nothing needs manual rotation.
+| **Detection Method 5** | If HTTP detection is bot-walled, CDP opens the channel `/live` page and trusts only an unblocked, playable player response. |
+| **Recording Method K** | CDP captures `hlsManifestUrl`, `dashManifestUrl`, a muxed format, or a matching video+audio pair; ffmpeg records it directly. |
+| **Strict public mode** | `PUBLIC_STREAM_ONLY=true` closes the cookie gate for every HTTP adapter and skips A/B. This is the CI default. |
+| **Last-resort cookies** | Only if you explicitly set `PUBLIC_STREAM_ONLY=false` and supply valid `YOUTUBE_COOKIES` can A/B run, after the cookieless paths. Restricted/members-only/age-gated streams may still need this. |
 
 ### Controls
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `BROWSER_ASSIST` | `auto` | `auto` = Method K after the fast cookieless paths · `first` = before everything · `off` = disable |
-| `BROWSER_SESSION_TIMEOUT` | `240` | Hard cap for one browser launch (seconds) |
-| `BROWSER_SESSION_MAX_AGE` | `900` | Reuse a captured session for this long (same video only) |
-| `BROWSER_HEADED` | `false` | Force headed mode (Xvfb) |
+| `BROWSER_MODE` | `cdp` | `cdp` = Pure CDP, no cookie export · `uc` = legacy cookie-jar fallback |
+| `BROWSER_ASSIST` | `first` in CI/config | `first` = Method K before HTTP methods · `auto` = after fast cookieless paths · `off` = disable |
+| `PUBLIC_STREAM_ONLY` | `true` in CI | Hard no-cookie contract for public recording |
+| `BROWSER_SESSION_TIMEOUT` | `240` | Hard cap for one browser capture (seconds) |
+| `BROWSER_SESSION_MAX_AGE` | `900` | Reuse a playable capture for this long (same video only) |
+| `BROWSER_BINARY` | auto | Chrome/Chromium executable |
+| `BROWSER_CDP_HOST` / `BROWSER_CDP_PORT` | unset | Attach to a **dedicated anonymous** Chrome instead of launching one |
+| `BROWSER_HEADED` | `false` | Force headed mode (Xvfb on Linux) |
 
-Set `BROWSER_ASSIST` as a repository **variable** (Settings → Secrets and
-variables → Actions → Variables) to change it for every workflow.
+Set these as repository **variables** (Settings → Secrets and variables →
+Actions → Variables) to change the workflows.
 
 ### Install / verify
 
 ```bash
-bash scripts/setup-browser.sh              # Xvfb + seleniumbase + uc_driver
-bash scripts/setup-browser.sh --check-only # verdict only
-bash scripts/setup-browser.sh --verify-launch  # prove Chrome really launches
-bash scripts/browser_session.py --selftest     # offline logic check
-bash tests/browser-session-test.sh             # hermetic plumbing test
+bash scripts/setup-browser.sh --verify-launch   # Chrome + SeleniumBase CDP launch
+python3 scripts/browser_session.py --selftest   # offline logic
+python3 tests/test_browser_cdp.py               # CDP capture contract
+bash tests/browser-cdp-test.sh                  # no-cookie wiring contract
+bash tests/cookieless-smoke-test.sh             # smoke verdict contract
+python3 tests/browser-cdp-local-integration.py  # real Chrome + ffmpeg local fixture
 ```
 
-The **Cookieless smoke test** workflow runs the browser bypass once a day and
-reports `session minted / N cookies / HLS manifest captured` in its summary, so
-rot is visible hours before a stream.
+The **Cookieless smoke test** workflow requires Method K to produce a bounded
+recording with real video **and audio**. A browser launch, visitor id, player
+blob, or cookie jar alone is not a pass. If required CDP fails, the job fails even
+when other cookieless methods pass.
 
-> `PUBLIC_STREAM_ONLY=true` still skips cookie methods A/B. Method K keeps
-> working there — it is a session, not a login.
+A local fixture pass is not a live YouTube pass. Run the smoke workflow against a
+public YouTube VOD/live URL from the production runner to verify current YouTube
+behavior; CDP reduces fingerprint friction but cannot guarantee bypass of every
+IP/account/restriction challenge.
 
 ---
 

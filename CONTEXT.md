@@ -10,11 +10,13 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
    → health (`mirror-health.yml` 6h) → repair (`repair-mirrors.yml` daily 08:30 UTC)
    → keep-alive (`cloud-refresh.yml`: gofile every 5d 06:00 UTC, pixeldrain monthly).
    Bot detection: recording **Method K** (`scripts/browser_session.py` via
-   `scripts/browser-session.sh`) opens the watch page in SeleniumBase UC-mode
-   Chrome, mints a cookie jar + direct HLS/DASH URLs, and replaces
-   `COOKIES_FILE` for the rest of the run. Detection **Method 5** reuses the
-   same helper when every HTTP client is bot-walled. Gated by `BROWSER_ASSIST`
-   (`auto|first|off`), installed by `scripts/setup-browser.sh`.
+   `scripts/browser-session.sh`) opens the watch page in SeleniumBase **Pure
+   CDP Mode** (`BROWSER_MODE=cdp`, default), reads anonymous HLS/DASH/muxed
+   player URLs, and records them with ffmpeg. It exports no cookie jar and does
+   not replace `COOKIES_FILE`. Detection **Method 5** reuses the same helper
+   when HTTP clients are bot-walled. `BROWSER_ASSIST=first` is the CI/config
+   default; `PUBLIC_STREAM_ONLY=true` is the CI no-cookie contract. Legacy
+   `BROWSER_MODE=uc` is opt-in only. Installed by `scripts/setup-browser.sh`.
 2. **Data** — JSON-as-database. **Canonical index: `data/recordings.json`** (NOT
    links.txt — that’s the legacy Discord-facing feed). State files also live in
    `data/` (mirror-health, source-health, system-status, backups/).
@@ -33,15 +35,16 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
 - **`mirror-health.sh` must never emit fewer rows than input recordings** — a
   structural guard exits 2 (vacuous-success outage 2026-09-02: workflow was
   green while checking nothing, so repair never dispatched).
-- **The bot wall is an IP/fingerprint challenge, not a login (2026-10-23).**
-  Never "fix" a bot wall by asking the owner for a fresher cookie: Method K
-  mints a session per run and publishes it through `set_env COOKIES_FILE`, so
-  a stale `YOUTUBE_COOKIES` secret must never be able to block a public
-  stream. Browser capture failures are non-fatal by design (return 1, cascade
-  continues) — Method K sits *after* the fast cookieless paths, before A/B.
-  `tests/browser-session-test.sh` locks: reuse window, blocked-jar handling,
-  id-less capture rejection, jar→yt-dlp handoff, ffmpeg manifest fallback,
-  `BROWSER_ASSIST=off` no-op.
+- **Public recording is cookie-free by default (2026-10-30).** Method K uses
+  SeleniumBase Pure CDP, exports no jar, and never promotes operator cookies.
+  A CDP pass requires an unblocked playable player plus real ffmpeg video+audio;
+  a jar/visitor/player blob alone is not success. `PUBLIC_STREAM_ONLY=true`
+  closes every HTTP adapter cookie gate. Account cookies are an explicit last
+  resort (`PUBLIC_STREAM_ONLY=false` + valid `YOUTUBE_COOKIES`) for restricted
+  streams, not the fix for a public bot wall. Browser failures remain non-fatal
+  to the cascade, but the cookieless smoke workflow fails when required CDP
+  fails. `tests/browser-cdp-test.sh`, `tests/test_browser_cdp.py`, and
+  `tests/browser-session-test.sh` (legacy UC) lock these contracts.
 - **Archive.org object names are underscore-folded (2026-10-23).** The uploader
   names uploads with `make_safe_filename()` (`upload-clouds.sh`): spaces and
   punctuation become `_`. Any offline derivation of `archive_direct` MUST use

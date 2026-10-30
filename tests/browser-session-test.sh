@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  BROWSER SESSION TEST, SeleniumBase UC bypass plumbing                       ║
+# ║  BROWSER SESSION TEST, SeleniumBase legacy UC bypass plumbing                       ║
 # ║                                                                              ║
 # ║  No Chrome, no YouTube, no network. Everything external is a PATH shim.      ║
 # ║  Locks the behaviour that makes cookieless operation safe:                   ║
@@ -17,6 +17,8 @@
 # ║  10. Method K falls back to ffmpeg with the browser hlsManifestUrl           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 set -uo pipefail
+# This file locks the opt-in legacy UC contract. CDP has its own test below.
+export BROWSER_MODE=uc
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$TEST_DIR/.." && pwd)"
@@ -333,7 +335,7 @@ if browser_detect_live "https://www.youtube.com/@TheMuslimLantern/live" > "$WORK
 else
     bad "browser_detect_live failed on a live capture"; tail -6 "$WORK/detect.out"
 fi
-if [[ "$DETECTED_VIDEO_ID" == "TESTVIDEO01" && "$DETECTED_METHOD" == "Browser (SeleniumBase UC)" ]]; then
+if [[ "$DETECTED_VIDEO_ID" == "TESTVIDEO01" && "$DETECTED_METHOD" == "Browser (SeleniumBase uc)" ]]; then
     ok "detection Method 5 sets video id + method label"
 else
     bad "detection facts wrong (id='$DETECTED_VIDEO_ID' method='$DETECTED_METHOD')"

@@ -67,6 +67,7 @@ expect_flag J 'yt-dlp --no-download --no-playlist --no-warnings --quiet -f best 
 expect_flag I '--hls-segment-threads 4' 'hardened streamlink flags'
 expect_flag I '--retry-max 10' 'streamlink retry flags'
 expect_flag K 'browser_session.py' 'real-browser session (Method K)'
+expect_flag K '--mode cdp' 'Pure CDP mode'
 OUTG=$(BROWSER_ASSIST=off bash "$SMOKE" --video-id dQw4w9WgXcQ --dry-run --only G 2>&1)
 grep -q 'player_client' <<< "$OUTG" && bad "G must stay the plain auto-select client" || ok "G: no player_client override"
 
@@ -160,6 +161,27 @@ else
     ok "MIN_PASS=7 rejects 5 working methods"
 fi
 if run_smoke 2; then ok "the same run passes at MIN_PASS=2"; else bad "5 working methods failed MIN_PASS=2"; fi
+
+echo "── 7: required CDP failure cannot be hidden by other passing methods ──"
+rm -rf "$TMP/out"; make_stubs 200000
+cat > "$TMP/bin/fake-browser-python" <<'STUB'
+#!/usr/bin/env bash
+[[ "${1:-}" == "-c" ]] && exit 0
+exit 3
+STUB
+chmod +x "$TMP/bin/fake-browser-python"
+if SMOKE_OUT="$TMP/out" BROWSER_ASSIST=first BROWSER_MODE=cdp BROWSER_PYTHON="$TMP/bin/fake-browser-python" \
+    SMOKE_REQUIRE_K=true PATH="$TMP/bin:$PATH" MIN_PASS=1 \
+    bash "$SMOKE" --video-id dQw4w9WgXcQ --json "$TMP/result.json" > "$TMP/run.log" 2>&1; then
+    bad "required CDP failure was hidden by MIN_PASS/other methods"
+else
+    ok "required CDP failure fails the smoke job"
+    if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["browser_required"] is True and d["browser_passed"] is False and d["at_risk"] is True' "$TMP/result.json"; then
+        ok "JSON reports required CDP did not pass"
+    else
+        bad "JSON missing required-CDP verdict"
+    fi
+fi
 
 echo ""
 if (( FAILURES > 0 )); then echo "RESULT: RED — $FAILURES case(s) failed"; exit 1; fi

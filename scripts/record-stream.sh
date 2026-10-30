@@ -10,7 +10,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/detect-stream.sh"
-# Real-browser session helper (SeleniumBase UC). Defines browser_mint_session,
+# Real-browser session helper (SeleniumBase CDP default). Defines browser_mint_session,
 # browser_session_jq, browser_assist_mode. Sourcing is side-effect free: the
 # browser only launches when a method actually asks for a session.
 source "$SCRIPT_DIR/browser-session.sh"
@@ -71,6 +71,14 @@ CUSTOM_DURATION_MODE="${CUSTOM_DURATION_MODE:-false}"
 #     • Recommended only if you're certain ALL streams will be fully public
 # ─────────────────────────────────────────────────────────────────────────────
 PUBLIC_STREAM_ONLY="${PUBLIC_STREAM_ONLY:-false}"
+
+# True only for an explicitly enabled, verified operator-cookie fallback.
+# PUBLIC_STREAM_ONLY=true is a hard no-cookie contract for every HTTP adapter.
+recording_cookies_allowed() {
+    [[ "${PUBLIC_STREAM_ONLY:-false}" != "true" ]] || return 1
+    [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] || return 1
+    [[ -f "${COOKIES_FILE:-cookies.txt}" && -s "${COOKIES_FILE:-cookies.txt}" ]]
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -223,7 +231,7 @@ record_method_d() {
     # cookies if they are verified-valid; otherwise run clean cookieless so a bad
     # cookie file can never block a public-stream recording.
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if recording_cookies_allowed; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -265,7 +273,7 @@ record_method_e() {
     # A stale/rotated cookie file can make YouTube reject the request and poison
     # the cookieless cascade, so gate on COOKIE_STATUS like D/H/I (see D).
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if recording_cookies_allowed; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -311,7 +319,7 @@ record_method_f() {
     # Cookieless method per design — only attach cookies when verified-valid
     # (a stale cookie file can poison the cookieless cascade; see method D).
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if recording_cookies_allowed; then
         cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -347,7 +355,7 @@ record_method_g() {
     # A stale/rotated cookie file can make YouTube reject the request and poison
     # the cookieless cascade, so gate on COOKIE_STATUS like D/H/I (see D).
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if recording_cookies_allowed; then
         cookies_args=(--cookies "${COOKIES_FILE:-cookies.txt}")
     fi
     
@@ -513,9 +521,7 @@ record_method_h() {
 
     # Optional cookies, only if verified valid (matches method D's logic)
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
-        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
-        && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if recording_cookies_allowed; then
         cookies_args=(-c "${COOKIES_FILE:-cookies.txt}")
     fi
 
@@ -575,9 +581,7 @@ record_method_i() {
     fi
 
     local -a cookies_args=()
-    if [[ "${COOKIE_STATUS:-}" == "valid" || "${COOKIE_STATUS:-}" == "valid_unverified" ]] \
-        && [[ -f "${COOKIES_FILE:-cookies.txt}" ]] \
-        && [[ -s "${COOKIES_FILE:-cookies.txt}" ]]; then
+    if recording_cookies_allowed; then
         cookies_args=(--http-cookie-file "${COOKIES_FILE:-cookies.txt}")
     fi
 
@@ -686,27 +690,13 @@ record_method_j() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  RECORDING METHOD K: REAL BROWSER SESSION (SeleniumBase UC mode)
+#  RECORDING METHOD K: REAL BROWSER (SeleniumBase Pure CDP by default)
 #
-#  WHY THIS EXISTS
-#    Every method above speaks HTTP like a bot. When YouTube decides the
-#    runner IP looks automated it answers "Sign in to confirm you're not a
-#    bot", and yt-dlp/ytarchive/streamlink all die at extraction time. The
-#    wall is an IP + TLS/JS fingerprint challenge, NOT a login requirement,
-#    so a hand-pasted YOUTUBE_COOKIES secret rots within days and needs
-#    constant manual refreshing.
-#
-#  WHAT THIS DOES
-#    1. Launches a genuine, undetected Chrome (SeleniumBase UC mode) on the
-#       SAME IP the download will use, opens the watch page, and clears the
-#       consent banner / bot interstitial if one appears.
-#    2. Exports that session's cookies as a Netscape jar.
-#    3. Tries yt-dlp with those cookies, then falls back to the direct
-#       hlsManifestUrl / dashManifestUrl / format URLs the real player
-#       advertised — a path with no extractor and therefore no bot check.
-#
-#  No Google account is involved, so public streams keep recording with no
-#  stored cookies at all. See BROWSER_ASSIST in scripts/browser-session.sh.
+#  CDP opens a fresh guest Chrome, reads the anonymous player response, and
+#  records HLS/DASH/muxed/video+audio URLs directly with ffmpeg. It exports no
+#  cookie jar, invokes no yt-dlp cookie handoff, and loads no account profile.
+#  Legacy BROWSER_MODE=uc is opt-in and retains the old jar/yt-dlp path.
+#  See BROWSER_MODE / BROWSER_ASSIST in scripts/browser-session.sh.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # _record_from_manifest <label> <output_file> <user_agent> <ffmpeg layout> <inputs...>
@@ -728,12 +718,20 @@ _record_from_manifest() {
     local -a maps=()
     [[ "$layout" == "split" ]] && maps=(-map 0:v:0 -map 1:a:0)
 
-    log_info "  Method K: ffmpeg direct from browser manifest (${label})"
-    timeout "${MAX_RECORD_DURATION:-18000}" ffmpeg -y \
-        -user_agent "$user_agent" \
+    local -a ua_args=() duration_args=()
+    [[ -n "$user_agent" ]] && ua_args=(-user_agent "$user_agent")
+    if [[ "${RECORD_CAPTURE_SECONDS:-0}" =~ ^[1-9][0-9]*$ ]]; then
+        duration_args=(-t "$RECORD_CAPTURE_SECONDS")
+    fi
+
+    log_info "  Method K: ffmpeg direct from browser manifest (${label}; no cookie file)"
+    timeout --kill-after=10 "${MAX_RECORD_DURATION:-18000}" ffmpeg -y -nostdin \
+        "${ua_args[@]}" \
         -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 \
+        -rw_timeout 15000000 \
         "${inputs[@]}" \
         ${maps[@]+"${maps[@]}"} \
+        "${duration_args[@]}" \
         -c copy \
         -f mp4 \
         -movflags +faststart \
@@ -747,11 +745,36 @@ _record_from_manifest() {
     return "$status"
 }
 
+_record_browser_manifests() {
+    local output_file="$1" ua="$2"
+    command -v ffmpeg >/dev/null 2>&1 || return 1
+    local hls dash vurl aurl muxed
+    hls=$(browser_session_jq hls_manifest_url)
+    dash=$(browser_session_jq dash_manifest_url)
+    vurl=$(browser_session_jq video_url)
+    aurl=$(browser_session_jq audio_url)
+    muxed=$(browser_session_jq muxed_url)
+    if [[ -n "$hls" ]]; then
+        _record_from_manifest "HLS manifest" "$output_file" "$ua" single -i "$hls" && return 0
+    fi
+    if [[ -n "$dash" ]]; then
+        _record_from_manifest "DASH manifest" "$output_file" "$ua" single -i "$dash" && return 0
+    fi
+    if [[ -n "$vurl" && -n "$aurl" ]]; then
+        _record_from_manifest "video+audio streams" "$output_file" "$ua" split -i "$vurl" -i "$aurl" && return 0
+    fi
+    if [[ -n "$muxed" ]]; then
+        _record_from_manifest "muxed stream" "$output_file" "$ua" single -i "$muxed" && return 0
+    fi
+    # A video-only adaptive stream is not a successful recording.
+    return 1
+}
+
 record_method_k() {
     local video_url="$1"
     local output_file="$2"
 
-    log_info "  Method K: real-browser session (SeleniumBase UC, no login)"
+    log_info "  Method K: real-browser session (SeleniumBase $(browser_mode), no login)"
 
     if [[ "$(browser_assist_mode)" == "off" ]]; then
         log_info "  Method K: Skipped (BROWSER_ASSIST=off)"
@@ -765,8 +788,8 @@ record_method_k() {
         return 1
     fi
 
-    # ── 1. Capture the session. Also upgrades COOKIES_FILE for A/B below. ──
-    if ! browser_mint_session "$vid"; then
+    # ── 1. Capture anonymous player facts. CDP never upgrades COOKIES_FILE. ──
+    if ! browser_mint_session "$video_url"; then
         log_warn "  Method K: no browser session captured"
         return 1
     fi
@@ -774,7 +797,17 @@ record_method_k() {
     local ua="${BROWSER_UA:-}"
     [[ -z "$ua" ]] && ua=$(rotate_user_agent)
 
-    # ── 2. yt-dlp, now holding a jar minted seconds ago on this very IP ────
+    if [[ "$(browser_mode)" == "cdp" ]]; then
+        # Pure CDP path: browser -> player URL -> ffmpeg. No yt-dlp extraction,
+        # no --cookies, no --http-cookie-file, and no persistent browser profile.
+        if _record_browser_manifests "$output_file" "$ua"; then
+            return 0
+        fi
+        log_warn "  Method K: CDP capture had no playable video+audio/manifest path"
+        return 1
+    fi
+
+    # ── Legacy UC mode only: yt-dlp with the jar minted by the browser ────
     if command -v yt-dlp >/dev/null 2>&1 && [[ -s "${BROWSER_COOKIES_FILE:-}" ]]; then
         log_info "  Method K: yt-dlp with the fresh browser jar"
         local live_start_flag="--live-from-start"
@@ -804,31 +837,11 @@ record_method_k() {
         [[ "$rc" == "124" ]] && return 0
     fi
 
-    # ── 3. Direct player URLs. No extractor, no extraction-time bot check. ─
-    if command -v ffmpeg >/dev/null 2>&1; then
-        local hls dash vurl aurl
-        hls=$(browser_session_jq hls_manifest_url)
-        dash=$(browser_session_jq dash_manifest_url)
-        vurl=$(browser_session_jq video_url)
-        aurl=$(browser_session_jq audio_url)
-
-        if [[ -n "$hls" ]]; then
-            _record_from_manifest "HLS manifest" "$output_file" "$ua" single -i "$hls" && return 0
-        fi
-        if [[ -n "$dash" ]]; then
-            _record_from_manifest "DASH manifest" "$output_file" "$ua" single -i "$dash" && return 0
-        fi
-        if [[ -n "$vurl" && -n "$aurl" ]]; then
-            _record_from_manifest "video+audio streams" "$output_file" "$ua" split -i "$vurl" -i "$aurl" && return 0
-        fi
-        if [[ -n "$vurl" ]]; then
-            _record_from_manifest "muxed stream" "$output_file" "$ua" single -i "$vurl" && return 0
-        fi
-        log_warn "  Method K: browser captured no playable URL"
-    else
-        log_warn "  Method K: ffmpeg not installed, skipping direct-manifest path"
+    # Legacy UC fallback: direct player URLs if the jar handoff did not work.
+    if _record_browser_manifests "$output_file" "$ua"; then
+        return 0
     fi
-
+    log_warn "  Method K: browser captured no playable video+audio/manifest URL"
     return 1
 }
 
@@ -866,13 +879,11 @@ attempt_recording() {
         "record_method_f|F: Streamlink (HLS, default flags)"
     )
 
-    # Method K = real browser session (SeleniumBase UC). It is the answer to
-    # "Sign in to confirm you're not a bot": a genuine Chrome clears the wall
-    # on the runner's own IP and hands us a fresh cookie jar + direct manifest.
-    #   BROWSER_ASSIST=auto  → after the fast cookieless paths (default)
-    #   BROWSER_ASSIST=first → before everything (bot-walled IPs)
+    # Method K = SeleniumBase CDP player capture + direct ffmpeg recording.
+    #   BROWSER_ASSIST=first → before everything (CI/config default)
+    #   BROWSER_ASSIST=auto  → after the fast cookieless paths
     #   BROWSER_ASSIST=off   → not in the cascade at all
-    local k_row="record_method_k|K: Real browser session (SeleniumBase UC)"
+    local k_row="record_method_k|K: Real browser session (SeleniumBase $(browser_mode))"
     case "$(browser_assist_mode)" in
         off) : ;;
         first) methods=("$k_row" ${methods[@]+"${methods[@]}"}) ;;
@@ -1292,7 +1303,7 @@ record_stream() {
             
             # Also try with cookies if available (they might still work for VOD even if live failed)
             # Skipped entirely under PUBLIC_STREAM_ONLY=true (permanent cookieless mode)
-            if [[ "$vod_rescued" != "true" ]] && [[ "${PUBLIC_STREAM_ONLY:-false}" != "true" ]] && [[ -f "$COOKIES_FILE" ]] && [[ -s "$COOKIES_FILE" ]]; then
+            if [[ "$vod_rescued" != "true" ]] && recording_cookies_allowed; then
                 log_info "  VOD Rescue retry with cookies: ${mname}..."
                 if timeout 1800 yt-dlp \
                     --cookies "$COOKIES_FILE" \

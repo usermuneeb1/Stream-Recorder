@@ -7,7 +7,7 @@
 # ║  scripts/record-stream.sh by tests/cookieless-smoke-test.sh:                ║
 # ║     D android_vr · C mediaconnect · G plain yt-dlp · E mweb · J ffmpeg HLS   ║
 # ║     H ytarchive (live-only) · I streamlink hardened · F streamlink ·         ║
-# ║     K real-browser session (SeleniumBase UC)                                 ║
+# ║     K real-browser recording (SeleniumBase CDP, required)                    ║
 # ║  A+B are cookie-jar methods, so they are not "cookieless" and are excluded.  ║
 # ║                                                                              ║
 # ║  Fails loudly (and pages Discord) when fewer than MIN_PASS methods work.     ║
@@ -128,9 +128,9 @@ jobs:
           echo "vid=$VID" >> "$GITHUB_OUTPUT"
           echo "Testing against: https://www.youtube.com/watch?v=$VID"
 
-      # ─── BROWSER BYPASS (SeleniumBase UC), the "no cookie" answer ──────────
-      # Installs the stack Method K uses: a real Chrome opens the watch page and
-      # mints its own session. Measured by the smoke script (method K), so a
+      # ─── BROWSER STACK (SeleniumBase Pure CDP), the no-cookie answer ───────
+      # Installs the stack Method K uses: Chrome exposes anonymous player URLs
+      # and ffmpeg must record real video+audio. A jar alone is not a pass.
       # browser regression shows up as a failed method instead of a silent note.
       - name: "Install browser bypass stack"
         continue-on-error: true
@@ -141,6 +141,9 @@ jobs:
         env:
           SMOKE_OUT: ${{ runner.temp }}/smoke
           SMOKE_TIMEOUT: "90"
+          BROWSER_MODE: cdp
+          BROWSER_ASSIST: first
+          SMOKE_REQUIRE_K: "true"
         run: |
           set +e
           bash scripts/cookieless-smoke-test.sh \

@@ -61,6 +61,8 @@ scripts/mega/accounts.old.csv
 .agents/
 skills-lock.json
 
-# SeleniumBase runtime scratch (driver downloads, locks) — never commit
+# Local Python environment and SeleniumBase runtime scratch — never commit
+.venv/
+browser_session/
 downloaded_files/
 saved_cookies/

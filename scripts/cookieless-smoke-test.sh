@@ -36,7 +36,7 @@ if [[ -f "$SCRIPT_DIR/browser-session.sh" ]]; then
     source "$SCRIPT_DIR/browser-session.sh"
 fi
 
-METHOD_ORDER=(D C G E J H I F K)
+METHOD_ORDER=(K D C G E J H I F)
 declare -A METHOD_LABEL=(
     [D]="Android VR (cookieless 1080p, primary)"
     [C]="mediaconnect player (no cookies)"
@@ -46,7 +46,7 @@ declare -A METHOD_LABEL=(
     [H]="ytarchive (purpose-built for live)"
     [I]="streamlink hardened retry"
     [F]="streamlink default"
-    [K]="Real-browser session (SeleniumBase UC)"
+    [K]="Real-browser recording (SeleniumBase CDP)"
 )
 
 VIDEO_ID="${SMOKE_VIDEO_ID:-}"
@@ -55,6 +55,7 @@ OUT_DIR="${SMOKE_OUT:-/tmp/smoke}"
 TIMEOUT_PER_METHOD="${SMOKE_TIMEOUT:-90}"
 MIN_PASS="${MIN_PASS:-2}"
 MIN_BYTES="${MIN_BYTES:-100000}"
+REQUIRE_K="${SMOKE_REQUIRE_K:-true}"
 ONLY=""
 JSON_PATH=""
 DRY_RUN=false
@@ -275,13 +276,15 @@ run_method_h() {
     fi
 }
 
-# Method K: the real-browser path — the one thing that does not depend on any
-# stored cookie. A captured session (manifest or jar) is a pass.
+# Method K exercises the REAL recorder function, not just "did Chrome open?".
+# A pass requires a bounded ffmpeg recording with both video and audio pixels.
 run_method_k() {
     local out="${OUT_DIR}/k"
-    local cmd=(python3 "$SCRIPT_DIR/browser_session.py" --video-id "$VIDEO_ID" --outdir "$out")
+    local py="${BROWSER_PYTHON:-python3}"
+    local helper="$SCRIPT_DIR/browser_session.py"
     if $DRY_RUN; then
-        printf '[dry-run] %s\n' "${cmd[*]}"
+        printf '[dry-run] %s %s --mode %s --url %s --outdir %s\n' "$py" "$helper" "$(browser_mode 2>/dev/null || echo cdp)" "$VIDEO_URL" "$out"
+        printf '[dry-run] record_method_k -> ffmpeg -t 10 -> ffprobe %s.mp4\n' "$out"
         record_result K SKIP "dry-run"
         return 0
     fi
@@ -289,33 +292,42 @@ run_method_k() {
         record_result K SKIP "BROWSER_ASSIST=off"
         return 0
     fi
-    if [[ -z "$VIDEO_ID" ]]; then
-        record_result K SKIP "no video id"
+    if [[ "$(browser_mode 2>/dev/null || echo cdp)" != "cdp" ]]; then
+        record_result K FAIL "cookieless smoke requires BROWSER_MODE=cdp"
         return 0
     fi
-    if ! command -v python3 >/dev/null 2>&1; then
-        record_result K SKIP "python3 missing"
+    if [[ -z "$VIDEO_URL" ]]; then
+        record_result K SKIP "no target URL"
         return 0
     fi
-    timeout $(( TIMEOUT_PER_METHOD * 3 )) "${cmd[@]}" >"${out}.log" 2>&1
+    if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+        record_result K FAIL "ffmpeg/ffprobe missing"
+        return 0
+    fi
+
+    # Isolate recorder logs from any live recording on the same runner.
+    export RECORD_DIR="${OUT_DIR}/recorder"
+    export SEGMENTS_DIR="${RECORD_DIR}/segments"
+    export BROWSER_SESSION_DIR="$out"
+    export BROWSER_ASSIST=first BROWSER_MODE=cdp PUBLIC_STREAM_ONLY=true
+    export CUSTOM_DURATION_MODE=true RECORD_CAPTURE_SECONDS=10
+    export MAX_RECORD_DURATION="$TIMEOUT_PER_METHOD"
+    export BROWSER_SESSION_TIMEOUT=$(( TIMEOUT_PER_METHOD * 2 ))
+    export BROWSER_MAX_WAIT="${BROWSER_MAX_WAIT:-45}"
+    mkdir -p "$SEGMENTS_DIR"
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/record-stream.sh"
+    record_method_k "$VIDEO_URL" "${out}.mp4" >"${out}.log" 2>&1
     local rc=$?
-    if [[ -f "${out}/stream.json" ]]; then
-        local manifest
-        manifest=$(jq -r '.hls_manifest_url // .dash_manifest_url // ""' "${out}/stream.json" 2>/dev/null)
-        if [[ -n "$manifest" ]]; then
-            record_result K PASS "session minted + manifest captured"
-            log_ok "  Method K: PASS (manifest captured, no cookies used)"
-            return 0
-        fi
-        if [[ -s "${out}/cookies.txt" ]]; then
-            record_result K PASS "session minted (jar only)"
-            log_ok "  Method K: PASS (jar minted)"
-            return 0
-        fi
+    if [[ "$rc" == "0" ]] && verify_media "${out}.mp4" \
+        && ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 "${out}.mp4" 2>/dev/null | grep -qx audio; then
+        record_result K PASS "CDP -> ffmpeg slice ok (${NOTE[size]:-0} bytes, video+audio, 0 cookie files)"
+        log_ok "  Method K: PASS (${NOTE[height]:-?}p, video+audio, no cookie file)"
+    else
+        tail -8 "${out}.log" 2>/dev/null | sed 's/^/       /'
+        record_result K FAIL "no playable CDP recording (rc=${rc})"
+        log_warn "  Method K: FAIL"
     fi
-    tail -3 "${out}.log" 2>/dev/null | sed 's/^/       /'
-    record_result K FAIL "no browser session captured (rc=${rc})"
-    log_warn "  Method K: FAIL"
 }
 
 wanted() {
@@ -350,6 +362,15 @@ for m in "${METHOD_ORDER[@]}"; do
 done
 
 TOTAL=$(( ${#PASSED[@]} + ${#FAILED[@]} ))
+BROWSER_REQUIRED=false
+if [[ "$REQUIRE_K" == "true" && "$(browser_assist_mode)" != "off" ]]; then
+    BROWSER_REQUIRED=true
+fi
+BROWSER_PASSED=false
+case " ${PASSED[*]-} " in *" K "*) BROWSER_PASSED=true ;; esac
+AT_RISK=false
+if (( ${#PASSED[@]} < MIN_PASS )); then AT_RISK=true; fi
+if [[ "$BROWSER_REQUIRED" == "true" && "$BROWSER_PASSED" != "true" ]]; then AT_RISK=true; fi
 printf '\n════════════════════════════════════════\n'
 printf '  PASSED: %d / %d   SKIPPED: %d\n' "${#PASSED[@]}" "$TOTAL" "${#SKIPPED[@]}"
 printf '  FAILED: %d\n' "${#FAILED[@]}"
@@ -367,7 +388,7 @@ done
 # ── machine-readable result ─────────────────────────────────────────────────
 build_json() {
     python3 - "$VIDEO_URL" "$VIDEO_ID" "$TOTAL" "${#PASSED[@]}" "${#FAILED[@]}" \
-             "${#SKIPPED[@]}" "${PASSED[*]-}" "${FAILED[*]-}" "${SKIPPED[*]-}" "$MIN_PASS" <<'PY'
+             "${#SKIPPED[@]}" "${PASSED[*]-}" "${FAILED[*]-}" "${SKIPPED[*]-}" "$MIN_PASS" "$BROWSER_REQUIRED" "$BROWSER_PASSED" <<'PY'
 import json, sys
 url, vid, total, p, f, s = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
 passed, failed, skipped = (x.split() if x.strip() else [] for x in sys.argv[7:10])
@@ -375,7 +396,9 @@ print(json.dumps({
     "video_url": url, "video_id": vid, "total": total,
     "passed": p, "failed": f, "skipped": s, "min_pass": int(sys.argv[10]),
     "passed_methods": passed, "failed_methods": failed, "skipped_methods": skipped,
-    "at_risk": p < int(sys.argv[10]),
+    "browser_required": sys.argv[11] == "true",
+    "browser_passed": sys.argv[12] == "true",
+    "at_risk": p < int(sys.argv[10]) or (sys.argv[11] == "true" and sys.argv[12] != "true"),
 }))
 PY
 }
@@ -430,9 +453,12 @@ if $DRY_RUN; then
     log_info "dry run complete — no verdict"
     exit 0
 fi
-if (( ${#PASSED[@]} >= MIN_PASS )); then
-    log_ok "recorder is safe: ${#PASSED[@]}/${TOTAL} cookieless methods working"
+if [[ "$AT_RISK" != "true" ]]; then
+    log_ok "recorder is safe: ${#PASSED[@]}/${TOTAL} cookieless methods working; required CDP=${BROWSER_PASSED}"
     exit 0
 fi
-log_error "RECORDER AT RISK: only ${#PASSED[@]}/${TOTAL} cookieless methods working (need ${MIN_PASS})"
+if [[ "$BROWSER_REQUIRED" == "true" && "$BROWSER_PASSED" != "true" ]]; then
+    log_error "RECORDER AT RISK: required CDP recording did not produce playable video+audio"
+fi
+log_error "RECORDER AT RISK: only ${#PASSED[@]}/${TOTAL} cookieless methods working (need ${MIN_PASS}, CDP required=${BROWSER_REQUIRED})"
 exit 1

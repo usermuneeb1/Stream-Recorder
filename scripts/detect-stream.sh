@@ -559,7 +559,7 @@ detect_live_stream() {
 
     random_sleep 1 3
 
-    # ── Method 5: Real browser session (SeleniumBase UC) ─────────────────────
+    # ── Method 5: Real browser player capture (SeleniumBase CDP default) ─────
     # Last resort, and the only method that survives YouTube answering every
     # HTTP client with "Sign in to confirm you're not a bot": a real Chrome on
     # this runner asks the player directly. It also warms the cookie jar that

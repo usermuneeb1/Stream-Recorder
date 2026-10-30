@@ -98,19 +98,15 @@ env:
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
   RECORD_DIR: /tmp/stream-recorder
   COOKIES_FILE: cookies.txt
-  # Permanent cookieless mode, the channel only streams public broadcasts.
-  # HYBRID mode (default 'false'): cookieless methods try first, cookie
-  # methods (A/B) catch sign-in-required streams as fallback. Real failure on
-  # 2026-06-27 stream WOqZf9Myz_c returned LOGIN_REQUIRED, pure cookieless
-  # mode could never have recorded it. Set repo variable
-  # PUBLIC_STREAM_ONLY=true ONLY if you're certain all streams are fully
-  # public AND never restricted.
-  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'false' }}
-  # Real-browser bypass (SeleniumBase UC). auto = Method K runs after the fast
-  # cookieless paths; first = run it before everything; off = disable.
-  # With this on, a stale/missing YOUTUBE_COOKIES secret can no longer stop a
-  # public stream from being recorded, because the session is minted per run.
-  BROWSER_ASSIST: ${{ vars.BROWSER_ASSIST || 'auto' }}
+  # Cookie-free public recording is the default. SeleniumBase Pure CDP reads
+  # anonymous player URLs and ffmpeg records them; no YOUTUBE_COOKIES secret,
+  # no exported jar, and no account profile are required.
+  # To enable the explicit account-cookie LAST RESORT for restricted streams,
+  # set repository variable PUBLIC_STREAM_ONLY=false and supply YOUTUBE_COOKIES.
+  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'true' }}
+  # Pure CDP first; fast cookieless HTTP adapters remain fallbacks.
+  BROWSER_MODE: ${{ vars.BROWSER_MODE || 'cdp' }}
+  BROWSER_ASSIST: ${{ vars.BROWSER_ASSIST || 'first' }}
   BROWSER_SESSION_TIMEOUT: "240"
   TZ: Asia/Karachi
 
@@ -237,9 +233,9 @@ jobs:
           echo "✅ All critical tools present, recording can proceed"
 
 
-      # ─── 4b. BROWSER BYPASS STACK (SeleniumBase UC) ───────────────────────
-      # Installs Xvfb + seleniumbase + uc_driver so Method K can open a real
-      # Chrome and clear "Sign in to confirm you're not a bot". Deliberately
+      # ─── 4b. BROWSER STACK (SeleniumBase Pure CDP) ────────────────────────
+      # Installs/verifies Chrome + seleniumbase so Method K can read anonymous
+      # player URLs without exporting cookies. Deliberately
       # separate from the pinned install block above (check-install-drift.sh
       # tracks that block); this step is best-effort and never blocks a run.
       - name: "Install browser bypass stack"
@@ -288,8 +284,8 @@ jobs:
           notify_system_health "disk_low" "Runner has less than ${MIN_DISK_SPACE_GB:-3} GB free, recording skipped."
 
       # ─── 5. PREPARE COOKIES ──────────────────────────────────────────────
-      - name: "Prepare cookies"
-        if: steps.disk_check.outputs.disk_ok == 'true'
+      - name: "Prepare optional last-resort cookies"
+        if: steps.disk_check.outputs.disk_ok == 'true' && vars.PUBLIC_STREAM_ONLY == 'false'
         run: |
           source scripts/utils.sh
           
@@ -331,8 +327,8 @@ jobs:
           fi
 
       # ─── 5b. CHECK COOKIE HEALTH ──────────────────────────────────────────
-      - name: "Check cookie health"
-        if: steps.disk_check.outputs.disk_ok == 'true'
+      - name: "Check optional last-resort cookie health"
+        if: steps.disk_check.outputs.disk_ok == 'true' && vars.PUBLIC_STREAM_ONLY == 'false'
         continue-on-error: true
         run: bash scripts/check-cookies.sh
 
@@ -570,7 +566,7 @@ jobs:
           pot_state="${POT_PROVIDER_READY:-unknown}"
           ip_state="${WARP_IP:-${ORIGINAL_IP:-unknown}}"
           cookie_state="${COOKIE_STATUS:-unknown}"
-          browser_state="${BROWSER_SESSION_OK:-not_run} (${BROWSER_ASSIST:-auto})"
+          browser_state="${BROWSER_SESSION_OK:-not_run} (${BROWSER_MODE:-cdp}/${BROWSER_ASSIST:-first})"
 
           # Diagnostic: single-line printf, 5 specifiers = 5 args (aligned).
           # Fixes: (1) prior 4-spec/5-arg mismatch made printf re-use the format,
