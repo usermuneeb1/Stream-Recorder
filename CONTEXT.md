@@ -92,6 +92,31 @@ Operational map for anyone debugging or changing this repo. Read this FIRST.
   diffs the matrix against `scripts/record-stream.sh`, so **adding a recording
   method without adding it to the smoke matrix is a red test** — the old inline
   YAML tested 5 of 11, hardcoded `/5`, and could not fail on Method K.
+- **Every recording reports HOW it was captured (2026-10-30).** The
+  "ARCHIVED SUCCESSFULLY" Discord card only listed duration/size/uploads, so
+  "was this recorded through the CDP browser or with cookies?" was
+  unanswerable after the fact. `record-stream.sh` now publishes
+  `RECORD_METHOD_DESC|CODE|TOOL|AUTH` as it leaves `attempt_recording()`
+  (`_note_recording_method_for`), plus the same for VOD rescue; the card shows
+  **Recorded via** + **Cookies**, and `links.txt` keeps it in the permanent
+  record. Method K self-describes as *SeleniumBase CDP + ffmpeg / cookieless*
+  (legacy UC: *browser jar*), and `tests/record-cascade-test.sh` locks that a
+  cookieless method can never be reported as a cookie one. **Any new recording
+  method must be added to `method_meta()`** or it reports `unknown`.
+- **Live chat is one pipeline, and only real messages count (2026-10-30).**
+  `scripts/archive-chat.sh` is the single capture implementation
+  (yt-dlp `live_chat` → chat-downloader fallback → `convert-chat.mjs`), used by
+  both the recorder (`--output` into `RECORD_DIR`, then
+  `upload-clouds.sh` publishes `data/chat/<video_id>.json` via
+  `github_api_write` + archive.org `chat.json`) and `chat-archiver.yml`. Before
+  this, `convert-chat.mjs` could only read yt-dlp's JSON-Lines dump while the
+  recorder captured chat-downloader's JSON **array** — so every capture
+  converted to 0 messages, the Discord card said "❌ Not archived", and the
+  dashboard replay was empty. A replay is valid only when
+  `(.messages|length) > 0`: a non-empty `[]` is a failed capture, never an
+  archive (the old `-s`/byte-count check blocked retries forever).
+  `tests/chat-archive-test.sh` locks both formats, `--output`, the `--wait`
+  retry and the empty-dump failure.
 - **Gofile is keyless by owner policy (2026-09-02).** Detection = public `wt`
   token contents endpoint only; upload = auto-minted guest token. The gofile
   SPA page returns 200 for dead folders — never treat page-200 as “alive”.
