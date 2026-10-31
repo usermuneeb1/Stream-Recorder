@@ -1,25 +1,25 @@
 {
-  "updated_at": "2026-10-26T12:03:21.000Z",
+  "updated_at": "2026-10-31T11:34:21.000Z",
   "dry_run": false,
   "totals": {
-    "checked": 63,
-    "alive": 62,
-    "refreshed": 62,
-    "dead": 1,
+    "checked": 66,
+    "alive": 64,
+    "refreshed": 64,
+    "dead": 2,
     "discord_messages_edited": 0
   },
   "providers": {
     "gofile": {
-      "total": 21
+      "total": 22
     },
     "pixeldrain": {
-      "total": 21
+      "total": 22
     },
     "st0807": {
-      "total": 21
+      "total": 22
     },
     "vikingfile": {
-      "total": 21
+      "total": 22
     },
     "archive": {
       "permanent": true
