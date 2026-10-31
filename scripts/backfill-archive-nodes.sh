@@ -122,22 +122,30 @@ persist_updates() {
     [[ "$UPDATES" == "[]" ]] && { log_info "nothing to persist"; return 0; }
 
     if [[ -n "${GITHUB_REPOSITORY:-}" && -n "${GH_PAT:-}" ]]; then
-        local current merged
-        current=$(github_api_read_content "data/recordings.json" 2>/dev/null || true)
-        if [[ -z "$current" ]] || ! jq -e 'type == "array" and length > 0' <<< "$current" >/dev/null 2>&1; then
-            log_error "canonical index unreadable/empty via the API — refusing to write (wipe guard)"
-            return 1
-        fi
-        merged=$(printf '%s' "$current" | merge_updates /dev/stdin) || {
-            log_error "merge failed — refusing to write"; return 1; }
-        if ! jq -e 'type == "array" and length > 0' <<< "$merged" >/dev/null 2>&1; then
-            log_error "computed index is empty — refusing to write (wipe guard)"
-            return 1
-        fi
-        github_api_write "data/recordings.json" "$merged" "Backfill archive playback nodes" || {
-            log_error "Contents API write failed"; return 1; }
-        log_ok "persisted archive playback fields to the repo via the Contents API"
-        return 0
+        local current merged attempt max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}" rc
+        for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+            current=$(github_api_read_content "data/recordings.json") || {
+                log_error "canonical index unreadable via the API — refusing to write"
+                return 1
+            }
+            if ! jq -e 'type == "array" and length > 0 and all(.[]; type == "object")' <<< "$current" >/dev/null 2>&1; then
+                log_error "canonical index invalid/empty — refusing to write"
+                return 1
+            fi
+            merged=$(printf '%s' "$current" | merge_updates /dev/stdin) || {
+                log_error "merge failed — refusing to write"; return 1; }
+            rc=0
+            github_api_write "data/recordings.json" "$merged" "Backfill archive playback nodes" || rc=$?
+            if (( rc == 0 )); then
+                log_ok "persisted archive playback fields to the repo via the Contents API"
+                return 0
+            elif (( rc == 2 )) && (( attempt < max_attempts )); then
+                log_warn "index changed concurrently; reapplying playback patch ($attempt/$max_attempts)"
+                sleep "$attempt"
+            else
+                log_error "Contents API write failed"; return 1
+            fi
+        done
     fi
 
     local merged
@@ -146,7 +154,8 @@ persist_updates() {
 }
 
 if ! persist_updates; then
-    log_warn "archive playback backfill could not be persisted this run"
+    log_error "archive playback backfill could not be persisted this run"
+    exit 1
 fi
 
 log_ok "Backfill complete: ${fixed} field(s) restored in $REC"

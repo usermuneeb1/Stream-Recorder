@@ -43,14 +43,19 @@ COVER = f"{SITE}/logo.png"
 
 def load_recordings() -> list[dict]:
     data = json.loads(RECS.read_text())
+    if not isinstance(data, list) or not data or any(not isinstance(r, dict) for r in data):
+        raise ValueError("data/recordings.json must be a non-empty array of objects")
     by_id: dict[str, dict] = {}
     for r in data:
         if "muslim lantern" not in r.get("channel", "").lower():
             continue
         m = re.search(r"(?:v=|/)([\w-]{11})", r.get("video_url", ""))
-        if not m:
+        # Match the dashboard/importer: archive-only imports use a prefixed
+        # canonical id when no YouTube source URL exists.
+        vid = r.get("video_id", "")
+        if not m and not (isinstance(vid, str) and re.fullmatch(r"archive-[A-Za-z0-9_.-]+", vid)):
             continue
-        yt = m.group(1)
+        yt = m.group(1) if m else vid
         ex = by_id.get(yt)
         if not ex:
             by_id[yt] = dict(r)
@@ -131,7 +136,7 @@ def make_rss(items: list[dict], podcast: bool) -> str:
     <itunes:explicit>false</itunes:explicit>"""
 
     item_xml = []
-    for r in items[:50]:
+    for r in items:
         link = watch_url(r)
         media = best_audio_or_video_url(r)
         size = r.get("size_bytes", 0)
@@ -203,7 +208,7 @@ def make_json_feed(items: list[dict]) -> str:
                     }
                 ] if best_audio_or_video_url(r) else [],
             }
-            for r in items[:100]
+            for r in items
         ],
     }
     return json.dumps(out, indent=2, ensure_ascii=False)

@@ -82,6 +82,21 @@ function b64decode(b64) {
   return new TextDecoder().decode(bytes);
 }
 
+function validateStorage(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('github storage: invalid shape');
+  }
+  for (const [key, value] of Object.entries(data)) {
+    if (key === '_comment' && typeof value === 'string') continue;
+    if (!Array.isArray(value) || value.some(c => !c || typeof c !== 'object' ||
+        Array.isArray(c) || typeof c.n !== 'string' || typeof c.t !== 'string' ||
+        (c.at !== undefined && typeof c.at !== 'string'))) {
+      throw new Error('github storage: invalid comment list');
+    }
+  }
+  return data;
+}
+
 async function ghGetFile() {
   const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${FILE_PATH}?ref=${BRANCH}`, {
     headers: {
@@ -95,8 +110,10 @@ async function ghGetFile() {
   const j = await r.json();
   let data;
   try { data = JSON.parse(b64decode((j.content || '').replace(/\n/g, ''))); }
-  catch { data = {}; }
-  if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
+  catch { throw new Error('github storage: invalid JSON'); }
+  // Apply the same validation to API and CDN reads. A failed read must never
+  // become an empty database that the next POST overwrites.
+  validateStorage(data);
   return { sha: j.sha, data };
 }
 
@@ -143,23 +160,25 @@ export default async function handler(request) {
   const videoId = (url.pathname.split('/').filter(Boolean).pop() || '').replace(/[^\w-]/g, '');
   if (!ID_RE.test(videoId)) return json(400, { error: 'Invalid videoId' });
 
-  // ── GET: public read (CDN fallback when token absent, e.g. preview deploys)
+  // ── GET: public read (CDN when token absent, e.g. preview deploys).
+  // An outage is not an empty conversation: clients must be able to tell the
+  // difference instead of displaying "No comments yet" for stored discussion.
   if (request.method === 'GET') {
-    if (!GH_TOKEN) {
-      try {
-        const r = await fetch(`https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/${FILE_PATH}?_=${Date.now()}`);
-        if (r.ok) {
-          const data = await r.json();
-          return json(200, { comments: data?.[videoId] || [] }, { 'Cache-Control': 'public, max-age=30, s-maxage=30' });
-        }
-      } catch { /* fall through */ }
-      return json(200, { comments: [] });
-    }
     try {
-      const { data } = await ghGetFile();
+      let data;
+      if (!GH_TOKEN) {
+        const r = await fetch(`https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/${FILE_PATH}?_=${Date.now()}`);
+        if (r.status === 404) data = {};
+        else {
+          if (!r.ok) throw new Error('CDN unavailable');
+          data = validateStorage(await r.json());
+        }
+      } else {
+        data = (await ghGetFile()).data;
+      }
       return json(200, { comments: data[videoId] || [] }, { 'Cache-Control': 'public, max-age=30, s-maxage=30' });
     } catch {
-      return json(200, { comments: [] });
+      return json(503, { error: 'Comments are temporarily unavailable.' }, { 'Cache-Control': 'no-store' });
     }
   }
 
@@ -174,6 +193,9 @@ export default async function handler(request) {
   let payload;
   try { payload = await request.json(); }
   catch { return json(400, { error: 'Invalid JSON' }); }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return json(400, { error: 'Expected a JSON object' });
+  }
 
   // Constant-time-ish compare (length leak is harmless for a shared word)
   const given = String(payload.passphrase || '');
@@ -192,7 +214,12 @@ export default async function handler(request) {
   try {
     await appendComment(videoId, comment);
   } catch (e) {
-    return json(502, { error: `Could not save comment: ${e.message}` });
+    const unsafeRead = String(e.message || '').startsWith('github storage:');
+    return json(unsafeRead ? 503 : 502, {
+      error: unsafeRead
+        ? 'Comments storage is unreadable; refusing to overwrite it.'
+        : `Could not save comment: ${e.message}`,
+    });
   }
 
   return json(200, { ok: true });

@@ -15,7 +15,7 @@ name: Chat archiver
 
 on:
   workflow_run:
-    workflows: ["Stream Recorder"]
+    workflows: ["Stream Recorder", "Go-live sniper"]
     types: [completed]
   schedule:
     - cron: "17 */6 * * *"

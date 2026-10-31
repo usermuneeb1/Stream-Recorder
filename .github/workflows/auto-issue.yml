@@ -11,10 +11,10 @@ on:
   workflow_run:
     workflows:
       - "Stream Recorder"
+      - "Go-live sniper"
       - "YouTube → Archive.org"
       - "Archive → MEGA migration"
       - "Repair cloud mirrors"
-      - "AI Enrichment"
     types: [completed]
 
 permissions:

@@ -6,7 +6,7 @@ on:
   # The script itself skips anything that already has a youtube_id, so
   # this is safe to run on every recording event, never re-uploads.
   workflow_run:
-    workflows: ["Stream Recorder"]
+    workflows: ["Stream Recorder", "Go-live sniper"]
     types: [completed]
   workflow_dispatch:
     inputs:

@@ -92,7 +92,7 @@ _metadata_entry() {
       --arg video_id "$video_id" \
       --arg title "$display_title" \
       --arg channel "${CHANNEL_DISPLAY_NAME:-The Muslim Lantern}" \
-      --arg video_url "" \
+      --arg video_url "$([[ "$video_id" =~ ^[A-Za-z0-9_-]{11}$ ]] && printf 'https://www.youtube.com/watch?v=%s' "$video_id" || printf '')" \
       --arg thumbnail "$thumbnail" \
       --arg duration_sec "$duration" \
       --arg duration_fmt "$(_hms_from_seconds "$duration")" \
@@ -138,14 +138,16 @@ import_archive_backups() {
     log_info "Display title: $display_title"
 
     local existing
-    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || existing="$(cat data/recordings.json 2>/dev/null || echo '')"
+    existing=$(github_api_read_content "data/recordings.json") || {
+        log_error "recordings.json unreadable via API — refusing import from a stale checkout"
+        return 1
+    }
     # Refuse to merge from a blind read — writing merged=entries-only would
     # wipe the existing index (found in 2026-09-02 audit).
-    if ! jq -e 'type == "array"' <<< "$existing" >/dev/null 2>&1; then
+    if ! jq -e 'type == "array" and all(.[]; type == "object")' <<< "$existing" >/dev/null 2>&1; then
         log_error "recordings.json unreadable — refusing to merge/write (would wipe existing entries)"
         return 1
     fi
-    [[ -z "$existing" || "$existing" != "["* ]] && existing='[]'
 
     local existing_ids existing_archive_ids existing_base_ids
     existing_ids=$(jq -r '.[].video_id // empty' <<< "$existing" 2>/dev/null | sort -u)
@@ -204,8 +206,31 @@ import_archive_backups() {
         return 0
     fi
 
-    github_api_write "data/recordings.json" "$merged" "Import Archive.org personal backups ($(now_pkt))"
-    log_ok "Imported $imported new backup video(s) into gallery"
+    local attempt max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}" fresh rc
+    for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+        # Candidate discovery may take minutes. Re-read at the persistence
+        # boundary so recordings added meanwhile survive this import.
+        fresh=$(github_api_read_content "data/recordings.json") || {
+            log_error "canonical index unreadable before import write"
+            return 1
+        }
+        if ! jq -e 'type == "array" and all(.[]; type == "object")' <<< "$fresh" >/dev/null 2>&1; then
+            log_error "canonical index invalid before import write"
+            return 1
+        fi
+        merged=$(jq -s '.[0] + .[1] | reduce .[] as $item ([]; if any(.[]; (.archive_link == $item.archive_link) or (.video_id == $item.video_id)) then . else . + [$item] end) | sort_by(.date) | reverse' <(printf '%s' "$entries") <(printf '%s' "$fresh")) || return 1
+        rc=0
+        github_api_write "data/recordings.json" "$merged" "Import Archive.org personal backups ($(now_pkt))" || rc=$?
+        if (( rc == 0 )); then
+            log_ok "Imported $imported new backup video(s) into gallery"
+            return 0
+        elif (( rc == 2 )) && (( attempt < max_attempts )); then
+            log_warn "Index changed during import; merging fresh remote data ($attempt/$max_attempts)"
+            sleep "$attempt"
+        else
+            return 1
+        fi
+    done
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

@@ -408,7 +408,7 @@ chat_message_count() {
 }
 
 # Publish the compact replay into the repo so the dashboard can serve it.
-# Best-effort: a GitHub API hiccup must never fail the upload step.
+# Best-effort at the upload-step boundary, but never advertise a failed write.
 publish_chat_to_repo() {
     local vid="${STREAM_VIDEO_ID:-}"
     if [[ ! "$vid" =~ ^[A-Za-z0-9_-]{11}$ ]]; then
@@ -416,15 +416,23 @@ publish_chat_to_repo() {
         return 1
     fi
 
-    local f msgs
+    local f
     if ! f=$(chat_file_path); then
         log_warn "Chat: no replay to publish (${RECORD_CHAT_REASON:-nothing captured})"
         return 1
     fi
 
-    msgs=$(jq -r '(.messages // []) | length' "$f" 2>/dev/null || echo 0)
-    if (( msgs == 0 )); then
-        log_warn "Chat: replay holds 0 messages, not publishing"
+    # The dashboard rejects malformed rows. Validate before advertising a chat
+    # URL, rather than publishing a file that can never be replayed.
+    if ! jq -e '
+      type == "object" and (.messages | type == "array" and length > 0) and
+      (.messages | all(type == "object" and
+        (.t | type == "number" and . >= 0) and
+        (.a | type == "string") and (.m | type == "string") and
+        ((.p? // "") | type == "string") and
+        ((.k? // "") | test("^(|super|member)$"))))
+    ' "$f" >/dev/null 2>&1; then
+        log_warn "Chat: replay is empty or malformed, not publishing"
         return 1
     fi
 
@@ -437,18 +445,55 @@ publish_chat_to_repo() {
         return 1
     fi
 
-    if github_api_write "data/chat/${vid}.json" "$(cat "$f")" \
-        "Archive live chat for ${vid} (${msgs} messages)"; then
-        log_ok "Chat: published data/chat/${vid}.json (${msgs} messages) → dashboard replay"
-        set_env "RECORD_CHAT_REPO" "data/chat/${vid}.json"
-        if [[ -z "${RECORD_CHAT_URL:-}" ]]; then
-            set_env "RECORD_CHAT_URL" \
-                "https://raw.githubusercontent.com/${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}/main/data/chat/${vid}.json"
+    local payload attempt max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}" rc remote merged msgs
+    payload=$(jq -c . "$f") || return 1
+    for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+        rc=0
+        github_api_write "data/chat/${vid}.json" "$payload" \
+            "Archive live chat for ${vid}" || rc=$?
+        if (( rc == 0 )); then
+            msgs=$(jq '.messages | length' <<< "$payload")
+            log_ok "Chat: published data/chat/${vid}.json (${msgs} messages) → dashboard replay"
+            set_env "RECORD_CHAT_REPO" "data/chat/${vid}.json"
+            if [[ -z "${RECORD_CHAT_URL:-}" ]]; then
+                set_env "RECORD_CHAT_URL" \
+                    "https://raw.githubusercontent.com/${GITHUB_REPOSITORY:-usermuneeb1/Stream-Recorder}/main/data/chat/${vid}.json"
+            fi
+            return 0
         fi
-        return 0
-    fi
+        if (( rc != 2 )) || (( attempt == max_attempts )); then
+            log_warn "Chat: repo publish failed; no dashboard chat URL was advertised"
+            return 1
+        fi
 
-    log_warn "Chat: repo publish failed (GH_PAT missing or API error), archive.org copy unaffected"
+        # Another capture may have published messages while we were uploading.
+        # Re-read and union both replays. Preserve the larger multiplicity of
+        # identical rows (chat has no message ids), then restore time order.
+        remote=$(github_api_read_content "data/chat/${vid}.json") || {
+            log_warn "Chat: concurrent replay unreadable; refusing a stale overwrite"
+            return 1
+        }
+        if ! jq -e 'type == "object" and (.messages | type == "array") and
+          (.messages | all(type == "object" and (.t | type == "number" and . >= 0) and
+            (.a | type == "string") and (.m | type == "string")))' <<< "$remote" >/dev/null 2>&1; then
+            log_warn "Chat: concurrent replay is malformed; refusing to overwrite it"
+            return 1
+        fi
+        merged=$(jq -cn --argjson local "$payload" --argjson remote "$remote" '
+          def key: [.t, .a, .m, (.p // ""), (.k // "")];
+          {messages: (
+            [($local.messages | group_by(key))[], ($remote.messages | group_by(key))[]]
+            | group_by(.[0] | key) | map(max_by(length)[]) | sort_by(.t)
+          )}
+        ') || return 1
+        if (( $(printf '%s' "$merged" | wc -c) > 25000000 )); then
+            log_warn "Chat: merged replay exceeds the repo API budget; archive.org copy unaffected"
+            return 1
+        fi
+        payload="$merged"
+        log_warn "Chat: replay changed concurrently; merged fresh messages ($attempt/$max_attempts)"
+        sleep "$attempt"
+    done
     return 1
 }
 

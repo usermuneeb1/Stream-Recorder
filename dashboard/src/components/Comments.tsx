@@ -5,12 +5,9 @@
 // localStorage so they only type it once per device. Everyone can read.
 
 import { useEffect, useState } from 'react';
+import { fetchComments, type ArchivedComment } from '../lib/fetcher';
 
-interface Comment {
-  n: string;   // display name
-  t: string;   // text
-  at: string;  // ISO timestamp
-}
+type Comment = ArchivedComment;
 
 const IDENTITY_KEY = 'mla-comments-identity';
 
@@ -28,6 +25,7 @@ function loadIdentity(): { name: string; passphrase: string } {
 export default function Comments({ videoId }: { videoId: string }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [name, setName] = useState(loadIdentity().name);
   const [passphrase, setPassphrase] = useState('');
   const [text, setText] = useState('');
@@ -37,11 +35,14 @@ export default function Comments({ videoId }: { videoId: string }) {
   useEffect(() => {
     let alive = true;
     setLoaded(false);
+    setLoadError(false);
     setComments([]);
-    fetch(`/api/comments/${encodeURIComponent(videoId)}`)
-      .then(r => (r.ok ? r.json() : { comments: [] }))
-      .then(j => { if (alive) { setComments(Array.isArray(j?.comments) ? j.comments : []); setLoaded(true); } })
-      .catch(() => { if (alive) setLoaded(true); });
+    fetchComments(videoId).then(rows => {
+      if (!alive) return;
+      setLoadError(rows === null);
+      setComments(rows ?? []);
+      setLoaded(true);
+    });
     return () => { alive = false; };
   }, [videoId]);
 
@@ -79,7 +80,7 @@ export default function Comments({ videoId }: { videoId: string }) {
         <span className="shelf-tick" />
         <span className="eyebrow">Comments</span>
         <span className="mono text-[10px]" style={{ color: 'var(--shade)' }}>
-          {loaded ? `${comments.length} left` : '…'}
+          {loaded ? (loadError ? 'unavailable' : `${comments.length} left`) : '…'}
         </span>
       </div>
 
@@ -138,6 +139,10 @@ export default function Comments({ videoId }: { videoId: string }) {
       {/* List */}
       {!loaded ? (
         <div className="mono text-[10.5px]" style={{ color: 'var(--shade)' }}>Loading comments…</div>
+      ) : loadError ? (
+        <div className="mono text-[10.5px]" role="status" style={{ color: 'var(--shade)' }}>
+          Comments are temporarily unavailable — please try again later.
+        </div>
       ) : comments.length === 0 ? (
         <div className="mono text-[10.5px]" style={{ color: 'var(--shade)' }}>
           No comments yet — the first word is yours.
@@ -149,7 +154,7 @@ export default function Comments({ videoId }: { videoId: string }) {
               <div className="flex items-baseline gap-2.5">
                 <span className="text-[12.5px] font-bold" style={{ color: 'var(--flame-2)' }}>{c.n || 'Guest'}</span>
                 <span className="mono text-[9.5px]" style={{ color: 'var(--shade)' }}>
-                  {(() => { try { return new Date(c.at).toLocaleDateString(); } catch { return ''; } })()}
+                  {(() => { try { return c.at ? new Date(c.at).toLocaleDateString() : ''; } catch { return ''; } })()}
                 </span>
               </div>
               <p className="text-[13px] mt-1 leading-relaxed" style={{ color: 'var(--mist)' }}>{c.t}</p>
