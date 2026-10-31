@@ -38,8 +38,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: "Generate status + badges"
-        run: python3 scripts/gen-status.py
+      - name: "Generate status + badges + public feeds"
+        run: |
+          python3 scripts/gen-status.py
+          # The canonical index is updated through the Contents API by many
+          # workflows. Regenerate its derived public artifacts here so those
+          # data-only commits cannot leave RSS/podcast/JSON/sitemap stale.
+          python3 scripts/generate-feeds.py
 
       - name: "Purge jsdelivr CDN cache (keep gallery data fresh)"
         run: |
@@ -58,21 +63,12 @@ jobs:
           # trigger) landed a commit on main between our checkout and our push
           # (incident 2026-07-12 run 29176112058). Now: only commit if changed,
           # then rebase onto freshest main and retry so the status lands.
-          if [[ -z "$(git status -s data/system-status.json data/badges)" ]]; then
+          if [[ -z "$(git status -s data/system-status.json data/badges dashboard/public/feed.xml dashboard/public/podcast.xml dashboard/public/feed.json dashboard/public/sitemap.xml)" ]]; then
             echo "No change."
             exit 0
           fi
           git config user.name "Stream Recorder Bot"
           git config user.email "bot@stream-recorder.local"
-          git add data/system-status.json data/badges
-          git commit -m "Update system status + badges"
-          for attempt in 1 2 3 4 5; do
-            if git pull --rebase origin main && git push; then
-              echo "✅ Status updated (attempt $attempt)."
-              exit 0
-            fi
-            echo "⚠️ push attempt $attempt failed (remote moved), rebasing + retrying in ${attempt}s"
-            sleep "$attempt"
-          done
-          echo "❌ Could not push status after 5 attempts, will retry on next schedule."
-          exit 1
+          git add data/system-status.json data/badges dashboard/public/feed.xml dashboard/public/podcast.xml dashboard/public/feed.json dashboard/public/sitemap.xml
+          git commit -m "Update system status, badges, and public feeds"
+          bash scripts/safe-push.sh

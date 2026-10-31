@@ -155,37 +155,47 @@ _download_archive_file() {
 
 _update_recording_links() {
     local video_id="$1" gofile="$2" pixel="$3" mega="$4" st0807="$5" viking="$6"
-    local current updated
-    current=$(github_api_read_content "data/recordings.json" 2>/dev/null) || current="$(cat data/recordings.json 2>/dev/null || echo '[]')"
-    # NEVER let a failed read become a wipe of the canonical index:
-    # refuse to write when the current data isn't a non-empty array.
-    if ! jq -e 'type == "array" and length > 0' <<< "$current" >/dev/null 2>&1; then
-        log_error "  recordings.json unreadable/empty — refusing to write (would wipe the index)"
-        return 1
-    fi
-    updated=$(jq \
-      --arg id "$video_id" \
-      --arg gofile "$gofile" \
-      --arg pixel "$pixel" \
-      --arg mega "$mega" \
-      --arg st0807 "${st0807:-}" \
-      --arg viking "${viking:-}" \
-      --arg checked "$(now_utc_iso)" \
-      'map(if (.video_id == $id) then
-          . + {
-            gofile_link: (if $gofile != "" then $gofile else (.gofile_link // "") end),
-            pixeldrain_link: (if $pixel != "" then $pixel else (.pixeldrain_link // "") end),
-            mega_link: (if $mega != "" then $mega else (.mega_link // "") end),
-            st0807_link: (if $st0807 != "" then $st0807 else (.st0807_link // "") end),
-            vikingfile_link: (if $viking != "" then $viking else (.vikingfile_link // "") end),
-            mirrors_repaired_at: $checked
-          }
-        else . end)' <<< "$current") || return 1
-    if ! jq -e 'type == "array" and length > 0' <<< "$updated" >/dev/null 2>&1; then
-        log_error "  computed recordings.json update is empty — refusing to write"
-        return 1
-    fi
-    github_api_write "data/recordings.json" "$updated" "Mirror repair: ${video_id}" >/dev/null
+    local attempt max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}" current updated rc
+    for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+        # In CI the repository is authoritative. Never substitute an old
+        # checkout after an API failure and overwrite newer remote mirrors.
+        current=$(github_api_read_content "data/recordings.json") || {
+            log_error "  recordings.json unreadable — refusing repair write"
+            return 1
+        }
+        if ! jq -e 'type == "array" and length > 0 and all(.[]; type == "object")' <<< "$current" >/dev/null 2>&1; then
+            log_error "  recordings.json invalid/empty — refusing repair write"
+            return 1
+        fi
+        if ! jq -e --arg id "$video_id" 'any(.[]; .video_id == $id)' <<< "$current" >/dev/null; then
+            log_error "  repair target disappeared from the index: $video_id"
+            return 1
+        fi
+        updated=$(jq \
+          --arg id "$video_id" \
+          --arg gofile "$gofile" \
+          --arg pixel "$pixel" \
+          --arg mega "$mega" \
+          --arg st0807 "${st0807:-}" \
+          --arg viking "${viking:-}" \
+          --arg checked "$(now_utc_iso)" \
+          'map(if (.video_id == $id) then
+              . + {
+                gofile_link: (if $gofile != "" then $gofile else (.gofile_link // "") end),
+                pixeldrain_link: (if $pixel != "" then $pixel else (.pixeldrain_link // "") end),
+                mega_link: (if $mega != "" then $mega else (.mega_link // "") end),
+                st0807_link: (if $st0807 != "" then $st0807 else (.st0807_link // "") end),
+                vikingfile_link: (if $viking != "" then $viking else (.vikingfile_link // "") end),
+                mirrors_repaired_at: $checked
+              }
+            else . end)' <<< "$current") || return 1
+        rc=0
+        github_api_write "data/recordings.json" "$updated" "Mirror repair: ${video_id}" || rc=$?
+        if (( rc == 0 )); then return 0; fi
+        if (( rc != 2 )) || (( attempt == max_attempts )); then return 1; fi
+        log_warn "  Index changed during repair; rebuilding from fresh data ($attempt/$max_attempts)"
+        sleep "$attempt"
+    done
 }
 
 repair_mirrors() {
@@ -364,9 +374,12 @@ repair_mirrors() {
         fi
 
         if [[ -n "$new_gofile$new_pixel$new_mega$new_st0807$new_viking" ]]; then
-            _update_recording_links "$video_id" "$new_gofile" "$new_pixel" "$new_mega" "$new_st0807" "$new_viking" || log_warn "  Failed to update recordings.json"
-            repaired=$((repaired + 1))
-            log_ok "  Repaired mirrors for ${video_id}"
+            if _update_recording_links "$video_id" "$new_gofile" "$new_pixel" "$new_mega" "$new_st0807" "$new_viking"; then
+                repaired=$((repaired + 1))
+                log_ok "  Repaired and persisted mirrors for ${video_id}"
+            else
+                log_error "  Upload produced links but persistence failed for ${video_id}; not counted as repaired"
+            fi
         else
             log_warn "  No new mirrors produced"
         fi

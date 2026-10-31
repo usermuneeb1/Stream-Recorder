@@ -29,6 +29,7 @@ LOCK_TTL="${RECORDING_LOCK_TTL:-21600}"   # 6h, longer than any stream + process
 lock_acquire() {
     local my_video="$1"
     local owner="${2:-recorder}"
+    local my_run="${GITHUB_RUN_ID:-local-$$}"
 
     # No video id → nothing to lock → proceed (fail-safe).
     [[ -z "$my_video" ]] && return 0
@@ -42,10 +43,11 @@ lock_acquire() {
     lock=$(github_api_read_content "$LOCK_FILE" 2>/dev/null) || lock=""
 
     if [[ -n "$lock" && "$lock" != "{}" ]]; then
-        local vid ow ts
+        local vid ow ts run
         vid=$(echo "$lock" | jq -r '.video_id // empty' 2>/dev/null)
         ow=$(echo "$lock" | jq -r '.owner // empty' 2>/dev/null)
         ts=$(echo "$lock" | jq -r '.started_at_epoch // 0' 2>/dev/null)
+        run=$(echo "$lock" | jq -r '.run_id // empty' 2>/dev/null)
         [[ "$ts" =~ ^[0-9]+$ ]] || ts=0
 
         local now fresh
@@ -55,8 +57,9 @@ lock_acquire() {
 
         # A clear, fresh lock exists.
         if [[ -n "$vid" && "$vid" != "null" && "$fresh" == "1" ]]; then
-            # Same video, same owner → re-acquire (idempotent), proceed.
-            if [[ "$vid" == "$my_video" && "$ow" == "$owner" ]]; then
+            # Only the same run may refresh its lease. A queued/new run of the
+            # same component is still a different capture and must defer.
+            if [[ "$vid" == "$my_video" && "$ow" == "$owner" && "$run" == "$my_run" ]]; then
                 : # proceed to (re)write below
             else
                 # Someone else (or another run) is actively recording this / another video.
@@ -72,9 +75,10 @@ lock_acquire() {
     payload=$(jq -n \
         --arg v "$my_video" \
         --arg o "$owner" \
+        --arg run "$my_run" \
         --argjson ts "$(date '+%s')" \
         --arg at "$(TZ='Asia/Karachi' date '+%Y-%m-%d %H:%M:%S PKT' 2>/dev/null)" \
-        '{video_id:$v, owner:$o, started_at_epoch:$ts, started_at:$at}' 2>/dev/null) || return 0
+        '{video_id:$v, owner:$o, run_id:$run, started_at_epoch:$ts, started_at:$at}' 2>/dev/null) || return 0
     github_api_write "$LOCK_FILE" "$payload" "Recording lock acquired: $my_video ($owner)" >/dev/null 2>&1 || return 0
     log_ok "Lock acquired: $my_video ($owner)"
     return 0
@@ -83,11 +87,27 @@ lock_acquire() {
 # Release (clear) the lock. Always best-effort.
 lock_release() {
     local my_video="${1:-}"
-    if [[ -z "${GH_PAT:-}" ]]; then return 0; fi
+    local owner="${2:-recorder}"
+    local my_run="${GITHUB_RUN_ID:-local-$$}"
+    if [[ -z "${GH_PAT:-}" || -z "$my_video" ]]; then return 0; fi
+    local lock vid ow run
+    lock=$(github_api_read_content "$LOCK_FILE" 2>/dev/null) || {
+        log_warn "Lock ownership unreadable; leaving it for TTL expiry"
+        return 0
+    }
+    vid=$(printf '%s' "$lock" | jq -r '.video_id // empty' 2>/dev/null) || return 0
+    ow=$(printf '%s' "$lock" | jq -r '.owner // empty' 2>/dev/null) || return 0
+    run=$(printf '%s' "$lock" | jq -r '.run_id // empty' 2>/dev/null) || return 0
+    if [[ "$vid" != "$my_video" || "$ow" != "$owner" || "$run" != "$my_run" ]]; then
+        log_info "Lock belongs to another capture; cleanup left it intact"
+        return 0
+    fi
     local payload
-    payload=$(jq -n --argjson ts "$(date '+%s')" \
-        '{video_id:null, owner:null, released_at_epoch:$ts}' 2>/dev/null) || return 0
-    github_api_write "$LOCK_FILE" "$payload" "Recording lock released${my_video:+: $my_video}" >/dev/null 2>&1 || true
-    log_info "Lock released"
+    payload=$(jq -n --argjson ts "$(date '+%s')" --arg run "$my_run" \
+        '{video_id:null, owner:null, run_id:null, released_at_epoch:$ts, released_by_run:$run}' 2>/dev/null) || return 0
+    # CAS failure means ownership may already have changed. Never retry a
+    # stale clear against a new owner; its TTL is the safe fallback.
+    github_api_write "$LOCK_FILE" "$payload" "Recording lock released: $my_video ($owner/$my_run)" >/dev/null 2>&1 || true
+    log_info "Lock release attempted for owning run"
     return 0
 }

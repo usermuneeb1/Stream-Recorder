@@ -165,7 +165,10 @@ update_stats() {
     fi
 
     # ── Update dashboard feed (data/recordings.json) ───────────────────────
-    update_recordings_json || true
+    update_recordings_json || {
+        log_error "Recording finished but its archive-index update failed"
+        return 1
+    }
     
     return 0
 }
@@ -200,25 +203,6 @@ update_recordings_json() {
     if [[ -n "${VIKINGFILE_LINKS:-}" ]]; then
         vikingfile_link=$(echo "${VIKINGFILE_LINKS}" | tr ';' '\n' | head -1 | cut -d'|' -f2)
     fi
-
-    local existing
-    existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
-        log_warn "recordings.json unreadable — skipping dashboard index update rather than risking a wipe"
-        return 1
-    }
-    if ! echo "$existing" | jq -e 'type=="array"' >/dev/null 2>&1; then
-        log_warn "recordings.json is not an array — skipping dashboard index update rather than risking a wipe"
-        return 1
-    fi
-
-    # ── Quarantine gate: fragments & false captures never enter the gallery ──
-    # (file is already uploaded to the clouds; only the index is protected)
-    if ! quarantine_check "$vid" "${STREAM_TITLE:-Unknown}" "$(TZ='Asia/Karachi' date '+%Y-%m-%d')" "${RECORD_DURATION_SEC:-0}" "$existing"; then
-        set_env "QUARANTINE_DECISION" "quarantine"
-        set_env "QUARANTINE_REASON" "${QUARANTINE_REASON:-unknown}"
-        return 0
-    fi
-    set_env "QUARANTINE_DECISION" "allow"
 
     local month
     month=$(TZ='Asia/Karachi' date '+%Y-%m')
@@ -271,18 +255,56 @@ update_recordings_json() {
             recorded_at: $recorded_at
         }')
 
-    local merged
-    merged=$(echo "$existing" | jq --argjson e "$entry" '
-        [$e] + .
-        | reduce .[] as $item ([];
-            if any(.[]; .video_id == $item.video_id) then . else . + [$item] end
-          )
-    ' 2>/dev/null) || { log_warn "jq failed to build recordings.json update"; return 1; }
-    if ! echo "$merged" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
-        log_warn "computed recordings.json update is empty — refusing to write (would wipe the index)"
-        return 1
-    fi
-    github_api_write "data/recordings.json" "$merged" "Dashboard: ${STREAM_TITLE:-recording}" >/dev/null 2>&1 || true
+    # Re-read and re-merge after a CAS conflict. Retrying the old merged
+    # document would erase the concurrent writer; swallowing the error would
+    # silently lose THIS recording while reporting a successful archive.
+    local attempt max_attempts="${GH_WRITE_MAX_ATTEMPTS:-5}" existing merged rc
+    for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+        local existing
+        existing=$(github_api_read_content "data/recordings.json" 2>/dev/null) || {
+            log_warn "recordings.json unreadable — skipping dashboard index update rather than risking a wipe"
+            return 1
+        }
+        if ! echo "$existing" | jq -e 'type=="array"' >/dev/null 2>&1; then
+            log_warn "recordings.json is not an array — skipping dashboard index update rather than risking a wipe"
+            return 1
+        fi
+
+        # ── Quarantine gate: fragments & false captures never enter the gallery ──
+        # (file is already uploaded to the clouds; only the index is protected)
+        if ! quarantine_check "$vid" "${STREAM_TITLE:-Unknown}" "$(TZ='Asia/Karachi' date '+%Y-%m-%d')" "${RECORD_DURATION_SEC:-0}" "$existing"; then
+            set_env "QUARANTINE_DECISION" "quarantine"
+            set_env "QUARANTINE_REASON" "${QUARANTINE_REASON:-unknown}"
+            return 0
+        fi
+        set_env "QUARANTINE_DECISION" "allow"
+        if ! printf '%s' "$existing" | jq -e 'all(.[]; type == "object")' >/dev/null 2>&1; then
+            log_warn "recordings.json contains non-object rows — refusing to rewrite it"
+            return 1
+        fi
+        # An index refresh is not a replacement record: preserve enrichment
+        # and mirror fields absent from this capture, and never duplicate an id.
+        merged=$(printf '%s' "$existing" | jq --argjson e "$entry" '
+            ($e | with_entries(select(.value != "" and .value != null and .value != 0))) as $patch
+            | map(if .video_id == $e.video_id then . * $patch else . end)
+            | if any(.[]; .video_id == $e.video_id) then . else [$e] + . end
+        ' 2>/dev/null) || { log_warn "jq failed to build recordings.json update"; return 1; }
+        if ! printf '%s' "$merged" | jq -e 'type=="array" and length > 0' >/dev/null 2>&1; then
+            log_warn "computed recordings.json update is empty — refusing to write"
+            return 1
+        fi
+        rc=0
+        github_api_write "data/recordings.json" "$merged" "Dashboard: ${STREAM_TITLE:-recording}" || rc=$?
+        if (( rc == 0 )); then
+            return 0
+        elif (( rc == 2 )) && (( attempt < max_attempts )); then
+            log_warn "Archive index changed concurrently; rebuilding update (attempt $attempt/$max_attempts)"
+            sleep "$attempt"
+        else
+            log_error "Could not persist the completed recording to data/recordings.json"
+            return 1
+        fi
+    done
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

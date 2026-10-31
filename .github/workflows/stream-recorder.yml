@@ -142,7 +142,7 @@ jobs:
           fi
           RUNS=$(curl -fsS -H "Authorization: token ${GH_PAT}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=50&status=completed" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/stream-recorder.yml/runs?per_page=50&status=completed" \
             | jq -r '.workflow_runs[5:] | .[].id' 2>/dev/null) || true
           
           deleted=0
@@ -360,9 +360,15 @@ jobs:
           WAIT_MODE="${{ github.event.inputs.wait_for_live }}"
           MAX_H="${{ github.event.inputs.wait_max_hours }}"
           MAX_H="${MAX_H:-5}"
+          # workflow_dispatch exposes this as a string. Never let a non-numeric
+          # value reach shell arithmetic (where bare words coerce to 0/1).
+          if ! [[ "$MAX_H" =~ ^[0-9]+$ ]]; then
+            echo "::warning::wait_max_hours must be an integer; using default 5"
+            MAX_H=5
+          fi
           # Clamp between 1 and 5
-          [[ "$MAX_H" -lt 1 ]] 2>/dev/null && MAX_H=1
-          [[ "$MAX_H" -gt 5 ]] 2>/dev/null && MAX_H=5
+          (( MAX_H < 1 )) && MAX_H=1
+          (( MAX_H > 5 )) && MAX_H=5
 
           # ── AUTO WAIT-FOR-LIVE on scheduled / repository_dispatch triggers ──
           # GitHub Actions silently throttles cron schedules on inactive repos:
@@ -381,18 +387,35 @@ jobs:
 
           if [[ "$WAIT_MODE" == "true" ]]; then
             echo "Wait-for-live mode: polling every 60s for up to ${MAX_H}h…"
-            MAX_POLLS=$(( MAX_H * 60 ))
+            # A poll count is not a time budget: one detector pass can take
+            # minutes when YouTube is slow. Bound BOTH each pass and the sleep
+            # by the remaining wall-clock budget, including the final pass.
+            DEADLINE=$(( $(date +%s) + MAX_H * 3600 ))
             POLL=0
-            while (( POLL < MAX_POLLS )); do
-              bash scripts/detect-stream.sh
+            while (( $(date +%s) < DEADLINE )); do
+              REMAINING=$(( DEADLINE - $(date +%s) ))
+              (( REMAINING > 0 )) || break
+              if timeout "${REMAINING}s" bash scripts/detect-stream.sh; then
+                :
+              else
+                RC=$?
+                if (( RC == 124 )); then
+                  echo "Wait-for-live deadline reached during detector pass."
+                  break
+                fi
+                exit "$RC"
+              fi
               # detect-stream.sh sets is_live in GITHUB_OUTPUT, check it
               if grep -q "is_live=true" "$GITHUB_OUTPUT" 2>/dev/null; then
                 echo "✅ Stream is LIVE, proceeding to record!"
                 break
               fi
               POLL=$(( POLL + 1 ))
-              echo "[poll $POLL/$MAX_POLLS] Not live yet, sleeping 60s…"
-              sleep 60
+              REMAINING=$(( DEADLINE - $(date +%s) ))
+              (( REMAINING > 0 )) || break
+              SLEEP_FOR=$(( REMAINING < 60 ? REMAINING : 60 ))
+              echo "[poll $POLL] Not live yet, sleeping ${SLEEP_FOR}s (${REMAINING}s budget left)…"
+              sleep "$SLEEP_FOR"
             done
           else
             bash scripts/detect-stream.sh
@@ -621,7 +644,7 @@ jobs:
         run: |
           source scripts/utils.sh
           source scripts/recording-lock.sh
-          lock_release "${{ steps.detect.outputs.video_id }}" || true
+          lock_release "${{ steps.detect.outputs.video_id }}" "recorder" || true
 
       # ─── 17. RUN SUMMARY ─────────────────────────────────────────────────
       - name: "Run summary"

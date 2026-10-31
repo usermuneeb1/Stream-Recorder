@@ -32,10 +32,29 @@ export async function fetchChat(videoId: string): Promise<{ demo?: boolean; mess
       const r = await fetch(`${base}/data/chat/${videoId}.json`);
       if (!r.ok) continue;
       const j = await r.json();
-      if (Array.isArray(j?.messages) && j.messages.length) return j;
+      if (Array.isArray(j?.messages) && j.messages.length &&
+          j.messages.every((m: unknown) => m !== null && typeof m === 'object' && !Array.isArray(m) &&
+            Number.isFinite((m as ChatMessage).t) && (m as ChatMessage).t >= 0 &&
+            typeof (m as ChatMessage).a === 'string' && typeof (m as ChatMessage).m === 'string')) return j;
     } catch { /* next mirror */ }
   }
   return null;
+}
+
+export interface ArchivedComment { n: string; t: string; at?: string }
+
+/** null means unavailable; [] is a successfully loaded empty conversation. */
+export async function fetchComments(videoId: string): Promise<ArchivedComment[] | null> {
+  try {
+    const r = await fetch(`/api/comments/${encodeURIComponent(videoId)}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j?.comments) || !j.comments.every((c: unknown) =>
+      c !== null && typeof c === 'object' && !Array.isArray(c) &&
+      typeof (c as ArchivedComment).n === 'string' && typeof (c as ArchivedComment).t === 'string' &&
+      ((c as ArchivedComment).at === undefined || typeof (c as ArchivedComment).at === 'string'))) return null;
+    return j.comments;
+  } catch { return null; }
 }
 
 /** Guest appearances for a recording, from data/guests.json (keyed by video id). */
@@ -78,7 +97,9 @@ export async function fetchTopics(): Promise<Record<string, string[]>> {
   return {};
 }
 
-async function fetchFirstJson<T = unknown>(path: string): Promise<T | null> {
+async function fetchFirstJson<T = unknown>(
+  path: string, validate: (value: unknown) => boolean = () => true,
+): Promise<T | null> {
   for (const base of SOURCES) {
     try {
       const r = await fetch(`${base}/${path}?_=${Date.now()}`);
@@ -88,7 +109,9 @@ async function fetchFirstJson<T = unknown>(path: string): Promise<T | null> {
       // propagation — detect non-JSON early and fall through.
       if (!txt || txt.trimStart().startsWith('<')) continue;
       try {
-        return JSON.parse(txt) as T;
+        const value = JSON.parse(txt);
+        if (!validate(value)) continue;
+        return value as T;
       } catch { continue; }
     } catch { /* network / DNS — next mirror */ }
   }
@@ -158,7 +181,9 @@ function dedupAndMerge(records: Recording[]): Recording[] {
   const map = new Map<string, Recording>();
   for (const r of records) {
     const m = r.videoUrl?.match?.(/(?:v=|\/)([\w-]{11})/);
-    const ytId = m ? m[1] : '';
+    // Personal Archive.org imports can have no YouTube source URL. Their
+    // prefixed canonical id is still a stable, route-safe gallery identity.
+    const ytId = m ? m[1] : (/^(?:[\w-]{11}|archive-[A-Za-z0-9_.-]+)$/.test(r.videoId) ? r.videoId : '');
     if (!ytId) continue;
 
     const ex = map.get(ytId);
@@ -188,7 +213,9 @@ function dedupAndMerge(records: Recording[]): Recording[] {
 }
 
 export async function fetchRecordings(): Promise<Recording[]> {
-  const raw = await fetchFirstJson<any[]>('data/recordings.json');
+  const raw = await fetchFirstJson<any[]>('data/recordings.json', value =>
+    Array.isArray(value) && value.every(r => r && typeof r === 'object' && !Array.isArray(r) &&
+      ['video_id', 'title', 'channel', 'date', 'video_url'].every(k => typeof r[k] === 'string')));
   if (!raw || !Array.isArray(raw)) return [];
 
   const mapped: Recording[] = raw

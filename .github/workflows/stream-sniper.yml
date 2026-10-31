@@ -57,9 +57,10 @@ env:
   AVATAR_URL: ${{ secrets.AVATAR_URL }}
   RECORD_DIR: /tmp/stream-sniper
   COOKIES_FILE: cookies.txt
-  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'false' }}
-  # Real-browser bypass (SeleniumBase UC), same contract as stream-recorder.
-  BROWSER_ASSIST: ${{ vars.BROWSER_ASSIST || 'auto' }}
+  PUBLIC_STREAM_ONLY: ${{ vars.PUBLIC_STREAM_ONLY || 'true' }}
+  # Real-browser bypass, same cookieless-first contract as stream-recorder.
+  BROWSER_MODE: ${{ vars.BROWSER_MODE || 'cdp' }}
+  BROWSER_ASSIST: ${{ vars.BROWSER_ASSIST || 'first' }}
   BROWSER_SESSION_TIMEOUT: "240"
   RECORDER_NAME: "Go-Live Sniper"
   TZ: Asia/Karachi
@@ -104,6 +105,7 @@ jobs:
           echo "yt-dlp: $(yt-dlp --version 2>&1 | head -1)"
 
       - name: "Prepare cookies"
+        if: ${{ env.PUBLIC_STREAM_ONLY == 'false' }}
         run: |
           source scripts/utils.sh
           if [[ -n "${YOUTUBE_COOKIES:-}" ]]; then
@@ -235,7 +237,7 @@ jobs:
         continue-on-error: true
         run: |
           source scripts/utils.sh; source scripts/recording-lock.sh
-          lock_release "${{ steps.detect.outputs.video_id }}" || true
+          lock_release "${{ steps.detect.outputs.video_id }}" "sniper" || true
 
       - name: "Cleanup"
         if: always()

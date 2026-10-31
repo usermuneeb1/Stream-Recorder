@@ -24,6 +24,22 @@ if [[ -f data/recordings.json ]]; then
     COUNT=$(jq 'length' data/recordings.json 2>/dev/null || echo 0)
     (( COUNT > 0 )) || fail "recordings.json is empty"
 
+    # Shape and numeric ranges are part of the public contract. Presence-only
+    # checks let objects/negative sizes reach display and player arithmetic.
+    if jq -e '
+      type == "array" and all(.[];
+        type == "object" and
+        (.video_id | type == "string") and (.video_id | test("^([A-Za-z0-9_-]{11}|archive-[A-Za-z0-9_.-]+)$")) and
+        (.title | type == "string") and (.channel | type == "string") and
+        (.date | type == "string") and (.video_url | type == "string") and
+        ((.duration_sec // 0) | type == "number" and . >= 0) and
+        ((.size_bytes // 0) | type == "number" and . >= 0))
+    ' data/recordings.json >/dev/null 2>&1; then
+        ok "record field types and numeric ranges valid"
+    else
+        fail "record field types/ranges invalid (required strings; duration/size nonnegative numbers)"
+    fi
+
     # required per-entry fields
     MISSING=$(jq -r '.[] | select((.video_id // "") == "" or (.title // "") == "" or (.date // "") == "") | .video_id' data/recordings.json 2>/dev/null)
     if [[ -n "$MISSING" ]]; then

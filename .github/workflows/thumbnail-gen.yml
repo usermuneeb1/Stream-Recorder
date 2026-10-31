@@ -11,7 +11,7 @@ name: Thumbnail generator
 
 on:
   workflow_run:
-    workflows: ["Stream Recorder"]
+    workflows: ["Stream Recorder", "Go-live sniper"]
     types: [completed]
   workflow_dispatch:
     inputs:

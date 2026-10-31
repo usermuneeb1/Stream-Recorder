@@ -397,7 +397,8 @@ github_api_read_content() {
     echo "$content" | base64 -d 2>/dev/null
 }
 
-# Write/update a file in GitHub repo
+# Write/update a file in GitHub repo. Returns 2 on a CAS conflict so
+# read-modify-write callers can rebuild from a fresh read (0=success, 1=other error).
 github_api_write() {
     local filepath="$1"
     local content="$2"
@@ -485,9 +486,52 @@ github_api_write() {
             return 0
         fi
 
-        # 409 Conflict (CAS), 422 (no-op or conflict), or 5xx → backoff + retry
-        if [[ "$http_code" == "409" ]] || [[ "$http_code" == "422" ]] || [[ "$http_code" =~ ^5 ]]; then
-            local backoff=$(( attempt * attempt ))   # 1, 4, 9, 16, 25 s
+        # A CAS conflict means another writer changed the file after our GET.
+        # Re-PUTting the same stale payload with a fresh SHA would silently wipe
+        # that writer. This generic helper cannot merge arbitrary documents, so
+        # report the conflict and let the caller re-read/recompute. The only
+        # safe success is an idempotent no-op: remote already equals our payload.
+        if [[ "$http_code" == "409" ]] || [[ "$http_code" == "422" ]]; then
+            local remote_content
+            remote_content=$(curl -s \
+                -H "Authorization: token $token" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null \
+                | jq -r '.content // empty' 2>/dev/null | base64 -d 2>/dev/null)
+            if [[ "$remote_content" == "$content" ]]; then
+                log_ok "GitHub already has the requested content for $filepath (no-op)"
+                rm -f "$tmp_b64"
+                return 0
+            fi
+            log_error "GitHub write conflict for $filepath — remote changed; refusing to overwrite stale payload"
+            rm -f "$tmp_b64"
+            return 2
+        fi
+
+        # Transient server errors may be retried, but never across a remote
+        # mutation: an ambiguous 5xx can mean our PUT landed, or another writer
+        # landed. Re-read before retrying and stop if the document diverged.
+        if [[ "$http_code" =~ ^5 ]]; then
+            local remote_state remote_sha remote_content
+            remote_state=$(curl -s \
+                -H "Authorization: token $token" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/${repo}/contents/${filepath}" 2>/dev/null)
+            remote_sha=$(echo "$remote_state" | jq -r '.sha // empty' 2>/dev/null)
+            remote_content=$(echo "$remote_state" | jq -r '.content // empty' 2>/dev/null | base64 -d 2>/dev/null)
+            if [[ "$remote_content" == "$content" ]]; then
+                log_ok "GitHub write for $filepath landed despite HTTP ${http_code}"
+                rm -f "$tmp_b64"
+                return 0
+            fi
+            if [[ -n "$remote_sha" && "$remote_sha" != "$sha" ]]; then
+                log_error "GitHub write for $filepath hit HTTP ${http_code} and remote changed; refusing stale retry"
+                rm -f "$tmp_b64"
+                return 2
+            fi
+            local backoff=$(( attempt * attempt ))
             log_warn "GitHub returned ${http_code} for $filepath, retry $((attempt+1))/${max_attempts} in ${backoff}s"
             sleep "$backoff"
             (( ++attempt ))

@@ -56,11 +56,34 @@ def main():
         except Exception:
             pass
 
-    recordings = load(os.path.join(DATA, "recordings.json"), [])
-    if not isinstance(recordings, list):
-        recordings = []
+    # The canonical index is not an optional input. Never turn a failed read,
+    # malformed document, or wrong schema into a published zero-record archive.
+    # Validate everything before the first write so the last good status and
+    # badges remain intact on failure.
+    try:
+        with open(os.path.join(DATA, "recordings.json"), encoding="utf-8") as f:
+            recordings = json.load(f)
+    except (OSError, ValueError) as exc:
+        print(f"❌ refusing to publish status: cannot read canonical recordings index: {exc}",
+              file=sys.stderr)
+        return 1
+    if not isinstance(recordings, list) or not all(isinstance(r, dict) for r in recordings):
+        print("❌ refusing to publish status: recordings.json must be an array of objects",
+              file=sys.stderr)
+        return 1
+    if not recordings:
+        print("❌ refusing to publish status: recordings.json is empty", file=sys.stderr)
+        return 1
+    # These are optional enrichment inputs. A wrong-shape optional document
+    # must not take down status publication for an otherwise valid archive.
     stats = load(os.path.join(ROOT, "stats.json"), {})
     yt = load(os.path.join(DATA, "youtube-stats.json"), {})
+    if not isinstance(stats, dict):
+        print("⚠️ stats.json is not an object; omitting optional totals", file=sys.stderr)
+        stats = {}
+    if not isinstance(yt, dict):
+        print("⚠️ youtube-stats.json is not an object; using unknown channel stats", file=sys.stderr)
+        yt = {}
 
     total = len(recordings)
     total_gb = round(sum(_num(r.get("size_bytes")) for r in recordings) / 1073741824, 2)
@@ -82,6 +105,14 @@ def main():
             "videos": yt.get("video_count"),
         },
     }
+    # Mirror health is owned by the health sweep, not by this aggregation.
+    # Preserve its last result across status refreshes (the dashboard reads it
+    # from this document). A malformed previous status is not a canonical-input
+    # failure, but also must not inject arbitrary fields into the new output.
+    previous = load(os.path.join(DATA, "system-status.json"), {})
+    if isinstance(previous, dict) and isinstance(previous.get("mirror_health"), dict):
+        status["mirror_health"] = previous["mirror_health"]
+
     write(os.path.join(DATA, "system-status.json"), status)
 
     # README badges (no AI badge anymore, feature removed)

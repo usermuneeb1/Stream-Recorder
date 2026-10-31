@@ -74,12 +74,15 @@ PY
 )
 
 echo "── 2: a known recording reproduces the URL the pipeline stored ──"
-HIST=$(python3 - "$ROOT/data/backups/recordings-2026-09-24.json" "$TMP/data/recordings.json" <<'PY'
+# Immutable regression fixture, copied from the historical archive entry.
+# data/backups/ is a rolling 30-snapshot window, NOT a fixture store: relying
+# on recordings-2026-09-24.json made this test fail when retention pruned it.
+HIST=$(python3 - "$ROOT/tests/fixtures/archive-filename-contract.json" "$TMP/data/recordings.json" <<'PY'
 import json, sys
-hist = {r["video_id"]: r.get("archive_direct", "") for r in json.load(open(sys.argv[1]))}
+hist = json.load(open(sys.argv[1]))
 now = {r["video_id"]: r.get("archive_direct", "") for r in json.load(open(sys.argv[2]))}
 vid = "y84vFOO8onU"
-print(hist.get(vid, "") + "\t" + now.get(vid, ""))
+print(hist.get("archive_direct", "") + "\t" + now.get(vid, ""))
 PY
 )
 HIST_URL=${HIST%%$'\t'*}
@@ -87,7 +90,7 @@ NEW_URL=${HIST##*$'\t'}
 # The item identifier differs by run (date + epoch suffix); the contract under
 # test is the OBJECT NAME inside the item.
 if [[ -n "$HIST_URL" && "${HIST_URL##*/}" == "${NEW_URL##*/}" ]]; then
-    ok "y84vFOO8onU: derived URL equals the archived 2026-09-24 entry"
+    ok "y84vFOO8onU: derived URL equals the immutable historical entry"
 else
     bad "historical URL and derived URL disagree"
     echo "       archived: ${HIST_URL##*/}"

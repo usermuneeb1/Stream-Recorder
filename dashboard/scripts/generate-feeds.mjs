@@ -57,13 +57,16 @@ function iso(r) {
 
 function loadRecordings(root = ROOT) {
   const rows = JSON.parse(readFileSync(resolve(root, 'data/recordings.json'), 'utf8'));
-  if (!Array.isArray(rows)) return [];
+  if (!Array.isArray(rows) || rows.length === 0 || rows.some(r => !r || typeof r !== 'object' || Array.isArray(r)))
+    throw new Error('data/recordings.json must be a non-empty array of objects');
   const byId = new Map();
   for (const r of rows) {
     if (!String(r.channel || '').toLowerCase().includes('muslim lantern')) continue;
     const m = /(?:v=|\/)([\w-]{11})/.exec(r.video_url || '');
-    if (!m) continue;
-    const yt = m[1];
+    // Archive-only imports have no YouTube URL; keep their prefixed id in
+    // parity with the dashboard and Python feed generator.
+    if (!m && !/^archive-[A-Za-z0-9_.-]+$/.test(r.video_id || '')) continue;
+    const yt = m ? m[1] : r.video_id;
     const ex = byId.get(yt);
     if (!ex) {
       byId.set(yt, { ...r });
@@ -111,7 +114,7 @@ function makeRss(items, podcast) {
     <itunes:category text="Religion &amp; Spirituality"><itunes:category text="Islam"/></itunes:category>
     <itunes:explicit>false</itunes:explicit>` : '';
 
-  const xmlItems = items.slice(0, 50).map((r) => {
+  const xmlItems = items.map((r) => {
     const media = bestMediaUrl(r);
     const size = r.size_bytes || 0;
     const dur = Math.trunc(r.duration_sec || 0);
@@ -161,7 +164,7 @@ function makeJsonFeed(items) {
     favicon: `${SITE}/logo-vertical.jpg`,
     authors: [{ name: AUTHOR }],
     language: LANG,
-    items: items.slice(0, 100).map((r) => {
+    items: items.map((r) => {
       const media = bestMediaUrl(r);
       return {
         id: r.video_id,
@@ -216,9 +219,9 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
     const n = generateFeeds({ out });
     console.log(`generate-feeds.mjs: ${n} recordings -> ${out || process.env.FEEDS_OUT || 'dashboard/public'}`);
   } catch (err) {
-    // A build must not fail because data is temporarily unreadable; the
-    // committed feeds stay in place and the next build refreshes them.
-    console.warn(`generate-feeds.mjs: skipped (${err.message})`);
-    process.exit(0);
+    // Never ship a successful build with stale feeds after canonical data
+    // becomes unreadable/malformed. Fail loudly and keep the last good files.
+    console.error(`generate-feeds.mjs: refusing to build (${err.message})`);
+    process.exit(1);
   }
 }

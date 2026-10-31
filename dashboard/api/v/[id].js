@@ -227,7 +227,7 @@ export default async function handler(request) {
     }
   });
   // Read-only comments (posting lives in the full app).
-  fetch('/api/comments/${id}').then(function(r){ return r.json(); }).then(function(j){
+  fetch('/api/comments/${id}').then(function(r){ if (!r.ok) throw new Error('comments unavailable'); return r.json(); }).then(function(j){
     var box = document.getElementById('cmts');
     var list = (j && j.comments) || [];
     var html = '<h2>Comments</h2>';

@@ -41,14 +41,15 @@ jobs:
           STAMP=$(date -u '+%Y-%m-%d')
           DEST="data/backups/recordings-${STAMP}.json"
           # Only write if content differs from the latest backup (avoid noise).
-          LATEST=$(ls -1t data/backups/recordings-*.json 2>/dev/null | head -1 || true)
+          LATEST=$(ls -1 data/backups/recordings-*.json 2>/dev/null | sort -r | head -1 || true)
           if [[ -n "$LATEST" ]] && cmp -s data/recordings.json "$LATEST"; then
             echo "No change since last backup ($LATEST)."
             exit 0
           fi
           cp data/recordings.json "$DEST"
           # Keep only the 30 newest backups.
-          ls -1t data/backups/recordings-*.json | tail -n +31 | xargs -r rm -f
+          # Sort by snapshot DATE in the filename, not checkout mtime.
+          ls -1 data/backups/recordings-*.json | sort -r | tail -n +31 | xargs -r rm -f --
           echo "Backup written: $DEST"
 
       - name: "Commit backup"
