@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-11-01T06:14:37Z",
+  "updated_at": "2026-11-01T13:33:24Z",
   "summary": {
     "total": 22,
     "healthy": 22,
     "degraded": 0,
-    "dead_links": 1,
+    "dead_links": 2,
     "unverifiable_links": 22
   },
   "recordings": [
@@ -473,8 +473,8 @@
     {
       "video_id": "1-Rb7AkebH4",
       "title": "Non-Muslims Question Islam Live! Muhammed Ali",
-      "alive": 6,
-      "dead": 0,
+      "alive": 5,
+      "dead": 1,
       "unverifiable": 1,
       "healthy": true,
       "permanent_ok": true,
@@ -486,7 +486,7 @@
         "mega": "alive",
         "github": "alive",
         "st0807": "alive",
-        "vikingfile": "alive",
+        "vikingfile": "dead",
         "telegram": "alive",
         "youtube": "dead",
         "archive_direct": "alive"
