@@ -1,22 +1,22 @@
 {
-  "total_streams": 24,
-  "total_hours": 52.25,
-  "total_gb": 11.80,
-  "avg_duration_hours": 2.17,
+  "total_streams": 25,
+  "total_hours": 54.73,
+  "total_gb": 12.28,
+  "avg_duration_hours": 2.18,
   "sources": {
-    "archive": 23,
-    "mega": 23,
-    "pixel": 23,
-    "gofile": 23,
-    "st0807": 23,
-    "vikingfile": 23
+    "archive": 24,
+    "mega": 24,
+    "pixel": 24,
+    "gofile": 24,
+    "st0807": 24,
+    "vikingfile": 24
   },
   "last_stream": {
-    "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-11-09",
+    "title": "Non-Muslims Question Islam Live! Muhammed Ali 2026-11-14",
     "channel": "The Muslim Lantern",
-    "date": "2026-11-09 03:52:50 AM PKT",
-    "duration": "02:24:24",
-    "size_gb": 0.5337
+    "date": "2026-11-14 06:05:54 AM PKT",
+    "duration": "02:28:31",
+    "size_gb": 0.4878
   },
-  "updated_at": "2026-11-08T22:52:51.000Z"
+  "updated_at": "2026-11-14T01:05:54.000Z"
 }
