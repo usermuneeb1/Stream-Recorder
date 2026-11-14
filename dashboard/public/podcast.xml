@@ -5,7 +5,7 @@
     <link>https://muslim-lantern-archive.vercel.app</link>
     <description>Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
     <language>en</language>
-    <lastBuildDate>Fri, 13 Nov 2026 23:05:43 +0000</lastBuildDate>
+    <lastBuildDate>Sat, 14 Nov 2026 01:06:06 +0000</lastBuildDate>
     <generator>generate-feeds.py</generator>
     <image><url>https://muslim-lantern-archive.vercel.app/logo.png</url><title>The Muslim Lantern, Stream Archive</title><link>https://muslim-lantern-archive.vercel.app</link></image>
     <itunes:author>Muneeb Ahmad</itunes:author>
@@ -14,6 +14,17 @@
     <itunes:image href="https://muslim-lantern-archive.vercel.app/logo.png"/>
     <itunes:category text="Religion &amp; Spirituality"><itunes:category text="Islam"/></itunes:category>
     <itunes:explicit>false</itunes:explicit>
+    <item>
+      <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-11-14</title>
+      <link>https://muslim-lantern-archive.vercel.app/#/watch/tPCLgZ-BbeU</link>
+      <guid isPermaLink="false">tPCLgZ-BbeU</guid>
+      <pubDate>Sat, 14 Nov 2026 01:05:56 +0000</pubDate>
+      <description>Non-Muslims Question Islam Live! Muhammed Ali 2026-11-14, Live stream archive of The Muslim Lantern. Recorded, mirrored, and chaptered automatically.</description>
+      
+      <itunes:duration>02:28:31</itunes:duration>
+      <itunes:image href="https://archive.org/download/tml-thumb-tPCLgZ-BbeU/thumbnail_tPCLgZ-BbeU.jpg"/>
+      <itunes:explicit>false</itunes:explicit>
+    </item>
     <item>
       <title>Non-Muslims Question Islam Live! Muhammed Ali 2026-11-09</title>
       <link>https://muslim-lantern-archive.vercel.app/#/watch/ucG003FVdOI</link>
