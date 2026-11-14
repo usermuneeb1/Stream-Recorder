@@ -13,10 +13,10 @@
     "videos": 651
   },
   "mirror_health": {
-    "healthy": true,
-    "total": 24,
-    "degraded": 0,
+    "healthy": false,
+    "total": 25,
+    "degraded": 1,
     "dead_links": 2,
-    "updated_at": "2026-11-13T19:50:17Z"
+    "updated_at": "2026-11-14T06:29:39Z"
   }
 }
